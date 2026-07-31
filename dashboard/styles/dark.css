@@ -1,0 +1,160 @@
+/* InternTrack Dashboard - Dark Mode Styles */
+
+/* Dark mode variables */
+[data-theme="dark"] {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #334155;
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --border-color: #334155;
+}
+
+/* Dark mode body */
+[data-theme="dark"] body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+/* Dark mode cards */
+[data-theme="dark"] .metric-card {
+    background: linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%);
+}
+
+[data-theme="dark"] .job-card {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .job-card:hover {
+    border-color: var(--primary-color);
+}
+
+[data-theme="dark"] .job-tag {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+/* Dark mode status badges */
+[data-theme="dark"] .status-badge.saved {
+    background: #1e293b;
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .status-badge.applied {
+    background: #1e3a5f;
+    color: #60a5fa;
+}
+
+[data-theme="dark"] .status-badge.interview {
+    background: #422006;
+    color: #fbbf24;
+}
+
+[data-theme="dark"] .status-badge.assessment {
+    background: #2e1065;
+    color: #a78bfa;
+}
+
+[data-theme="dark"] .status-badge.rejected {
+    background: #450a0a;
+    color: #f87171;
+}
+
+[data-theme="dark"] .status-badge.offer {
+    background: #022c22;
+    color: #34d399;
+}
+
+[data-theme="dark"] .status-badge.joined {
+    background: #064e3b;
+    color: #6ee7b7;
+}
+
+/* Dark mode inputs */
+[data-theme="dark"] .stTextInput > div > div > input,
+[data-theme="dark"] .stTextArea > div > div > textarea,
+[data-theme="dark"] .stSelectbox > div > div {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+/* Dark mode buttons */
+[data-theme="dark"] .stButton > button {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .stButton > button:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+/* Dark mode sidebar */
+[data-theme="dark"] [data-testid="stSidebar"] {
+    background-color: var(--bg-secondary);
+}
+
+/* Dark mode tables */
+[data-theme="dark"] .stDataFrame {
+    background-color: var(--bg-secondary);
+}
+
+/* Dark mode expanders */
+[data-theme="dark"] .streamlit-expander {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+/* Dark mode alerts */
+[data-theme="dark"] .stAlert {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+/* Dark mode charts */
+[data-theme="dark"] .stPlotlyChart {
+    background-color: var(--bg-secondary);
+}
+
+/* Dark mode metrics */
+[data-theme="dark"] [data-testid="stMetric"] {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+/* Dark mode dividers */
+[data-theme="dark"] hr {
+    border-color: var(--border-color);
+}
+
+/* Dark mode code blocks */
+[data-theme="dark"] code {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* Dark mode links */
+[data-theme="dark"] a {
+    color: #60a5fa;
+}
+
+[data-theme="dark"] a:hover {
+    color: #93bbfd;
+}
+
+/* Dark mode shadows */
+[data-theme="dark"] .metric-card {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .job-card {
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .job-card:hover {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+}

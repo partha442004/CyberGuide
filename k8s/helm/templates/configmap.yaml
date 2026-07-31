@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cybershield.fullname" . }}-config
+  labels:
+    {{- include "cybershield.labels" . | nindent 4 }}
+data:
+  ENVIRONMENT: "production"
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"
+  DATABASE_URL: "postgresql+asyncpg://cybershield:{{ .Values.secrets.postgresPassword }}@{{ include "cybershield.fullname" . }}-postgres:5432/cybershield"
+  REDIS_URL: "redis://{{ include "cybershield.fullname" . }}-redis:6379/0"
+  ELASTICSEARCH_URL: "http://{{ include "cybershield.fullname" . }}-elasticsearch:9200"

@@ -1,0 +1,172 @@
+# CyberShield Career Intelligence Platform - Docker Compose
+# Full Stack: API + PostgreSQL + Redis + Dashboard + Scheduler
+# ================================================
+
+version: '3.8'
+
+services:
+  # ================================================
+  # PostgreSQL Database
+  # ================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: cybershield-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cybershield}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cybershield_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-cybershield}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - cybershield-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cybershield} -d ${POSTGRES_DB:-cybershield}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ================================================
+  # Redis (Caching)
+  # ================================================
+  redis:
+    image: redis:7-alpine
+    container_name: cybershield-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - cybershield-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ================================================
+  # Elasticsearch (Full-text Search)
+  # ================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: cybershield-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - cybershield-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # ================================================
+  # API Server
+  # ================================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cybershield-api
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-cybershield}:${POSTGRES_PASSWORD:-cybershield_secret}@postgres:5432/${POSTGRES_DB:-cybershield}
+      - REDIS_URL=redis://redis:6379/0
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+    volumes:
+      - app_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - cybershield-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ================================================
+  # Dashboard (Streamlit)
+  # ================================================
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cybershield-dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8000
+    volumes:
+      - app_logs:/app/logs
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - cybershield-network
+    restart: unless-stopped
+    command: ["streamlit", "run", "cybershield/dashboard/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+
+  # ================================================
+  # Scheduler (Background Jobs)
+  # ================================================
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cybershield-scheduler
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-cybershield}:${POSTGRES_PASSWORD:-cybershield_secret}@postgres:5432/${POSTGRES_DB:-cybershield}
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - app_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cybershield-network
+    restart: unless-stopped
+    command: ["python", "-m", "cybershield.scheduler"]
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  app_logs:
+    driver: local
+
+networks:
+  cybershield-network:
+    driver: bridge

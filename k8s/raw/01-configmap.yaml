@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cybershield-config
+  namespace: cybershield
+  labels:
+    app.kubernetes.io/name: cybershield
+data:
+  ENVIRONMENT: "production"
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"
+  DATABASE_URL: "postgresql+asyncpg://cybershield:cybershield_secret@cybershield-postgres:5432/cybershield"
+  REDIS_URL: "redis://cybershield-redis:6379/0"
+  ELASTICSEARCH_URL: "http://cybershield-elasticsearch:9200"
+  SMTP_HOST: "smtp.gmail.com"
+  SMTP_PORT: "587"

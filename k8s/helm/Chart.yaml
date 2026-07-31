@@ -1,0 +1,17 @@
+apiVersion: v2
+name: cybershield
+description: CyberShield Career Intelligence Platform - Kubernetes Deployment
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - cybersecurity
+  - career
+  - jobs
+  - intelligence
+maintainers:
+  - name: CyberShield Team
+    email: team@cybershield.dev
+home: https://cybershield.dev
+sources:
+  - https://github.com/cybershield/cybershield

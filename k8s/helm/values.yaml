@@ -1,0 +1,139 @@
+# CyberShield Helm Chart - Default Values
+# ==========================================
+
+global:
+  namespace: cybershield
+
+# PostgreSQL
+postgres:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  storage: 5Gi
+
+# Redis
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+# Elasticsearch
+elasticsearch:
+  enabled: true
+  image:
+    repository: docker.elastic.co/elasticsearch/elasticsearch
+    tag: "8.12.0"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+  storage: 10Gi
+
+# API Server
+api:
+  replicaCount: 2
+  image:
+    repository: cybershield-api
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# Dashboard (Streamlit)
+dashboard:
+  replicaCount: 1
+  image:
+    repository: cybershield-api
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8501
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Scheduler
+scheduler:
+  enabled: true
+  image:
+    repository: cybershield-api
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Ingress
+ingress:
+  enabled: true
+  className: nginx
+  api:
+    host: api.cybershield.dev
+    tls: true
+  dashboard:
+    host: dashboard.cybershield.dev
+    tls: true
+  websocket:
+    host: ws.cybershield.dev
+    tls: true
+
+# Network Policy
+networkPolicy:
+  enabled: true
+
+# Secrets (override via --set or secrets.yaml)
+secrets:
+  postgresPassword: "cybershield_secret"
+  secretKey: "change-me-in-production"
+  telegramBotToken: ""
+  telegramChatId: ""
+  discordWebhookUrl: ""
+  slackWebhookUrl: ""
+  smtpUsername: ""
+  smtpPassword: ""
+  apiKeys: ""

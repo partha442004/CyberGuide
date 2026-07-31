@@ -1,0 +1,611 @@
+# InternTrack - Master TODO Checklist
+
+> Complete checklist for development, testing, deployment, and maintenance.
+
+---
+
+## 📋 TABLE OF CONTENTS
+
+1. [Initial Setup](#1-initial-setup)
+2. [Development Phase](#2-development-phase)
+3. [Database Operations](#3-database-operations)
+4. [API Development](#4-api-development)
+5. [Scraper Development](#5-scraper-development)
+6. [Notification System](#6-notification-system)
+7. [AI Integration](#7-ai-integration)
+8. [Dashboard Development](#8-dashboard-development)
+9. [Testing](#9-testing)
+10. [Pre-Deployment](#10-pre-deployment)
+11. [Deployment](#11-deployment)
+12. [Post-Deployment](#12-post-deployment)
+13. [Maintenance & Updates](#13-maintenance--updates)
+14. [Monitoring](#14-monitoring)
+15. [Security](#15-security)
+
+---
+
+## 1. INITIAL SETUP
+
+### Environment Setup
+- [ ] Install Python 3.11+
+- [ ] Install pip and virtualenv
+- [ ] Clone repository
+- [ ] Run `python -m venv venv`
+- [ ] Activate virtual environment
+- [ ] Run `make dev` or `pip install -e ".[all]"`
+- [ ] Copy `.env.example` to `.env`
+- [ ] Configure environment variables in `.env`
+- [ ] Run `make setup` for initial setup
+
+### Database Setup
+- [ ] Create data directory: `mkdir -p data`
+- [ ] Run `alembic upgrade head` to create tables
+- [ ] Run `make seed` to populate sample data (optional)
+- [ ] Verify database file exists: `data/interntrack.db`
+
+### External Services Setup
+- [ ] Install and start Ollama (optional)
+- [ ] Pull LLM model: `ollama pull llama3`
+- [ ] Get Gemini API key (optional)
+- [ ] Configure Telegram bot token (optional)
+- [ ] Configure Discord webhook (optional)
+- [ ] Configure Slack webhook (optional)
+- [ ] Configure SMTP credentials (optional)
+
+---
+
+## 2. DEVELOPMENT PHASE
+
+### Starting Services
+- [ ] Start API server: `make run`
+- [ ] Start worker: `make worker`
+- [ ] Start dashboard: `make dashboard`
+- [ ] Verify API health: `curl http://localhost:8000/health`
+- [ ] Open dashboard: `http://localhost:8501`
+- [ ] Open API docs: `http://localhost:8000/docs` (debug mode)
+
+### Code Quality Checks
+- [ ] Run linter: `make lint`
+- [ ] Run formatter: `make format`
+- [ ] Run type checker: `make typecheck`
+- [ ] Fix all linting errors
+- [ ] Fix all type errors
+- [ ] Ensure no security warnings
+
+### Git Workflow
+- [ ] Create feature branch: `git checkout -b feature/xxx`
+- [ ] Make changes
+- [ ] Run tests: `make test`
+- [ ] Stage changes: `git add .`
+- [ ] Commit with message: `git commit -m "feat: description"`
+- [ ] Push branch: `git push origin feature/xxx`
+- [ ] Create pull request
+- [ ] Get code review approval
+- [ ] Merge to main
+
+---
+
+## 3. DATABASE OPERATIONS
+
+### Schema Changes
+- [ ] Modify models in `src/interntrack/domain/models.py`
+- [ ] Generate migration: `alembic revision --autogenerate -m "description"`
+- [ ] Review generated migration in `migrations/versions/`
+- [ ] Test migration: `alembic upgrade head`
+- [ ] Test downgrade: `alembic downgrade -1`
+- [ ] Re-run upgrade: `alembic upgrade head`
+- [ ] Commit migration file
+
+### Data Management
+- [ ] Backup database before changes: `cp data/interntrack.db data/backup_$(date).db`
+- [ ] Run seed script: `python -m interntrack.scripts.seed`
+- [ ] Export data: `make export-jobs`
+- [ ] Verify data integrity
+
+### Migration Checklist
+- [ ] Migration is reversible
+- [ ] Migration handles existing data
+- [ ] Migration doesn't break running application
+- [ ] Migration tested on clean database
+- [ ] Migration tested with existing data
+
+---
+
+## 4. API DEVELOPMENT
+
+### Creating New Endpoint
+- [ ] Define Pydantic schema in `api/schemas/`
+- [ ] Create router file in `api/v1/` (if new resource)
+- [ ] Add endpoint function
+- [ ] Add request validation
+- [ ] Add response model
+- [ ] Add error handling
+- [ ] Add to `api/router.py`
+- [ ] Test endpoint manually
+- [ ] Add to API documentation
+- [ ] Write integration test
+
+### Endpoint Checklist
+- [ ] Request body validated with Pydantic
+- [ ] Response model defined
+- [ ] HTTP status codes correct
+- [ ] Error responses follow standard format
+- [ ] Authentication added (if required)
+- [ ] Rate limiting configured
+- [ ] Input sanitization implemented
+
+### API Testing
+- [ ] Test with curl/httpx
+- [ ] Test with Swagger UI
+- [ ] Test error cases
+- [ ] Test pagination
+- [ ] Test filtering
+- [ ] Test authentication
+
+---
+
+## 5. SCRAPER DEVELOPMENT
+
+### Creating New Scraper
+- [ ] Create scraper class in `scrapers/`
+- [ ] Inherit from `BaseScraper`
+- [ ] Implement `source_name` property
+- [ ] Implement `fetch()` method
+- [ ] Parse job data into `RawJob`
+- [ ] Handle errors gracefully
+- [ ] Add rate limiting
+- [ ] Register in `registry.py`
+- [ ] Test scraper
+- [ ] Add to default registry
+
+### Scraper Testing
+- [ ] Test with sample queries
+- [ ] Verify deduplication works
+- [ ] Test error handling
+- [ ] Test rate limiting
+- [ ] Test with different locations
+- [ ] Verify data quality
+
+### Scraper Maintenance
+- [ ] Monitor for website changes
+- [ ] Update selectors when needed
+- [ ] Check robots.txt compliance
+- [ ] Verify rate limits
+- [ ] Update user agent if blocked
+
+---
+
+## 6. NOTIFICATION SYSTEM
+
+### Adding Notification Channel
+- [ ] Create channel class in `notifications/`
+- [ ] Inherit from `NotificationChannel`
+- [ ] Implement `send()` method
+- [ ] Add to `NotificationManager._setup_channels()`
+- [ ] Add configuration to `.env`
+- [ ] Add to `Settings` class
+- [ ] Test channel
+- [ ] Update documentation
+
+### Notification Testing
+- [ ] Configure channel in `.env`
+- [ ] Test with `POST /api/v1/notifications/test`
+- [ ] Verify message format
+- [ ] Test error handling
+- [ ] Test multiple channels
+- [ ] Verify rate limits
+
+### Notification Templates
+- [ ] Create/update HTML templates
+- [ ] Test template rendering
+- [ ] Verify variable substitution
+- [ ] Test with sample data
+- [ ] Check responsive design
+
+---
+
+## 7. AI INTEGRATION
+
+### Ollama Setup
+- [ ] Install Ollama
+- [ ] Pull model: `ollama pull llama3`
+- [ ] Configure `OLLAMA_BASE_URL` in `.env`
+- [ ] Test connection: `curl http://localhost:11434/api/tags`
+- [ ] Test classification
+
+### Gemini Setup
+- [ ] Get API key from Google AI Studio
+- [ ] Configure `GEMINI_API_KEY` in `.env`
+- [ ] Test connection
+- [ ] Test classification
+
+### AI Features Testing
+- [ ] Test job classification
+- [ ] Test skill extraction
+- [ ] Test skill matching
+- [ ] Test learning path generation
+- [ ] Verify fallback to rule-based
+
+---
+
+## 8. DASHBOARD DEVELOPMENT
+
+### Adding Dashboard Page
+- [ ] Create page file in `dashboard/pages/`
+- [ ] Add page title and icon
+- [ ] Add navigation entry
+- [ ] Add data fetching
+- [ ] Add visualizations
+- [ ] Add interactivity
+- [ ] Test responsiveness
+- [ ] Test with different data
+
+### Dashboard Testing
+- [ ] Start dashboard: `streamlit run dashboard/app.py`
+- [ ] Test all pages
+- [ ] Test all charts
+- [ ] Test filters
+- [ ] Test search
+- [ ] Test dark/light mode
+- [ ] Test mobile view
+
+### Dashboard Deployment
+- [ ] Verify API connection
+- [ ] Test with production data
+- [ ] Verify all charts render
+- [ ] Check loading times
+- [ ] Test error states
+
+---
+
+## 9. TESTING
+
+### Unit Tests
+- [ ] Write tests for new functions
+- [ ] Test happy path
+- [ ] Test edge cases
+- [ ] Test error cases
+- [ ] Mock external services
+- [ ] Achieve >80% coverage
+
+### Integration Tests
+- [ ] Test API endpoints
+- [ ] Test database operations
+- [ ] Test service interactions
+- [ ] Test notification delivery
+- [ ] Test report generation
+
+### Running Tests
+```bash
+# Run all tests
+make test
+
+# Run unit tests only
+make test-unit
+
+# Run integration tests only
+make test-integration
+
+# Generate coverage report
+make test-cov
+```
+
+### Test Checklist
+- [ ] All tests pass
+- [ ] Coverage >80%
+- [ ] No flaky tests
+- [ ] No slow tests (>5s)
+- [ ] All mocking is correct
+
+---
+
+## 10. PRE-DEPLOYMENT
+
+### Code Review
+- [ ] Self-review complete
+- [ ] Linting passes
+- [ ] Type checking passes
+- [ ] All tests pass
+- [ ] Documentation updated
+- [ ] No console.log/print statements
+- [ ] No hardcoded secrets
+- [ ] No debug code
+
+### Configuration
+- [ ] Environment variables documented
+- [ ] `.env.example` updated
+- [ ] Default values are safe
+- [ ] Feature flags configured
+- [ ] Logging configured
+
+### Documentation
+- [ ] README updated
+- [ ] API docs generated
+- [ ] Changelog updated
+- [ ] Deployment guide updated
+
+### Security Review
+- [ ] No secrets in code
+- [ ] Input validation complete
+- [ ] SQL injection prevention
+- [ ] XSS prevention
+- [ ] CSRF protection
+- [ ] Rate limiting configured
+- [ ] CORS configured correctly
+
+---
+
+## 11. DEPLOYMENT
+
+### Docker Deployment
+```bash
+# Build images
+docker-compose build
+
+# Start services
+docker-compose up -d
+
+# Check status
+docker-compose ps
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+### Docker Checklist
+- [ ] Dockerfile builds successfully
+- [ ] docker-compose.yml configured
+- [ ] Environment variables set
+- [ ] Volumes configured
+- [ ] Health checks working
+- [ ] Logs accessible
+- [ ] Restart policy set
+
+### Production Deployment
+- [ ] Pull latest changes
+- [ ] Build Docker images
+- [ ] Run database migrations
+- [ ] Start services
+- [ ] Verify health checks
+- [ ] Test critical paths
+- [ ] Monitor logs
+
+### Deployment Verification
+- [ ] API responds to health check
+- [ ] Dashboard loads
+- [ ] Database connection works
+- [ ] Notifications working
+- [ ] Scrapers running
+- [ ] No errors in logs
+
+---
+
+## 12. POST-DEPLOYMENT
+
+### Immediate Checks
+- [ ] All services healthy
+- [ ] No error logs
+- [ ] API response times normal
+- [ ] Dashboard accessible
+- [ ] Database responding
+
+### Monitoring Setup
+- [ ] Check application logs
+- [ ] Monitor API metrics
+- [ ] Monitor database size
+- [ ] Check disk usage
+- [ ] Monitor memory usage
+
+### User Verification
+- [ ] Test user flows
+- [ ] Verify notifications
+- [ ] Check report generation
+- [ ] Test job discovery
+
+---
+
+## 13. MAINTENANCE & UPDATES
+
+### Regular Maintenance
+- [ ] Review error logs daily
+- [ ] Check database backups weekly
+- [ ] Update dependencies monthly
+- [ ] Review security advisories
+- [ ] Clean old logs
+- [ ] Optimize database
+
+### Dependency Updates
+```bash
+# Check outdated packages
+pip list --outdated
+
+# Update all packages
+pip install --upgrade -r requirements.txt
+
+# Test after updates
+make test
+```
+
+### Database Maintenance
+```bash
+# Backup database
+cp data/interntrack.db data/backup_$(date +%Y%m%d).db
+
+# Vacuum database (SQLite)
+sqlite3 data/interntrack.db "VACUUM;"
+
+# Check integrity
+sqlite3 data/interntrack.db "PRAGMA integrity_check;"
+```
+
+### Update Checklist
+- [ ] Create backup
+- [ ] Review changelog
+- [ ] Test in development
+- [ ] Run migration tests
+- [ ] Deploy to staging
+- [ ] Run smoke tests
+- [ ] Deploy to production
+- [ ] Monitor for issues
+
+---
+
+## 14. MONITORING
+
+### Application Metrics
+- [ ] API response times
+- [ ] Request counts
+- [ ] Error rates
+- [ ] Database query times
+- [ ] Scraper success rates
+- [ ] Notification delivery rates
+
+### System Metrics
+- [ ] CPU usage
+- [ ] Memory usage
+- [ ] Disk usage
+- [ ] Network traffic
+- [ ] Process count
+
+### Log Monitoring
+- [ ] Application logs
+- [ ] Access logs
+- [ ] Error logs
+- [ ] Database logs
+
+### Alerting
+- [ ] High error rate alert
+- [ ] High response time alert
+- [ ] Disk space alert
+- [ ] Memory alert
+- [ ] Service down alert
+
+---
+
+## 15. SECURITY
+
+### Security Checklist
+- [ ] Environment variables secure
+- [ ] API keys rotated regularly
+- [ ] Database encrypted at rest
+- [ ] HTTPS configured
+- [ ] Rate limiting enabled
+- [ ] Input validation complete
+- [ ] SQL injection prevention
+- [ ] XSS prevention
+- [ ] CSRF protection
+- [ ] Authentication working
+- [ ] Authorization working
+- [ ] Audit logging enabled
+
+### Security Updates
+- [ ] Monitor CVE databases
+- [ ] Update vulnerable packages
+- [ ] Review access logs
+- [ ] Rotate secrets quarterly
+- [ ] Review user permissions
+- [ ] Update security documentation
+
+---
+
+## 🔄 QUICK REFERENCE
+
+### Common Commands
+
+```bash
+# Development
+make dev              # Install all dependencies
+make run              # Start API server
+make worker           # Start background worker
+make dashboard        # Start Streamlit dashboard
+
+# Code Quality
+make lint             # Run linter
+make format           # Format code
+make typecheck        # Run type checker
+
+# Testing
+make test             # Run all tests
+make test-unit        # Run unit tests
+make test-integration # Run integration tests
+make test-cov         # Generate coverage report
+
+# Database
+make db-migrate       # Run migrations
+make db-revision      # Create migration
+make db-reset         # Reset database
+
+# Docker
+make docker-build     # Build images
+make docker-up        # Start services
+make docker-down      # Stop services
+make docker-logs      # View logs
+
+# Cleanup
+make clean            # Clean temporary files
+```
+
+### Environment Variables
+
+```bash
+# Required
+DATABASE_URL=sqlite+aiosqlite:///./data/interntrack.db
+SECRET_KEY=your-secret-key
+
+# Optional - AI
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3
+GEMINI_API_KEY=your-key
+
+# Optional - Notifications
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+DISCORD_WEBHOOK_URL=
+SLACK_WEBHOOK_URL=
+SMTP_USER=
+SMTP_PASSWORD=
+
+# Optional - Scraper
+SCRAPE_INTERVAL_MINUTES=30
+MAX_CONCURRENT_SCRAPERS=5
+```
+
+---
+
+## 📝 NOTES
+
+### Before Going Live
+1. All items in "Pre-Deployment" must be checked
+2. All tests must pass
+3. Security review must be complete
+4. Documentation must be updated
+5. Backup must be created
+
+### When Updating Live
+1. Create backup first
+2. Test in staging environment
+3. Run migrations
+4. Deploy with zero downtime
+5. Monitor for errors
+6. Have rollback plan ready
+
+### Emergency Rollback
+```bash
+# Stop services
+docker-compose down
+
+# Restore database
+cp data/backup_YYYYMMDD.db data/interntrack.db
+
+# Start previous version
+git checkout <previous-tag>
+docker-compose up -d
+```
+
+---
+
+**Last Updated:** {{DATE}}
+**Version:** 1.0.0
