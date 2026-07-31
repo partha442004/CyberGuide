@@ -9,7 +9,7 @@ description = "AI-powered Cybersecurity Career Intelligence Platform"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "CyberShield Team", email = "team@cybershield.dev"}
+    {name = "PARTHASARATHI B", email = "partha442004@gmail.com"}
 ]
 requires-python = ">=3.10"
 keywords = ["cybersecurity", "career", "jobs", "internships", "ai", "scraper"]
@@ -56,10 +56,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/cybershield/cybershield"
+Homepage = "https://github.com/partha442004/cybershield"
 Documentation = "https://docs.cybershield.dev"
-Repository = "https://github.com/cybershield/cybershield"
-Issues = "https://github.com/cybershield/cybershield/issues"
+Repository = "https://github.com/partha442004/cybershield"
+Issues = "https://github.com/partha442004/cybershield/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
