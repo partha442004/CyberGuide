@@ -79,3 +79,9 @@ test-results/
 # Documentation build
 docs/_build/
 site/
+
+# SSH keys
+cyberguide-key
+cyberguide-key.pub
+*.pem
+*.key
