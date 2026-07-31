@@ -5,19 +5,18 @@ Endpoints for application tracking and management.
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from cybershield.dependencies import get_session, get_application_repository
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from cybershield.dependencies import get_application_repository
+from cybershield.domain.enums import ApplicationStatus
 from cybershield.repositories.application_repository import ApplicationRepository
 from cybershield.schemas.application import (
     ApplicationCreate,
-    ApplicationUpdate,
+    ApplicationMetrics,
     ApplicationResponse,
     ApplicationStatusUpdate,
-    ApplicationMetrics,
 )
-from cybershield.domain.models import ApplicationStatus
 
 router = APIRouter()
 
