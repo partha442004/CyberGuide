@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     )
 
     # Application
-    app_name: str = "CyberShield"
+    app_name: str = "CyberGuide"
     app_version: str = "1.0.0"
     debug: bool = False
     secret_key: str = "change-me-in-production"
@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_user: Optional[str] = None
     smtp_password: Optional[str] = None
-    email_from: str = "CyberShield <noreply@cybershield.dev>"
+    email_from: str = "CyberGuide <noreply@cybershield.dev>"
 
     # Scraper Settings
     scrape_interval_minutes: int = 30

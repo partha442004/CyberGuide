@@ -1,5 +1,5 @@
 """
-Domain enumerations for CyberShield.
+Domain enumerations for CyberGuide.
 """
 
 from enum import Enum

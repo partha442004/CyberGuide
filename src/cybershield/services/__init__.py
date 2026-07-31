@@ -1,3 +1,3 @@
 """
-CyberShield Services Package
+CyberGuide Services Package
 """

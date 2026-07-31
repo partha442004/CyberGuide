@@ -1,5 +1,5 @@
 """
-CyberShield Middleware Package
+CyberGuide Middleware Package
 
 Provides rate limiting and API key authentication middleware.
 """

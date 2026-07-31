@@ -1,5 +1,5 @@
 """
-CyberShield Notifications Package
+CyberGuide Notifications Package
 
 Multi-channel notification system for job alerts and reports.
 """

@@ -34,7 +34,7 @@ class NotificationConfig(BaseModel):
 class NotificationTest(BaseModel):
     """Schema for testing notification channels."""
     channel: str = Field(..., pattern="^(telegram|email|discord|slack|push)$")
-    message: Optional[str] = "This is a test notification from CyberShield."
+    message: Optional[str] = "This is a test notification from CyberGuide."
 
 
 class NotificationResponse(BaseModel):

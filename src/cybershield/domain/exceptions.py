@@ -1,5 +1,5 @@
 """
-Domain exceptions for CyberShield.
+Domain exceptions for CyberGuide.
 """
 
 from typing import Optional
@@ -35,7 +35,7 @@ class AppException(Exception):
 
 
 # Alias for backward compatibility
-CyberShieldException = AppException
+CyberGuideException = AppException
 
 
 class NotFoundError(AppException):

@@ -43,7 +43,7 @@ class DiscordNotifier(BaseNotifier):
             "color": color,
             "timestamp": message.timestamp.isoformat(),
             "footer": {
-                "text": "CyberShield Career Intelligence Platform"
+                "text": "CyberGuide Career Intelligence Platform"
             }
         }
 
@@ -70,7 +70,7 @@ class DiscordNotifier(BaseNotifier):
             return False
 
         payload = {
-            "username": "CyberShield",
+            "username": "CyberGuide",
             "avatar_url": "https://example.com/cybershield-avatar.png",
             "embeds": [self._build_embed(message)]
         }

@@ -42,7 +42,7 @@ async def websocket_endpoint(
         # Send welcome message
         await websocket.send_json({
             "type": "connected",
-            "message": f"Connected to CyberShield notifications",
+            "message": f"Connected to CyberGuide notifications",
             "user_id": user_id,
             "connection_id": conn_id,
         })
