@@ -3,9 +3,6 @@
 # CyberGuide - Oracle Cloud Free Tier Setup
 # Always-Free ARM VM Deployment
 # ============================================
-# Run this script on a fresh Oracle Linux 8/9 ARM VM
-# ssh -i your-key.pem opc@your-ip
-# ============================================
 
 set -e
 
@@ -42,31 +39,21 @@ cd cybershield
 
 # Configure environment
 echo "⚙️  Configuring environment..."
-cat > .env << 'EOF'
-# CyberGuide Configuration
+SECRET=$(openssl rand -hex 32)
+API_KEY=$(openssl rand -hex 16)
+
+cat > .env << EOF
 APP_NAME=CyberGuide
 APP_VERSION=1.0.0
 ENVIRONMENT=production
 DEBUG=false
-
-# Database (Docker PostgreSQL)
 DATABASE_URL=postgresql+asyncpg://cyberguide:cyberguide_secret@postgres:5432/cyberguide
-
-# Redis
 REDIS_URL=redis://redis:6379/0
-
-# Elasticsearch
 ELASTICSEARCH_URL=http://elasticsearch:9200
-
-# Security
-SECRET_KEY=$(openssl rand -hex 32)
-API_KEYS=$(openssl rand -hex 16)
-
-# Scraper Settings
+SECRET_KEY=$SECRET
+API_KEYS=$API_KEY
 SCRAPE_INTERVAL_MINUTES=30
 MAX_CONCURRENT_SCRAPERS=5
-
-# Notifications (optional - leave empty to disable)
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
 DISCORD_WEBHOOK_URL=
@@ -76,10 +63,6 @@ SMTP_PORT=587
 SMTP_USERNAME=
 SMTP_PASSWORD=
 EOF
-
-# Generate a random secret key
-SECRET=$(openssl rand -hex 32)
-sed -i "s/SECRET_KEY=.*/SECRET_KEY=$SECRET/" .env
 
 echo "Environment configured!"
 
@@ -96,27 +79,33 @@ echo "Firewall configured!"
 echo "🚀 Starting CyberGuide services..."
 docker-compose up -d
 
+# Verify services
 echo ""
-echo "✅ CyberGuide is starting up!"
+echo "📊 Verifying services..."
+sleep 10
+docker-compose ps
+
+# Test health endpoint
 echo ""
-echo "📊 Services:"
-echo "   - API:        http://localhost:8000"
-echo "   - Dashboard:  http://localhost:8501"
-echo "   - API Docs:   http://localhost:8000/api/docs"
-echo "   - Health:     http://localhost:8000/health"
+echo "🏥 Testing health endpoint..."
+sleep 5
+HEALTH=$(curl -s http://localhost:8000/health 2>/dev/null || echo "Not ready yet")
+echo "Health: $HEALTH"
+
 echo ""
-echo "🔑 Your API Key is in .env file (API_KEYS)"
+echo "✅ CyberGuide is running!"
+echo ""
+echo "🌐 Access URLs:"
+echo "   - API:       http://YOUR-PUBLIC-IP:8000"
+echo "   - Dashboard: http://YOUR-PUBLIC-IP:8501"
+echo "   - API Docs:  http://YOUR-PUBLIC-IP:8000/api/docs"
+echo ""
+echo "🔑 Your API Key: $API_KEY"
+echo "   (Saved in .env file)"
 echo ""
 echo "📋 Useful commands:"
 echo "   docker-compose logs -f          # View logs"
 echo "   docker-compose ps               # Check status"
 echo "   docker-compose restart          # Restart all"
 echo "   docker-compose down             # Stop all"
-echo ""
-echo "🌐 To access from your browser:"
-echo "   1. Go to Oracle Cloud Console"
-echo "   2. Networking > Virtual Cloud Networks > Your VCN"
-echo "   3. Security Lists > Add Ingress Rule"
-echo "   4. Add rules for ports 8000 and 8501"
-echo "   5. Access: http://YOUR-PUBLIC-IP:8000"
 echo ""

@@ -3,7 +3,6 @@ Application configuration management using Pydantic Settings.
 """
 
 from functools import lru_cache
-from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -32,29 +31,32 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./data/interntrack.db"
 
     # Redis (Optional)
-    redis_url: Optional[str] = None
+    redis_url: str | None = None
+
+    # Elasticsearch (Optional)
+    elasticsearch_url: str | None = None
 
     # AI Services
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3"
-    gemini_api_key: Optional[str] = None
+    gemini_api_key: str | None = None
     gemini_model: str = "gemini-pro"
 
     # Telegram Notifications
-    telegram_bot_token: Optional[str] = None
-    telegram_chat_id: Optional[str] = None
+    telegram_bot_token: str | None = None
+    telegram_chat_id: str | None = None
 
     # Discord Notifications
-    discord_webhook_url: Optional[str] = None
+    discord_webhook_url: str | None = None
 
     # Slack Notifications
-    slack_webhook_url: Optional[str] = None
+    slack_webhook_url: str | None = None
 
     # Email (SMTP)
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
-    smtp_user: Optional[str] = None
-    smtp_password: Optional[str] = None
+    smtp_user: str | None = None
+    smtp_password: str | None = None
     email_from: str = "InternTrack <noreply@interntrack.local>"
 
     # Scraper Settings
