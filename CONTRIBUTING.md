@@ -54,8 +54,8 @@ Please be respectful and professional in all interactions. We are committed to p
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/interntrack.git
-cd internship-tracker
+git clone https://github.com/partha442004/CyberGuide.git
+cd CyberGuide
 
 # Create virtual environment
 python -m venv venv

@@ -61,14 +61,14 @@ ssh -i cybershield-key opc@YOUR-PUBLIC-IP
 ### Step 5: Deploy CyberGuide
 ```bash
 # Download and run the setup script
-curl -sSL https://raw.githubusercontent.com/partha442004/cybershield/main/deploy/oracle-cloud/setup.sh | bash
+curl -sSL https://raw.githubusercontent.com/partha442004/CyberGuide/main/deploy/oracle-cloud/setup.sh | bash
 ```
 
 **Or manually:**
 ```bash
 # Clone the repo
-git clone https://github.com/partha442004/cybershield.git
-cd cybershield
+git clone https://github.com/partha442004/CyberGuide.git
+cd CyberGuide
 
 # Run setup
 chmod +x deploy/oracle-cloud/setup.sh

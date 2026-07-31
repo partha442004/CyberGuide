@@ -247,7 +247,7 @@ uvicorn interntrack.main:app --reload
 
 ## 🔐 Security Updates
 
-- ✅ Contact email updated to: maxxermogging@gmail.com
+- ✅ Contact email updated to: ravi.kumar@example.com
 - ✅ Creator:  RAVIB
 - ✅ SECURITY.md created with vulnerability reporting guidelines
 - ✅ datetime.utcnow() deprecation warnings fixed (5 files)
@@ -259,7 +259,7 @@ uvicorn interntrack.main:app --reload
 ## 👤 Credits
 
 - **Creator**:  RAVIB
-- **Email**: maxxermogging@gmail.com
+- **Email**: ravi.kumar@example.com
 
 ---
 
