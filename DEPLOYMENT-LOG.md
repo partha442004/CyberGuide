@@ -431,3 +431,34 @@ The `docker-compose.yml` includes Ollama with GPU passthrough. If the ARM VM has
 ```
 622c9ce fix: update all contact details and GitHub URLs to CyberGuide
 ```
+
+---
+
+## 12. Deployment Config Fixes (Session: July 31, 2026)
+
+### Issues Found & Fixed
+
+#### Critical: Dockerfile PYTHONPATH
+- **Problem**: `COPY src/ ./src/` puts code at `/app/src/cybershield/`, but CMD runs `cybershield.main:app` — Python can't find the package
+- **Fix**: Added `PYTHONPATH=/app/src` to both `Dockerfile` and `Dockerfile.dashboard`
+
+#### Critical: Worker service references non-existent module
+- **Problem**: `docker-compose.yml` runs `python -m cybershield.worker` but `worker.py` doesn't exist
+- **Fix**: Changed to `python -m cybershield.scheduler` (which exists at `src/cybershield/scheduler/__main__.py`)
+
+#### Ollama GPU requirement
+- **Problem**: Ollama service has `deploy.resources.reservations.devices` for NVIDIA GPU — ARM VM has no GPU
+- **Fix**: Removed GPU config, moved Ollama to `profiles: [ai]` (opt-in via `docker-compose --profile ai up`)
+
+#### SSH key security
+- **Problem**: Private SSH key accidentally committed to repo
+- **Fix**: `git rm --cached`, added `cyberguide-key*` and `*.pem`/`*.key` to `.gitignore`
+
+### SSH Key Generated
+- **Private key**: `C:\internship-tracker\cyberguide-key` (local only, gitignored)
+- **Public key**: `C:\internship-tracker\cyberguide-key.pub` (paste into Oracle Cloud)
+
+### Commits
+```
+a5b818a fix: deployment config for Oracle Cloud ARM VM
+```
