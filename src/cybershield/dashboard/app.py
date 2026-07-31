@@ -1,5 +1,5 @@
 """
-CyberShield Dashboard - Main Application
+CyberGuide Dashboard - Main Application
 
 Streamlit application with multi-page navigation and theme support.
 """
@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 # Page configuration
 st.set_page_config(
-    page_title="CyberShield - Career Intelligence Platform",
+    page_title="CyberGuide - Career Intelligence Platform",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -83,7 +83,7 @@ def main():
     # Sidebar
     with st.sidebar:
         st.image("https://img.icons8.com/nolan/96/shield.png", width=80)
-        st.title("🛡️ CyberShield")
+        st.title("🛡️ CyberGuide")
         st.caption("Career Intelligence Platform")
         
         st.divider()

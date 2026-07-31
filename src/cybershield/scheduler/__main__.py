@@ -1,5 +1,5 @@
 """
-CyberShield Scheduler - Entry Point
+CyberGuide Scheduler - Entry Point
 
 Runs background jobs for:
 - Job discovery (every 30 minutes)
@@ -497,7 +497,7 @@ def create_scheduler() -> AsyncIOScheduler:
 
 async def main():
     """Main scheduler loop."""
-    logger.info("Starting CyberShield Scheduler...")
+    logger.info("Starting CyberGuide Scheduler...")
     logger.info(f"Debug mode: {settings.debug}")
 
     # Initialize database

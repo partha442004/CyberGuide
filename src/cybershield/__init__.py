@@ -1,5 +1,5 @@
 """
-CyberShield Career Intelligence Platform (CSCIP)
+CyberGuide Career Intelligence Platform (CSCIP)
 AI-powered cybersecurity career intelligence platform
 """
 

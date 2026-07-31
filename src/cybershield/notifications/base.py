@@ -141,7 +141,7 @@ class BaseNotifier(ABC):
         top_skills = data.get("top_skills", [])
 
         lines = [
-            "📊 **Daily CyberShield Digest**",
+            "📊 **Daily CyberGuide Digest**",
             f"\n📈 **{new_jobs}** new opportunities found",
             f"⏰ **{expiring}** jobs expiring soon",
         ]

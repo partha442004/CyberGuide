@@ -1,5 +1,5 @@
 """
-CyberShield Startup Script
+CyberGuide Startup Script
 
 Starts all services:
 - API Server (FastAPI)
@@ -83,7 +83,7 @@ def start_scheduler():
 def main():
     """Main entry point - starts all services."""
     logger.info("=" * 60)
-    logger.info("🛡️  CyberShield Career Intelligence Platform")
+    logger.info("🛡️  CyberGuide Career Intelligence Platform")
     logger.info("=" * 60)
     logger.info("")
     logger.info("Starting all services...")

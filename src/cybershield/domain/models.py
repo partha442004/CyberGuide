@@ -1,5 +1,5 @@
 """
-SQLAlchemy ORM models for CyberShield (30+ tables).
+SQLAlchemy ORM models for CyberGuide (30+ tables).
 """
 
 from datetime import datetime, timezone

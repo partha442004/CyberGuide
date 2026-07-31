@@ -1,5 +1,5 @@
 """
-CyberShield Scrapers Package
+CyberGuide Scrapers Package
 
 Scrapers organized by region and source type.
 """

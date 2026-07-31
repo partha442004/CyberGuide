@@ -1,5 +1,5 @@
 """
-CyberShield Engines Package
+CyberGuide Engines Package
 
 AI engines for job analysis, verification, and classification.
 """

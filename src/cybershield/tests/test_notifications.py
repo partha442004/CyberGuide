@@ -51,7 +51,7 @@ class TestEmailNotifier:
         msg = NotificationMessage(title="Test", content="Hello World")
         text = notifier._build_text_version(msg)
         assert "Test" in text
-        assert "CyberShield" in text
+        assert "CyberGuide" in text
 
 
 class TestNotificationOrchestrator:

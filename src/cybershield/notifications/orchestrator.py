@@ -182,7 +182,7 @@ class NotificationOrchestrator:
         content = self._format_daily_digest(data)
 
         message = NotificationMessage(
-            title="📊 Daily CyberShield Digest",
+            title="📊 Daily CyberGuide Digest",
             content=content,
             notification_type=NotificationType.DAILY_DIGEST,
             priority=NotificationPriority.LOW,

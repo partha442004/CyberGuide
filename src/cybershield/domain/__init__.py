@@ -1,1 +1,1 @@
-"""Domain layer for CyberShield."""
+"""Domain layer for CyberGuide."""

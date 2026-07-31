@@ -1,5 +1,5 @@
 """
-Async database session management for CyberShield.
+Async database session management for CyberGuide.
 
 Supports both SQLite (development) and PostgreSQL (production).
 Uses lazy initialization to avoid import-time errors when env vars aren't set.

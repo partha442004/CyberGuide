@@ -1,4 +1,4 @@
-# CyberShield Career Intelligence Platform - Dockerfile
+# CyberGuide Career Intelligence Platform - Dockerfile
 # Multi-stage build for optimized image size
 
 # ================================================

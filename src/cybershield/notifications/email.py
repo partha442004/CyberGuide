@@ -69,7 +69,7 @@ class EmailNotifier(BaseNotifier):
         {f'<div style="margin-top: 20px;"><a href="{message.url}" style="display: inline-block; background-color: {color}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">View Details</a></div>' if message.url else ''}
         
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #999; font-size: 12px;">
-            <p>CyberShield Career Intelligence Platform</p>
+            <p>CyberGuide Career Intelligence Platform</p>
             <p>To unsubscribe, update your notification preferences.</p>
         </div>
     </div>
@@ -92,7 +92,7 @@ class EmailNotifier(BaseNotifier):
         lines.extend([
             "",
             "---",
-            "CyberShield Career Intelligence Platform",
+            "CyberGuide Career Intelligence Platform",
         ])
         return "\n".join(lines)
 

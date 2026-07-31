@@ -1,5 +1,5 @@
 """
-CyberShield Repositories Package
+CyberGuide Repositories Package
 
 Repository pattern implementation for data access layer.
 """

@@ -1,5 +1,5 @@
 """
-CyberShield Schemas Package
+CyberGuide Schemas Package
 
 Pydantic models for API request/response validation.
 """

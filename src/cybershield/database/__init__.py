@@ -1,1 +1,1 @@
-"""Database layer for CyberShield."""
+"""Database layer for CyberGuide."""

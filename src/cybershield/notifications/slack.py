@@ -115,7 +115,7 @@ class SlackNotifier(BaseNotifier):
         try:
             test_message = NotificationMessage(
                 title="Test Connection",
-                content="CyberShield notification test successful!",
+                content="CyberGuide notification test successful!",
             )
             return await self.send(test_message)
         except Exception as e:

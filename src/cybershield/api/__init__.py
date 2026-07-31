@@ -1,5 +1,5 @@
 """
-CyberShield API Package
+CyberGuide API Package
 """
 
 from .v1 import jobs, applications, users, analytics, notifications

@@ -1,5 +1,5 @@
 """
-CyberShield Career Intelligence Platform - Main Application
+CyberGuide Career Intelligence Platform - Main Application
 
 FastAPI application entry point with all routes and middleware.
 """
@@ -17,7 +17,7 @@ from cybershield.middleware import RateLimitMiddleware, APIKeyMiddleware
 
 settings = get_settings()
 from cybershield.database.session import init_db
-from cybershield.domain.exceptions import CyberShieldException
+from cybershield.domain.exceptions import CyberGuideException
 
 
 @asynccontextmanager
@@ -65,11 +65,11 @@ if settings.require_api_key and settings.api_keys:
     app.add_middleware(APIKeyMiddleware)
 
 
-@app.exception_handler(CyberShieldException)
+@app.exception_handler(CyberGuideException)
 async def cybershield_exception_handler(
-    request: Request, exc: CyberShieldException
+    request: Request, exc: CyberGuideException
 ) -> JSONResponse:
-    """Handle CyberShield custom exceptions."""
+    """Handle CyberGuide custom exceptions."""
     return JSONResponse(
         status_code=exc.status_code,
         content={
