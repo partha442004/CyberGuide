@@ -1,8 +1,9 @@
 # CyberGuide - Deployment Log
 
 > **Date**: 2026-07-30
-> **Status**: READY FOR PUSH
+> **Status**: PUSHED TO GITHUB
 > **Author**: KIRA (AI-assisted)
+> **Repo**: https://github.com/partha442004/CyberGuide
 
 ---
 
@@ -261,6 +262,8 @@ TOTAL: 295 passed (7.91s)
 ### Last Commits
 
 ```
+19a20ad chore: remove stale workflow files missing from disk
+fef0965 fix: deployment config and import bugs for Oracle Cloud
 36a597b feat: add Oracle Cloud Free Tier deployment guide and setup script
 50def1a chore: fix root pyproject.toml name to cybershield
 e09c97e feat: rename CyberShield to CyberGuide across codebase
@@ -271,27 +274,9 @@ c9b895c feat: CyberShield Career Intelligence Platform - Complete Implementation
 ### Current Status
 
 - **Branch**: `master`
-- **Remote**: NOT CONFIGURED (needs `git remote add origin`)
-- **Unstaged changes**: 168 files modified (mostly line-ending CRLF/LF conversions + our fixes)
-- **Untracked**: `alembic.ini`, `src/interntrack/reports/__init__.py`
-
-### What Needs Committing
-
-```
-# Core deployment fixes
-Dockerfile
-docker-compose.yml
-deploy/oracle-cloud/setup.sh
-requirements.txt
-
-# Bug fixes
-src/cybershield/api/v1/applications.py
-src/interntrack/config.py
-
-# Config
-.env (EXCLUDED by .gitignore - generate on server via setup.sh)
-```
-
+- **Remote**: `origin` -> `https://github.com/partha442004/cybershield.git`
+- **Pushed**: YES (all commits pushed)
+- **Unstaged changes**: ~160 files with CRLF/LF line-ending warnings (cosmetic, no functional impact)
 ---
 
 ## 8. Oracle Cloud Deployment Steps
@@ -344,11 +329,11 @@ git push -u origin master
 
 ```bash
 # Option A: One-liner
-curl -sSL https://raw.githubusercontent.com/partha442004/cybershield/main/deploy/oracle-cloud/setup.sh | bash
+curl -sSL https://raw.githubusercontent.com/partha442004/CyberGuide/main/deploy/oracle-cloud/setup.sh | bash
 
 # Option B: Manual
-git clone https://github.com/partha442004/cybershield.git
-cd cybershield
+git clone https://github.com/partha442004/CyberGuide.git
+cd CyberGuide
 chmod +x deploy/oracle-cloud/setup.sh
 ./deploy/oracle-cloud/setup.sh
 ```
