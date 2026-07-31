@@ -33,7 +33,7 @@ echo "Docker Compose installed: $(docker-compose --version)"
 echo "📥 Cloning CyberGuide..."
 cd /home/opc
 if [ ! -d "cybershield" ]; then
-    git clone https://github.com/partha442004/cybershield.git
+    git clone https://github.com/partha442004/CyberGuide.git
 fi
 cd cybershield
 
