@@ -393,3 +393,41 @@ The `docker-compose.yml` includes Ollama with GPU passthrough. If the ARM VM has
 ### Dashboard Dockerfile
 
 `Dockerfile.dashboard` copies from `dashboard/` directory. This directory exists and is populated. No issues.
+
+---
+
+## 11. Contact & URL Audit (Session: July 31, 2026)
+
+### Changes Made
+- **Email**: Replaced all `maxxermogging@gmail.com` → `parthasarathi442004@gmail.com`
+- **GitHub URLs**: Replaced all `partha442004/cybershield` → `partha442004/CyberGuide`
+- **Placeholder URLs**: Replaced all `yourusername/interntrack` → `partha442004/CyberGuide`
+
+### Files Updated (14 total)
+| File | Change |
+|------|--------|
+| `pyproject.toml` | Email + repo URLs |
+| `src/cybershield/pyproject.toml` | Repo URLs |
+| `src/cybershield/README.md` | Clone URL |
+| `README.md` | Clone URL + contact |
+| `SETUP.md` | Clone URLs + contact |
+| `CONTRIBUTING.md` | Clone URL |
+| `SECURITY.md` | Email (2 locations) |
+| `CHANGELOG.md` | Email |
+| `PROJECT-PROGRESS.md` | Email (2 locations) |
+| `PROJECT-STATUS.md` | Email (2 locations) |
+| `DEPLOYMENT-LOG.md` | 3 repo URLs |
+| `ORACLE-CLOUD-DEPLOY.md` | 2 URLs |
+| `k8s/helm/Chart.yaml` | Maintainer email + URLs |
+| `.env.example` | USER_AGENT URL |
+
+### Verification
+- `grep maxxermogging` → **0 matches**
+- `grep partha442004/cybershield` → **0 matches**
+- `grep yourusername` → **0 matches**
+- `grep team@cybershield` → **0 matches**
+
+### Commit
+```
+622c9ce fix: update all contact details and GitHub URLs to CyberGuide
+```
