@@ -1,0 +1,44 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cybershield-network-policy
+  namespace: cybershield
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow API ingress from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              app.kubernetes.io/name: ingress-nginx
+      ports:
+        - port: 8000
+        - port: 8501
+    # Allow inter-service communication
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cybershield
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Allow outbound HTTP/HTTPS (for scrapers, notifications, etc.)
+    - to: []
+      ports:
+        - port: 80
+          protocol: TCP
+        - port: 443
+          protocol: TCP
+    # Allow inter-service communication
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: cybershield

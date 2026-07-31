@@ -1,0 +1,145 @@
+"""
+RSS Feed job scraper.
+"""
+
+from datetime import datetime
+from typing import List, Optional
+
+import feedparser
+
+from interntrack.domain.enums import JobSource
+from interntrack.scrapers.base import BaseScraper, RawJob
+
+
+# Popular job RSS feeds
+DEFAULT_FEEDS = {
+    "remoteok": "https://remoteok.com/remote-jobs.rss",
+    "weworkremotely": "https://weworkremotely.com/remote-jobs.rss",
+    "hackernews_jobs": "https://hnrss.org/newest?q=hiring",
+}
+
+
+class RSSFeedScraper(BaseScraper):
+    """Scraper for RSS job feeds."""
+
+    def __init__(self, feeds: Optional[dict] = None):
+        super().__init__()
+        self.feeds = feeds or DEFAULT_FEEDS
+
+    @property
+    def source_name(self) -> str:
+        return JobSource.RSS_FEED.value
+
+    @property
+    def rate_limit(self) -> int:
+        return 60
+
+    async def fetch(
+        self,
+        query: str,
+        location: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[RawJob]:
+        """Fetch jobs from RSS feeds."""
+        jobs = []
+
+        for feed_name, feed_url in self.feeds.items():
+            try:
+                feed_jobs = await self._fetch_feed(feed_url, query, feed_name)
+                jobs.extend(feed_jobs)
+            except Exception as e:
+                print(f"Error fetching RSS feed {feed_name}: {e}")
+                continue
+
+        return jobs[:limit]
+
+    async def _fetch_feed(
+        self, feed_url: str, query: str, source_name: str
+    ) -> List[RawJob]:
+        """Fetch and parse a single RSS feed."""
+        jobs = []
+
+        response = await self._get(feed_url)
+        feed = feedparser.parse(response.text)
+
+        for entry in feed.entries[:50]:
+            job = self._parse_entry(entry, query, source_name)
+            if job:
+                jobs.append(job)
+
+        return jobs
+
+    def _parse_entry(
+        self, entry: dict, query: str, source_name: str
+    ) -> Optional[RawJob]:
+        """Parse RSS entry into RawJob."""
+        title = entry.get("title", "")
+        link = entry.get("link", "")
+        summary = entry.get("summary", "")
+        published = entry.get("published_parsed")
+
+        # Check if matches query
+        query_lower = query.lower()
+        search_text = f"{title} {summary}".lower()
+        if query_lower not in search_text:
+            return None
+
+        # Parse published date
+        posted_at = None
+        if published:
+            try:
+                posted_at = datetime(*published[:6])
+            except Exception:
+                pass
+
+        return RawJob(
+            title=title,
+            company=self._extract_company_from_title(title),
+            url=link,
+            description=summary,
+            posted_at=posted_at,
+            tags=self._extract_tags(summary),
+            source=source_name,
+        )
+
+    def _extract_company_from_title(self, title: str) -> str:
+        """Try to extract company name from title."""
+        import re
+
+        # Common patterns: "Company is hiring" or "Hiring: Company"
+        patterns = [
+            r"^(.+?)\s+(?:is|are)\s+hiring",
+            r"(?:hiring|hired)\s*[:\-]\s*(.+?)$",
+            r"^\[(.+?)\]",
+        ]
+
+        for pattern in patterns:
+            match = re.search(pattern, title, re.IGNORECASE)
+            if match:
+                return match.group(1).strip()
+
+        return "Unknown"
+
+    def _extract_tags(self, text: str) -> List[str]:
+        """Extract tags from text."""
+        tags = []
+        text_lower = text.lower()
+
+        common_tags = [
+            "python", "javascript", "react", "node", "aws", "docker",
+            "kubernetes", "remote", "fullstack", "backend", "frontend",
+        ]
+
+        for tag in common_tags:
+            if tag in text_lower:
+                tags.append(tag)
+
+        return tags
+
+
+class CustomRSSFeedScraper(RSSFeedScraper):
+    """Scraper for custom RSS feeds."""
+
+    def __init__(self, feed_urls: List[str]):
+        feeds = {f"custom_{i}": url for i, url in enumerate(feed_urls)}
+        super().__init__(feeds=feeds)

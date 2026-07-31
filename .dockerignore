@@ -1,0 +1,47 @@
+# Dependencies
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+dist
+build
+.eggs
+
+# Development
+.vscode
+.idea
+.mypy_cache
+.pytest_cache
+.coverage
+htmlcov
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Documentation
+docs/
+*.md
+LICENSE
+
+# Testing
+tests/
+pytest.ini
+conftest.py
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+
+# IDE
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS
+desktop.ini

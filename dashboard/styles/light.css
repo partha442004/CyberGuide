@@ -1,0 +1,165 @@
+/* InternTrack Dashboard - Light Mode Styles */
+
+/* Light mode variables (default) */
+:root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8fafc;
+    --bg-tertiary: #f1f5f9;
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --text-muted: #94a3b8;
+    --border-color: #e2e8f0;
+}
+
+/* Light mode body */
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+/* Light mode cards */
+.metric-card {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    box-shadow: var(--shadow-md);
+}
+
+.job-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+}
+
+.job-card:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary-color);
+}
+
+.job-tag {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+/* Light mode status badges */
+.status-badge.saved {
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.status-badge.applied {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.status-badge.interview {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-badge.assessment {
+    background: #ede9fe;
+    color: #5b21b6;
+}
+
+.status-badge.rejected {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.status-badge.offer {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-badge.joined {
+    background: #a7f3d0;
+    color: #064e3b;
+}
+
+/* Light mode inputs */
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea,
+.stSelectbox > div > div {
+    background-color: var(--bg-primary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+/* Light mode buttons */
+.stButton > button {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+.stButton > button:hover {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+
+/* Light mode sidebar */
+[data-testid="stSidebar"] {
+    background-color: var(--bg-secondary);
+}
+
+/* Light mode tables */
+.stDataFrame {
+    background-color: var(--bg-primary);
+    border-color: var(--border-color);
+}
+
+/* Light mode expanders */
+.streamlit-expander {
+    background-color: var(--bg-primary);
+    border-color: var(--border-color);
+}
+
+/* Light mode alerts */
+.stAlert {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+/* Light mode charts */
+.stPlotlyChart {
+    background-color: var(--bg-primary);
+}
+
+/* Light mode metrics */
+[data-testid="stMetric"] {
+    background-color: var(--bg-primary);
+    border-color: var(--border-color);
+}
+
+/* Light mode dividers */
+hr {
+    border-color: var(--border-color);
+}
+
+/* Light mode code blocks */
+code {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* Light mode links */
+a {
+    color: var(--primary-color);
+}
+
+a:hover {
+    color: var(--primary-dark);
+}
+
+/* Light mode shadows */
+.metric-card {
+    box-shadow: var(--shadow-md);
+}
+
+.job-card {
+    box-shadow: var(--shadow-sm);
+}
+
+.job-card:hover {
+    box-shadow: var(--shadow-md);
+}

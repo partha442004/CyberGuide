@@ -1,0 +1,14 @@
+{{- if .Values.elasticsearch.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "cybershield.fullname" . }}-elasticsearch-data
+  labels:
+    {{- include "cybershield.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.elasticsearch.storage }}
+{{- end }}

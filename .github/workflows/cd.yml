@@ -1,0 +1,60 @@
+name: CD Pipeline
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: |
+          pytest tests/ -v
+
+      - name: Build Docker image
+        run: |
+          docker build -t interntrack:${{ github.sha }} .
+          docker tag interntrack:${{ github.sha }} interntrack:latest
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Push to Docker Hub
+        run: |
+          docker push interntrack:${{ github.sha }}
+          docker push interntrack:latest
+
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
+
+    steps:
+      - name: Deploy to production
+        run: |
+          echo "Deploying to production server..."
+          # Add your deployment commands here
+          # Example: ssh user@server "cd /app && docker compose pull && docker compose up -d"
+
+      - name: Notify deployment
+        run: |
+          echo "Deployment completed for version ${{ github.ref_name }}"

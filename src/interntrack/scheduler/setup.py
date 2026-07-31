@@ -1,0 +1,69 @@
+"""
+Scheduler setup with APScheduler.
+"""
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
+
+from interntrack.scheduler.jobs import (
+    run_job_discovery,
+    generate_daily_report,
+    verify_job_links,
+    deactivate_expired_jobs,
+)
+from interntrack.config import get_settings
+
+settings = get_settings()
+
+scheduler = AsyncIOScheduler()
+
+
+def setup_scheduler():
+    """Configure and start the scheduler."""
+    # Job discovery every 30 minutes
+    scheduler.add_job(
+        run_job_discovery,
+        IntervalTrigger(minutes=settings.scrape_interval_minutes),
+        id="job_discovery",
+        name="Job Discovery",
+        replace_existing=True,
+    )
+
+    # Daily report at 6 AM
+    scheduler.add_job(
+        generate_daily_report,
+        CronTrigger(hour=6, minute=0),
+        id="daily_report",
+        name="Daily Report",
+        replace_existing=True,
+    )
+
+    # Weekly report on Monday at 8 AM
+    scheduler.add_job(
+        generate_daily_report,
+        CronTrigger(day_of_week="mon", hour=8, minute=0),
+        id="weekly_report",
+        name="Weekly Report",
+        replace_existing=True,
+    )
+
+    # Verify links daily at 2 AM
+    scheduler.add_job(
+        verify_job_links,
+        CronTrigger(hour=2, minute=0),
+        id="link_verification",
+        name="Link Verification",
+        replace_existing=True,
+    )
+
+    # Deactivate expired jobs every hour
+    scheduler.add_job(
+        deactivate_expired_jobs,
+        IntervalTrigger(hours=1),
+        id="expire_jobs",
+        name="Expire Jobs",
+        replace_existing=True,
+    )
+
+    return scheduler

@@ -1,0 +1,446 @@
+"""
+Unit Tests for Resume Parser
+
+Tests the ResumeParser class covering:
+- Skill extraction from text
+- Education parsing (degree, institution, GPA, years)
+- Experience extraction
+- Certification detection
+- Project extraction
+- Link detection (GitHub, LinkedIn, email, phone)
+- PDF parsing (integration test)
+"""
+
+import pytest
+import asyncio
+from cybershield.services.resume_service import ResumeParser, SECURITY_SKILLS
+
+
+class TestResumeParserSkills:
+    """Test skill extraction from text."""
+
+    def setup_method(self):
+        self.parser = ResumeParser()
+
+    def test_extract_pentesting_skills(self):
+        """Should detect penetration testing related skills."""
+        text = "experienced in penetration testing and ethical hacking using metasploit and burp suite"
+        skills = self.parser._extract_skills(text)
+        skill_names = [s["name"].lower() for s in skills]
+        assert "penetration testing" in skill_names
+        assert "ethical hacking" in skill_names
+        assert "metasploit" in skill_names
+        assert "burp suite" in skill_names
+
+    def test_extract_security_tools(self):
+        """Should detect security tools."""
+        text = "proficient with nmap, wireshark, and kali linux for vulnerability scanning"
+        skills = self.parser._extract_skills(text)
+        skill_names = [s["name"].lower() for s in skills]
+        assert "nmap" in skill_names
+        assert "wireshark" in skill_names
+        assert "kali linux" in skill_names
+
+    def test_extract_siem_skills(self):
+        """Should detect SIEM related skills."""
+        text = "experience with splunk and microsoft sentinel for log analysis and siem"
+        skills = self.parser._extract_skills(text)
+        skill_names = [s["name"].lower() for s in skills]
+        assert "splunk" in skill_names
+        assert "microsoft sentinel" in skill_names
+        assert "siem" in skill_names
+
+    def test_extract_web_security_skills(self):
+        """Should detect web security skills."""
+        text = "expert in xss, csrf, sql injection, and owasp top 10 testing"
+        skills = self.parser._extract_skills(text)
+        skill_names = [s["name"].lower() for s in skills]
+        assert "xss" in skill_names
+        assert "csrf" in skill_names
+        assert "sql injection" in skill_names
+        assert "owasp top 10" in skill_names
+
+    def test_extract_cloud_security_skills(self):
+        """Should detect cloud security skills."""
+        text = "aws security and azure security experience with iam and cloudtrail"
+        skills = self.parser._extract_skills(text)
+        skill_names = [s["name"].lower() for s in skills]
+        assert "aws security" in skill_names
+        assert "azure security" in skill_names
+        assert "iam" in skill_names
+
+    def test_extract_certifications_as_skills(self):
+        """Should detect certifications as skills."""
+        text = "certified ethical hacker (ceh) and oscp certified"
+        skills = self.parser._extract_skills(text)
+        skill_names = [s["name"].lower() for s in skills]
+        assert "ceh" in skill_names
+        assert "oscp" in skill_names
+
+    def test_no_skills_in_empty_text(self):
+        """Should return empty list for text with no skills."""
+        skills = self.parser._extract_skills("hello world nothing here")
+        assert skills == []
+
+    def test_skill_categories_are_valid(self):
+        """All extracted skills should have valid categories."""
+        text = "penetration testing with nmap and splunk"
+        skills = self.parser._extract_skills(text)
+        valid_categories = set(SECURITY_SKILLS.keys())
+        for skill in skills:
+            assert skill["category"] in valid_categories
+
+    def test_skill_confidence_is_high(self):
+        """All extracted skills should have high confidence."""
+        text = "python scripting and bash automation"
+        skills = self.parser._extract_skills(text)
+        for skill in skills:
+            assert skill["confidence"] >= 0.8
+
+
+class TestResumeParserEducation:
+    """Test education extraction."""
+
+    def setup_method(self):
+        self.parser = ResumeParser()
+
+    def test_extract_btech_degree(self):
+        """Should extract B.Tech degree."""
+        text = "EDUCATION\nB.Tech in Computer Science\nUniversity of Technology\nCGPA: 8.5\n2020 - 2024"
+        edu = self.parser._extract_education(text)
+        assert len(edu) >= 1
+        assert "b.tech" in edu[0]["degree"].lower() or "bachelor" in edu[0]["degree"].lower()
+
+    def test_extract_institution(self):
+        """Should extract institution name."""
+        text = "EDUCATION\nB.Tech in IT\nMahendra Engineering College, Salem\nCGPA: 6.75\n2021 - 2025"
+        edu = self.parser._extract_education(text)
+        assert len(edu) >= 1
+        assert edu[0]["institution"] is not None
+        assert "mahendra" in edu[0]["institution"].lower() or "engineering" in edu[0]["institution"].lower()
+
+    def test_extract_gpa(self):
+        """Should extract GPA/CGPA."""
+        text = "EDUCATION\nB.Tech in CS\nEngineering College\nCGPA: 8.5/10\n2020 - 2024"
+        edu = self.parser._extract_education(text)
+        assert len(edu) >= 1
+        assert edu[0]["gpa"] is not None
+        assert "8.5" in edu[0]["gpa"]
+
+    def test_extract_year_range(self):
+        """Should extract year range."""
+        text = "EDUCATION\nB.Tech in CS\nEngineering College\nCGPA: 8.5\n2020 - 2024"
+        edu = self.parser._extract_education(text)
+        assert len(edu) >= 1
+        assert edu[0]["years"] is not None
+        assert "2020" in edu[0]["years"]
+        assert "2024" in edu[0]["years"]
+
+    def test_extract_gpa_with_suffix(self):
+        """Should extract GPA with /10 suffix."""
+        text = "EDUCATION\nB.Tech\nCollege\nCGPA: 6.75/10"
+        edu = self.parser._extract_education(text)
+        assert len(edu) >= 1
+        assert "6.75" in edu[0]["gpa"]
+        assert "/10" in edu[0]["gpa"]
+
+    def test_no_education_returns_empty(self):
+        """Should return empty list when no education found."""
+        edu = self.parser._extract_education("no education info here")
+        assert edu == []
+
+
+class TestResumeParserExperience:
+    """Test experience extraction."""
+
+    def setup_method(self):
+        self.parser = ResumeParser()
+
+    def test_extract_intern_role(self):
+        """Should detect intern roles."""
+        text = "WORK EXPERIENCE\nSecurity Intern at Tech Corp\nWorked on vulnerability assessment"
+        exp = self.parser._extract_experience(text)
+        roles = [e["role"].lower() for e in exp]
+        assert "intern" in roles
+
+    def test_extract_analyst_role(self):
+        """Should detect analyst roles."""
+        text = "EXPERIENCE\nSOC Analyst at CyberSec Inc\nMonitoring security events"
+        exp = self.parser._extract_experience(text)
+        roles = [e["role"].lower() for e in exp]
+        assert "analyst" in roles
+
+    def test_extract_engineer_role(self):
+        """Should detect engineer roles."""
+        text = "EXPERIENCE\nSecurity Engineer at Company\nBuilding secure systems"
+        exp = self.parser._extract_experience(text)
+        roles = [e["role"].lower() for e in exp]
+        assert "engineer" in roles
+
+    def test_experience_deduplication(self):
+        """Should deduplicate same roles."""
+        text = "Intern at Company A\nIntern at Company B\nIntern at Company C"
+        exp = self.parser._extract_experience(text)
+        roles = [e["role"].lower() for e in exp]
+        assert roles.count("intern") == 1
+
+    def test_experience_has_context(self):
+        """Each experience should have context."""
+        text = "Security Intern at Tech Corp doing vulnerability assessments"
+        exp = self.parser._extract_experience(text)
+        assert len(exp) >= 1
+        assert exp[0]["context"] is not None
+        assert len(exp[0]["context"]) > 0
+
+
+class TestResumeParserCertifications:
+    """Test certification extraction."""
+
+    def setup_method(self):
+        self.parser = ResumeParser()
+
+    def test_extract_ceh(self):
+        """Should detect CEH certification."""
+        text = "CERTIFICATIONS\nCertified Ethical Hacker (CEH) - Completed"
+        certs = self.parser._extract_certifications(text)
+        cert_names = [c["name"].lower() for c in certs]
+        assert "ceh" in cert_names
+
+    def test_extract_oscp(self):
+        """Should detect OSCP certification."""
+        text = "CERTIFICATIONS\nOffensive Security Certified Professional (OSCP)"
+        certs = self.parser._extract_certifications(text)
+        cert_names = [c["name"].lower() for c in certs]
+        assert "oscp" in cert_names
+
+    def test_extract_security_plus(self):
+        """Should detect Security+ certification."""
+        text = "CERTIFICATIONS\nCompTIA Security+ - In Progress"
+        certs = self.parser._extract_certifications(text)
+        cert_names = [c["name"].lower() for c in certs]
+        assert any("security" in name for name in cert_names)
+
+    def test_certification_status_in_progress(self):
+        """Should detect in progress status."""
+        text = "CERTIFICATIONS\nCEH - In Progress"
+        certs = self.parser._extract_certifications(text)
+        assert len(certs) >= 1
+        assert any(c["status"] == "in progress" for c in certs)
+
+    def test_certification_status_completed(self):
+        """Should detect completed status."""
+        text = "CERTIFICATIONS\nCEH - Completed"
+        certs = self.parser._extract_certifications(text)
+        assert len(certs) >= 1
+        completed = [c for c in certs if c["status"] == "completed"]
+        assert len(completed) >= 1
+
+
+class TestResumeParserProjects:
+    """Test project extraction."""
+
+    def setup_method(self):
+        self.parser = ResumeParser()
+
+    def test_extract_projects_section(self):
+        """Should extract projects from PROJECTS section."""
+        text = """PROJECTS
+- Network Vulnerability Assessment using Nessus and Nmap
+- DVWA Security Testing with Burp Suite
+- PortSwigger SQL Injection Labs
+"""
+        projects = self.parser._extract_projects(text)
+        assert len(projects) >= 2
+
+    def test_project_has_name(self):
+        """Each project should have a name."""
+        text = "PROJECTS\n- Metasploitable 2 Vulnerability Testing"
+        projects = self.parser._extract_projects(text)
+        assert len(projects) >= 1
+        assert projects[0]["name"] is not None
+        assert len(projects[0]["name"]) > 0
+
+    def test_project_has_technologies(self):
+        """Projects should detect mentioned technologies."""
+        text = "PROJECTS\n- DVWA Testing using Burp Suite and OWASP"
+        projects = self.parser._extract_projects(text)
+        assert len(projects) >= 1
+        techs = [t.lower() for t in projects[0]["technologies"]]
+        assert any("burp" in t for t in techs)
+
+    def test_no_projects_returns_empty(self):
+        """Should return empty list when no projects found."""
+        projects = self.parser._extract_projects("no projects here")
+        assert projects == []
+
+
+class TestResumeParserLinks:
+    """Test link extraction."""
+
+    def setup_method(self):
+        self.parser = ResumeParser()
+
+    def test_extract_github(self):
+        """Should extract GitHub profile URL."""
+        text = "GitHub: https://github.com/username"
+        links = self.parser._extract_links(text)
+        assert "github" in links
+        assert "github.com" in links["github"]
+
+    def test_extract_linkedin(self):
+        """Should extract LinkedIn profile URL."""
+        text = "LinkedIn: https://linkedin.com/in/johndoe"
+        links = self.parser._extract_links(text)
+        assert "linkedin" in links
+        assert "linkedin.com" in links["linkedin"]
+
+    def test_extract_email(self):
+        """Should extract email address."""
+        text = "Contact: john.doe@example.com"
+        links = self.parser._extract_links(text)
+        assert "email" in links
+        assert "john.doe@example.com" in links["email"]
+
+    def test_extract_phone(self):
+        """Should extract phone number."""
+        text = "Phone: +1 555 123 4567"
+        links = self.parser._extract_links(text)
+        assert "phone" in links
+
+    def test_extract_tryhackme(self):
+        """Should extract TryHackMe profile URL."""
+        text = "TryHackMe: https://tryhackme.com/p/username"
+        links = self.parser._extract_links(text)
+        assert "tryhackme" in links
+
+    def test_no_links_returns_empty(self):
+        """Should return empty dict when no links found."""
+        links = self.parser._extract_links("no links here")
+        assert links == {}
+
+    def test_multiple_links(self):
+        """Should extract multiple link types."""
+        text = """
+GitHub: https://github.com/user
+LinkedIn: https://linkedin.com/in/user
+Email: user@test.com
+Phone: +91 9876543210
+"""
+        links = self.parser._extract_links(text)
+        assert "github" in links
+        assert "linkedin" in links
+        assert "email" in links
+        assert "phone" in links
+
+
+class TestResumeParserFlattenSkills:
+    """Test skill flattening."""
+
+    def test_all_skills_flattened(self):
+        """Should flatten all security skills into a single dict.
+        Note: Some keywords appear in multiple categories (e.g., 'burp suite'
+        in both pentesting and security_tools), so the flattened dict may have
+        fewer entries than the total count due to deduplication."""
+        parser = ResumeParser()
+        total_entries = sum(len(skills) for skills in SECURITY_SKILLS.values())
+        unique_skills = len(parser._all_skills)
+        # Unique skills should be <= total entries (due to cross-category duplicates)
+        # and at least 80% of total (not too many duplicates)
+        assert unique_skills <= total_entries
+        assert unique_skills >= total_entries * 0.8
+
+    def test_skill_mapping_is_correct(self):
+        """Each skill should map to its correct category."""
+        parser = ResumeParser()
+        assert parser._all_skills["nmap"] == "security_tools"
+        assert parser._all_skills["metasploit"] == "security_tools"
+        assert parser._all_skills["python"] == "scripting"
+        assert parser._all_skills["siem"] == "siem"
+
+
+class TestResumeParserFullParse:
+    """Test full text parsing."""
+
+    def setup_method(self):
+        self.parser = ResumeParser()
+
+    def test_full_parse_returns_all_fields(self):
+        """Full parse should return all expected fields."""
+        text = """
+John Doe
+john@example.com | +91 9876543210
+GitHub: https://github.com/johndoe
+LinkedIn: https://linkedin.com/in/johndoe
+
+EDUCATION
+B.Tech in Information Technology
+Mahendra Engineering College, Salem
+CGPA: 6.75/10
+2021 - 2025
+
+SKILLS
+Penetration Testing, Nmap, Burp Suite, Metasploit
+Python, Bash scripting
+OWASP Top 10, SQL Injection, XSS
+
+EXPERIENCE
+Security Intern at Tech Corp
+Vulnerability assessment and penetration testing
+
+PROJECTS
+- DVWA Security Testing using Burp Suite
+- Network Scanning with Nmap
+
+CERTIFICATIONS
+CEH - Completed
+"""
+        result = self.parser._parse_text(text, "test_resume.pdf")
+
+        assert "skills" in result
+        assert "education" in result
+        assert "experience" in result
+        assert "certifications" in result
+        assert "projects" in result
+        assert "links" in result
+        assert "raw_text" in result
+        assert "parsed_at" in result
+
+    def test_full_parse_extracts_skills(self):
+        """Full parse should extract multiple skills."""
+        text = "penetration testing with nmap and metasploit using python scripting"
+        result = self.parser._parse_text(text)
+        assert len(result["skills"]) >= 3
+
+    def test_full_parse_extracts_links(self):
+        """Full parse should extract links."""
+        text = """
+GitHub: https://github.com/user
+Email: user@test.com
+"""
+        result = self.parser._parse_text(text)
+        assert "github" in result["links"]
+        assert "email" in result["links"]
+
+    def test_full_parse_extracts_education(self):
+        """Full parse should extract education."""
+        text = "EDUCATION\nB.Tech in CS\nUniversity\nCGPA: 8.0\n2020 - 2024"
+        result = self.parser._parse_text(text)
+        assert len(result["education"]) >= 1
+
+    def test_full_parse_extracts_experience(self):
+        """Full parse should extract experience."""
+        text = "EXPERIENCE\nSecurity Intern at Company"
+        result = self.parser._parse_text(text)
+        assert len(result["experience"]) >= 1
+
+    def test_full_parse_extracts_projects(self):
+        """Full parse should extract projects."""
+        text = "PROJECTS\n- Project A using Nmap and Metasploit\n- Project B with Burp Suite"
+        result = self.parser._parse_text(text)
+        assert len(result["projects"]) >= 1
+
+    def test_full_parse_extracts_certifications(self):
+        """Full parse should extract certifications."""
+        text = "CERTIFICATIONS\nCEH - Completed\nOSCP - In Progress"
+        result = self.parser._parse_text(text)
+        assert len(result["certifications"]) >= 1
