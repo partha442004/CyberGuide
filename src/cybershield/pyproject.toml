@@ -56,10 +56,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/partha442004/cybershield"
+Homepage = "https://github.com/partha442004/CyberGuide"
 Documentation = "https://docs.cybershield.dev"
-Repository = "https://github.com/partha442004/cybershield"
-Issues = "https://github.com/partha442004/cybershield/issues"
+Repository = "https://github.com/partha442004/CyberGuide"
+Issues = "https://github.com/partha442004/CyberGuide/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

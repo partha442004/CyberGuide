@@ -34,8 +34,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/interntrack.git
-cd internship-tracker
+git clone https://github.com/partha442004/CyberGuide.git
+cd CyberGuide
 
 # Create virtual environment
 python -m venv venv
@@ -279,6 +279,6 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) for deta
 
 ## 📧 Contact
 
-**PARTHASARATHI B** - maxxermogging@gmail.com
+**PARTHASARATHI B** - parthasarathi442004@gmail.com
 
-Project Link: https://github.com/yourusername/interntrack
+Project Link: https://github.com/partha442004/CyberGuide

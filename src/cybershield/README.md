@@ -36,8 +36,8 @@ CyberShield is a comprehensive AI-powered platform that continuously discovers, 
 
 ```bash
 # Clone the repository
-git clone https://github.com/cybershield/cybershield.git
-cd cybershield
+git clone https://github.com/partha442004/CyberGuide.git
+cd CyberGuide
 
 # Create virtual environment
 python -m venv venv

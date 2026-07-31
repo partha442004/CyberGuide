@@ -39,7 +39,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Added SECURITY.md with vulnerability reporting
 
 #### Security Updates
-- Contact email updated to maxxermogging@gmail.com
+- Contact email updated to parthasarathi442004@gmail.com
 - Creator name added: PARTHASARATHI B
 - Fixed datetime.utcnow() deprecation warnings (5 files)
 

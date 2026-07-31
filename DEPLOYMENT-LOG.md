@@ -150,7 +150,7 @@ Named volumes: `redis_data`, `postgres_data`, `es_data`, `ollama_data`
 
 - `APP_NAME=CyberGuide`
 - `EMAIL_FROM=CyberGuide <noreply@cyberguide.dev>`
-- `USER_AGENT=CyberGuide/1.0 (+https://github.com/partha442004/cybershield)`
+- `USER_AGENT=CyberGuide/1.0 (+https://github.com/partha442004/CyberGuide)`
 - Added `ELASTICSEARCH_URL=http://localhost:9200`
 - `DATABASE_URL` points to `cyberguide.db` (local dev)
 
@@ -274,7 +274,7 @@ c9b895c feat: CyberShield Career Intelligence Platform - Complete Implementation
 ### Current Status
 
 - **Branch**: `master`
-- **Remote**: `origin` -> `https://github.com/partha442004/cybershield.git`
+- **Remote**: `origin` -> `https://github.com/partha442004/CyberGuide.git`
 - **Pushed**: YES (all commits pushed)
 - **Unstaged changes**: ~160 files with CRLF/LF line-ending warnings (cosmetic, no functional impact)
 ---
@@ -318,7 +318,7 @@ ssh -i cybershield-key opc@YOUR_PUBLIC_IP
 
 ```bash
 cd C:\internship-tracker
-git remote add origin https://github.com/partha442004/cybershield.git
+git remote add origin https://github.com/partha442004/CyberGuide.git
 git add Dockerfile docker-compose.yml deploy/oracle-cloud/setup.sh requirements.txt
 git add src/cybershield/api/v1/applications.py src/interntrack/config.py
 git commit -m "fix: deployment config and import bugs for Oracle Cloud"

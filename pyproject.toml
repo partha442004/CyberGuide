@@ -10,7 +10,7 @@ readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
 authors = [
-    { name = "PARTHASARATHI B", email = "maxxermogging@gmail.com" }
+    { name = "PARTHASARATHI B", email = "parthasarathi442004@gmail.com" }
 ]
 keywords = ["internship", "job-tracker", "career", "automation"]
 classifiers = [
@@ -69,9 +69,9 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/partha442004/cybershield"
+Homepage = "https://github.com/partha442004/CyberGuide"
 Documentation = "https://docs.cybershield.dev"
-Repository = "https://github.com/partha442004/cybershield"
+Repository = "https://github.com/partha442004/CyberGuide"
 
 [project.scripts]
 interntrack = "interntrack.main:cli"

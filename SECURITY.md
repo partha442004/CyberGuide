@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability within InternTrack, please send an email to maxxermogging@gmail.com. All security vulnerabilities will be promptly addressed.
+If you discover a security vulnerability within CyberGuide, please send an email to parthasarathi442004@gmail.com. All security vulnerabilities will be promptly addressed.
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 
@@ -111,7 +111,7 @@ Security updates will be released as soon as possible after a vulnerability is c
 
 ## Contact
 
-- **Security Email**: maxxermogging@gmail.com
+- **Security Email**: parthasarathi442004@gmail.com
 - **GitHub Issues**: For non-sensitive bugs only
 - **Documentation**: See docs/SECURITY-AND-METHODOLOGIES.md
 

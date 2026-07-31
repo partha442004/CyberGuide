@@ -22,10 +22,10 @@ Before you begin, ensure you have:
 ### Step 1: Clone & Enter Project
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/interntrack.git
+git clone https://github.com/partha442004/CyberGuide.git
 
 # Enter project directory
-cd internship-tracker
+cd CyberGuide
 ```
 
 ### Step 2: Create Virtual Environment
@@ -84,8 +84,8 @@ uvicorn interntrack.main:app --reload
 
 #### 1.1 Clone Repository
 ```bash
-git clone https://github.com/yourusername/interntrack.git
-cd internship-tracker
+git clone https://github.com/partha442004/CyberGuide.git
+cd CyberGuide
 ```
 
 #### 1.2 Create Virtual Environment
@@ -229,8 +229,8 @@ docker-compose down
 
 ```bash
 # Clone and enter project
-git clone https://github.com/yourusername/interntrack.git
-cd internship-tracker
+git clone https://github.com/partha442004/CyberGuide.git
+cd CyberGuide
 
 # Create virtual environment
 python -m venv venv
@@ -388,7 +388,7 @@ make docker-down      # Stop services
 **Solution:**
 ```bash
 # Ensure you're in the project directory
-cd internship-tracker
+cd CyberGuide
 
 # Ensure virtual environment is activated
 source venv/bin/activate  # or venv\Scripts\activate
@@ -445,7 +445,7 @@ chmod +x setup.sh
 - **Documentation**: Check `docs/` folder
 - **Issues**: Open GitHub issue
 - **Discord**: Join our Discord server
-- **Email**: maxxermogging@gmail.com
+- **Email**: parthasarathi442004@gmail.com
 
 ---
 
