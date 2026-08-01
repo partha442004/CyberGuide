@@ -17,6 +17,126 @@ from collections import defaultdict
 from starlette.middleware.base import BaseHTTPMiddleware
 
 
+class BusinessMetricsStore:
+    """In-memory business metrics collector.
+
+    Tracks the non-HTTP signals the monitoring dashboards surface: database
+    query times, scraper success/failure rates per source, and notification
+    delivery/failure rates per channel. Dependency-free, same pattern as
+    :class:`MetricsStore`; resets on process restart.
+    """
+
+    def __init__(self) -> None:
+        self.db_queries = 0
+        self.db_query_total_ms = 0.0
+        self.scraper_runs: dict[str, int] = defaultdict(int)
+        self.scraper_failures: dict[str, int] = defaultdict(int)
+        self.notifications_sent: dict[str, int] = defaultdict(int)
+        self.notification_failures: dict[str, int] = defaultdict(int)
+
+    def record_db_query(self, duration_ms: float) -> None:
+        """Record one completed database query and its duration."""
+        self.db_queries += 1
+        self.db_query_total_ms += duration_ms
+
+    def record_scraper_run(self, source: str, success: bool) -> None:
+        """Record one scraper run outcome for a given source."""
+        self.scraper_runs[source] += 1
+        if not success:
+            self.scraper_failures[source] += 1
+
+    def record_notification(self, channel: str, delivered: bool) -> None:
+        """Record one notification delivery outcome for a given channel."""
+        self.notifications_sent[channel] += 1
+        if not delivered:
+            self.notification_failures[channel] += 1
+
+    def snapshot(self) -> dict:
+        """Return a JSON-serializable snapshot of business metrics."""
+        avg_db_ms = self.db_query_total_ms / self.db_queries if self.db_queries else 0.0
+        return {
+            "db_queries": self.db_queries,
+            "avg_db_query_ms": round(avg_db_ms, 3),
+            "scraper_runs": dict(self.scraper_runs),
+            "scraper_failures": dict(self.scraper_failures),
+            "notifications_sent": dict(self.notifications_sent),
+            "notification_failures": dict(self.notification_failures),
+        }
+
+    def reset(self) -> None:
+        """Clear all collected business metrics."""
+        self.db_queries = 0
+        self.db_query_total_ms = 0.0
+        self.scraper_runs.clear()
+        self.scraper_failures.clear()
+        self.notifications_sent.clear()
+        self.notification_failures.clear()
+
+    def render_prometheus(self) -> str:
+        """Render business metrics in Prometheus text exposition format."""
+        avg_db_ms = self.db_query_total_ms / self.db_queries if self.db_queries else 0.0
+
+        def escape_label(value: str) -> str:
+            return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+        lines: list[str] = [
+            "# HELP interntrack_db_queries_total Total database queries executed.",
+            "# TYPE interntrack_db_queries_total counter",
+            f"interntrack_db_queries_total {self.db_queries}",
+            (
+                "# HELP interntrack_db_query_duration_ms "
+                "Average database query time in ms."
+            ),
+            "# TYPE interntrack_db_query_duration_ms gauge",
+            f"interntrack_db_query_duration_ms {avg_db_ms:.3f}",
+        ]
+        if self.scraper_runs:
+            lines.append(
+                "# HELP interntrack_scraper_runs_total Total scraper runs per source.",
+            )
+            lines.append("# TYPE interntrack_scraper_runs_total counter")
+            for source, count in sorted(self.scraper_runs.items()):
+                src = escape_label(source)
+                lines.append(
+                    f'interntrack_scraper_runs_total{{source="{src}"}} {count}',
+                )
+        if self.scraper_failures:
+            lines.append(
+                "# HELP interntrack_scraper_failures_total "
+                "Failed scraper runs per source.",
+            )
+            lines.append("# TYPE interntrack_scraper_failures_total counter")
+            for source, count in sorted(self.scraper_failures.items()):
+                src = escape_label(source)
+                lines.append(
+                    f'interntrack_scraper_failures_total{{source="{src}"}} {count}',
+                )
+        if self.notifications_sent:
+            lines.append(
+                "# HELP interntrack_notifications_total "
+                "Notifications delivered per channel.",
+            )
+            lines.append("# TYPE interntrack_notifications_total counter")
+            for channel, count in sorted(self.notifications_sent.items()):
+                ch = escape_label(channel)
+                lines.append(
+                    f'interntrack_notifications_total{{channel="{ch}"}} {count}',
+                )
+        if self.notification_failures:
+            lines.append(
+                "# HELP interntrack_notification_failures_total "
+                "Failed notifications per channel.",
+            )
+            lines.append("# TYPE interntrack_notification_failures_total counter")
+            for channel, count in sorted(self.notification_failures.items()):
+                ch = escape_label(channel)
+                sample = (
+                    f'interntrack_notification_failures_total{{channel="{ch}"}} {count}'
+                )
+                lines.append(sample)
+        return "\n".join(lines) + "\n"
+
+
 class MetricsStore:
     """In-memory request metrics collector."""
 
@@ -138,8 +258,9 @@ class MetricsStore:
         return "\n".join(lines) + "\n"
 
 
-# Global metrics store (one per process)
+# Global metrics stores (one per process)
 metrics_store = MetricsStore()
+business_metrics_store = BusinessMetricsStore()
 
 
 class MetricsMiddleware(BaseHTTPMiddleware):

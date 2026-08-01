@@ -14,7 +14,11 @@ from interntrack.api.router import api_router
 from interntrack.config import get_settings
 from interntrack.database.session import close_db, init_db
 from interntrack.domain.exceptions import AppException
-from interntrack.metrics import MetricsMiddleware, metrics_store
+from interntrack.metrics import (
+    MetricsMiddleware,
+    business_metrics_store,
+    metrics_store,
+)
 from interntrack.middleware.rate_limit import RateLimitMiddleware, get_rate_limit_store
 from interntrack.utils.logger import get_logger
 
@@ -138,13 +142,17 @@ async def health():
 
 @app.get("/metrics")
 async def metrics():
-    """Expose in-memory request metrics for monitoring.
+    """Expose in-memory request + business metrics for monitoring.
 
     Returns request counts per path, error counts/rate (HTTP >= 500), average
-    latency, and a status-code histogram. The metrics endpoint itself is not
-    recorded, and it is exempt from rate limiting so scrapers stay reliable.
+    latency, a status-code histogram, plus the business metrics (DB query
+    times, scraper success rates, notification delivery rates) under the
+    ``business`` key. The metrics endpoint itself is not recorded, and it is
+    exempt from rate limiting so scrapers stay reliable.
     """
-    return metrics_store.snapshot()
+    snapshot = metrics_store.snapshot()
+    snapshot["business"] = business_metrics_store.snapshot()
+    return snapshot
 
 
 @app.get("/metrics/prometheus")
@@ -153,11 +161,16 @@ async def metrics_prometheus():
 
     Lets a Prometheus server scrape the same in-memory counters via the
     standard text format (``# HELP`` / ``# TYPE`` + samples) without pulling
-    in ``prometheus_client``. Like ``/metrics`` it is not recorded and is
-    exempt from rate limiting so scrapers stay reliable.
+    in ``prometheus_client``. Includes both HTTP metrics and the business
+    metrics (``interntrack_db_*``, ``interntrack_scraper_*``,
+    ``interntrack_notification_*``). Like ``/metrics`` it is not recorded and
+    is exempt from rate limiting so scrapers stay reliable.
     """
+    body = (
+        metrics_store.render_prometheus() + business_metrics_store.render_prometheus()
+    )
     return Response(
-        content=metrics_store.render_prometheus(),
+        content=body,
         media_type="text/plain; version=0.0.4; charset=utf-8",
     )
 

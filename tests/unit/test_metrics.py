@@ -123,6 +123,8 @@ class TestMetricsMiddleware:
         assert "avg_latency_ms" in data
         assert "requests_per_path" in data
         assert "status_codes" in data
+        # business metrics (DB / scrapers / notifications) ride on /metrics too
+        assert "business" in data
 
     @pytest.mark.asyncio
     async def test_requests_are_recorded(self, client: AsyncClient):

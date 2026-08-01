@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.config import get_settings
 from interntrack.domain.exceptions import NotificationError
+from interntrack.metrics import business_metrics_store
 
 settings = get_settings()
 
@@ -180,7 +181,12 @@ class NotificationManager:
         message: str,
         subject: str | None = None,
     ) -> dict[str, bool]:
-        """Send notification to multiple channels."""
+        """Send notification to multiple channels.
+
+        Records per-channel delivery into the business metrics store.
+        ``delivered=False`` covers both a real delivery failure and a channel
+        that is not configured (never attempted).
+        """
         results = {}
         for channel_name in channels:
             channel = self._channels.get(channel_name)
@@ -189,8 +195,16 @@ class NotificationManager:
                     results[channel_name] = await channel.send(message, subject)
                 except Exception:
                     results[channel_name] = False
+                business_metrics_store.record_notification(
+                    channel_name,
+                    delivered=bool(results[channel_name]),
+                )
             else:
                 results[channel_name] = False
+                business_metrics_store.record_notification(
+                    channel_name,
+                    delivered=False,
+                )
         return results
 
     async def notify_all(

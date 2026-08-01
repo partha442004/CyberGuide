@@ -4,6 +4,39 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.19.0] - 2026-08-01
+
+### Added
+
+#### Business Metrics Instrumentation (InternTrack)
+- `BusinessMetricsStore` in `src/interntrack/metrics.py` — dependency-free
+  collector + Prometheus renderer for DB query times, scraper success rates
+  and notification delivery rates; global `business_metrics_store`
+- Instrumentation wiring:
+  - `database/session.py` — SQLAlchemy `before/after_cursor_execute` event
+    listeners (positional signature, timestamp on `conn.info`) record query
+    durations into `interntrack_db_queries_total` /
+    `interntrack_db_query_duration_ms`
+  - `scrapers/registry.py` — `fetch_all` records per-source runs/failures
+    (`interntrack_scraper_runs_total{source}` /
+    `interntrack_scraper_failures_total{source}`)
+  - `services/notification_service.py` — `notify` records per-channel
+    delivery/failures (`interntrack_notifications_total{channel}` /
+    `interntrack_notification_failures_total{channel}`)
+- `main.py` — `/metrics` gains a `business` key; `/metrics/prometheus`
+  concatenates both renders
+- `deploy/grafana/dashboards/business.json` — **InternTrack Business**
+  dashboard (uid `interntrack-business`): DB query latency, scraper runs vs
+  failures per source, notification delivery vs failures per channel
+- `tests/unit/test_business_metrics.py` (13 tests) — store behavior,
+  DB-listener wiring (regression guard for the event-signature bug),
+  scraper/notification instrumentation, dashboard exprs pinned to emitted
+  metrics
+
+### Changed
+- Both packages + `.env`/`.env.example` + `pyproject.toml` + deployment
+  artifacts synced to **1.19.0**; `make version-check` exit 0
+
 ## [1.18.0] - 2026-08-01
 
 ### Added
