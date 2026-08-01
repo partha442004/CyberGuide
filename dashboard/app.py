@@ -43,7 +43,7 @@ st.markdown(
 # API base URL
 API_URL = "http://localhost:8000/api/v1"
 HEALTH_URL = "http://localhost:8000/health"
-DEFAULT_VERSION = "1.14.0"
+DEFAULT_VERSION = "1.15.0"
 
 
 def fetch_data(endpoint: str):

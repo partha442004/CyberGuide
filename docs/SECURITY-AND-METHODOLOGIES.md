@@ -827,7 +827,7 @@ FROM python:3.11-slim
 services:
   api:
     # Don't use :latest
-    image: interntrack:1.14.0
+    image: interntrack:1.15.0
     
     # Use secrets
     secrets:
@@ -1287,5 +1287,5 @@ async def cleanup_old_data():
 ---
 
 **Last Updated:** {{DATE}}
-**Version:** 1.14.0
+**Version:** 1.15.0
 **Owner:** Security Team

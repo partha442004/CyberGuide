@@ -4,6 +4,45 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.15.0] - 2026-08-01
+
+### Added
+
+#### Grafana Monitoring Stack (InternTrack)
+- New `deploy/grafana/` assets behind the compose `monitoring` profile:
+  - `provisioning/datasources/datasource.yml` — Prometheus datasource (uid
+    `prometheus`, url `http://prometheus:9090`, isDefault, 15s timeInterval)
+  - `provisioning/dashboards/dashboards.yml` — file provider loading the
+    mounted dashboards dir; provisioned dashboards are read-only
+    (`allowUiUpdates: false`, `disableDeletion: true`)
+  - `dashboards/interntrack.json` — **InternTrack API** dashboard (uid
+    `interntrack-api`) with 5 panels: request rate
+    (`rate(interntrack_http_requests_total[5m])`), 5xx error rate (5xx rate /
+    clamped request rate), average latency stat
+    (`interntrack_http_request_duration_ms`), requests by status code
+    (`..._by_status_total`), and top paths by request rate
+    (`topk(10, ..._by_path_total)`); 15s refresh matching the scrape interval
+- `docker-compose.yml`: new `grafana` service
+  (`grafana/grafana:11.1.0`, port 3000, env-overridable
+  `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD`, `GF_USERS_ALLOW_SIGN_UP=false`,
+  provisioning + dashboards mounted read-only, `grafana_data` volume,
+  `depends_on: prometheus`, `monitoring` profile)
+- Tests: `tests/unit/test_grafana_dashboard.py` (8 tests) — validates the
+  dashboard JSON structure and that **every PromQL expression references a
+  metric the API actually emits** (guards against dashboard drift), the
+  datasource uid matches provisioning, and the provisioning YAML points at
+  `prometheus:9090`
+- `pyyaml>=6.0` added to `requirements-dev.txt` (the dashboard tests import
+  yaml directly instead of relying on bandit's transitive dependency)
+- `05-api-design.md` monitoring-stack section: `docker compose --profile
+  monitoring up -d prometheus grafana` + production warning to override the
+  default `admin`/`admin` Grafana credentials
+
+#### Version
+- Both packages, `.env`/`.env.example`, canaries, Helm chart, Oracle
+  deployment files, and docs bumped to `1.15.0`; root `pyproject.toml`
+  synced — verified by `make version-check` (exit 0)
+
 ## [1.14.0] - 2026-08-01
 
 ### Added

@@ -9,3 +9,4 @@ httpx>=0.25.0
 safety>=2.3.0
 bandit>=1.7.0
 fakeredis[lua]>=2.0.0
+pyyaml>=6.0

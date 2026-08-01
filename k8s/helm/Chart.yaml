@@ -2,8 +2,8 @@ apiVersion: v2
 name: cybershield
 description: CyberGuide Career Intelligence Platform - Kubernetes Deployment
 type: application
-version: 1.14.0
-appVersion: "1.14.0"
+version: 1.15.0
+appVersion: "1.15.0"
 keywords:
   - cybersecurity
   - career
