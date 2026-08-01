@@ -827,7 +827,7 @@ FROM python:3.11-slim
 services:
   api:
     # Don't use :latest
-    image: interntrack:1.15.0
+    image: interntrack:1.16.0
     
     # Use secrets
     secrets:
@@ -1006,35 +1006,52 @@ async def metrics_middleware(request: Request, call_next):
 
 ### 7.3 Alerting Rules
 
+> ✅ **Implemented** in `deploy/prometheus/alerts.yml` (2026-08-01), mounted
+> into the prometheus compose service and loaded via `rule_files` in
+> `deploy/prometheus/prometheus.yml`. Every expression targets the metrics the
+> API actually emits (`interntrack_http_*` — see `src/interntrack/metrics.py`)
+> plus Prometheus's built-in `up{}` scrape-health metric; `tests/unit/
+> test_prometheus_alerts.py` pins each PromQL expression to the emitted metric
+> set so the rules can't silently drift.
+
 ```yaml
-# alerts.yml
+# deploy/prometheus/alerts.yml
 groups:
-  - name: application
+  - name: interntrack-api
     rules:
       - alert: HighErrorRate
-        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+        expr: |
+          sum(rate(interntrack_http_errors_total[5m]))
+            / clamp_min(sum(rate(interntrack_http_requests_total[5m])), 0.0001)
+            > 0.1
         for: 5m
         labels:
           severity: critical
         annotations:
-          summary: High error rate detected
-      
+          summary: "High 5xx error rate ({{ $value | humanizePercentage }})"
+          description: "InternTrack API is returning 5xx on more than 10% of requests over 5 minutes."
+
       - alert: HighLatency
-        expr: histogram_quantile(0.95, http_request_duration_seconds) > 1
+        expr: interntrack_http_request_duration_ms > 1000
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: High latency detected
-      
-      - alert: DiskSpaceLow
-        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
-        for: 5m
+          summary: "High average latency ({{ $value | humanize }}ms)"
+          description: "Average request latency exceeded 1000ms over 5 minutes."
+
+      - alert: ServiceDown
+        expr: up{job="interntrack-api"} == 0
+        for: 1m
         labels:
           severity: critical
         annotations:
-          summary: Disk space is low
+          summary: "InternTrack API is down"
+          description: "Prometheus cannot scrape the InternTrack API (job interntrack-api)."
 ```
+
+System-level alerts (disk/memory/CPU) require a node-exporter target and are
+not part of the app-level `interntrack-api` group.
 
 ---
 
@@ -1287,5 +1304,5 @@ async def cleanup_old_data():
 ---
 
 **Last Updated:** {{DATE}}
-**Version:** 1.15.0
+**Version:** 1.16.0
 **Owner:** Security Team

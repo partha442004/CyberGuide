@@ -8,7 +8,7 @@
 
 - ✅ **mypy**: 0 errors across 177 source files (107 cybershield errors fixed)
 - ✅ **ruff**: all checks pass, 212 files formatted
-- ✅ **Tests**: 479 InternTrack + 323 CyberGuide = **802 passing**
+- ✅ **Tests**: 487 InternTrack + 323 CyberGuide = **810 passing**
 - ✅ **CI**: `.github/workflows/ci.yml` (ruff, mypy, full test suite + coverage + bandit + safety + Trivy security jobs); `.github/workflows/cd.yml` (tag-based deploy)
 - ✅ **Error handling**: `AppException` handler + consistent error payload; CORS settings-driven
 - ✅ **API rate limiting**: `RateLimitMiddleware` (per-IP 100/min, per-API-key 1000/min) with 429 error contract, exempt paths, `RATE_LIMIT_*` env overrides
@@ -20,7 +20,11 @@
   text exposition format) exposing the same counters; exempt from recording
   + rate limiting; `deploy/prometheus/prometheus.yml` + compose `prometheus`
   service (`monitoring` profile); k8s `prometheus.io` Service annotations
-- ✅ **Version**: both packages single-source-of-truth at **1.15.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate; CONTRIBUTING release-bump checklist
+- ✅ **Version**: both packages single-source-of-truth at **1.16.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate; CONTRIBUTING release-bump checklist
+- ✅ **Alerting**: `deploy/prometheus/alerts.yml` (HighErrorRate, HighLatency,
+  ServiceDown) loaded via `rule_files` + compose mount; SECURITY §7.3 stale
+  example replaced with the real rules; 8 tests pin every PromQL expr to
+  emitted metrics
 - ✅ **Grafana**: provisioned monitoring stack (`monitoring` profile) —
   Prometheus datasource + InternTrack API dashboard (request rate, 5xx error
   rate, avg latency, status codes, top paths); read-only provisioned
@@ -199,8 +203,8 @@ internship-tracker/
 ## 🧪 Test Results
 
 ### Test Summary
-- **Total Tests:** 802 (479 InternTrack + 323 CyberGuide)
-- **Tests Passing:** ✅ 802 (100%)
+- **Total Tests:** 810 (487 InternTrack + 323 CyberGuide)
+- **Tests Passing:** ✅ 810 (100%)
 - **Test Files:** 32+ test files
 
 ### Test Breakdown
@@ -241,7 +245,7 @@ internship-tracker/
 | Integration - API | 23 | ✅ (incl. CORS middleware + health) |
 | **Total (InternTrack)** | **453** | ✅ **All Passing** |
 | **CyberGuide (cybershield)** | **323** | ✅ **All Passing** |
-| **Grand Total** | **802** | ✅ **All Passing** |
+| **Grand Total** | **810** | ✅ **All Passing** |
 
 ---
 

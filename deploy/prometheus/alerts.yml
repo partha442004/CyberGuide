@@ -1,0 +1,44 @@
+# Prometheus alerting rules for the InternTrack API.
+#
+# Every expression references a metric the API actually emits at
+# GET /metrics/prometheus (see src/interntrack/metrics.py), so the rules can
+# never silently drift from the code. Mounted read-only into the prometheus
+# service via docker-compose.yml and loaded through the `rule_files` entry in
+# prometheus.yml.
+#
+# Usage:
+#   docker compose --profile monitoring up -d prometheus
+#   open http://localhost:9090/alerts
+
+groups:
+  - name: interntrack-api
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(interntrack_http_errors_total[5m]))
+            / clamp_min(sum(rate(interntrack_http_requests_total[5m])), 0.0001)
+            > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High 5xx error rate ({{ $value | humanizePercentage }})"
+          description: "InternTrack API is returning 5xx on more than 10% of requests over 5 minutes."
+
+      - alert: HighLatency
+        expr: interntrack_http_request_duration_ms > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High average latency ({{ $value | humanize }}ms)"
+          description: "Average request latency exceeded 1000ms over 5 minutes."
+
+      - alert: ServiceDown
+        expr: up{job="interntrack-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "InternTrack API is down"
+          description: "Prometheus cannot scrape the InternTrack API (job interntrack-api)."

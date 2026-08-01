@@ -34,13 +34,19 @@
   limiting; `deploy/prometheus/prometheus.yml` + compose `prometheus`
   service (`monitoring` profile); k8s `prometheus.io` Service annotations;
   6 new tests (renderer format/escaping + endpoint + exempt-path coverage)
-- **Version**: both packages single-source-of-truth at **1.15.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate
+- **Version**: both packages single-source-of-truth at **1.16.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate
 - **Grafana**: provisioned monitoring stack (`monitoring` profile) — Prometheus
   datasource (uid `prometheus`) + **InternTrack API** dashboard (request rate,
   5xx error rate, avg latency, requests by status, top paths); read-only
   provisioned dashboards (`allowUiUpdates: false`); 8 validation tests
   (`test_grafana_dashboard.py`) pin every PromQL expr to emitted metrics;
   `pyyaml` declared in requirements-dev
+- **Alerting**: `deploy/prometheus/alerts.yml` — `HighErrorRate` (5xx rate /
+  request rate > 0.1, critical), `HighLatency` (avg latency > 1000ms,
+  warning), `ServiceDown` (`up{job="interntrack-api"} == 0`, critical);
+  loaded via `rule_files` + compose mount; SECURITY §7.3 example replaced with
+  the real rules (was generic `http_requests_total` metrics that don't exist);
+  8 tests (`test_prometheus_alerts.py`) pin every expr to emitted metrics
 - **Rate limiting (Redis)**: `RedisRateLimitStore` — atomic Lua sliding window
   over a Redis ZSET (`rl:{key}` + `:seq` counter, both `EXPIRE`-bounded),
   multi-instance shared limits; in-memory fallback on Redis outage (never
@@ -75,7 +81,7 @@
 | **Engines** | ✅ Complete | 100% | Dedup, verify, classify |
 | **Notifications** | ✅ Complete | 100% | Telegram, Email, Discord |
 | **Dashboard** | ✅ Complete | 100% | Streamlit with charts |
-| **Tests** | ✅ Complete | 100% | 802 tests passing |
+| **Tests** | ✅ Complete | 100% | 810 tests passing |
 | **CI/CD** | ✅ Complete | 100% | GitHub Actions ready |
 | **Documentation** | ✅ Complete | 100% | All docs created |
 | **Docker** | ✅ Complete | 100% | Compose ready |
@@ -86,10 +92,10 @@
 ## 📊 FINAL TEST RESULTS
 
 ```
-======================== 802 passed ========================
-InternTrack: 479 passed
+======================== 810 passed ========================
+InternTrack: 487 passed
 CyberGuide (cybershield): 323 passed
-Total: 802 tests passing
+Total: 810 tests passing
 ```
 
 ### Coverage Improvement Summary
@@ -151,7 +157,7 @@ Total: 802 tests passing
 - [x] `src/interntrack/utils/` - 4 utility files
 - [x] `src/interntrack/reports/templates/` - 3 report templates
 
-### Tests (802 total: 479 InternTrack + 323 CyberGuide)
+### Tests (810 total: 487 InternTrack + 323 CyberGuide)
 - [x] `tests/conftest.py` - Test fixtures
 - [x] `tests/unit/test_job_service.py` - 8 tests
 - [x] `tests/unit/test_application_service.py` - 8 tests

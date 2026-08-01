@@ -4,6 +4,39 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.16.0] - 2026-08-01
+
+### Added
+
+#### Prometheus Alerting Rules (InternTrack)
+- New `deploy/prometheus/alerts.yml` — app-level alert rules in the
+  `interntrack-api` group, all targeting the **actual** metrics the API emits
+  at `/metrics/prometheus`:
+  - `HighErrorRate` — 5xx rate / request rate > 0.1 for 5m (critical)
+  - `HighLatency` — `interntrack_http_request_duration_ms > 1000` for 5m
+    (warning)
+  - `ServiceDown` — `up{job="interntrack-api"} == 0` for 1m (critical)
+- `deploy/prometheus/prometheus.yml` now declares `rule_files: [alerts.yml]`
+  (resolved relative to the config, i.e. `/etc/prometheus/alerts.yml`), and
+  the compose `prometheus` service mounts `./deploy/prometheus/alerts.yml`
+  read-only — alerts viewable at `http://localhost:9090/alerts`
+- `docs/SECURITY-AND-METHODOLOGIES.md` §7.3 example replaced: it previously
+  documented a generic `alerts.yml` using metrics that don't exist
+  (`http_requests_total{status=~"5.."}`, `histogram_quantile(...
+  http_request_duration_seconds)`); the section now documents the real rules
+- Tests: `tests/unit/test_prometheus_alerts.py` (8 tests) — validates the
+  rules YAML, expected rule names, every rule has `expr`+`for`, every PromQL
+  expression references an emitted `interntrack_http_*` metric (guards against
+  drift), `ServiceDown` uses `up{}`, `rule_files` is declared, and the compose
+  service mounts the alerts file
+- `05-api-design.md`: monitoring-stack section documents the alert table
+  (rule / expression / severity / `for`) and the `/alerts` endpoint
+
+#### Version
+- Both packages, `.env`/`.env.example`, canaries, Helm chart, Oracle
+  deployment files, and docs bumped to `1.16.0`; root `pyproject.toml`
+  synced — verified by `make version-check` (exit 0)
+
 ## [1.15.0] - 2026-08-01
 
 ### Added

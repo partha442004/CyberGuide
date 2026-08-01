@@ -106,7 +106,7 @@ curl http://localhost:8000/health
 
 Expected output:
 ```json
-{"status":"healthy","version":"1.15.0","debug":false}
+{"status":"healthy","version":"1.16.0","debug":false}
 ```
 
 ### 3. View Logs

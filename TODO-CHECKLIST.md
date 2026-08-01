@@ -479,11 +479,11 @@ sqlite3 data/interntrack.db "PRAGMA integrity_check;"
 - [ ] Database logs
 
 ### Alerting
-- [ ] High error rate alert
-- [ ] High response time alert
-- [ ] Disk space alert
-- [ ] Memory alert
-- [ ] Service down alert
+- [x] High error rate alert — `HighErrorRate` (5xx rate / request rate > 0.1, critical)
+- [x] High response time alert — `HighLatency` (avg latency > 1000ms, warning)
+- [x] Service down alert — `ServiceDown` (`up{job="interntrack-api"} == 0`, critical)
+- [ ] Disk space alert (needs node-exporter)
+- [ ] Memory alert (needs node-exporter)
 
 ---
 
@@ -849,5 +849,19 @@ docker-compose up -d
 
 ---
 
+## ✅ HARDENING PASS 14 (2026-08-01) — COMPLETED
+
+### Prometheus Alerting Rules + v1.16.0
+- [x] `deploy/prometheus/alerts.yml` — `HighErrorRate`, `HighLatency`,
+      `ServiceDown` (all targeting real `interntrack_http_*` metrics + `up{}`)
+- [x] `rule_files: [alerts.yml]` in `prometheus.yml` + read-only compose mount
+- [x] SECURITY §7.3 stale generic-metric example replaced with the real rules
+- [x] `tests/unit/test_prometheus_alerts.py` (8 tests) pin every PromQL expr
+      to emitted metrics + wiring checks
+- [x] Both packages + `.env`/`.env.example` + `pyproject.toml` + deployment
+      artifacts synced to **1.16.0**; `make version-check` exit 0
+
+---
+
 **Last Updated:** 2026-08-01
-**Version:** 1.15.0
+**Version:** 1.16.0
