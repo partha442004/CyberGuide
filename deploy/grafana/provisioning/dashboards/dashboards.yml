@@ -1,0 +1,19 @@
+# Grafana dashboard provider provisioning.
+#
+# Loads every dashboard JSON from /var/lib/grafana/dashboards (mounted
+# read-only from ./deploy/grafana/dashboards in docker-compose.yml) into the
+# "default" org on startup.
+
+apiVersion: 1
+
+providers:
+  - name: InternTrack
+    orgId: 1
+    folder: InternTrack
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

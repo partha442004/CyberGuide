@@ -586,14 +586,24 @@ interntrack_http_request_duration_ms 12.345
 
 #### Local monitoring stack
 
-`docker-compose.yml` ships a Prometheus service (behind the `monitoring`
-profile) pre-configured by `deploy/prometheus/prometheus.yml` to scrape
-`api:8000/metrics/prometheus` every 15s:
+`docker-compose.yml` ships a Prometheus + Grafana stack (both behind the
+`monitoring` profile). Prometheus is pre-configured by
+`deploy/prometheus/prometheus.yml` to scrape `api:8000/metrics/prometheus`
+every 15s; Grafana is pre-provisioned with a Prometheus datasource (uid
+`prometheus`) and an **InternTrack API** dashboard
+(`deploy/grafana/dashboards/interntrack.json`) showing request rate, 5xx
+error rate, average latency, requests by status code, and top paths:
 
 ```bash
-docker compose --profile monitoring up -d prometheus
-# open http://localhost:9090
+docker compose --profile monitoring up -d prometheus grafana
+# Prometheus: http://localhost:9090
+# Grafana:    http://localhost:3000 (admin / admin)
 ```
+
+> **Production:** override the Grafana admin credentials with
+> `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` env vars — the default
+> `admin`/`admin` is for local dev only. Provisioned dashboards are
+> read-only (`allowUiUpdates: false`).
 
 For Kubernetes, the API `Service` (`k8s/raw/06-api.yaml`) carries
 `prometheus.io/scrape: "true"` (+ `path`/`port`) annotations for

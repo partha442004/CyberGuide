@@ -459,6 +459,8 @@ sqlite3 data/interntrack.db "PRAGMA integrity_check;"
 - [x] API response times — `interntrack_http_request_duration_ms` via `/metrics/prometheus`
 - [x] Request counts — `interntrack_http_requests_total` (total + per-path + per-status)
 - [x] Error rates — `interntrack_http_errors_total` + `interntrack_http_error_rate`
+- [x] Visualization — Grafana dashboard (request rate, error rate, latency,
+      status codes, top paths) via `docker compose --profile monitoring up -d grafana`
 - [ ] Database query times
 - [ ] Scraper success rates
 - [ ] Notification delivery rates
@@ -828,5 +830,24 @@ docker-compose up -d
 
 ---
 
+## ✅ HARDENING PASS 13 (2026-08-01) — COMPLETED
+
+### Grafana Monitoring Stack + v1.15.0
+- [x] `deploy/grafana/provisioning/` — Prometheus datasource (uid
+      `prometheus` → `http://prometheus:9090`) + file provider; provisioned
+      dashboards read-only (`allowUiUpdates: false`)
+- [x] `deploy/grafana/dashboards/interntrack.json` — InternTrack API
+      dashboard (request rate, 5xx error rate, avg latency, status codes,
+      top paths; 15s refresh)
+- [x] `docker-compose.yml` `grafana` service (11.1.0, port 3000,
+      env-overridable admin creds, `monitoring` profile, `grafana_data`)
+- [x] `tests/unit/test_grafana_dashboard.py` (8 tests) — every PromQL expr
+      pinned to emitted `interntrack_http_*` metrics; `pyyaml` declared in
+      requirements-dev
+- [x] Both packages + `.env`/`.env.example` + `pyproject.toml` + deployment
+      artifacts synced to **1.15.0**; `make version-check` exit 0
+
+---
+
 **Last Updated:** 2026-08-01
-**Version:** 1.14.0
+**Version:** 1.15.0

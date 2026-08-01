@@ -1,0 +1,22 @@
+# Grafana datasource provisioning.
+#
+# The UID "prometheus" must match the datasource refs used in the
+# interntrack dashboard (deploy/grafana/dashboards/interntrack.json) so the
+# panels resolve to the right datasource automatically.
+#
+# Usage:
+#   docker compose --profile monitoring up -d grafana
+#   open http://localhost:3000 (admin / admin)
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 15s
