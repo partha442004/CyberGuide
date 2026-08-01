@@ -4,6 +4,31 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.5.0] - 2026-08-01
+
+### Added
+
+#### Security Scanning (bandit)
+- First security scan: `bandit -r src/` — 3 high (B324 weak MD5) + 5 medium
+  (B104 bind-all) findings found and resolved
+- MD5 calls in `cybershield/cache.py` and `cybershield/scrapers/base.py` now use
+  `usedforsecurity=False` (cache/dedup fingerprinting, not security)
+- Intentional dev `0.0.0.0` binds marked `# nosec B104` (env-overridable defaults)
+- CI: new `security` job (`bandit -r src/ -ll -q`) gates the test job
+- Makefile: `security` (bandit gate) and `security-report` (HTML) targets
+
+#### Pre-commit & Environment
+- Added `.pre-commit-config.yaml` (ruff --fix + ruff-format, mypy with
+  `PYTHONPATH=src`, commitizen) matching the hooks documented in 17-cicd.md
+- `.env.example` rewritten: added `RATE_LIMIT_*` and CORS variables
+
+#### Health Check Enhancement (InternTrack)
+- `GET /health` now runs a DB connectivity probe (`SELECT 1` via `get_db`)
+- Returns 200 `healthy` with `version` + `database: ok`, or 503 `degraded`
+  when the probe fails
+- Tests: integration health test asserts `database: ok` + `version`; new
+  `TestHealthEndpoint` unit tests (healthy + degraded 503)
+
 ## [1.4.0] - 2026-08-01
 
 ### Added

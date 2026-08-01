@@ -131,7 +131,7 @@ app.include_router(search_router, prefix="/api/v1/search", tags=["Search"])
 if __name__ == "__main__":
     uvicorn.run(
         "cybershield.main:app",
-        host="0.0.0.0",
+        host="0.0.0.0",  # nosec B104 (dev default, env-overridable)
         port=8000,
         reload=settings.debug,
     )

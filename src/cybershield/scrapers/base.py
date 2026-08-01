@@ -157,7 +157,8 @@ class BaseScraper(ABC):
     def _generate_cache_key(self, url: str, params: Optional[Dict[str, Any]] = None) -> str:
         """Generate a cache key from URL and parameters."""
         content = f"{url}:{params}"
-        return hashlib.md5(content.encode()).hexdigest()
+        # MD5 is used for cache-key fingerprinting, not security.
+        return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
 
     async def _do_fetch(
         self,
@@ -272,7 +273,8 @@ class BaseScraper(ABC):
     def _generate_content_hash(self, title: str, company: str, location: str) -> str:
         """Generate hash for deduplication."""
         content = f"{title.lower()}|{company.lower()}|{location.lower()}"
-        return hashlib.md5(content.encode()).hexdigest()
+        # MD5 is used for dedup fingerprinting, not security.
+        return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
 
     def _parse_date(self, date_str: Optional[str]) -> Optional[datetime]:
         """Parse date string into datetime."""

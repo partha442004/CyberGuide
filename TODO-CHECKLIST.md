@@ -570,6 +570,26 @@ sqlite3 data/interntrack.db "PRAGMA integrity_check;"
 
 ---
 
+## ✅ HARDENING PASS 3 (2026-08-01) — COMPLETED
+
+### Security Scanning (bandit)
+- [x] First `bandit -r src/` scan: 3 high (B324 weak MD5) + 5 medium (B104 bind-all) fixed
+- [x] MD5 in cache/scrapers now uses `usedforsecurity=False` (fingerprinting, not security)
+- [x] Dev `0.0.0.0` binds marked `# nosec B104` (env-overridable defaults)
+- [x] CI `security` job (`bandit -r src/ -ll -q`) gates the test job
+- [x] Makefile `security` + `security-report` targets
+
+### Pre-commit & Environment
+- [x] `.pre-commit-config.yaml` (ruff --fix + ruff-format, mypy with PYTHONPATH=src, commitizen)
+- [x] `.env.example` rewritten with `RATE_LIMIT_*` and CORS variables
+
+### Health Check
+- [x] `GET /health` runs DB connectivity probe (`SELECT 1`)
+- [x] 200 healthy with `version` + `database: ok`; 503 degraded on probe failure
+- [x] Integration test asserts `database: ok`; `TestHealthEndpoint` unit tests (healthy + degraded)
+
+---
+
 ## 🔄 QUICK REFERENCE
 
 ### Common Commands

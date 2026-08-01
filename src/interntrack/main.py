@@ -5,13 +5,15 @@ InternTrack - Main FastAPI Application
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.api.router import api_router
 from interntrack.config import get_settings
-from interntrack.database.session import close_db, init_db
+from interntrack.database.session import close_db, get_db, init_db
 from interntrack.domain.exceptions import AppException
 from interntrack.middleware.rate_limit import RateLimitMiddleware
 from interntrack.utils.logger import get_logger
@@ -95,9 +97,31 @@ async def root():
 
 
 @app.get("/health")
-async def health():
-    """Health check endpoint."""
-    return {"status": "healthy"}
+async def health(db: AsyncSession = Depends(get_db)):
+    """Health check endpoint with a database connectivity probe.
+
+    Returns 200 with ``status: healthy`` when the database responds, or 503
+    with ``status: degraded`` when the connectivity probe fails.
+
+    Note: if the database engine cannot be reached at all, session creation
+    fails inside ``get_db`` before this handler runs and the response is a 500
+    (via the global handler) rather than a 503. For a full readiness probe the
+    session should be created inside the handler with its own try/except.
+    """
+    db_ok = True
+    try:
+        await db.execute(text("SELECT 1"))
+    except Exception:
+        db_ok = False
+
+    payload = {
+        "status": "healthy" if db_ok else "degraded",
+        "version": settings.app_version,
+        "database": "ok" if db_ok else "error",
+    }
+    if not db_ok:
+        return JSONResponse(status_code=503, content=payload)
+    return payload
 
 
 def cli():

@@ -48,6 +48,12 @@ format-check: ## Check formatting without making changes
 typecheck: ## Run type checker (mypy)
 	mypy src/interntrack
 
+security: ## Run security scan (bandit)
+	bandit -r src/ -ll -q
+
+security-report: ## Generate HTML security report (bandit)
+	bandit -r src/ -f html -o bandit-report.html
+
 # Database
 db-migrate: ## Run database migrations
 	alembic upgrade head

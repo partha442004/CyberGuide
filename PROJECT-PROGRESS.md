@@ -11,16 +11,20 @@
 | **ruff lint** | ✅ All checks passed (was 1,294 errors) |
 | **ruff format** | ✅ 212 files formatted |
 | **mypy** | ✅ 0 errors in 177 source files (fixed 107 in cybershield) |
-| **InternTrack tests** | ✅ 416 passing |
+| **InternTrack tests** | ✅ 418 passing |
 | **CyberGuide tests** | ✅ 321 passing |
-| **Smoke test** | ✅ /health, /, CORS preflight, 404, docs (prod-off) verified |
-| **CI pipeline** | ✅ .github/workflows/ci.yml added (lint + typecheck + tests + coverage) |
+| **Smoke test** | ✅ /health (DB probe), /, CORS preflight, 404, docs (prod-off) verified |
+| **CI pipeline** | ✅ .github/workflows/ci.yml (lint + typecheck + tests + coverage + security) |
+| **Security scan** | ✅ bandit clean at medium+ (fixed 3x MD5 + 5x bind-all) |
 
 ### Highlights
 - **Error handling**: dedicated `AppException` handler + consistent `{error: {code, message, details}}` payload; debug detail gated
 - **CORS**: settings-driven with comma-separated env parsing + integration tests
 - **API rate limiting**: `RateLimitMiddleware` (per-IP 100/min, per-API-key 1000/min), 429 with error contract, exempt paths, `RATE_LIMIT_*` env overrides
 - **Dashboard component tests**: 46 tests for cards/forms/charts via fake streamlit + plotly modules
+- **Security**: bandit scan clean at medium+ — MD5 `usedforsecurity=False` (cache/dedup), `# nosec B104` on dev binds; CI security job gates tests
+- **Pre-commit**: `.pre-commit-config.yaml` added (ruff, mypy with PYTHONPATH, commitizen)
+- **Health check**: `/health` runs a DB probe — 200 healthy (version, database) / 503 degraded
 - **Real bugs fixed**: httpx 0.28 `allow_redirects` removal, `NotificationPriority.NORMAL`, `SkillTrend.recorded_at`, `Company.is_trusted` (models + migration), `Job.company` relationship shadowing the string column (broke search), scheduler `not Job.is_verified` filter
 - New tests: `tests/unit/test_main.py` (11) + `tests/unit/test_rate_limit.py` (9) + `tests/unit/test_dashboard_components.py` (46) + `TestCorsMiddleware` integration tests
 
@@ -40,7 +44,7 @@
 | **Engines** | ✅ Complete | 100% | Dedup, verify, classify |
 | **Notifications** | ✅ Complete | 100% | Telegram, Email, Discord |
 | **Dashboard** | ✅ Complete | 100% | Streamlit with charts |
-| **Tests** | ✅ Complete | 100% | 737 tests passing |
+| **Tests** | ✅ Complete | 100% | 739 tests passing |
 | **CI/CD** | ✅ Complete | 100% | GitHub Actions ready |
 | **Documentation** | ✅ Complete | 100% | All docs created |
 | **Docker** | ✅ Complete | 100% | Compose ready |
@@ -51,10 +55,10 @@
 ## 📊 FINAL TEST RESULTS
 
 ```
-======================== 737 passed ========================
-InternTrack: 416 passed
+======================== 739 passed ========================
+InternTrack: 418 passed
 CyberGuide (cybershield): 321 passed
-Total: 737 tests passing
+Total: 739 tests passing
 ```
 
 ### Coverage Improvement Summary
@@ -68,9 +72,9 @@ Total: 737 tests passing
 | Phase 4 | 239 | 72% | +47 tests, +6% |
 | Phase 5 | 271 | 74% | +32 tests, +2% |
 | Phase 6 | 331 | 80% | +60 tests, +6% |
-| **Latest** | **416** | **82%+** | +58 tests (InternTrack, incl. rate limit + dashboard) |
+| **Latest** | **418** | **82%+** | +60 tests (InternTrack, incl. rate limit + dashboard + health) |
 | **CyberGuide** | **321** | — | Full cleanup + engine/ES tests added |
-| **Combined** | **737** | **67%** | interntrack + cybershield measured together |
+| **Combined** | **739** | **67%** | interntrack + cybershield measured together |
 
 ---
 
@@ -111,7 +115,7 @@ Total: 737 tests passing
 - [x] `src/interntrack/utils/` - 4 utility files
 - [x] `src/interntrack/reports/templates/` - 3 report templates
 
-### Tests (737 total: 416 InternTrack + 321 CyberGuide)
+### Tests (739 total: 418 InternTrack + 321 CyberGuide)
 - [x] `tests/conftest.py` - Test fixtures
 - [x] `tests/unit/test_job_service.py` - 8 tests
 - [x] `tests/unit/test_application_service.py` - 8 tests
@@ -227,13 +231,13 @@ uvicorn interntrack.main:app --reload
 | Unit - Indeed Scraper | 12 | ✅ |
 | Unit - Glassdoor Scraper | 12 | ✅ |
 | Unit - Learning Service | 16 | ✅ |
-| Unit - Main/Error Handling | 11 | ✅ **NEW** |
+| Unit - Main/Error Handling | 13 | ✅ (incl. health endpoint) |
 | Unit - Rate Limiting | 10 | ✅ **NEW** |
 | Unit - Dashboard Components | 46 | ✅ **NEW** |
-| Integration - API | 23 | ✅ (incl. CORS middleware) |
-| **Total (InternTrack)** | **416** | ✅ **All Passing** |
+| Integration - API | 23 | ✅ (incl. CORS middleware + health) |
+| **Total (InternTrack)** | **418** | ✅ **All Passing** |
 | **CyberGuide (cybershield)** | **321** | ✅ **All Passing** |
-| **Grand Total** | **737** | ✅ **All Passing** |
+| **Grand Total** | **739** | ✅ **All Passing** |
 
 ---
 

@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production"  # noqa: S105 (dev default)
 
     # API Server
-    api_host: str = "0.0.0.0"  # noqa: S104 (dev default)
+    api_host: str = "0.0.0.0"  # noqa: S104 # nosec B104 (dev default)
     api_port: int = 8000
     api_key_header: str = "X-API-Key"
 

@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production"
 
     # API Server
-    api_host: str = "0.0.0.0"
+    api_host: str = "0.0.0.0"  # nosec B104 (dev default, env-overridable)
     api_port: int = 8000
     api_key_header: str = "X-API-Key"
 

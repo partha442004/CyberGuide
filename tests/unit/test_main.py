@@ -59,6 +59,41 @@ class TestDomainExceptionHandler:
         assert data["error"]["message"] == "something broke"
 
 
+class TestHealthEndpoint:
+    """Tests for the /health endpoint with DB connectivity probe."""
+
+    @pytest.mark.asyncio
+    async def test_healthy_when_db_ok(self):
+        """A working database yields a healthy payload."""
+        from interntrack.main import health
+
+        class _OkDB:
+            async def execute(self, *args, **kwargs):
+                return None
+
+        payload = await health(db=_OkDB())
+        assert payload["status"] == "healthy"
+        assert payload["database"] == "ok"
+        assert "version" in payload
+
+    @pytest.mark.asyncio
+    async def test_degraded_when_db_fails(self):
+        """A failing DB probe yields a 503 degraded payload."""
+        import json as jsonlib
+
+        from interntrack.main import health
+
+        class _BrokenDB:
+            async def execute(self, *args, **kwargs):
+                raise RuntimeError("db unreachable")
+
+        response = await health(db=_BrokenDB())
+        assert response.status_code == 503
+        data = jsonlib.loads(response.body)
+        assert data["status"] == "degraded"
+        assert data["database"] == "error"
+
+
 class TestGlobalExceptionHandler:
     """Tests for the global fallback exception handler."""
 

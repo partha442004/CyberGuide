@@ -34,7 +34,7 @@ def start_api():
                 "uvicorn",
                 "cybershield.main:app",
                 "--host",
-                "0.0.0.0",
+                "0.0.0.0",  # nosec B104 (dev default)
                 "--port",
                 "8000",
                 "--reload",
@@ -62,7 +62,7 @@ def start_dashboard():
                 "--server.port",
                 "8501",
                 "--server.address",
-                "0.0.0.0",
+                "0.0.0.0",  # nosec B104 (dev default)
             ],
             cwd=str(PROJECT_ROOT),
         )
