@@ -605,6 +605,18 @@ docker compose --profile monitoring up -d prometheus grafana
 > `admin`/`admin` is for local dev only. Provisioned dashboards are
 > read-only (`allowUiUpdates: false`).
 
+Prometheus also loads **alerting rules** from `deploy/prometheus/alerts.yml`
+(`rule_files` in `prometheus.yml`, mounted into the container):
+
+| Alert | Expression (simplified) | Severity | `for` |
+|-------|------------------------|----------|-------|
+| `HighErrorRate` | 5xx rate / request rate > 0.1 | critical | 5m |
+| `HighLatency` | `interntrack_http_request_duration_ms > 1000` | warning | 5m |
+| `ServiceDown` | `up{job="interntrack-api"} == 0` | critical | 1m |
+
+View them at `http://localhost:9090/alerts`. Every expression is pinned to
+an emitted `interntrack_http_*` metric by `tests/unit/test_prometheus_alerts.py`.
+
 For Kubernetes, the API `Service` (`k8s/raw/06-api.yaml`) carries
 `prometheus.io/scrape: "true"` (+ `path`/`port`) annotations for
 `kubernetes_sd_configs`-based scraping.

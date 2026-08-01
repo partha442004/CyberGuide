@@ -12,6 +12,11 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+# Alerting rules for the InternTrack API (see alerts.yml). Loaded relative to
+# this file, i.e. /etc/prometheus/alerts.yml inside the container.
+rule_files:
+  - alerts.yml
+
 scrape_configs:
   - job_name: interntrack-api
     metrics_path: /metrics/prometheus
