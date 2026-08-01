@@ -157,7 +157,7 @@ async def index_jobs(jobs: List[Dict[str, Any]]) -> int:
         if actions:
             success, _ = await async_bulk(_es_client, actions)
             logger.info(f"Indexed {success} jobs into Elasticsearch")
-            return success
+            return int(success)
         return 0
     except Exception as e:
         logger.error(f"Bulk index failed: {e}")

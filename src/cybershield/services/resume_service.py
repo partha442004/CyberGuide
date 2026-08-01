@@ -257,9 +257,9 @@ class ResumeParser:
         import pymupdf
 
         # Extract text from PDF
-        doc = pymupdf.open(file_path)
+        doc: Any = pymupdf.open(file_path)
         full_text = ""
-        for page in doc:  # type: ignore[attr-defined]
+        for page in doc:
             full_text += page.get_text()
         doc.close()
 

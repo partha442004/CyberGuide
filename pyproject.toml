@@ -133,9 +133,12 @@ disallow_untyped_calls = false
 module = [
     "apscheduler.*",
     "bs4",
+    "elasticsearch",
+    "elasticsearch.*",
     "feedparser",
     "google",
     "google.generativeai",
+    "pymupdf",
     "structlog",
     "streamlit",
     "plotly",

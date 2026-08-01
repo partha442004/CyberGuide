@@ -4,7 +4,7 @@ Job repository with job-specific queries.
 
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.domain.enums import JobSource, JobType
@@ -168,18 +168,27 @@ class JobRepository(BaseRepository[Job]):
 
     async def deactivate_expired(self) -> int:
         """Deactivate expired jobs."""
-        from sqlalchemy import update
-
-        result = await self.session.execute(
-            update(Job)
-            .where(
-                and_(
-                    Job.expires_at.isnot(None),
-                    Job.expires_at < datetime.now(UTC),
-                    Job.is_active,
-                ),
+        now = datetime.now(UTC)
+        expired_ids = (
+            (
+                await self.session.execute(
+                    select(Job.id).where(
+                        and_(
+                            Job.expires_at.isnot(None),
+                            Job.expires_at < now,
+                            Job.is_active,
+                        ),
+                    ),
+                )
             )
-            .values(is_active=False),
+            .scalars()
+            .all()
         )
-        await self.session.flush()
-        return result.rowcount
+
+        if expired_ids:
+            await self.session.execute(
+                update(Job).where(Job.id.in_(expired_ids)).values(is_active=False),
+            )
+            await self.session.flush()
+
+        return len(expired_ids)

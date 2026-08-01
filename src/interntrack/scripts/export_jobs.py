@@ -5,6 +5,7 @@ Export jobs to CSV format.
 import asyncio
 import csv
 from pathlib import Path
+from typing import Any
 
 from interntrack.database.session import get_db_session, init_db
 from interntrack.domain.models import Job
@@ -114,7 +115,7 @@ def _export_json(jobs: list[Job], output_path: Path):
     """Export jobs to JSON format."""
     import json
 
-    data = []
+    data: list[dict[str, Any]] = []
     for job in jobs:
         data.append(
             {
