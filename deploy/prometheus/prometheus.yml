@@ -1,0 +1,23 @@
+# Prometheus scrape configuration for the InternTrack API.
+#
+# The API exposes dependency-free metrics in Prometheus text format at
+# GET /metrics/prometheus (see src/interntrack/metrics.py). This file is
+# mounted into the prometheus service in docker-compose.yml.
+#
+# Usage:
+#   docker compose up -d prometheus
+#   open http://localhost:9090
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: interntrack-api
+    metrics_path: /metrics/prometheus
+    static_configs:
+      - targets:
+          - api:8000
+        labels:
+          app: interntrack
+          component: api

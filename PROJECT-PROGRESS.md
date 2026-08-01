@@ -29,7 +29,12 @@
 - **Pre-commit**: `.pre-commit-config.yaml` added (ruff, mypy with PYTHONPATH, commitizen)
 - **Health check**: `/health` creates its own session via `async_session_factory` — engine-down now returns **503 degraded** (was 500); 200 healthy (version, database) / 503 degraded; conftest points the factory at the in-memory test engine
 - **Metrics**: `GET /metrics` (request counts, error rate, avg latency, status histogram) via in-memory `MetricsStore` + middleware; 429s recorded, /metrics exempt from both recording and rate limiting
-- **Version**: both packages single-source-of-truth at **1.12.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate
+- **Prometheus**: dependency-free `GET /metrics/prometheus` (text exposition
+  format, same counters as `/metrics`); exempt from recording + rate
+  limiting; `deploy/prometheus/prometheus.yml` + compose `prometheus`
+  service (`monitoring` profile); k8s `prometheus.io` Service annotations;
+  6 new tests (renderer format/escaping + endpoint + exempt-path coverage)
+- **Version**: both packages single-source-of-truth at **1.13.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate
 - **Lint**: `dashboard/` now in CI ruff scope — all 24 pre-existing dashboard
   errors fixed (S110→suppress, C408, PIE810, ARG001, E501, COM812, unused
   imports/locals); `make lint/format/format-check` cover `src/ tests/ dashboard/`
@@ -58,7 +63,7 @@
 | **Engines** | ✅ Complete | 100% | Dedup, verify, classify |
 | **Notifications** | ✅ Complete | 100% | Telegram, Email, Discord |
 | **Dashboard** | ✅ Complete | 100% | Streamlit with charts |
-| **Tests** | ✅ Complete | 100% | 776 tests passing |
+| **Tests** | ✅ Complete | 100% | 782 tests passing |
 | **CI/CD** | ✅ Complete | 100% | GitHub Actions ready |
 | **Documentation** | ✅ Complete | 100% | All docs created |
 | **Docker** | ✅ Complete | 100% | Compose ready |
@@ -69,10 +74,10 @@
 ## 📊 FINAL TEST RESULTS
 
 ```
-======================== 776 passed ========================
+======================== 782 passed ========================
 InternTrack: 453 passed
 CyberGuide (cybershield): 323 passed
-Total: 776 tests passing
+Total: 782 tests passing
 ```
 
 ### Coverage Improvement Summary
@@ -134,7 +139,7 @@ Total: 776 tests passing
 - [x] `src/interntrack/utils/` - 4 utility files
 - [x] `src/interntrack/reports/templates/` - 3 report templates
 
-### Tests (776 total: 453 InternTrack + 323 CyberGuide)
+### Tests (782 total: 459 InternTrack + 323 CyberGuide)
 - [x] `tests/conftest.py` - Test fixtures
 - [x] `tests/unit/test_job_service.py` - 8 tests
 - [x] `tests/unit/test_application_service.py` - 8 tests

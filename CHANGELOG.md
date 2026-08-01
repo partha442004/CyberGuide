@@ -4,6 +4,38 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.13.0] - 2026-08-01
+
+### Added
+
+#### Prometheus Integration (InternTrack)
+- `MetricsStore.render_prometheus()` — dependency-free renderer emitting the
+  standard Prometheus text exposition format (`# HELP` / `# TYPE` + labeled
+  samples) with proper label escaping (backslash, double-quote, newline); no
+  `prometheus_client` dependency required
+- New `GET /metrics/prometheus` endpoint serving the same in-memory counters
+  (`interntrack_http_requests_total`, `interntrack_http_errors_total`,
+  `interntrack_http_error_rate`, `interntrack_http_request_duration_ms`) with
+  per-path and per-status labels
+- `/metrics/prometheus` added to the rate-limiter exempt paths and the
+  `MetricsMiddleware` exempt set so scrapers stay reliable and counters stay
+  stable
+- New `deploy/prometheus/prometheus.yml` scrape config (job
+  `interntrack-api`, 15s interval, target `api:8000`) + `prometheus` service
+  (`prom/prometheus:v2.53.0`) in `docker-compose.yml` behind the `monitoring`
+  profile with a `prometheus_data` volume — `docker compose --profile monitoring up -d prometheus`
+- `prometheus.io/scrape|path|port` annotations added to the `k8s/raw/06-api.yaml`
+  Service for `kubernetes_sd_configs`-based scraping
+- Tests: `TestRenderPrometheus` (format, HELP/TYPE headers, labeled samples,
+  label escaping) + middleware tests (endpoint returns `text/plain` text
+  format, reflects recorded requests, is not recorded itself) + rate-limit
+  exempt-path coverage for `/metrics/prometheus`
+
+#### Version
+- Both packages, `.env`/`.env.example`, canaries, Helm chart, Oracle
+  deployment files, and docs bumped to `1.13.0`; root `pyproject.toml`
+  synced — verified by `make version-check` (exit 0)
+
 ## [1.12.0] - 2026-08-01
 
 ### Added

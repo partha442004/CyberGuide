@@ -8,7 +8,7 @@
 
 - ✅ **mypy**: 0 errors across 177 source files (107 cybershield errors fixed)
 - ✅ **ruff**: all checks pass, 212 files formatted
-- ✅ **Tests**: 453 InternTrack + 323 CyberGuide = **776 passing**
+- ✅ **Tests**: 459 InternTrack + 323 CyberGuide = **782 passing**
 - ✅ **CI**: `.github/workflows/ci.yml` (ruff, mypy, full test suite + coverage + bandit + safety + Trivy security jobs); `.github/workflows/cd.yml` (tag-based deploy)
 - ✅ **Error handling**: `AppException` handler + consistent error payload; CORS settings-driven
 - ✅ **API rate limiting**: `RateLimitMiddleware` (per-IP 100/min, per-API-key 1000/min) with 429 error contract, exempt paths, `RATE_LIMIT_*` env overrides
@@ -16,7 +16,11 @@
 - ✅ **Security**: bandit clean at medium+ (MD5 `usedforsecurity=False`, `# nosec B104`); safety deps scan 0 vulnerabilities; pre-commit config added
 - ✅ **Health check**: `/health` creates its own session (`async_session_factory`) — engine-down returns **503 degraded** (was 500); 200 healthy / 503 degraded; conftest points factory at in-memory test engine
 - ✅ **Metrics**: `GET /metrics` (request counts, error rate, latency, status histogram) — new `MetricsStore` + middleware, 10 tests
-- ✅ **Version**: both packages single-source-of-truth at **1.12.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate; CONTRIBUTING release-bump checklist
+- ✅ **Prometheus**: dependency-free `GET /metrics/prometheus` (Prometheus
+  text exposition format) exposing the same counters; exempt from recording
+  + rate limiting; `deploy/prometheus/prometheus.yml` + compose `prometheus`
+  service (`monitoring` profile); k8s `prometheus.io` Service annotations
+- ✅ **Version**: both packages single-source-of-truth at **1.13.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate; CONTRIBUTING release-bump checklist
 - ✅ **Lint**: dashboard in CI ruff scope; all 24 pre-existing dashboard errors
   fixed; `make lint/format/format-check` cover `src/ tests/ dashboard/`
 - ✅ **Smoke**: live API smoke test (`scripts/smoke_test.py`) booting real
@@ -187,8 +191,8 @@ internship-tracker/
 ## 🧪 Test Results
 
 ### Test Summary
-- **Total Tests:** 776 (453 InternTrack + 323 CyberGuide)
-- **Tests Passing:** ✅ 776 (100%)
+- **Total Tests:** 782 (459 InternTrack + 323 CyberGuide)
+- **Tests Passing:** ✅ 782 (100%)
 - **Test Files:** 32+ test files
 
 ### Test Breakdown
@@ -229,7 +233,7 @@ internship-tracker/
 | Integration - API | 23 | ✅ (incl. CORS middleware + health) |
 | **Total (InternTrack)** | **453** | ✅ **All Passing** |
 | **CyberGuide (cybershield)** | **323** | ✅ **All Passing** |
-| **Grand Total** | **776** | ✅ **All Passing** |
+| **Grand Total** | **782** | ✅ **All Passing** |
 
 ---
 

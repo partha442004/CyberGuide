@@ -112,8 +112,23 @@ services:
     profiles:
       - ai
 
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: cyberguide-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - api
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
 volumes:
   redis_data:
   postgres_data:
   es_data:
   ollama_data:
+  prometheus_data:

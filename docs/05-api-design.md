@@ -542,6 +542,63 @@ Exposes in-memory request metrics collected by `MetricsMiddleware`
 - HTTP >= 500 responses count as errors; 4xx are not
 - `/metrics` itself is not recorded, and is exempt from rate limiting
 
+### Prometheus Metrics
+```
+GET /metrics/prometheus
+```
+
+Serves the **same** in-memory counters in the Prometheus text exposition
+format (`# HELP` / `# TYPE` + labeled samples) so a Prometheus server can
+scrape it without requiring the `prometheus_client` library:
+
+```
+# HELP interntrack_http_requests_total Total HTTP requests.
+# TYPE interntrack_http_requests_total counter
+interntrack_http_requests_total 100
+# HELP interntrack_http_requests_by_path_total Total HTTP requests per path.
+# TYPE interntrack_http_requests_by_path_total counter
+interntrack_http_requests_by_path_total{path="/api/v1/jobs/"} 40
+# HELP interntrack_http_requests_by_status_total Total HTTP requests per status.
+# TYPE interntrack_http_requests_by_status_total counter
+interntrack_http_requests_by_status_total{status="200"} 98
+# HELP interntrack_http_errors_total Total HTTP 5xx responses.
+# TYPE interntrack_http_errors_total counter
+interntrack_http_errors_total 2
+# HELP interntrack_http_errors_by_path_total Total HTTP 5xx responses per path.
+# TYPE interntrack_http_errors_by_path_total counter
+interntrack_http_errors_by_path_total{path="/api/v1/boom"} 2
+# HELP interntrack_http_error_rate Fraction of requests with 5xx.
+# TYPE interntrack_http_error_rate gauge
+interntrack_http_error_rate 0.02
+# HELP interntrack_http_request_duration_ms Average latency in ms.
+# TYPE interntrack_http_request_duration_ms gauge
+interntrack_http_request_duration_ms 12.345
+```
+
+> Each labeled metric uses its own family name (`*_by_path_total`,
+> `*_by_status_total`) so `sum()`/`rate()` never mix label sets and cannot
+> double-count across families.
+
+- Label values are escaped per the exposition format (backslash, `"`, newline)
+- Response `Content-Type: text/plain; version=0.0.4; charset=utf-8`
+- `/metrics/prometheus` is exempt from both metrics recording and rate
+  limiting so scrapers stay reliable
+
+#### Local monitoring stack
+
+`docker-compose.yml` ships a Prometheus service (behind the `monitoring`
+profile) pre-configured by `deploy/prometheus/prometheus.yml` to scrape
+`api:8000/metrics/prometheus` every 15s:
+
+```bash
+docker compose --profile monitoring up -d prometheus
+# open http://localhost:9090
+```
+
+For Kubernetes, the API `Service` (`k8s/raw/06-api.yaml`) carries
+`prometheus.io/scrape: "true"` (+ `path`/`port`) annotations for
+`kubernetes_sd_configs`-based scraping.
+
 ---
 
 ## Rate Limiting
@@ -556,7 +613,8 @@ InternTrack applies API-level rate limiting via `RateLimitMiddleware`
 | Per IP | 100 req/min | `RATE_LIMIT_PER_MINUTE` |
 | Per API key (`X-API-Key`) | 1000 req/min | `RATE_LIMIT_API_KEY_PER_MINUTE` |
 
-- **Exempt paths:** `/`, `/health`, `/metrics`, `/docs`, `/redoc`, `/openapi.json`
+- **Exempt paths:** `/`, `/health`, `/metrics`, `/metrics/prometheus`,
+  `/docs`, `/redoc`, `/openapi.json`
 - **Disable:** set `RATE_LIMIT_ENABLED=false`
 
 Responses include `X-RateLimit-Limit`, `X-RateLimit-Remaining`,
