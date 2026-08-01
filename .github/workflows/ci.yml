@@ -72,15 +72,13 @@ jobs:
       - name: Safety dependency scan
         run: safety check -r requirements.txt -r requirements-dev.txt --full-report
 
-      - name: Trivy filesystem scan (HIGH/CRITICAL)
-        uses: aquasecurity/trivy-action@v0.30.0
+      - name: Install Trivy
+        uses: aquasecurity/setup-trivy@v0.3.1
         with:
-          scan-type: fs
-          scan-ref: src/
-          skip-dirs: tests,dashboard,data,migrations
-          severity: HIGH,CRITICAL
-          exit-code: '1'
-          format: table
+          version: latest
+
+      - name: Trivy filesystem scan (HIGH/CRITICAL)
+        run: trivy fs --severity HIGH,CRITICAL --exit-code 1 --skip-dirs tests,dashboard,data,migrations src/
 
   version:
     name: Version consistency
