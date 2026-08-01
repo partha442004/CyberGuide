@@ -2,7 +2,7 @@
 Base repository with common CRUD operations.
 """
 
-from typing import Any, Generic, List, Optional, Type, TypeVar
+from typing import Generic, TypeVar
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -16,11 +16,11 @@ ModelType = TypeVar("ModelType", bound=Base)
 class BaseRepository(Generic[ModelType]):
     """Base repository with common CRUD operations."""
 
-    def __init__(self, model: Type[ModelType], session: AsyncSession):
+    def __init__(self, model: type[ModelType], session: AsyncSession):
         self.model = model
         self.session = session
 
-    async def get_by_id(self, id: str) -> Optional[ModelType]:
+    async def get_by_id(self, id: str) -> ModelType | None:
         """Get a record by ID."""
         result = await self.session.execute(select(self.model).where(self.model.id == id))
         return result.scalar_one_or_none()
@@ -29,8 +29,8 @@ class BaseRepository(Generic[ModelType]):
         self,
         skip: int = 0,
         limit: int = 100,
-        filters: Optional[dict] = None,
-    ) -> List[ModelType]:
+        filters: dict | None = None,
+    ) -> list[ModelType]:
         """Get all records with optional filters."""
         query = select(self.model)
 
@@ -43,7 +43,7 @@ class BaseRepository(Generic[ModelType]):
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
-    async def count(self, filters: Optional[dict] = None) -> int:
+    async def count(self, filters: dict | None = None) -> int:
         """Count records with optional filters."""
         from sqlalchemy import func
 
@@ -65,7 +65,7 @@ class BaseRepository(Generic[ModelType]):
         await self.session.flush()
         return obj
 
-    async def create_many(self, objects: List[ModelType]) -> List[ModelType]:
+    async def create_many(self, objects: list[ModelType]) -> list[ModelType]:
         """Create multiple records."""
         for obj in objects:
             if not obj.id:
@@ -74,7 +74,7 @@ class BaseRepository(Generic[ModelType]):
         await self.session.flush()
         return objects
 
-    async def update(self, id: str, updates: dict) -> Optional[ModelType]:
+    async def update(self, id: str, updates: dict) -> ModelType | None:
         """Update a record by ID."""
         obj = await self.get_by_id(id)
         if obj:
@@ -96,6 +96,6 @@ class BaseRepository(Generic[ModelType]):
     async def exists(self, id: str) -> bool:
         """Check if a record exists."""
         result = await self.session.execute(
-            select(self.model.id).where(self.model.id == id)
+            select(self.model.id).where(self.model.id == id),
         )
         return result.scalar_one_or_none() is not None

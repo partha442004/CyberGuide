@@ -6,9 +6,8 @@ Provides WebSocket connections for real-time job notifications.
 
 import json
 import logging
-from typing import Optional
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from cybershield.notifications.websocket import ws_manager
 
@@ -42,7 +41,7 @@ async def websocket_endpoint(
         # Send welcome message
         await websocket.send_json({
             "type": "connected",
-            "message": f"Connected to CyberGuide notifications",
+            "message": "Connected to CyberGuide notifications",
             "user_id": user_id,
             "connection_id": conn_id,
         })

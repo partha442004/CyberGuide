@@ -6,12 +6,11 @@ Workday uses a POST JSON API endpoint for job search.
 """
 
 import logging
-from abc import abstractmethod
 from typing import Any, Dict, List, Optional
 
 import httpx
 
-from cybershield.scrapers.base import ScrapedJob, ScraperConfig
+from cybershield.scrapers.base import ScrapedJob
 from cybershield.scrapers.companies.base_company import BaseCompanyScraper
 
 logger = logging.getLogger(__name__)

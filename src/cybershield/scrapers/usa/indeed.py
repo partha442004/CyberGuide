@@ -5,7 +5,7 @@ Scrapes cybersecurity jobs from Indeed.com (USA).
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 from urllib.parse import urlencode
 
 from bs4 import BeautifulSoup
@@ -153,8 +153,8 @@ class IndeedScraper(BaseScraper):
 
     def _parse_relative_date(self, text: str) -> Optional[Any]:
         """Parse relative date like 'Posted 3 days ago'."""
-        from datetime import datetime, timedelta, timezone
         import re
+        from datetime import datetime, timedelta, timezone
 
         text = text.lower().replace("posted", "").strip()
 

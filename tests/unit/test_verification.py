@@ -2,8 +2,9 @@
 Unit tests for VerificationEngine.
 """
 
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 
 from interntrack.engines.verification import VerificationEngine
 

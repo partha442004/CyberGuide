@@ -138,10 +138,10 @@ class ScraperRegistry:
 def _register_all_scrapers():
     """Register all built-in scrapers."""
     # India scrapers
-    from cybershield.scrapers.india.naukri import NaukriScraper
-    from cybershield.scrapers.india.internshala import InternshalaScraper
-    from cybershield.scrapers.india.unstop import UnstopScraper
     from cybershield.scrapers.india.freshersworld import FreshersworldScraper
+    from cybershield.scrapers.india.internshala import InternshalaScraper
+    from cybershield.scrapers.india.naukri import NaukriScraper
+    from cybershield.scrapers.india.unstop import UnstopScraper
 
     ScraperRegistry.register("naukri", NaukriScraper)
     ScraperRegistry.register("internshala", InternshalaScraper)
@@ -156,8 +156,8 @@ def _register_all_scrapers():
     ScraperRegistry.register("linkedin", LinkedInScraper)
 
     # Global scrapers
-    from cybershield.scrapers.worldwide.remoteok import RemoteOKScraper
     from cybershield.scrapers.worldwide.hackernews import HackerNewsScraper
+    from cybershield.scrapers.worldwide.remoteok import RemoteOKScraper
     from cybershield.scrapers.worldwide.rss_feeds import RSSFeedScraper
 
     ScraperRegistry.register("remoteok", RemoteOKScraper)
@@ -165,16 +165,16 @@ def _register_all_scrapers():
     ScraperRegistry.register("rss_feeds", RSSFeedScraper)
 
     # Company scrapers
-    from cybershield.scrapers.companies.microsoft import MicrosoftScraper
-    from cybershield.scrapers.companies.google import GoogleScraper
     from cybershield.scrapers.companies.amazon import AmazonScraper
+    from cybershield.scrapers.companies.checkpoint import CheckPointScraper
     from cybershield.scrapers.companies.cisco import CiscoScraper
     from cybershield.scrapers.companies.crowdstrike import CrowdStrikeScraper
-    from cybershield.scrapers.companies.paloalto import PaloAltoScraper
     from cybershield.scrapers.companies.fortinet import FortinetScraper
-    from cybershield.scrapers.companies.checkpoint import CheckPointScraper
-    from cybershield.scrapers.companies.symantec import SymantecScraper
+    from cybershield.scrapers.companies.google import GoogleScraper
     from cybershield.scrapers.companies.mcafee import McAfeeScraper
+    from cybershield.scrapers.companies.microsoft import MicrosoftScraper
+    from cybershield.scrapers.companies.paloalto import PaloAltoScraper
+    from cybershield.scrapers.companies.symantec import SymantecScraper
     from cybershield.scrapers.companies.trendmicro import TrendMicroScraper
 
     ScraperRegistry.register("company_microsoft", MicrosoftScraper)

@@ -8,9 +8,9 @@ Classifies jobs into categories and extracts skills using:
 - Experience level detection
 """
 
-import re
 import logging
-from typing import Any, Dict, List, Optional, Set
+import re
+from typing import Any, Dict, List, Optional
 
 from cybershield.engines.base import BaseEngine, EngineResult
 
@@ -312,7 +312,7 @@ class ClassificationEngine(BaseEngine):
                 "primary_domain": primary_domain,
                 "skills": skills,
                 "skills_list": [s["skill"] for s in skills],
-                "skill_categories": list(set(s["category"] for s in skills)),
+                "skill_categories": list({s["category"] for s in skills}),
             },
             job_id=job.get("id"),
         )

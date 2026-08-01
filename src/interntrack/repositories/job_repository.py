@@ -2,8 +2,7 @@
 Job repository with job-specific queries.
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +18,7 @@ class JobRepository(BaseRepository[Job]):
     def __init__(self, session: AsyncSession):
         super().__init__(Job, session)
 
-    async def get_by_url(self, url: str) -> Optional[Job]:
+    async def get_by_url(self, url: str) -> Job | None:
         """Get a job by URL (for deduplication)."""
         result = await self.session.execute(select(Job).where(Job.url == url))
         return result.scalar_one_or_none()
@@ -30,16 +29,16 @@ class JobRepository(BaseRepository[Job]):
         company: str,
         source: JobSource,
         tolerance_days: int = 7,
-    ) -> Optional[Job]:
+    ) -> Job | None:
         """Find potential duplicate job posting."""
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=tolerance_days)
+        cutoff_date = datetime.now(UTC) - timedelta(days=tolerance_days)
         query = select(Job).where(
             and_(
                 func.lower(Job.title) == title.lower(),
                 func.lower(Job.company) == company.lower(),
                 Job.source == source,
                 Job.created_at >= cutoff_date,
-            )
+            ),
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
@@ -48,10 +47,10 @@ class JobRepository(BaseRepository[Job]):
         self,
         skip: int = 0,
         limit: int = 100,
-        job_type: Optional[JobType] = None,
-        is_remote: Optional[bool] = None,
-        company: Optional[str] = None,
-    ) -> List[Job]:
+        job_type: JobType | None = None,
+        is_remote: bool | None = None,
+        company: str | None = None,
+    ) -> list[Job]:
         """Get active jobs with filters."""
         query = select(Job).where(Job.is_active == True)
 
@@ -68,15 +67,15 @@ class JobRepository(BaseRepository[Job]):
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
-    async def get_jobs_by_source(self, source: JobSource) -> List[Job]:
+    async def get_jobs_by_source(self, source: JobSource) -> list[Job]:
         """Get all jobs from a specific source."""
         query = select(Job).where(Job.source == source)
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
-    async def get_recent_jobs(self, days: int = 7) -> List[Job]:
+    async def get_recent_jobs(self, days: int = 7) -> list[Job]:
         """Get jobs posted in the last N days."""
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+        cutoff_date = datetime.now(UTC) - timedelta(days=days)
         query = (
             select(Job)
             .where(Job.created_at >= cutoff_date)
@@ -85,9 +84,9 @@ class JobRepository(BaseRepository[Job]):
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
-    async def get_closing_soon(self, days: int = 2) -> List[Job]:
+    async def get_closing_soon(self, days: int = 2) -> list[Job]:
         """Get jobs closing within N days."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cutoff = now + timedelta(days=days)
         query = (
             select(Job)
@@ -97,14 +96,14 @@ class JobRepository(BaseRepository[Job]):
                     Job.expires_at <= cutoff,
                     Job.expires_at >= now,
                     Job.is_active == True,
-                )
+                ),
             )
             .order_by(Job.expires_at)
         )
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
-    async def get_top_companies(self, limit: int = 10) -> List[tuple]:
+    async def get_top_companies(self, limit: int = 10) -> list[tuple]:
         """Get top companies by job count."""
         query = (
             select(Job.company, func.count(Job.id).label("count"))
@@ -116,7 +115,7 @@ class JobRepository(BaseRepository[Job]):
         result = await self.session.execute(query)
         return list(result.all())
 
-    async def search_jobs(self, query_str: str, limit: int = 50) -> List[Job]:
+    async def search_jobs(self, query_str: str, limit: int = 50) -> list[Job]:
         """Search jobs by title, company, or description."""
         search_term = f"%{query_str}%"
         query = (
@@ -129,7 +128,7 @@ class JobRepository(BaseRepository[Job]):
                         | Job.company.ilike(search_term)
                         | Job.description.ilike(search_term)
                     ),
-                )
+                ),
             )
             .order_by(Job.created_at.desc())
             .limit(limit)
@@ -145,7 +144,7 @@ class JobRepository(BaseRepository[Job]):
             func.avg(Job.salary_min).label("avg_min"),
             func.avg(Job.salary_max).label("avg_max"),
         ).where(
-            and_(Job.salary_min.isnot(None), Job.salary_max.isnot(None))
+            and_(Job.salary_min.isnot(None), Job.salary_max.isnot(None)),
         )
         result = await self.session.execute(query)
         row = result.one()
@@ -156,7 +155,7 @@ class JobRepository(BaseRepository[Job]):
             "avg_max": round(row.avg_max, 2) if row.avg_max else None,
         }
 
-    async def get_job_type_distribution(self) -> List[tuple]:
+    async def get_job_type_distribution(self) -> list[tuple]:
         """Get job type distribution."""
         query = (
             select(Job.job_type, func.count(Job.id).label("count"))
@@ -176,11 +175,11 @@ class JobRepository(BaseRepository[Job]):
             .where(
                 and_(
                     Job.expires_at.isnot(None),
-                    Job.expires_at < datetime.now(timezone.utc),
+                    Job.expires_at < datetime.now(UTC),
                     Job.is_active == True,
-                )
+                ),
             )
-            .values(is_active=False)
+            .values(is_active=False),
         )
         await self.session.flush()
         return result.rowcount

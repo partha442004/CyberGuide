@@ -2,8 +2,7 @@
 Application repository with application-specific queries.
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,17 +18,17 @@ class ApplicationRepository(BaseRepository[Application]):
     def __init__(self, session: AsyncSession):
         super().__init__(Application, session)
 
-    async def get_by_job_id(self, job_id: str) -> Optional[Application]:
+    async def get_by_job_id(self, job_id: str) -> Application | None:
         """Get application by job ID."""
         result = await self.session.execute(
-            select(Application).where(Application.job_id == job_id)
+            select(Application).where(Application.job_id == job_id),
         )
         return result.scalar_one_or_none()
 
-    async def get_by_status(self, status: ApplicationStatus) -> List[Application]:
+    async def get_by_status(self, status: ApplicationStatus) -> list[Application]:
         """Get all applications with a specific status."""
         result = await self.session.execute(
-            select(Application).where(Application.status == status)
+            select(Application).where(Application.status == status),
         )
         return list(result.scalars().all())
 
@@ -42,9 +41,9 @@ class ApplicationRepository(BaseRepository[Application]):
         result = await self.session.execute(query)
         return {status: count for status, count in result.all()}
 
-    async def get_recent_applications(self, days: int = 30) -> List[Application]:
+    async def get_recent_applications(self, days: int = 30) -> list[Application]:
         """Get applications from the last N days."""
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+        cutoff_date = datetime.now(UTC) - timedelta(days=days)
         query = (
             select(Application)
             .where(Application.created_at >= cutoff_date)
@@ -53,9 +52,9 @@ class ApplicationRepository(BaseRepository[Application]):
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
-    async def get_application_timeline(self, days: int = 30) -> List[dict]:
+    async def get_application_timeline(self, days: int = 30) -> list[dict]:
         """Get application timeline for charts."""
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+        cutoff_date = datetime.now(UTC) - timedelta(days=days)
         query = (
             select(
                 func.date(Application.created_at).label("date"),
@@ -72,7 +71,7 @@ class ApplicationRepository(BaseRepository[Application]):
             for row in result.all()
         ]
 
-    async def get_pending_reminders(self) -> List[Application]:
+    async def get_pending_reminders(self) -> list[Application]:
         """Get applications that need reminders."""
         query = (
             select(Application)
@@ -83,15 +82,15 @@ class ApplicationRepository(BaseRepository[Application]):
                         ApplicationStatus.APPLIED,
                         ApplicationStatus.INTERVIEW,
                     ]),
-                )
+                ),
             )
         )
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
     async def get_priority_applications(
-        self, min_priority: int = 1
-    ) -> List[Application]:
+        self, min_priority: int = 1,
+    ) -> list[Application]:
         """Get high-priority applications."""
         query = (
             select(Application)
@@ -105,8 +104,8 @@ class ApplicationRepository(BaseRepository[Application]):
         self,
         application_id: str,
         new_status: ApplicationStatus,
-        notes: Optional[str] = None,
-    ) -> Optional[Application]:
+        notes: str | None = None,
+    ) -> Application | None:
         """Update application status with history tracking."""
         from interntrack.domain.models import ApplicationStatusHistory
 
@@ -118,7 +117,7 @@ class ApplicationRepository(BaseRepository[Application]):
         application.status = new_status
 
         if new_status == ApplicationStatus.APPLIED and not application.applied_at:
-            application.applied_at = datetime.now(timezone.utc)
+            application.applied_at = datetime.now(UTC)
 
         # Add status history entry
         history = ApplicationStatusHistory(

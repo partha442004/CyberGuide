@@ -9,9 +9,8 @@ Tests the TrendMicroScraper class covering:
 - Location detection
 """
 
-import pytest
-from cybershield.scrapers.companies.trendmicro import TrendMicroScraper
 from cybershield.scrapers.base import ScrapedJob, ScraperConfig
+from cybershield.scrapers.companies.trendmicro import TrendMicroScraper
 
 
 class TestTrendMicroScraper:

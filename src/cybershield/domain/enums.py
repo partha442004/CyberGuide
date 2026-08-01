@@ -69,19 +69,19 @@ class JobSource(str, Enum):
     UNSTOP = "unstop"
     FRESHERSWORLD = "freshersworld"
     AICTE = "aicte"
-    
+
     # USA
     LINKEDIN = "linkedin"
     INDEED = "indeed"
     GLASSDOOR = "glassdoor"
-    
+
     # Global
     REMOTE_OK = "remote_ok"
     HACKER_NEWS = "hackernews"
     WE_WORK_REMOTELY = "we_work_remotely"
     GOOGLE_JOBS = "google_jobs"
     RSS_FEED = "rss_feed"
-    
+
     # Company Careers
     MICROSOFT = "microsoft"
     GOOGLE = "google"
@@ -89,11 +89,11 @@ class JobSource(str, Enum):
     CROWDSTRIKE = "crowdstrike"
     CLOUDFLARE = "cloudflare"
     PALO_ALTO = "palo_alto"
-    
+
     # Security Platforms
     OWASP = "owasp"
     GITHUB = "github"
-    
+
     # Other
     MANUAL = "manual"
     UNKNOWN = "unknown"

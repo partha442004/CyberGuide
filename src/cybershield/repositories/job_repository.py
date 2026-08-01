@@ -4,14 +4,14 @@ Job Repository
 Specialized repository for job-related operations.
 """
 
-from typing import List, Optional, Sequence
 from datetime import datetime, timedelta, timezone
+from typing import List, Optional, Sequence
 
-from sqlalchemy import select, func, desc, and_, or_
+from sqlalchemy import and_, desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from cybershield.domain.models import Job, ScamScore, DuplicateGroup
+from cybershield.domain.models import DuplicateGroup, Job, ScamScore
 from cybershield.repositories.base import BaseRepository
 
 
@@ -53,7 +53,7 @@ class JobRepository(BaseRepository[Job]):
         """Search jobs with multiple filters."""
         stmt = (
             select(Job)
-            .where(Job.is_active == True)
+            .where(Job.is_active is True)
         )
 
         # Text search - search in title, description, and company name
@@ -102,7 +102,7 @@ class JobRepository(BaseRepository[Job]):
             select(Job)
             .where(
                 and_(
-                    Job.is_active == True,
+                    Job.is_active is True,
                     Job.expires_at <= future,
                     Job.expires_at >= now,
                 )
@@ -118,7 +118,7 @@ class JobRepository(BaseRepository[Job]):
             .join(ScamScore, Job.id == ScamScore.job_id)
             .where(
                 and_(
-                    Job.is_active == True,
+                    Job.is_active is True,
                     ScamScore.scam_score >= threshold,
                 )
             )

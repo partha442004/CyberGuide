@@ -2,13 +2,13 @@
 Unit tests for ApplicationService.
 """
 
-import pytest
 from unittest.mock import AsyncMock
-from datetime import datetime
 
-from interntrack.services.application_service import ApplicationService
-from interntrack.domain.models import Application
+import pytest
+
 from interntrack.domain.enums import ApplicationStatus
+from interntrack.domain.models import Application
+from interntrack.services.application_service import ApplicationService
 
 
 class TestApplicationService:

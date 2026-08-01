@@ -8,7 +8,6 @@ Detects potential job scams using:
 - Confidence scoring
 """
 
-import re
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
@@ -122,7 +121,7 @@ class ScamDetectionEngine(BaseEngine):
             # Check for unusual TLDs
             suspicious_tlds = [".xyz", ".top", ".club", ".site", ".online"]
             if any(domain.endswith(tld) for tld in suspicious_tlds):
-                return {"suspicious": True, "reason": f"Unusual TLD"}
+                return {"suspicious": True, "reason": "Unusual TLD"}
 
             return {"suspicious": False}
 
@@ -192,9 +191,6 @@ class ScamDetectionEngine(BaseEngine):
     ) -> Dict[str, Any]:
         """Calculate final scam confidence score."""
         # Weighted scoring
-        content_weight = 0.5
-        domain_weight = 0.3
-        email_weight = 0.2
 
         base_score = content_analysis.get("score", 0)
 

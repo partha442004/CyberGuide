@@ -10,8 +10,6 @@ import re
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
-import httpx
-
 from cybershield.scrapers.base import ScrapedJob, ScraperConfig
 from cybershield.scrapers.companies.base_company import BaseCompanyScraper
 

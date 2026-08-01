@@ -6,13 +6,13 @@ Manages and coordinates all notification channels.
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional
 
 from cybershield.notifications.base import (
     BaseNotifier,
     NotificationMessage,
-    NotificationType,
     NotificationPriority,
+    NotificationType,
 )
 
 logger = logging.getLogger(__name__)
@@ -97,7 +97,7 @@ class NotificationOrchestrator:
 
         outcomes = await asyncio.gather(*tasks, return_exceptions=True)
 
-        for name, outcome in zip(channel_names, outcomes):
+        for name, outcome in zip(channel_names, outcomes, strict=False):
             if isinstance(outcome, Exception):
                 logger.error(f"Error sending to {name}: {outcome}")
                 results[name] = False
@@ -321,10 +321,10 @@ class NotificationOrchestrator:
 
 def create_default_orchestrator(config: Dict[str, Any]) -> NotificationOrchestrator:
     """Create a notification orchestrator with default channels."""
-    from cybershield.notifications.telegram import TelegramNotifier
-    from cybershield.notifications.email import EmailNotifier
     from cybershield.notifications.discord import DiscordNotifier
+    from cybershield.notifications.email import EmailNotifier
     from cybershield.notifications.slack import SlackNotifier
+    from cybershield.notifications.telegram import TelegramNotifier
 
     orchestrator = NotificationOrchestrator()
 

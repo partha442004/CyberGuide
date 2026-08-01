@@ -4,7 +4,7 @@ Cache utilities with Redis support.
 
 import json
 from functools import wraps
-from typing import Any, Optional
+from typing import Any
 
 from interntrack.config import get_settings
 
@@ -17,13 +17,13 @@ class InMemoryCache:
     def __init__(self):
         self._cache = {}
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """Get value from cache."""
         import time
         item = self._cache.get(key)
         if item and item["expires"] > time.time():
             return item["value"]
-        elif item:
+        if item:
             del self._cache[key]
         return None
 
@@ -51,7 +51,7 @@ class RedisCache:
         import redis.asyncio as redis
         self.client = redis.from_url(redis_url)
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """Get value from cache."""
         value = await self.client.get(key)
         if value:

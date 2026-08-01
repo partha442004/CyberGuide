@@ -92,8 +92,9 @@ async def link_verification():
     """Verify job links are still active."""
     logger.info("Starting link verification...")
     try:
-        from cybershield.engines.verification import VerificationEngine
         from sqlalchemy import select
+
+        from cybershield.engines.verification import VerificationEngine
 
         engine = VerificationEngine()
 
@@ -101,8 +102,8 @@ async def link_verification():
             # Get jobs that haven't been verified
             result = await session.execute(
                 select(Job).where(
-                    Job.is_active == True,
-                    Job.is_verified == False,
+                    Job.is_active is True,
+                    Job.is_verified is False,
                 ).limit(50)
             )
             jobs_to_verify = result.scalars().all()
@@ -133,8 +134,9 @@ async def scam_analysis():
     """Analyze jobs for scam indicators."""
     logger.info("Starting scam analysis...")
     try:
-        from cybershield.engines.scam_detection import ScamDetectionEngine
         from sqlalchemy import select
+
+        from cybershield.engines.scam_detection import ScamDetectionEngine
 
         engine = ScamDetectionEngine()
 
@@ -142,7 +144,7 @@ async def scam_analysis():
             # Get jobs without scam score
             result = await session.execute(
                 select(Job).where(
-                    Job.is_active == True,
+                    Job.is_active is True,
                 ).limit(50)
             )
             jobs_to_analyze = result.scalars().all()
@@ -187,12 +189,13 @@ async def daily_report():
     """Generate and send daily digest."""
     logger.info("Generating daily report...")
     try:
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
+
         from cybershield.notifications.orchestrator import NotificationOrchestrator
 
         async with get_db_session() as session:
             # Get stats
-            total_jobs = await session.scalar(select(func.count(Job.id)))
+            await session.scalar(select(func.count(Job.id)))
             new_today = await session.scalar(
                 select(func.count(Job.id)).where(
                     Job.created_at >= datetime.now(timezone.utc).replace(hour=0, minute=0, second=0)
@@ -202,7 +205,7 @@ async def daily_report():
             # Get expiring soon (next 7 days)
             expiring = await session.scalar(
                 select(func.count(Job.id)).where(
-                    Job.is_active == True,
+                    Job.is_active is True,
                     Job.expires_at <= datetime.now(timezone.utc) + timedelta(days=7),
                     Job.expires_at >= datetime.now(timezone.utc),
                 )
@@ -211,7 +214,7 @@ async def daily_report():
             # Get high-match jobs
             high_match = await session.scalar(
                 select(func.count(Job.id)).where(
-                    Job.is_active == True,
+                    Job.is_active is True,
                 )
             )
 
@@ -243,9 +246,10 @@ async def weekly_report():
     """Generate and send weekly analytics report."""
     logger.info("Generating weekly report...")
     try:
-        from sqlalchemy import select, func
-        from cybershield.notifications.orchestrator import NotificationOrchestrator
+        from sqlalchemy import func, select
+
         from cybershield.domain.models import Application, SkillTrend
+        from cybershield.notifications.orchestrator import NotificationOrchestrator
 
         week_ago = datetime.now(timezone.utc) - timedelta(days=7)
 
@@ -287,7 +291,7 @@ async def weekly_report():
             next_week = datetime.now(timezone.utc) + timedelta(days=7)
             expiring_count = await session.scalar(
                 select(func.count(Job.id)).where(
-                    Job.is_active == True,
+                    Job.is_active is True,
                     Job.expires_at <= next_week,
                     Job.expires_at >= datetime.now(timezone.utc),
                 )
@@ -324,9 +328,10 @@ async def monthly_report():
     """Generate and send monthly analytics report."""
     logger.info("Generating monthly report...")
     try:
-        from sqlalchemy import select, func, desc
-        from cybershield.notifications.orchestrator import NotificationOrchestrator
+        from sqlalchemy import desc, func, select
+
         from cybershield.domain.models import Application, SkillTrend
+        from cybershield.notifications.orchestrator import NotificationOrchestrator
 
         month_ago = datetime.now(timezone.utc) - timedelta(days=30)
 
@@ -338,7 +343,7 @@ async def monthly_report():
             )
 
             # Application stats
-            total_apps = await session.scalar(select(func.count(Application.id)))
+            await session.scalar(select(func.count(Application.id)))
             apps_this_month = await session.scalar(
                 select(func.count(Application.id)).where(Application.created_at >= month_ago)
             )

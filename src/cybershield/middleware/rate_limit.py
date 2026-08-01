@@ -5,12 +5,12 @@ Provides configurable rate limiting using an in-memory sliding window algorithm.
 Supports per-IP and per-API-key rate limiting with configurable limits.
 """
 
-import time
 import logging
+import time
 from collections import defaultdict
 from typing import Dict, Optional, Tuple
 
-from fastapi import Request, HTTPException, status
+from fastapi import Request, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 

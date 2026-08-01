@@ -4,14 +4,14 @@ Skill Repository
 Specialized repository for skill operations and market analysis.
 """
 
-from typing import Optional, Sequence
 from datetime import datetime, timedelta, timezone
+from typing import Optional, Sequence
 
-from sqlalchemy import select, func, desc
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from cybershield.domain.models import Skill, SkillTrend, UserSkill, JobSkill
+from cybershield.domain.models import JobSkill, Skill, SkillTrend, UserSkill
 from cybershield.repositories.base import BaseRepository
 
 
@@ -59,7 +59,7 @@ class SkillRepository(BaseRepository[Skill]):
             )
             .join(JobSkill, Skill.id == JobSkill.skill_id)
             .join(Job, JobSkill.job_id == Job.id)
-            .where(Job.is_active == True)
+            .where(Job.is_active is True)
             .group_by(Skill.id)
             .order_by(desc("job_count"))
             .limit(limit)

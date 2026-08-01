@@ -3,14 +3,12 @@ SQLAlchemy ORM models for CyberGuide (30+ tables).
 """
 
 from datetime import datetime, timezone
-from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
-    Enum,
     Float,
     ForeignKey,
     Index,
@@ -20,16 +18,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.orm import DeclarativeBase, relationship
-
-from cybershield.domain.enums import (
-    ApplicationStatus,
-    ExperienceLevel,
-    JobSource,
-    JobType,
-    SecurityDomain,
-    SkillCategory,
-    WorkMode,
-)
 
 
 class Base(DeclarativeBase):
@@ -41,7 +29,7 @@ class TimestampMixin:
     """Mixin for timestamp fields."""
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc), 
+        DateTime, default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc), nullable=False
     )
 

@@ -5,11 +5,11 @@ Multi-channel notification system for job alerts and reports.
 """
 
 from .base import BaseNotifier, NotificationMessage
-from .telegram import TelegramNotifier
-from .email import EmailNotifier
 from .discord import DiscordNotifier
-from .slack import SlackNotifier
+from .email import EmailNotifier
 from .orchestrator import NotificationOrchestrator
+from .slack import SlackNotifier
+from .telegram import TelegramNotifier
 
 __all__ = [
     "BaseNotifier",

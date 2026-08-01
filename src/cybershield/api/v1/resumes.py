@@ -6,13 +6,18 @@ Endpoints for resume upload, parsing, matching, and skill extraction.
 
 from datetime import datetime, timezone
 from typing import List
+
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from cybershield.dependencies import get_session
 from cybershield.domain.models import Job, ResumeData, ResumeMatchResult
-from cybershield.schemas.resume import ResumeUploadResponse, ResumeMatchResponse, ResumeBatchMatchResponse
+from cybershield.schemas.resume import (
+    ResumeBatchMatchResponse,
+    ResumeMatchResponse,
+    ResumeUploadResponse,
+)
 from cybershield.services.resume_service import ResumeParser
 
 router = APIRouter()
@@ -118,9 +123,9 @@ async def upload_resume(
     try:
         parsed_data = await parser.parse_upload(content, file.filename)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to parse resume: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to parse resume: {str(e)}") from e
 
     existing = await session.execute(
         select(ResumeData).where(ResumeData.user_id == user_id)

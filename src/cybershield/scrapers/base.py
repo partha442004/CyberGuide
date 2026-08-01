@@ -17,11 +17,11 @@ import random
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import httpx
 
-from cybershield.cache import cache_manager, CacheManager
+from cybershield.cache import cache_manager
 
 logger = logging.getLogger(__name__)
 

@@ -2,12 +2,12 @@
 Unit tests for advanced scraper implementations (LinkedIn, Indeed, Glassdoor).
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
-from interntrack.scrapers.linkedin import LinkedInScraper
-from interntrack.scrapers.indeed import IndeedScraper
+import pytest
+
 from interntrack.scrapers.glassdoor import GlassdoorScraper
+from interntrack.scrapers.indeed import IndeedScraper
+from interntrack.scrapers.linkedin import LinkedInScraper
 
 
 class TestLinkedInScraper:

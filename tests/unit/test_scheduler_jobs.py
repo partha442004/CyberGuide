@@ -1,8 +1,8 @@
 """Unit tests for scheduler/jobs.py."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timezone
 
 
 class TestFormatDailyReport:
@@ -16,7 +16,7 @@ class TestFormatDailyReport:
                 "new_jobs": 5,
                 "new_applications": 3,
                 "total_applications": 10,
-            }
+            },
         }
 
         result = format_daily_report(report)
@@ -84,7 +84,7 @@ class TestRunJobDiscovery:
         # Verify
         mock_registry.fetch_all.assert_called_once()
         mock_service.save_jobs.assert_called_once_with(
-            [{"title": "Python Dev", "company": "TechCo"}]
+            [{"title": "Python Dev", "company": "TechCo"}],
         )
 
     @patch("interntrack.scrapers.registry.get_default_registry")
@@ -121,7 +121,7 @@ class TestGenerateDailyReport:
     @patch("interntrack.scheduler.jobs.get_db_session")
     @pytest.mark.asyncio
     async def test_generate_daily_report_success(
-        self, mock_get_db, mock_report_cls, mock_notif_cls
+        self, mock_get_db, mock_report_cls, mock_notif_cls,
     ):
         from interntrack.scheduler.jobs import generate_daily_report
 
@@ -130,7 +130,7 @@ class TestGenerateDailyReport:
 
         mock_report_service = AsyncMock()
         mock_report_service.generate_daily_report.return_value = {
-            "summary": {"new_jobs": 5, "new_applications": 3, "total_applications": 10}
+            "summary": {"new_jobs": 5, "new_applications": 3, "total_applications": 10},
         }
         mock_report_cls.return_value = mock_report_service
 

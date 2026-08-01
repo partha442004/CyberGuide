@@ -6,7 +6,7 @@ Specialized repository for company operations.
 
 from typing import Optional, Sequence
 
-from sqlalchemy import select, func, desc
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -66,7 +66,7 @@ class CompanyRepository(BaseRepository[Company]):
                 func.count(Job.id).label("job_count"),
             )
             .join(Job, Company.id == Job.company_id)
-            .where(Job.is_active == True)
+            .where(Job.is_active is True)
             .group_by(Company.id)
             .order_by(desc("job_count"))
             .limit(limit)
@@ -85,7 +85,7 @@ class CompanyRepository(BaseRepository[Company]):
         """Get list of known trusted companies."""
         result = await self.session.execute(
             select(Company)
-            .where(Company.is_trusted == True)
+            .where(Company.is_trusted is True)
             .order_by(Company.name)
         )
         return result.scalars().all()

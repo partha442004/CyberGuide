@@ -2,7 +2,6 @@
 Notifications API endpoints.
 """
 
-from typing import List
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,7 +56,7 @@ async def test_notification(
 
 @router.post("/send")
 async def send_notification(
-    channels: List[str],
+    channels: list[str],
     message: str,
     subject: str = "InternTrack Notification",
     db: AsyncSession = Depends(get_db),

@@ -2,13 +2,12 @@
 Scheduled background jobs.
 """
 
-import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from interntrack.database.session import get_db_session
 from interntrack.services.job_service import JobService
-from interntrack.services.report_service import ReportService
 from interntrack.services.notification_service import NotificationManager
+from interntrack.services.report_service import ReportService
 
 
 async def run_job_discovery():
@@ -21,7 +20,7 @@ async def run_job_discovery():
 
         jobs = await registry.fetch_all(query="python developer")
         saved = await service.save_jobs(jobs)
-        print(f"[{datetime.now(timezone.utc)}] Discovery: {len(jobs)} found, {len(saved)} saved")
+        print(f"[{datetime.now(UTC)}] Discovery: {len(jobs)} found, {len(saved)} saved")
 
 
 async def generate_daily_report():
@@ -57,7 +56,7 @@ async def verify_job_links():
 
         dead_links = [r for r in results if not r.get("is_alive")]
         if dead_links:
-            print(f"[{datetime.now(timezone.utc)}] Found {len(dead_links)} dead links")
+            print(f"[{datetime.now(UTC)}] Found {len(dead_links)} dead links")
 
 
 async def deactivate_expired_jobs():
@@ -66,4 +65,4 @@ async def deactivate_expired_jobs():
         service = JobService(session)
         count = await service.deactivate_expired()
         if count > 0:
-            print(f"[{datetime.now(timezone.utc)}] Deactivated {count} expired jobs")
+            print(f"[{datetime.now(UTC)}] Deactivated {count} expired jobs")

@@ -54,7 +54,7 @@ class RSSFeedScraper(BaseScraper):
             # URL
             link = entry.get("link", "")
             job.url = self._normalize_url(link)
-            parsed_url = urlparse(link) if link else None
+            urlparse(link) if link else None
             job.source = f"rss_{feed_name.lower().replace(' ', '_')}"
             job.source_id = entry.get("id", link)
 

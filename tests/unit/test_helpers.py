@@ -1,13 +1,13 @@
 """Unit tests for utils/helpers.py."""
 
-import pytest
 from datetime import datetime
+
 from interntrack.utils.helpers import (
-    format_datetime,
     format_currency,
-    truncate_text,
-    slugify,
+    format_datetime,
     generate_id,
+    slugify,
+    truncate_text,
 )
 
 

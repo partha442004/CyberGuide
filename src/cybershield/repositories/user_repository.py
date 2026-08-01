@@ -6,9 +6,8 @@ Specialized repository for user management operations.
 
 from typing import Optional, Sequence
 
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from cybershield.domain.models import User, Watchlist
 from cybershield.repositories.base import BaseRepository

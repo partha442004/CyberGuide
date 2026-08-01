@@ -2,7 +2,6 @@
 Application service for tracking job applications.
 """
 
-from typing import Dict, List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,17 +18,17 @@ class ApplicationService:
         self.app_repo = ApplicationRepository(session)
 
     async def create_application(
-        self, job_id: str, status: ApplicationStatus = ApplicationStatus.SAVED
+        self, job_id: str, status: ApplicationStatus = ApplicationStatus.SAVED,
     ) -> Application:
         """Create a new application."""
         application = Application(job_id=job_id, status=status)
         return await self.app_repo.create(application)
 
-    async def get_application(self, application_id: str) -> Optional[Application]:
+    async def get_application(self, application_id: str) -> Application | None:
         """Get an application by ID."""
         return await self.app_repo.get_by_id(application_id)
 
-    async def get_application_for_job(self, job_id: str) -> Optional[Application]:
+    async def get_application_for_job(self, job_id: str) -> Application | None:
         """Get application for a specific job."""
         return await self.app_repo.get_by_job_id(job_id)
 
@@ -37,22 +36,22 @@ class ApplicationService:
         self,
         application_id: str,
         new_status: ApplicationStatus,
-        notes: Optional[str] = None,
-    ) -> Optional[Application]:
+        notes: str | None = None,
+    ) -> Application | None:
         """Update application status."""
         return await self.app_repo.update_status(application_id, new_status, notes)
 
     async def get_applications_by_status(
-        self, status: ApplicationStatus
-    ) -> List[Application]:
+        self, status: ApplicationStatus,
+    ) -> list[Application]:
         """Get all applications with a specific status."""
         return await self.app_repo.get_by_status(status)
 
-    async def get_status_counts(self) -> Dict[str, int]:
+    async def get_status_counts(self) -> dict[str, int]:
         """Get count of applications by status."""
         return await self.app_repo.get_status_counts()
 
-    async def get_application_timeline(self, days: int = 30) -> List[dict]:
+    async def get_application_timeline(self, days: int = 30) -> list[dict]:
         """Get application timeline for charts."""
         return await self.app_repo.get_application_timeline(days)
 
@@ -67,7 +66,7 @@ class ApplicationService:
             "rejection_rate": await self.app_repo.get_rejection_rate(),
             "response_rate": await self.app_repo.get_response_rate(),
             "recent_applications": len(
-                await self.app_repo.get_recent_applications(days=7)
+                await self.app_repo.get_recent_applications(days=7),
             ),
         }
 
@@ -78,10 +77,10 @@ class ApplicationService:
             application.reminded = True
             await self.session.flush()
 
-    async def get_pending_reminders(self) -> List[Application]:
+    async def get_pending_reminders(self) -> list[Application]:
         """Get applications needing reminders."""
         return await self.app_repo.get_pending_reminders()
 
-    async def set_priority(self, application_id: str, priority: int) -> Optional[Application]:
+    async def set_priority(self, application_id: str, priority: int) -> Application | None:
         """Set application priority."""
         return await self.app_repo.update(application_id, {"priority": priority})

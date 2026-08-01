@@ -8,8 +8,10 @@ Tests the Elasticsearch service covering:
 - Graceful fallback behavior
 """
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+
 from cybershield.services import elasticsearch_service as es
 
 
@@ -103,7 +105,7 @@ class TestElasticsearchSearchQuery:
         es._es_client = mock_client
         es._es_available = True
 
-        result = await es.search_jobs(query="security engineer")
+        await es.search_jobs(query="security engineer")
 
         # Verify search was called
         mock_client.search.assert_called_once()
@@ -132,7 +134,7 @@ class TestElasticsearchSearchQuery:
         es._es_client = mock_client
         es._es_available = True
 
-        result = await es.search_jobs(
+        await es.search_jobs(
             company="CrowdStrike",
             country="USA",
             is_remote=True,
@@ -168,7 +170,7 @@ class TestElasticsearchSearchQuery:
         es._es_client = mock_client
         es._es_available = True
 
-        result = await es.search_jobs(skills=["Python", "AWS"])
+        await es.search_jobs(skills=["Python", "AWS"])
 
         call_kwargs = mock_client.search.call_args
         query = call_kwargs.kwargs.get("query") or call_kwargs[1].get("query")

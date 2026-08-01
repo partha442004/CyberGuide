@@ -3,12 +3,12 @@ AI service for job classification and skill matching.
 """
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.config import get_settings
-from interntrack.domain.enums import ExperienceLevel, JobType, SkillCategory
+from interntrack.domain.enums import ExperienceLevel, JobType
 from interntrack.repositories.skill_repository import SkillRepository
 
 settings = get_settings()
@@ -21,16 +21,15 @@ class AIService:
         self.session = session
         self.skill_repo = SkillRepository(session)
 
-    async def classify_job(self, job_data: dict) -> Dict[str, Any]:
+    async def classify_job(self, job_data: dict) -> dict[str, Any]:
         """Classify a job posting using AI."""
         prompt = self._build_classification_prompt(job_data)
 
         if settings.gemini_api_key:
             return await self._classify_with_gemini(prompt)
-        elif settings.ollama_base_url:
+        if settings.ollama_base_url:
             return await self._classify_with_ollama(prompt)
-        else:
-            return self._classify_with_rules(job_data)
+        return self._classify_with_rules(job_data)
 
     def _build_classification_prompt(self, job_data: dict) -> str:
         """Build prompt for job classification."""
@@ -48,7 +47,7 @@ Return JSON with:
 - confidence: 0.0-1.0
 """
 
-    async def _classify_with_gemini(self, prompt: str) -> Dict[str, Any]:
+    async def _classify_with_gemini(self, prompt: str) -> dict[str, Any]:
         """Classify using Google Gemini API."""
         try:
             import google.generativeai as genai
@@ -60,7 +59,7 @@ Return JSON with:
         except Exception:
             return {"error": "Gemini classification failed"}
 
-    async def _classify_with_ollama(self, prompt: str) -> Dict[str, Any]:
+    async def _classify_with_ollama(self, prompt: str) -> dict[str, Any]:
         """Classify using local Ollama."""
         try:
             import httpx
@@ -81,7 +80,7 @@ Return JSON with:
             pass
         return {"error": "Ollama classification failed"}
 
-    def _classify_with_rules(self, job_data: dict) -> Dict[str, Any]:
+    def _classify_with_rules(self, job_data: dict) -> dict[str, Any]:
         """Rule-based classification fallback."""
         title = job_data.get("title", "").lower()
         description = job_data.get("description", "").lower()
@@ -107,8 +106,8 @@ Return JSON with:
         }
 
     async def match_skills(
-        self, job_skills: List[str], user_skills: List[str]
-    ) -> Dict[str, Any]:
+        self, job_skills: list[str], user_skills: list[str],
+    ) -> dict[str, Any]:
         """Match job skills with user skills."""
         matched = set(job_skills) & set(user_skills)
         missing = set(job_skills) - set(user_skills)
@@ -124,7 +123,7 @@ Return JSON with:
             "recommendations": await self._get_skill_recommendations(list(missing)),
         }
 
-    async def _get_skill_recommendations(self, skills: List[str]) -> List[dict]:
+    async def _get_skill_recommendations(self, skills: list[str]) -> list[dict]:
         """Get learning recommendations for missing skills."""
         recommendations = []
         for skill_name in skills:
@@ -138,8 +137,8 @@ Return JSON with:
         return recommendations
 
     async def generate_learning_path(
-        self, current_skills: List[str], target_role: str
-    ) -> Dict[str, Any]:
+        self, current_skills: list[str], target_role: str,
+    ) -> dict[str, Any]:
         """Generate a learning path for career progression."""
         prompt = f"""Create a learning path for someone with skills: {', '.join(current_skills)}
 Target role: {target_role}
@@ -149,7 +148,7 @@ Return JSON with steps, estimated time, and resources."""
         try:
             if settings.gemini_api_key:
                 return await self._classify_with_gemini(prompt)
-            elif settings.ollama_base_url:
+            if settings.ollama_base_url:
                 return await self._classify_with_ollama(prompt)
         except Exception:
             pass

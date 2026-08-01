@@ -11,9 +11,7 @@ Tests the ResumeParser class covering:
 - PDF parsing (integration test)
 """
 
-import pytest
-import asyncio
-from cybershield.services.resume_service import ResumeParser, SECURITY_SKILLS
+from cybershield.services.resume_service import SECURITY_SKILLS, ResumeParser
 
 
 class TestResumeParserSkills:

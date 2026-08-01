@@ -9,12 +9,19 @@ from typing import AsyncGenerator
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cybershield.database.session import get_db_session
-from cybershield.repositories.job_repository import JobRepository
+from cybershield.config import get_settings
+from cybershield.notifications.orchestrator import (
+    NotificationOrchestrator,
+    create_default_orchestrator,
+)
 from cybershield.repositories.application_repository import ApplicationRepository
-from cybershield.repositories.user_repository import UserRepository
 from cybershield.repositories.company_repository import CompanyRepository
+from cybershield.repositories.job_repository import JobRepository
 from cybershield.repositories.skill_repository import SkillRepository
+from cybershield.repositories.user_repository import UserRepository
+
+# Global notification orchestrator instance
+_notification_orchestrator: NotificationOrchestrator | None = None
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
@@ -46,3 +53,30 @@ def get_company_repository(session: AsyncSession = Depends(get_session)) -> Comp
 def get_skill_repository(session: AsyncSession = Depends(get_session)) -> SkillRepository:
     """Get skill repository instance."""
     return SkillRepository(session)
+
+
+def get_notification_orchestrator() -> NotificationOrchestrator:
+    """Get or create the global notification orchestrator with configured channels."""
+    global _notification_orchestrator
+    if _notification_orchestrator is None:
+        settings = get_settings()
+        config = {}
+        if settings.telegram_bot_token:
+            config["telegram"] = {
+                "bot_token": settings.telegram_bot_token,
+                "chat_id": settings.telegram_chat_id,
+            }
+        if settings.smtp_user:
+            config["email"] = {
+                "host": settings.smtp_host,
+                "port": settings.smtp_port,
+                "user": settings.smtp_user,
+                "password": settings.smtp_password,
+                "from_address": settings.email_from,
+            }
+        if settings.discord_webhook_url:
+            config["discord"] = {"webhook_url": settings.discord_webhook_url}
+        if settings.slack_webhook_url:
+            config["slack"] = {"webhook_url": settings.slack_webhook_url}
+        _notification_orchestrator = create_default_orchestrator(config)
+    return _notification_orchestrator

@@ -9,9 +9,8 @@ Tests the CrowdStrikeScraper class covering:
 - Location detection
 """
 
-import pytest
-from cybershield.scrapers.companies.crowdstrike import CrowdStrikeScraper
 from cybershield.scrapers.base import ScrapedJob, ScraperConfig
+from cybershield.scrapers.companies.crowdstrike import CrowdStrikeScraper
 
 
 class TestCrowdStrikeScraper:

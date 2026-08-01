@@ -1,7 +1,8 @@
 """Unit tests for worker.py."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
 
 
 class TestWorkerMain:
@@ -12,9 +13,8 @@ class TestWorkerMain:
     @patch("interntrack.worker.setup_scheduler")
     @patch("interntrack.worker.signal")
     def test_main_sets_up_scheduler(
-        self, mock_signal, mock_setup_scheduler, mock_setup_logging, mock_get_logger
+        self, mock_signal, mock_setup_scheduler, mock_setup_logging, mock_get_logger,
     ):
-        from interntrack.worker import main
 
         mock_logger = MagicMock()
         mock_get_logger.return_value = mock_logger
@@ -23,7 +23,6 @@ class TestWorkerMain:
         mock_setup_scheduler.return_value = mock_scheduler
 
         # We need to mock asyncio.run to test the async main
-        import asyncio
 
         with patch("asyncio.run") as mock_run:
             # The main() function is async, but it's called via asyncio.run
@@ -35,7 +34,7 @@ class TestWorkerMain:
     @patch("interntrack.worker.setup_scheduler")
     @pytest.mark.asyncio
     async def test_main_logs_startup(
-        self, mock_setup_scheduler, mock_setup_logging, mock_get_logger
+        self, mock_setup_scheduler, mock_setup_logging, mock_get_logger,
     ):
         from interntrack.worker import main
 

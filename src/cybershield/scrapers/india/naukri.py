@@ -4,9 +4,7 @@ Naukri Scraper
 Scrapes cybersecurity jobs from Naukri.com (India's largest job portal).
 """
 
-import json
 import logging
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 

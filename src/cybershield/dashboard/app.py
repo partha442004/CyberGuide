@@ -4,9 +4,10 @@ CyberGuide Dashboard - Main Application
 Streamlit application with multi-page navigation and theme support.
 """
 
-import streamlit as st
-import pandas as pd
 from datetime import datetime, timezone
+
+import pandas as pd
+import streamlit as st
 
 # Page configuration
 st.set_page_config(
@@ -24,7 +25,7 @@ st.markdown("""
         padding-top: 2rem;
         max-width: 1200px;
     }
-    
+
     /* Header styling */
     .stHeader {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -32,7 +33,7 @@ st.markdown("""
         border-radius: 10px;
         color: white;
     }
-    
+
     /* Metric cards */
     div[data-testid="stMetric"] {
         background-color: #f8f9fa;
@@ -40,12 +41,12 @@ st.markdown("""
         border-radius: 10px;
         border-left: 4px solid #667eea;
     }
-    
+
     /* Sidebar styling */
     section[data-testid="stSidebar"] {
         background-color: #1e1e1e;
     }
-    
+
     /* Job card styling */
     .job-card {
         background: white;
@@ -55,18 +56,18 @@ st.markdown("""
         margin-bottom: 1rem;
         border-left: 4px solid #667eea;
     }
-    
+
     .job-card:hover {
         box-shadow: 0 4px 20px rgba(0,0,0,0.15);
         transform: translateY(-2px);
         transition: all 0.3s ease;
     }
-    
+
     /* Scam score badges */
     .scam-low { color: #28a745; }
     .scam-medium { color: #ffc107; }
     .scam-high { color: #dc3545; }
-    
+
     /* Status badges */
     .status-saved { background-color: #6c757d; }
     .status-applied { background-color: #007bff; }
@@ -79,15 +80,15 @@ st.markdown("""
 
 def main():
     """Main dashboard application."""
-    
+
     # Sidebar
     with st.sidebar:
         st.image("https://img.icons8.com/nolan/96/shield.png", width=80)
         st.title("🛡️ CyberGuide")
         st.caption("Career Intelligence Platform")
-        
+
         st.divider()
-        
+
         # Navigation
         page = st.radio(
             "Navigate to:",
@@ -108,16 +109,16 @@ def main():
             ],
             index=0,
         )
-        
+
         st.divider()
-        
+
         # Quick stats
         st.metric("Jobs Tracked", "1,234", "+45 today")
         st.metric("Applications", "23", "+3 this week")
-        
+
         st.divider()
         st.caption(f"Last updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
-    
+
     # Route to page
     if page == "📊 Overview":
         show_overview()
@@ -150,7 +151,7 @@ def main():
 def show_overview():
     """Overview dashboard page."""
     st.header("📊 Dashboard Overview")
-    
+
     # Key metrics row
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -161,12 +162,12 @@ def show_overview():
         st.metric("⏰ Expiring Soon", "8", "")
     with col4:
         st.metric("🛡️ Scam Blocked", "5", "")
-    
+
     st.divider()
-    
+
     # Charts row
     col1, col2 = st.columns(2)
-    
+
     with col1:
         st.subheader("📈 Job Trends (Last 30 Days)")
         import plotly.graph_objects as go
@@ -176,11 +177,11 @@ def show_overview():
             y=[10 + i * 2 + (i % 5) for i in range(30)],
             mode='lines+markers',
             name='Jobs Found',
-            line=dict(color='#667eea', width=2)
+            line={"color": '#667eea', "width": 2}
         ))
-        fig.update_layout(height=300, margin=dict(l=0, r=0, t=0, b=0))
+        fig.update_layout(height=300, margin={"l": 0, "r": 0, "t": 0, "b": 0})
         st.plotly_chart(fig, use_container_width=True)
-    
+
     with col2:
         st.subheader("🎯 Top Skills in Demand")
         skills_data = {
@@ -196,9 +197,9 @@ def show_overview():
             orientation='h',
             marker_color='#667eea'
         ))
-        fig.update_layout(height=300, margin=dict(l=0, r=0, t=0, b=0))
+        fig.update_layout(height=300, margin={"l": 0, "r": 0, "t": 0, "b": 0})
         st.plotly_chart(fig, use_container_width=True)
-    
+
     # Recent jobs table
     st.subheader("🆕 Recent Jobs")
     import pandas as pd
@@ -215,29 +216,29 @@ def show_overview():
 def show_jobs():
     """Jobs search and listing page."""
     st.header("💼 Job Search")
-    
+
     # Search filters
     col1, col2, col3 = st.columns(3)
     with col1:
-        search_query = st.text_input("🔍 Search", placeholder="Security Engineer, SOC Analyst...")
+        st.text_input("🔍 Search", placeholder="Security Engineer, SOC Analyst...")
     with col2:
-        location = st.selectbox("📍 Location", ["All", "India", "USA", "Remote", "UK", "Germany"])
+        st.selectbox("📍 Location", ["All", "India", "USA", "Remote", "UK", "Germany"])
     with col3:
-        job_type = st.selectbox("💼 Type", ["All", "Internship", "Full-time", "Part-time", "Contract"])
-    
+        st.selectbox("💼 Type", ["All", "Internship", "Full-time", "Part-time", "Contract"])
+
     col1, col2, col3 = st.columns(3)
     with col1:
-        experience = st.selectbox("📊 Experience", ["All", "Fresher", "Junior", "Mid", "Senior"])
+        st.selectbox("📊 Experience", ["All", "Fresher", "Junior", "Mid", "Senior"])
     with col2:
-        security_domain = st.selectbox("🛡️ Domain", ["All", "SOC", "Blue Team", "Red Team", "Cloud Security", "AppSec"])
+        st.selectbox("🛡️ Domain", ["All", "SOC", "Blue Team", "Red Team", "Cloud Security", "AppSec"])
     with col3:
-        salary_range = st.slider("💰 Salary Range (USD)", 0, 200000, (0, 200000), step=10000)
-    
+        st.slider("💰 Salary Range (USD)", 0, 200000, (0, 200000), step=10000)
+
     st.divider()
-    
+
     # Results count
-    st.info(f"Found **156** jobs matching your criteria")
-    
+    st.info("Found **156** jobs matching your criteria")
+
     # Job cards
     for i in range(5):
         with st.container():
@@ -250,7 +251,7 @@ def show_jobs():
                 st.caption("🛡️ SOC • 🌐 Remote")
             with col3:
                 st.button("Apply", key=f"apply_{i}", type="primary")
-            
+
             st.caption("Posted 2 days ago • Skills: Python, SIEM, Splunk, AWS")
             st.divider()
 
@@ -258,27 +259,27 @@ def show_jobs():
 def show_applications():
     """Application tracker page."""
     st.header("📋 Application Tracker")
-    
+
     # Kanban board style
     cols = st.columns(6)
     statuses = ["Saved", "Applied", "Interview", "Assessment", "Rejected", "Offer"]
     counts = [12, 8, 3, 2, 4, 1]
-    
-    for col, status, count in zip(cols, statuses, counts):
+
+    for col, status, count in zip(cols, statuses, counts, strict=False):
         with col:
             st.metric(status, count)
-    
+
     st.divider()
-    
+
     # Application list
     st.subheader("📝 Recent Applications")
-    
+
     applications = [
         {"title": "SOC Analyst", "company": "Microsoft", "status": "Interview", "date": "2024-01-15"},
         {"title": "Security Engineer", "company": "Google", "status": "Applied", "date": "2024-01-14"},
         {"title": "Penetration Tester", "company": "Amazon", "status": "Saved", "date": "2024-01-13"},
     ]
-    
+
     for app in applications:
         col1, col2, col3, col4 = st.columns([3, 2, 1, 1])
         with col1:
@@ -297,9 +298,9 @@ def show_applications():
 def show_analytics():
     """Analytics dashboard page."""
     st.header("📈 Analytics Dashboard")
-    
+
     tab1, tab2, tab3, tab4 = st.tabs(["Skills", "Salary", "Geographic", "Trends"])
-    
+
     with tab1:
         st.subheader("🎯 Skill Distribution")
         import plotly.express as px
@@ -309,15 +310,15 @@ def show_analytics():
         })
         fig = px.pie(skills_df, values="Demand", names="Skill", hole=0.4)
         st.plotly_chart(fig, use_container_width=True)
-    
+
     with tab2:
         st.subheader("💰 Salary Insights")
         st.info("Average salary by security domain")
-    
+
     with tab3:
         st.subheader("🌍 Geographic Distribution")
         st.info("Job distribution by location")
-    
+
     with tab4:
         st.subheader("📈 Hiring Trends")
         st.info("Historical hiring trends")
@@ -326,7 +327,7 @@ def show_analytics():
 def show_skills():
     """Skills market page."""
     st.header("🎯 Skills Market Intelligence")
-    
+
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("🔥 Trending Skills")
@@ -337,7 +338,7 @@ def show_skills():
         4. **Container Security** - ↑ 12%
         5. **Zero Trust** - ↑ 10%
         """)
-    
+
     with col2:
         st.subheader("📉 Declining Skills")
         st.markdown("""
@@ -350,13 +351,13 @@ def show_skills():
 def show_ctf():
     """CTF competitions page."""
     st.header("🏆 CTF Competitions")
-    
+
     competitions = [
         {"name": "PicoCTF 2024", "date": "2024-03-12", "platform": "picoCTF", "difficulty": "Beginner"},
         {"name": "CTFtime League", "date": "Ongoing", "platform": "CTFtime", "difficulty": "All Levels"},
         {"name": "HackTheBox CTF", "date": "Monthly", "platform": "HTB", "difficulty": "Intermediate"},
     ]
-    
+
     for comp in competitions:
         col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
         with col1:
@@ -372,13 +373,13 @@ def show_ctf():
 def show_bug_bounty():
     """Bug bounty programs page."""
     st.header("💰 Bug Bounty Programs")
-    
+
     programs = [
         {"company": "Google", "platform": "HackerOne", "rewards": "$100-$100k+", "scope": "Web, Mobile, API"},
         {"company": "Microsoft", "platform": "MSRC", "rewards": "$500-$250k", "scope": "Azure, Office 365"},
         {"company": "Apple", "platform": "Apple Security", "rewards": "$100-$1.5M", "scope": "iOS, macOS"},
     ]
-    
+
     for prog in programs:
         col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
         with col1:
@@ -394,13 +395,13 @@ def show_bug_bounty():
 def show_events():
     """Security events page."""
     st.header("📅 Security Events")
-    
+
     events = [
         {"name": "DEF CON 32", "date": "2024-08-08", "location": "Las Vegas, NV", "type": "Conference"},
         {"name": "Black Hat USA", "date": "2024-08-07", "location": "Las Vegas, NV", "type": "Conference"},
         {"name": "BSides Las Vegas", "date": "2024-08-06", "location": "Las Vegas, NV", "type": "Conference"},
     ]
-    
+
     for event in events:
         col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
         with col1:
@@ -416,13 +417,13 @@ def show_events():
 def show_cyber_news():
     """Cyber news feed page."""
     st.header("📰 Cybersecurity News")
-    
+
     news = [
         {"title": "Critical Zero-Day in Windows Kernel", "source": "BleepingComputer", "time": "2 hours ago"},
         {"title": "New Ransomware Group Targets Healthcare", "source": "The Hacker News", "time": "5 hours ago"},
         {"title": "Microsoft Patches 73 Vulnerabilities", "source": "SecurityWeek", "time": "1 day ago"},
     ]
-    
+
     for item in news:
         col1, col2, col3 = st.columns([4, 2, 1])
         with col1:
@@ -436,9 +437,9 @@ def show_cyber_news():
 def show_learning():
     """Learning recommendations page."""
     st.header("🎓 Learning Recommendations")
-    
+
     tab1, tab2, tab3 = st.tabs(["Skill Gap", "Courses", "Certifications"])
-    
+
     with tab1:
         st.subheader("📊 Your Skill Gaps")
         gaps = [
@@ -449,7 +450,7 @@ def show_learning():
         for gap in gaps:
             progress = gap['current'] / gap['target']
             st.progress(progress, text=f"{gap['skill']}: {gap['current']}% → {gap['target']}%")
-    
+
     with tab2:
         st.subheader("📚 Recommended Courses")
         courses = [
@@ -459,7 +460,7 @@ def show_learning():
         ]
         for course in courses:
             st.markdown(f"- 📖 {course}")
-    
+
     with tab3:
         st.subheader("🎓 Certifications to Pursue")
         certs = [
@@ -474,21 +475,21 @@ def show_learning():
 def show_resume():
     """Resume analysis page."""
     st.header("📄 Resume Engine")
-    
+
     col1, col2 = st.columns([1, 1])
-    
+
     with col1:
         st.subheader("Upload Resume")
         uploaded_file = st.file_uploader("Choose your resume", type=["pdf", "docx"])
         if uploaded_file:
             st.success("Resume uploaded successfully!")
             st.button("🔍 Analyze Resume", type="primary")
-    
+
     with col2:
         st.subheader("Resume Score")
         st.metric("ATS Score", "72/100")
         st.progress(0.72)
-        
+
         st.markdown("**Missing Keywords:**")
         st.caption("Kubernetes, Container Security, CI/CD, DevSecOps")
 
@@ -496,7 +497,7 @@ def show_resume():
 def show_notifications():
     """Notification settings page."""
     st.header("🔔 Notification Settings")
-    
+
     st.subheader("📧 Email Notifications")
     col1, col2 = st.columns(2)
     with col1:
@@ -505,9 +506,9 @@ def show_notifications():
     with col2:
         st.toggle("Instant Alerts", value=True)
         st.toggle("Deadline Reminders", value=True)
-    
+
     st.divider()
-    
+
     st.subheader("💬 Messaging Platforms")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -524,7 +525,7 @@ def show_notifications():
 def show_settings():
     """Settings page."""
     st.header("⚙️ Settings")
-    
+
     st.subheader("👤 Profile")
     col1, col2 = st.columns(2)
     with col1:
@@ -533,9 +534,9 @@ def show_settings():
     with col2:
         st.text_input("LinkedIn URL", placeholder="https://linkedin.com/in/...")
         st.text_input("GitHub URL", placeholder="https://github.com/...")
-    
+
     st.divider()
-    
+
     st.subheader("🎯 Job Preferences")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -544,19 +545,19 @@ def show_settings():
         st.multiselect("Target Locations", ["India", "USA", "Remote", "UK"], default=["Remote"])
     with col3:
         st.multiselect("Target Companies", ["Microsoft", "Google", "Amazon"], default=["Microsoft", "Google"])
-    
+
     st.divider()
-    
+
     st.subheader("🏢 Company Watchlist")
-    companies = st.text_area("Add companies to watch (one per line)", value="Microsoft\nGoogle\nAmazon\nCisco")
-    
+    st.text_area("Add companies to watch (one per line)", value="Microsoft\nGoogle\nAmazon\nCisco")
+
     st.divider()
-    
+
     st.subheader("🔑 API Keys")
     with st.expander("AI Services"):
         st.text_input("Ollama Endpoint", value="http://localhost:11434", key="ollama")
         st.text_input("Gemini API Key", type="password", placeholder="Enter API key")
-    
+
     if st.button("💾 Save Settings", type="primary"):
         st.success("Settings saved successfully!")
 

@@ -5,7 +5,8 @@ Pydantic models for application tracking API operations.
 """
 
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

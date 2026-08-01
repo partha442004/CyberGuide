@@ -5,7 +5,6 @@ Deduplication engine for identifying and removing duplicate job postings.
 import hashlib
 import re
 from difflib import SequenceMatcher
-from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +19,7 @@ class DeduplicationEngine:
         self.session = session
         self.job_repo = JobRepository(session)
 
-    async def filter_unique(self, jobs: List[dict]) -> List[dict]:
+    async def filter_unique(self, jobs: list[dict]) -> list[dict]:
         """Filter out duplicate jobs from a list."""
         unique_jobs = []
         seen_hashes = set()
@@ -42,7 +41,7 @@ class DeduplicationEngine:
 
         return unique_jobs
 
-    async def _find_existing(self, job_data: dict) -> Optional[Job]:
+    async def _find_existing(self, job_data: dict) -> Job | None:
         """Find existing job that matches the given data."""
         url = job_data.get("url")
         if url:
@@ -102,8 +101,8 @@ class DeduplicationEngine:
         return url
 
     async def find_duplicates_in_database(
-        self, threshold: float = 0.85
-    ) -> List[Tuple[Job, Job]]:
+        self, threshold: float = 0.85,
+    ) -> list[tuple[Job, Job]]:
         """Find potential duplicates in the database."""
         from sqlalchemy import select
 

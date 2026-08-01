@@ -5,10 +5,11 @@ Tests for deduplication, verification, scam detection, and classification engine
 """
 
 import pytest
-from cybershield.engines.deduplication import DeduplicationEngine
-from cybershield.engines.verification import VerificationEngine
-from cybershield.engines.scam_detection import ScamDetectionEngine
+
 from cybershield.engines.classification import ClassificationEngine
+from cybershield.engines.deduplication import DeduplicationEngine
+from cybershield.engines.scam_detection import ScamDetectionEngine
+from cybershield.engines.verification import VerificationEngine
 
 
 class TestDeduplicationEngine:

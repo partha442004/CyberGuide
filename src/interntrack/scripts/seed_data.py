@@ -3,25 +3,24 @@ Database seed script for populating sample data.
 """
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 from interntrack.database.session import get_db_session, init_db
 from interntrack.domain.enums import (
     ApplicationStatus,
+    ExperienceLevel,
     JobSource,
     JobType,
-    ExperienceLevel,
     SkillCategory,
 )
 from interntrack.domain.models import (
-    Job,
     Application,
-    Skill,
+    Job,
     JobSkill,
+    Skill,
     UserSkill,
 )
-
 
 # Sample jobs
 SAMPLE_JOBS = [
@@ -204,7 +203,7 @@ async def seed_database():
                 is_remote=job_data["is_remote"],
                 tags=job_data["tags"],
                 is_active=True,
-                posted_at=datetime.now(timezone.utc) - timedelta(days=3),
+                posted_at=datetime.now(UTC) - timedelta(days=3),
             )
             session.add(job)
             await session.flush()
@@ -240,7 +239,7 @@ async def seed_database():
 
         # Get first 3 jobs for applications
         result = await session.execute(
-            select(Job).limit(3)
+            select(Job).limit(3),
         )
         jobs = list(result.scalars().all())
 
@@ -251,8 +250,8 @@ async def seed_database():
                 job_id=job.id,
                 status=status,
                 notes=f"Sample application for {job.title}",
-                applied_at=datetime.now(timezone.utc) - timedelta(days=i) if status != ApplicationStatus.SAVED else None,
-                interview_at=datetime.now(timezone.utc) + timedelta(days=5) if status == ApplicationStatus.INTERVIEW else None,
+                applied_at=datetime.now(UTC) - timedelta(days=i) if status != ApplicationStatus.SAVED else None,
+                interview_at=datetime.now(UTC) + timedelta(days=5) if status == ApplicationStatus.INTERVIEW else None,
             )
             session.add(application)
 
@@ -261,8 +260,8 @@ async def seed_database():
     print("✅ Database seeded successfully!")
     print(f"   - {len(SAMPLE_SKILLS)} skills created")
     print(f"   - {len(SAMPLE_JOBS)} jobs created")
-    print(f"   - 3 applications created")
-    print(f"   - User skills for demo user created")
+    print("   - 3 applications created")
+    print("   - User skills for demo user created")
 
 
 if __name__ == "__main__":

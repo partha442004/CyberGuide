@@ -1,8 +1,6 @@
 """Unit tests for scheduler/setup.py."""
 
-import pytest
-from unittest.mock import patch, MagicMock
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from unittest.mock import MagicMock, patch
 
 
 class TestSchedulerSetup:

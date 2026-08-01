@@ -170,7 +170,7 @@ class TestApplicationsAPI:
         status_update = {"status": "applied", "notes": "Applied via website"}
         response = await client.patch(
             f"/api/v1/applications/{app_id}/status",
-            json=status_update
+            json=status_update,
         )
 
         assert response.status_code == 200

@@ -4,15 +4,15 @@ Application Repository
 Specialized repository for application tracking operations.
 """
 
-from typing import Optional, Sequence
 from datetime import datetime, timezone
+from typing import Optional, Sequence
 
-from sqlalchemy import select, func, desc, and_
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from cybershield.domain.models import Application, ApplicationStatusHistory, Job
 from cybershield.domain.enums import ApplicationStatus
+from cybershield.domain.models import Application, ApplicationStatusHistory
 from cybershield.repositories.base import BaseRepository
 
 
