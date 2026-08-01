@@ -41,10 +41,11 @@ CSCIP uses GitHub Actions for continuous integration and deployment with automat
 ### CI Workflow
 
 > ✅ **Implemented** in `.github/workflows/ci.yml` (2026-08-01). It runs ruff
-> lint + format check, mypy across both modules, and the combined InternTrack +
-> CyberGuide test suite (737 tests) with coverage collection and an uploaded
-> `coverage.xml` artifact. Docker build + Trivy scan are future enhancements;
-> the current pipeline is focused on lint/type/tests/coverage.
+> lint + format check, mypy across both modules, the combined InternTrack +
+> CyberGuide test suite (749 tests) with coverage collection and an uploaded
+> `coverage.xml` artifact, plus a security gate (bandit static scan + safety
+> dependency scan). Docker build + Trivy scan are future enhancements; the
+> current pipeline is focused on lint/type/tests/coverage/security.
 
 ```yaml
 # .github/workflows/ci.yml
@@ -120,28 +121,34 @@ jobs:
           path: coverage.xml
 
   security:
-    name: Security (bandit)
+    name: Security (bandit + safety)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install bandit
-        run: python -m pip install bandit
+      - name: Install security tools
+        # safety pinned to <3 (v3 replaced `check` with `scan`) to match
+        # requirements-dev.txt and keep the gate deterministic
+        run: python -m pip install bandit "safety>=2.3.0,<3"
       - name: Bandit scan (medium+ severities)
         run: bandit -r src/ -ll -q
+      - name: Safety dependency scan
+        run: safety check -r requirements.txt -r requirements-dev.txt --full-report
 ```
 
 > The `test` job depends on `lint`, `typecheck`, and `security` — a medium+ or
-> high-severity bandit finding blocks the test run.
+> high-severity bandit finding, or any known-vulnerable dependency flagged by
+> safety, blocks the test run.
 
 ### CD Workflow
 
 > ⏳ **Planned / future enhancement.** Not yet implemented — shown here as the
 > target pipeline for tag-based releases. Requires Docker Hub credentials and a
-> deploy target with SSH access. `safety` (dependency vulnerabilities) and
-> Trivy (container scan) are future additions to the security gate.
+> deploy target with SSH access. Trivy (container scan) is a future addition to
+> the security gate; `safety` (dependency vulnerabilities) is already part of
+> the CI security job.
 
 ```yaml
 # .github/workflows/cd.yml
@@ -259,7 +266,7 @@ repos:
 | Tests | pytest | 100% pass |
 | Coverage | pytest-cov | ≥80% |
 | Security (static) | bandit | 0 medium/high |
-| Security (deps) | safety | future |
+| Security (deps) | safety | 0 known vulnerabilities |
 | Security (container) | trivy | future |
 | Build | docker build | Success |
 

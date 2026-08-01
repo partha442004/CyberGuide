@@ -8,13 +8,14 @@
 
 - ✅ **mypy**: 0 errors across 177 source files (107 cybershield errors fixed)
 - ✅ **ruff**: all checks pass, 212 files formatted
-- ✅ **Tests**: 418 InternTrack + 321 CyberGuide = **739 passing**
-- ✅ **CI**: `.github/workflows/ci.yml` (ruff, mypy, full test suite + coverage + bandit security job)
+- ✅ **Tests**: 428 InternTrack + 321 CyberGuide = **749 passing**
+- ✅ **CI**: `.github/workflows/ci.yml` (ruff, mypy, full test suite + coverage + bandit + safety security jobs)
 - ✅ **Error handling**: `AppException` handler + consistent error payload; CORS settings-driven
 - ✅ **API rate limiting**: `RateLimitMiddleware` (per-IP 100/min, per-API-key 1000/min) with 429 error contract, exempt paths, `RATE_LIMIT_*` env overrides
 - ✅ **Dashboard tests**: 46 tests for cards/forms/charts via fake streamlit + plotly modules
-- ✅ **Security**: bandit clean at medium+ (MD5 `usedforsecurity=False`, `# nosec B104`); pre-commit config added
+- ✅ **Security**: bandit clean at medium+ (MD5 `usedforsecurity=False`, `# nosec B104`); safety deps scan 0 vulnerabilities; pre-commit config added
 - ✅ **Health check**: `/health` DB probe — 200 healthy / 503 degraded
+- ✅ **Report service**: template dir module-relative fix + 10 new rendering/generation tests
 - ✅ **Real runtime bugs fixed**: httpx 0.28 `follow_redirects`, `NotificationPriority.NORMAL`, `SkillTrend.recorded_at`, `Company.is_trusted` (model + migration), `Job.company` relationship shadowing the string column, scheduler verification filter
 - ✅ **New tests**: exception handlers, CORS config parsing, CORS middleware, rate limiting (58 new tests this pass)
 
@@ -177,8 +178,8 @@ internship-tracker/
 ## 🧪 Test Results
 
 ### Test Summary
-- **Total Tests:** 739 (418 InternTrack + 321 CyberGuide)
-- **Tests Passing:** ✅ 739 (100%)
+- **Total Tests:** 749 (428 InternTrack + 321 CyberGuide)
+- **Tests Passing:** ✅ 749 (100%)
 - **Test Files:** 32+ test files
 
 ### Test Breakdown
@@ -213,10 +214,11 @@ internship-tracker/
 | Unit - Main/Error Handling | 13 | ✅ (incl. health endpoint) |
 | Unit - Rate Limiting | 10 | ✅ **NEW** |
 | Unit - Dashboard Components | 46 | ✅ **NEW** |
+| Unit - Report Service | 10 | ✅ **NEW** |
 | Integration - API | 23 | ✅ (incl. CORS middleware + health) |
-| **Total (InternTrack)** | **418** | ✅ **All Passing** |
+| **Total (InternTrack)** | **428** | ✅ **All Passing** |
 | **CyberGuide (cybershield)** | **321** | ✅ **All Passing** |
-| **Grand Total** | **739** | ✅ **All Passing** |
+| **Grand Total** | **749** | ✅ **All Passing** |
 
 ---
 
@@ -265,7 +267,8 @@ uvicorn interntrack.main:app --reload
 | **2026-08-01** | **358** | — | InternTrack Hardened (+11 tests) |
 | **2026-08-01** | **321** | — | CyberGuide Hardened |
 | **2026-08-01** | **418** | — | InternTrack + rate limiting + dashboard + health (+60) |
-| **2026-08-01** | **739** | **67%** | Combined (interntrack + cybershield) |
+| **2026-08-01** | **428** | — | InternTrack + report service tests (+10) |
+| **2026-08-01** | **749** | **67%** | Combined (interntrack + cybershield) |
 
 ---
 
@@ -299,7 +302,7 @@ uvicorn interntrack.main:app --reload
 ✅ Dashboard with charts
 ✅ Docker deployment ready
 ✅ Documentation complete
-✅ 739 tests passing (418 InternTrack + 321 CyberGuide)
+✅ 749 tests passing (428 InternTrack + 321 CyberGuide)
 ✅ CI/CD pipelines configured
 ✅ Security documentation
 ✅ API rate limiting enabled

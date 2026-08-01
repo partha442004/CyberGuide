@@ -590,6 +590,20 @@ sqlite3 data/interntrack.db "PRAGMA integrity_check;"
 
 ---
 
+## ✅ HARDENING PASS 4 (2026-08-01) — COMPLETED
+
+### Dependency Security Scan (safety)
+- [x] `safety check -r requirements.txt -r requirements-dev.txt --full-report` wired into CI `security` job
+- [x] safety pinned `>=2.3.0,<3` in CI (matches requirements-dev.txt; v3 replaced `check` with `scan`)
+- [x] Local result: 22 packages scanned, 0 vulnerabilities (requirements.txt); 9 scanned, 0 (dev)
+- [x] Makefile `deps-check` target
+
+### Report Service (InternTrack)
+- [x] `report_service.py` template dir resolved module-relative (`Path(__file__)...`), not CWD-relative
+- [x] `tests/unit/test_report_service.py` (10 tests): template dir, Jinja env, daily/weekly/monthly render assertions (incl. `{:,.0f}` salary formatting), unknown-type raises `TemplateNotFound`, autoescape XSS, generate_* shape tests with mocked repos
+
+---
+
 ## 🔄 QUICK REFERENCE
 
 ### Common Commands

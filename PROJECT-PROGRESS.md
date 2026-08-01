@@ -11,11 +11,12 @@
 | **ruff lint** | ✅ All checks passed (was 1,294 errors) |
 | **ruff format** | ✅ 212 files formatted |
 | **mypy** | ✅ 0 errors in 177 source files (fixed 107 in cybershield) |
-| **InternTrack tests** | ✅ 418 passing |
+| **InternTrack tests** | ✅ 428 passing |
 | **CyberGuide tests** | ✅ 321 passing |
 | **Smoke test** | ✅ /health (DB probe), /, CORS preflight, 404, docs (prod-off) verified |
 | **CI pipeline** | ✅ .github/workflows/ci.yml (lint + typecheck + tests + coverage + security) |
 | **Security scan** | ✅ bandit clean at medium+ (fixed 3x MD5 + 5x bind-all) |
+| **Dependency scan** | ✅ safety: 22+9 packages scanned, 0 vulnerabilities (CI gate) |
 
 ### Highlights
 - **Error handling**: dedicated `AppException` handler + consistent `{error: {code, message, details}}` payload; debug detail gated
@@ -25,6 +26,7 @@
 - **Security**: bandit scan clean at medium+ — MD5 `usedforsecurity=False` (cache/dedup), `# nosec B104` on dev binds; CI security job gates tests
 - **Pre-commit**: `.pre-commit-config.yaml` added (ruff, mypy with PYTHONPATH, commitizen)
 - **Health check**: `/health` runs a DB probe — 200 healthy (version, database) / 503 degraded
+- **Report service**: template dir now module-relative (works from any CWD); 10 new tests (`test_report_service.py`) for rendering + generation
 - **Real bugs fixed**: httpx 0.28 `allow_redirects` removal, `NotificationPriority.NORMAL`, `SkillTrend.recorded_at`, `Company.is_trusted` (models + migration), `Job.company` relationship shadowing the string column (broke search), scheduler `not Job.is_verified` filter
 - New tests: `tests/unit/test_main.py` (11) + `tests/unit/test_rate_limit.py` (9) + `tests/unit/test_dashboard_components.py` (46) + `TestCorsMiddleware` integration tests
 
@@ -44,7 +46,7 @@
 | **Engines** | ✅ Complete | 100% | Dedup, verify, classify |
 | **Notifications** | ✅ Complete | 100% | Telegram, Email, Discord |
 | **Dashboard** | ✅ Complete | 100% | Streamlit with charts |
-| **Tests** | ✅ Complete | 100% | 739 tests passing |
+| **Tests** | ✅ Complete | 100% | 749 tests passing |
 | **CI/CD** | ✅ Complete | 100% | GitHub Actions ready |
 | **Documentation** | ✅ Complete | 100% | All docs created |
 | **Docker** | ✅ Complete | 100% | Compose ready |
@@ -55,10 +57,10 @@
 ## 📊 FINAL TEST RESULTS
 
 ```
-======================== 739 passed ========================
-InternTrack: 418 passed
+======================== 749 passed ========================
+InternTrack: 428 passed
 CyberGuide (cybershield): 321 passed
-Total: 739 tests passing
+Total: 749 tests passing
 ```
 
 ### Coverage Improvement Summary
@@ -73,8 +75,9 @@ Total: 739 tests passing
 | Phase 5 | 271 | 74% | +32 tests, +2% |
 | Phase 6 | 331 | 80% | +60 tests, +6% |
 | **Latest** | **418** | **82%+** | +60 tests (InternTrack, incl. rate limit + dashboard + health) |
+| **Pass 4** | **428** | — | +10 report service tests (render + generation) |
 | **CyberGuide** | **321** | — | Full cleanup + engine/ES tests added |
-| **Combined** | **739** | **67%** | interntrack + cybershield measured together |
+| **Combined** | **749** | **67%** | interntrack + cybershield measured together |
 
 ---
 
@@ -115,7 +118,7 @@ Total: 739 tests passing
 - [x] `src/interntrack/utils/` - 4 utility files
 - [x] `src/interntrack/reports/templates/` - 3 report templates
 
-### Tests (739 total: 418 InternTrack + 321 CyberGuide)
+### Tests (749 total: 428 InternTrack + 321 CyberGuide)
 - [x] `tests/conftest.py` - Test fixtures
 - [x] `tests/unit/test_job_service.py` - 8 tests
 - [x] `tests/unit/test_application_service.py` - 8 tests
@@ -234,10 +237,11 @@ uvicorn interntrack.main:app --reload
 | Unit - Main/Error Handling | 13 | ✅ (incl. health endpoint) |
 | Unit - Rate Limiting | 10 | ✅ **NEW** |
 | Unit - Dashboard Components | 46 | ✅ **NEW** |
+| Unit - Report Service | 10 | ✅ **NEW** |
 | Integration - API | 23 | ✅ (incl. CORS middleware + health) |
-| **Total (InternTrack)** | **418** | ✅ **All Passing** |
+| **Total (InternTrack)** | **428** | ✅ **All Passing** |
 | **CyberGuide (cybershield)** | **321** | ✅ **All Passing** |
-| **Grand Total** | **739** | ✅ **All Passing** |
+| **Grand Total** | **749** | ✅ **All Passing** |
 
 ---
 

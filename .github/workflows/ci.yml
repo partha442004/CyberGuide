@@ -61,11 +61,16 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install bandit
-        run: python -m pip install bandit
+      - name: Install security tools
+        # safety pinned to <3 (v3 replaced `check` with `scan`) to match
+        # requirements-dev.txt and keep the gate deterministic
+        run: python -m pip install bandit "safety>=2.3.0,<3"
 
       - name: Bandit scan (medium+ severities)
         run: bandit -r src/ -ll -q
+
+      - name: Safety dependency scan
+        run: safety check -r requirements.txt -r requirements-dev.txt --full-report
 
   test:
     name: Tests (pytest)

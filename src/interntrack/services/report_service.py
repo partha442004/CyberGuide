@@ -3,6 +3,7 @@ Report service for generating daily, weekly, and monthly reports.
 """
 
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -10,6 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.repositories.application_repository import ApplicationRepository
 from interntrack.repositories.job_repository import JobRepository
+
+# Resolve the template directory relative to this module so rendering works
+# regardless of the current working directory.
+TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "reports" / "templates"
 
 
 class ReportService:
@@ -20,7 +25,7 @@ class ReportService:
         self.job_repo = JobRepository(session)
         self.app_repo = ApplicationRepository(session)
         self.jinja_env = Environment(
-            loader=FileSystemLoader("src/interntrack/reports/templates"),
+            loader=FileSystemLoader(str(TEMPLATE_DIR)),
             autoescape=select_autoescape(["html", "xml"]),
         )
 
