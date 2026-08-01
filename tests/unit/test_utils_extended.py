@@ -193,11 +193,8 @@ class TestEncryptionEdgeCases:
     def test_mask_visible_zero(self):
         from interntrack.utils.encryption import mask_sensitive
         result = mask_sensitive("secretkey", visible_chars=0)
-        # len=9 > 0, so: "*" * 9 + "secretkey"[-0:]
-        # Note: -0 == 0, so "secretkey"[0:] == "secretkey"
-        # This is a known quirk — visible_chars=0 shows full string
-        assert len(result) == 18
-        assert result.startswith("*********")
+        assert result == "*********"
+        assert len(result) == 9
 
     def test_mask_visible_one(self):
         from interntrack.utils.encryption import mask_sensitive
