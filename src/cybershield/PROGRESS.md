@@ -4,7 +4,7 @@
 
 **Last Updated:** July 31, 2026
 **Total Files:** 120+
-**Total Tests:** 295 passing, 1 warning
+**Total Tests:** 323 passing, 1 warning
 **Total Routes:** 33 (via OpenAPI schema)
 
 ---
@@ -35,11 +35,11 @@
 
 ## 📈 Test Status
 
-**Status: ✅ ALL 295 TESTS PASSING (1 warning)**
+**Status: ✅ ALL 323 TESTS PASSING (1 warning)**
 
 ```bash
 C:/Python311/python.exe -m pytest src/cybershield/tests/ -v
-# 295 passed, 0 failed, 0 errors, 1 warning
+# 323 passed, 0 failed, 0 errors, 1 warning
 ```
 
 ---

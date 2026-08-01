@@ -4,6 +4,37 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Merged] - 2026-08-01 — origin/master reconciled into local master
+
+### Merged
+- Reconciled the divergent histories (local master had 18 commits: hardening
+  v1.10 → v1.19; origin/master had 31 commits: notification system, coverage
+  push, Render/Railway deployment configs). All 60 conflicting files resolved
+  keeping the **local (newer, validated) line**; merge base `4ca12b0`.
+- Adopted 25 remote-only new files: `Procfile`, `railway.toml`,
+  `render.yaml`, root `alembic.ini`, `src/interntrack/reports/__init__.py`,
+  and 20 new test files.
+- Test triage of the 20 remote test files against the kept source:
+  - 15 files (341 tests) passed as-is and are retained
+  - 2 obsolete `src/cybershield/tests/test_notification_*` files removed
+    (tested the old notification API superseded by the kept line)
+  - 2 ABC-enforcement tests dropped from `test_notification_service_v2.py`
+    (our `NotificationChannel` is a plain base class, not `abc.ABC`)
+  - API mismatches fixed: `export_jobs(file_format=...)` and
+    `send_test_notification` (matching kept source signatures)
+  - 32 ruff errors fixed across 7 test files (SIM117, ARG005, B017/PT011,
+    S106, E501, PTH123)
+- `tests/conftest.py`: ported `make_job`, `make_job_mock`, `make_app_mock`
+  helpers from the remote line (needed by the adopted test files);
+  C408 dict() → literals, E501 docstring wrap.
+- `test_notification_service.py`: replaced an auto-merged remote ABC
+  assertion with `test_base_send_not_implemented` (matches kept plain-base
+  implementation).
+- Test suite now **1247 passing** (924 InternTrack + 323 CyberGuide);
+  ruff + format clean, mypy clean, `make version-check` exit 0.
+- Docs re-synced: README badge, PROJECT-PROGRESS, PROJECT-STATUS,
+  TODO-CHECKLIST, docs/cscip/17-cicd.md, src/cybershield/PROGRESS.md.
+
 ## [1.19.0] - 2026-08-01
 
 ### Added

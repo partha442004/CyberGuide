@@ -449,5 +449,5 @@ chmod +x setup.sh
 
 ---
 
-**Last Updated:** 2026-07-29
-**Version:** 1.0.0
+**Last Updated:** 2026-08-01
+**Version:** 1.2.0

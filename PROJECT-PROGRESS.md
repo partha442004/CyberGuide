@@ -11,7 +11,7 @@
 | **ruff lint** | ✅ All checks passed (was 1,294 errors) |
 | **ruff format** | ✅ 212 files formatted |
 | **mypy** | ✅ 0 errors in 177 source files (fixed 107 in cybershield) |
-| **InternTrack tests** | ✅ 453 passing |
+| **InternTrack tests** | ✅ 924 passing |
 | **CyberGuide tests** | ✅ 323 passing |
 | **Smoke test** | ✅ Live uvicorn boot verified: / (200), /health (200 healthy), /docs (404 prod), CORS preflight, 404, rate-limit burst (200/200/429/429/429) + RATE_LIMITED contract |
 | **CI pipeline** | ✅ .github/workflows/ci.yml (lint + typecheck + tests + coverage + security) |
@@ -81,7 +81,7 @@
 | **Engines** | ✅ Complete | 100% | Dedup, verify, classify |
 | **Notifications** | ✅ Complete | 100% | Telegram, Email, Discord |
 | **Dashboard** | ✅ Complete | 100% | Streamlit with charts |
-| **Tests** | ✅ Complete | 100% | 840 tests passing |
+| **Tests** | ✅ Complete | 100% | 1247 tests passing |
 | **CI/CD** | ✅ Complete | 100% | GitHub Actions ready |
 | **Documentation** | ✅ Complete | 100% | All docs created |
 | **Docker** | ✅ Complete | 100% | Compose ready |
@@ -92,10 +92,10 @@
 ## 📊 FINAL TEST RESULTS
 
 ```
-======================== 840 passed ========================
-InternTrack: 517 passed
+======================== 1247 passed ========================
+InternTrack: 924 passed
 CyberGuide (cybershield): 323 passed
-Total: 840 tests passing
+Total: 1247 tests passing
 ```
 
 ### Coverage Improvement Summary
@@ -117,6 +117,7 @@ Total: 840 tests passing
 | **Pass 8** | **453** | — | version consistency gate (+10 script tests) |
 | **CyberGuide** | **323** | — | Full cleanup + engine/ES tests + version test (+2) |
 | **Combined** | **766** | **67%** | interntrack + cybershield measured together |
+| **Merge (2026-08-01)** | **1247** | — | origin/master merged — 20 remote test files adopted (+481 InternTrack) |
 
 ---
 
@@ -157,7 +158,7 @@ Total: 840 tests passing
 - [x] `src/interntrack/utils/` - 4 utility files
 - [x] `src/interntrack/reports/templates/` - 3 report templates
 
-### Tests (840 total: 517 InternTrack + 323 CyberGuide)
+### Tests (1247 total: 924 InternTrack + 323 CyberGuide)
 - [x] `tests/conftest.py` - Test fixtures
 - [x] `tests/unit/test_job_service.py` - 8 tests
 - [x] `tests/unit/test_application_service.py` - 8 tests
@@ -280,9 +281,9 @@ uvicorn interntrack.main:app --reload
 | Unit - Metrics | 10 | ✅ **NEW** |
 | Unit - Worker | 4 | ✅ (0% → 100% coverage) |
 | Integration - API | 23 | ✅ (incl. CORS middleware + health) |
-| **Total (InternTrack)** | **443** | ✅ **All Passing** |
+| **Total (InternTrack)** | **924** | ✅ **All Passing** |
 | **CyberGuide (cybershield)** | **323** | ✅ **All Passing** |
-| **Grand Total** | **766** | ✅ **All Passing** |
+| **Grand Total** | **1247** | ✅ **All Passing** |
 
 ---
 

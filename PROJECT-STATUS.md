@@ -8,7 +8,7 @@
 
 - ✅ **mypy**: 0 errors across 177 source files (107 cybershield errors fixed)
 - ✅ **ruff**: all checks pass, 212 files formatted
-- ✅ **Tests**: 517 InternTrack + 323 CyberGuide = **840 passing**
+- ✅ **Tests**: 924 InternTrack + 323 CyberGuide = **1247 passing**
 - ✅ **CI**: `.github/workflows/ci.yml` (ruff, mypy, full test suite + coverage + bandit + safety + Trivy security jobs); `.github/workflows/cd.yml` (tag-based deploy)
 - ✅ **Error handling**: `AppException` handler + consistent error payload; CORS settings-driven
 - ✅ **API rate limiting**: `RateLimitMiddleware` (per-IP 100/min, per-API-key 1000/min) with 429 error contract, exempt paths, `RATE_LIMIT_*` env overrides
@@ -57,7 +57,7 @@
 internship-tracker/
 ├── src/interntrack/     ✅ Complete
 ├── dashboard/          ✅ Complete  
-├── tests/              ✅ Complete (358 tests)
+├── tests/              ✅ Complete (924 tests)
 ├── docs/               ✅ Complete
 ├── docker/             ✅ Complete
 └── config files        ✅ Complete
@@ -207,8 +207,8 @@ internship-tracker/
 ## 🧪 Test Results
 
 ### Test Summary
-- **Total Tests:** 840 (517 InternTrack + 323 CyberGuide)
-- **Tests Passing:** ✅ 840 (100%)
+- **Total Tests:** 1247 (924 InternTrack + 323 CyberGuide)
+- **Tests Passing:** ✅ 1247 (100%)
 - **Test Files:** 32+ test files
 
 ### Test Breakdown
@@ -247,9 +247,9 @@ internship-tracker/
 | Unit - Metrics | 10 | ✅ **NEW** |
 | Unit - Worker | 4 | ✅ (0% → 100% coverage) |
 | Integration - API | 23 | ✅ (incl. CORS middleware + health) |
-| **Total (InternTrack)** | **453** | ✅ **All Passing** |
+| **Total (InternTrack)** | **924** | ✅ **All Passing** |
 | **CyberGuide (cybershield)** | **323** | ✅ **All Passing** |
-| **Grand Total** | **840** | ✅ **All Passing** |
+| **Grand Total** | **1247** | ✅ **All Passing** |
 
 ---
 
@@ -304,6 +304,7 @@ uvicorn interntrack.main:app --reload
 | **2026-08-01** | **323** | — | CyberGuide + version consistency test (+2) |
 | **2026-08-01** | **453** | — | InternTrack + version consistency gate script tests (+10) |
 | **2026-08-01** | **766** | **67%** | Combined (interntrack + cybershield) |
+| **2026-08-01** | **1247** | — | origin/master merged — 20 remote test files adopted (+481 InternTrack) |
 
 ---
 
@@ -337,7 +338,7 @@ uvicorn interntrack.main:app --reload
 ✅ Dashboard with charts
 ✅ Docker deployment ready
 ✅ Documentation complete
-✅ 766 tests passing (443 InternTrack + 323 CyberGuide)
+✅ 1247 tests passing (924 InternTrack + 323 CyberGuide)
 ✅ CI/CD pipelines configured
 ✅ Security documentation
 ✅ API rate limiting enabled
