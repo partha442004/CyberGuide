@@ -2,41 +2,12 @@
 
 import csv
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from interntrack.domain.enums import ExperienceLevel, JobSource, JobType
-from interntrack.domain.models import Job
-
-
-def _make_job(**overrides) -> Job:
-    """Create a Job instance with sensible defaults."""
-    defaults = dict(
-        id="job-1",
-        title="Python Developer",
-        company="TechCorp",
-        url="https://example.com/job/1",
-        source=JobSource.LINKEDIN,
-        job_type=JobType.FULL_TIME,
-        experience_level=ExperienceLevel.MID,
-        location="Remote",
-        description="Build APIs",
-        salary_min=80000,
-        salary_max=120000,
-        salary_currency="USD",
-        is_remote=True,
-        is_active=True,
-        posted_at=datetime(2026, 1, 15, tzinfo=UTC),
-        expires_at=None,
-        created_at=datetime(2026, 1, 10, tzinfo=UTC),
-        updated_at=datetime(2026, 1, 10, tzinfo=UTC),
-        tags=["python", "fastapi"],
-    )
-    defaults.update(overrides)
-    return Job(**defaults)
+from tests.conftest import make_job as _make_job
 
 
 class TestExportJobs:
