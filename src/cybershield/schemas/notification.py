@@ -7,7 +7,7 @@ Pydantic models for notification configuration and testing.
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class NotificationConfig(BaseModel):
@@ -48,7 +48,6 @@ class NotificationResponse(BaseModel):
 
 class NotificationSendRequest(BaseModel):
     """Schema for sending a notification."""
-    """Schema for sending a notification."""
     channel: str = Field(
         default="unknown",
         pattern="^(telegram|email|discord|slack|push|unknown)$",
@@ -61,6 +60,14 @@ class NotificationSendRequest(BaseModel):
     )
     url: Optional[str] = None
     data: Optional[Dict[str, Any]] = None
+
+    @field_validator("priority", mode="before")
+    @classmethod
+    def normalize_priority(cls, v: Optional[str]) -> Optional[str]:
+        """Normalize 'normal' to 'medium' for backward compatibility."""
+        if v == "normal":
+            return "medium"
+        return v
 
 
 class NotificationHistory(BaseModel):
