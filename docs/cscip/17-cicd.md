@@ -104,6 +104,20 @@ jobs:
     name: Tests (pytest)
     runs-on: ubuntu-latest
     needs: [lint, typecheck, version, security]
+
+  smoke:
+    name: Smoke (live API boot)
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, security, version, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - run: python scripts/smoke_test.py
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -140,7 +154,7 @@ jobs:
         # requirements-dev.txt and keep the gate deterministic
         run: python -m pip install bandit "safety>=2.3.0,<3"
       - name: Bandit scan (medium+ severities)
-        run: bandit -r src/ -ll -q
+        run: bandit -r src/ scripts/ dashboard/ -ll -q
       - name: Safety dependency scan
         run: safety check -r requirements.txt -r requirements-dev.txt --full-report
       - name: Trivy filesystem scan (HIGH/CRITICAL)

@@ -4,6 +4,35 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.12.0] - 2026-08-01
+
+### Added
+
+#### Live Smoke Test
+- New `scripts/smoke_test.py` — boots the **real uvicorn server** on an
+  ephemeral port against a temp SQLite DB (rate limit enabled, 3/min) and
+  verifies over HTTP: `GET /` 200, `GET /health` 200 with
+  `version == interntrack.__version__` and `status: healthy`, `GET /metrics`
+  snapshot shape, CORS preflight 200 with `access-control-allow-origin: *`,
+  unknown route 404 (checked before the burst so the exhausted limit can't
+  mask it), rate-limit burst `200 200 429 429 429` (the pre-burst 404 consumes
+  one of the 3 credits) with the `RATE_LIMITED` contract; cleans up temp DB
+  and log in `finally`; exits non-zero on any failure
+- Wired into CI as a new **smoke** job (gated after test) and a
+  `make smoke` target
+
+#### Bandit Scope + Makefile Targets
+- `dashboard/` and `scripts/` added to the bandit scan scope in CI and
+  `make security` / `make security-report`
+- `make test` / `test-unit` / `test-integration` / `test-cov` now run the full
+  suite (`tests/` + `src/cybershield/tests`) with `PYTHONPATH=src` and
+  `--cov=interntrack --cov=cybershield`, matching CI exactly
+
+#### Version
+- Both packages, `.env`/`.env.example`, canaries, Helm chart, Oracle
+  deployment files, and docs bumped to `1.12.0`; root `pyproject.toml`
+  synced — verified by `make version-check` (exit 0)
+
 ## [1.11.0] - 2026-08-01
 
 ### Changed

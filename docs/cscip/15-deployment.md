@@ -213,7 +213,7 @@ API_KEY_HEADER=X-API-Key
 
 # Application
 APP_NAME=CyberShield
-APP_VERSION=1.11.0
+APP_VERSION=1.12.0
 DEBUG=false
 ```
 

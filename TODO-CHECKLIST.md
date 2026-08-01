@@ -775,7 +775,21 @@ docker-compose up -d
 - [x] Live smoke test: `/health` version 1.11.0, `/metrics` snapshot, CORS
       preflight 200, rate-limit burst `200 200 200 429 429` (limit=3)
 
+## ✅ HARDENING PASS 10 (2026-08-01) — COMPLETED
+
+### Live Smoke Test + v1.12.0
+- [x] New `scripts/smoke_test.py` — boots real uvicorn on an ephemeral port
+      with a temp DB (rate limit 3/min) and verifies `/health` version ==
+      `__version__`, `/metrics` shape, CORS, 404, rate burst `200 200 429 429
+      429` (404 consumes one of 3 credits) + `RATE_LIMITED` contract
+- [x] New CI **smoke** job + `make smoke` target
+- [x] `bandit` scope extended to `dashboard/` + `scripts/` (CI + Makefile)
+- [x] `make test*` targets now run the full suite (`tests/` +
+      `src/cybershield/tests`) with `PYTHONPATH=src` matching CI
+- [x] Both packages + `.env`/`.env.example` + `pyproject.toml` + deployment
+      artifacts synced to **1.12.0**; `make version-check` exit 0
+
 ---
 
 **Last Updated:** {{DATE}}
-**Version:** 1.11.0
+**Version:** 1.12.0
