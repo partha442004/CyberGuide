@@ -809,5 +809,24 @@ docker-compose up -d
 
 ---
 
+## ✅ HARDENING PASS 12 (2026-08-01) — COMPLETED
+
+### Redis-Backed Rate Limiting + v1.14.0
+- [x] `RedisRateLimitStore` — atomic Lua sliding window over a Redis ZSET
+      (`rl:{key}` + `:seq` counter, both `EXPIRE`-bounded); multi-instance
+      shared limits via `REDIS_URL`
+- [x] Graceful in-memory fallback on a Redis outage (once-only warning, never
+      fails closed)
+- [x] `get_rate_limit_store()` factory wired into `main.py`;
+      `RateLimitStore.is_allowed_async` alias for one shared middleware path
+- [x] `X-RateLimit-Reset` semantics aligned across in-memory and Redis stores
+- [x] 12 new tests (fakeredis): store behavior, fallback, factory selection,
+      async alias parity, middleware-over-Redis; `fakeredis[lua]` dev dep;
+      smoke test pins `REDIS_URL=''`
+- [x] Both packages + `.env`/`.env.example` + `pyproject.toml` + deployment
+      artifacts synced to **1.14.0**; `make version-check` exit 0
+
+---
+
 **Last Updated:** 2026-08-01
-**Version:** 1.13.0
+**Version:** 1.14.0

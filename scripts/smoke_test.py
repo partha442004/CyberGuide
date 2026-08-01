@@ -85,6 +85,9 @@ def main() -> int:
             "DATABASE_URL": f"sqlite+aiosqlite:///{db_path}",
             "RATE_LIMIT_ENABLED": "true",
             "RATE_LIMIT_PER_MINUTE": "3",
+            # Force the in-memory rate-limit store so the burst is deterministic
+            # even on a machine with a local Redis running.
+            "REDIS_URL": "",
             "API_PORT": str(port),
         },
     )

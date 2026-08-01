@@ -15,7 +15,7 @@ from interntrack.config import get_settings
 from interntrack.database.session import close_db, init_db
 from interntrack.domain.exceptions import AppException
 from interntrack.metrics import MetricsMiddleware, metrics_store
-from interntrack.middleware.rate_limit import RateLimitMiddleware
+from interntrack.middleware.rate_limit import RateLimitMiddleware, get_rate_limit_store
 from interntrack.utils.logger import get_logger
 
 settings = get_settings()
@@ -52,6 +52,9 @@ if settings.rate_limit_enabled:
         default_limit=settings.rate_limit_per_minute,
         api_key_limit=settings.rate_limit_api_key_per_minute,
         api_key_header=settings.api_key_header,
+        # Redis-backed when REDIS_URL is configured (shared across replicas),
+        # in-memory otherwise; falls back gracefully on a Redis outage.
+        store=get_rate_limit_store(),
     )
 
 # Metrics middleware - records request counts/errors/latency for /metrics.

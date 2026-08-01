@@ -34,7 +34,13 @@
   limiting; `deploy/prometheus/prometheus.yml` + compose `prometheus`
   service (`monitoring` profile); k8s `prometheus.io` Service annotations;
   6 new tests (renderer format/escaping + endpoint + exempt-path coverage)
-- **Version**: both packages single-source-of-truth at **1.13.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate
+- **Version**: both packages single-source-of-truth at **1.14.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate
+- **Rate limiting (Redis)**: `RedisRateLimitStore` — atomic Lua sliding window
+  over a Redis ZSET (`rl:{key}` + `:seq` counter, both `EXPIRE`-bounded),
+  multi-instance shared limits; in-memory fallback on Redis outage (never
+  fails closed); `get_rate_limit_store()` factory wired in `main.py`;
+  `X-RateLimit-Reset` semantics aligned across stores; 12 new tests via
+  fakeredis; `fakeredis[lua]` added to requirements-dev
 - **Lint**: `dashboard/` now in CI ruff scope — all 24 pre-existing dashboard
   errors fixed (S110→suppress, C408, PIE810, ARG001, E501, COM812, unused
   imports/locals); `make lint/format/format-check` cover `src/ tests/ dashboard/`
@@ -63,7 +69,7 @@
 | **Engines** | ✅ Complete | 100% | Dedup, verify, classify |
 | **Notifications** | ✅ Complete | 100% | Telegram, Email, Discord |
 | **Dashboard** | ✅ Complete | 100% | Streamlit with charts |
-| **Tests** | ✅ Complete | 100% | 782 tests passing |
+| **Tests** | ✅ Complete | 100% | 794 tests passing |
 | **CI/CD** | ✅ Complete | 100% | GitHub Actions ready |
 | **Documentation** | ✅ Complete | 100% | All docs created |
 | **Docker** | ✅ Complete | 100% | Compose ready |
@@ -74,10 +80,10 @@
 ## 📊 FINAL TEST RESULTS
 
 ```
-======================== 782 passed ========================
-InternTrack: 453 passed
+======================== 794 passed ========================
+InternTrack: 471 passed
 CyberGuide (cybershield): 323 passed
-Total: 782 tests passing
+Total: 794 tests passing
 ```
 
 ### Coverage Improvement Summary
@@ -139,7 +145,7 @@ Total: 782 tests passing
 - [x] `src/interntrack/utils/` - 4 utility files
 - [x] `src/interntrack/reports/templates/` - 3 report templates
 
-### Tests (782 total: 459 InternTrack + 323 CyberGuide)
+### Tests (794 total: 471 InternTrack + 323 CyberGuide)
 - [x] `tests/conftest.py` - Test fixtures
 - [x] `tests/unit/test_job_service.py` - 8 tests
 - [x] `tests/unit/test_application_service.py` - 8 tests

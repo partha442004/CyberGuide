@@ -1,8 +1,16 @@
 """
 Rate Limiting Middleware
 
-Provides configurable rate limiting using an in-memory sliding window algorithm.
-Supports per-IP and per-API-key rate limiting with configurable limits.
+Provides configurable rate limiting using a sliding window algorithm. Supports
+per-IP and per-API-key rate limiting with configurable limits.
+
+Two store implementations back the middleware:
+
+- :class:`RateLimitStore` — dependency-free in-memory sliding window (the
+  default; per-process limits).
+- :class:`RedisRateLimitStore` — Redis-backed sliding window using an atomic
+  Lua script (ZSET), so limits are shared across API replicas. Falls back to
+  the in-memory store when Redis is unreachable so the API never fails closed.
 
 Responses use the standard InternTrack error contract::
 
@@ -12,6 +20,7 @@ Responses use the standard InternTrack error contract::
 import logging
 import time
 from collections import defaultdict
+from typing import Any
 
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
@@ -58,7 +67,7 @@ class RateLimitStore:
             headers = {
                 "X-RateLimit-Limit": str(max_requests),
                 "X-RateLimit-Remaining": "0",
-                "X-RateLimit-Reset": str(int(cutoff + window_seconds)),
+                "X-RateLimit-Reset": str(int(now + window_seconds)),
                 "Retry-After": str(retry_after),
             }
             return False, headers
@@ -71,9 +80,18 @@ class RateLimitStore:
         headers = {
             "X-RateLimit-Limit": str(max_requests),
             "X-RateLimit-Remaining": str(remaining),
-            "X-RateLimit-Reset": str(int(cutoff + window_seconds)),
+            "X-RateLimit-Reset": str(int(now + window_seconds)),
         }
         return True, headers
+
+    async def is_allowed_async(
+        self,
+        key: str,
+        max_requests: int,
+        window_seconds: int,
+    ) -> tuple[bool, dict[str, str]]:
+        """Async alias of :meth:`is_allowed` (shared middleware code path)."""
+        return self.is_allowed(key, max_requests, window_seconds)
 
     def cleanup_expired(self):
         """Remove entries older than CLEANUP_WINDOW for all keys."""
@@ -105,8 +123,148 @@ class RateLimitStore:
             self._requests.clear()
 
 
-# Global rate limit store
+# Global in-memory rate limit store (used when Redis is not configured)
 rate_limit_store = RateLimitStore()
+
+
+class RedisRateLimitStore:
+    """
+    Redis-backed sliding window rate limit store (multi-instance safe).
+
+    Uses a sorted set per key plus an atomic Lua script so the prune, count
+    and record happen in one round trip with no TOCTOU races. Falls back to
+    an in-memory :class:`RateLimitStore` when Redis is unreachable so the API
+    keeps serving with per-instance limits during an outage.
+    """
+
+    # Lua sliding window: KEYS[1] is the key; ARGV holds now, window, max.
+    _SLIDING_WINDOW_LUA = """
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local max_requests = tonumber(ARGV[3])
+redis.call('ZREMRANGEBYSCORE', key, 0, now - window)
+local count = redis.call('ZCARD', key)
+if count >= max_requests then
+  local oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+  local retry_after = 0
+  if oldest[2] then
+    retry_after = math.floor(tonumber(oldest[2]) + window - now) + 1
+  end
+  return {0, retry_after}
+end
+local member = now .. ':' .. redis.call('INCR', key .. ':seq')
+redis.call('ZADD', key, now, member)
+redis.call('EXPIRE', key, window)
+-- Keep the seq counter in lockstep with the zset so it never leaks and
+-- never resets while the zset is alive (avoids same-second member collisions).
+redis.call('EXPIRE', key .. ':seq', window)
+local remaining = max_requests - count - 1
+return {1, remaining}
+"""
+
+    def __init__(self, redis_url: str, connect_timeout: float = 2.0):
+
+        self._redis_url = redis_url
+        self._connect_timeout = connect_timeout
+        self._client: Any = None
+        self._fallback = RateLimitStore()
+        self._degraded = False
+
+    async def _get_client(self):
+        """Lazily create the Redis client (avoids failing at import time)."""
+        if self._client is None:
+            import redis.asyncio as redis
+
+            self._client = redis.from_url(
+                self._redis_url,
+                socket_connect_timeout=self._connect_timeout,
+                socket_timeout=self._connect_timeout,
+            )
+        return self._client
+
+    async def is_allowed_async(
+        self,
+        key: str,
+        max_requests: int,
+        window_seconds: int,
+    ) -> tuple[bool, dict[str, str]]:
+        """Check a request against the Redis-backed sliding window."""
+        try:
+            client = await self._get_client()
+            now = time.time()
+            result = await client.eval(
+                self._SLIDING_WINDOW_LUA,
+                1,
+                f"rl:{key}",
+                now,
+                window_seconds,
+                max_requests,
+            )
+            allowed = bool(result[0])
+            value = int(result[1])
+            if not allowed:
+                headers = {
+                    "X-RateLimit-Limit": str(max_requests),
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": str(int(now + window_seconds)),
+                    "Retry-After": str(max(1, value)),
+                }
+                return False, headers
+            headers = {
+                "X-RateLimit-Limit": str(max_requests),
+                "X-RateLimit-Remaining": str(max(0, value)),
+                "X-RateLimit-Reset": str(int(now + window_seconds)),
+            }
+            return True, headers
+        except Exception:
+            # Redis unreachable: degrade to the in-memory store so the API
+            # keeps serving (per-instance limits until Redis returns).
+            if not self._degraded:
+                self._degraded = True
+                logger.warning(
+                    "Redis rate limit store unreachable; falling back to "
+                    "in-memory store",
+                )
+            return self._fallback.is_allowed(key, max_requests, window_seconds)
+
+    async def cleanup_expired(self):
+        """Redis keys self-expire (EXPIRE); nothing to sweep here."""
+        return 0
+
+    async def clear(self, key: str | None = None):
+        """Clear rate limit data for a key or all keys in Redis."""
+        try:
+            client = await self._get_client()
+            if key:
+                await client.delete(f"rl:{key}")
+                await client.delete(f"rl:{key}:seq")
+            else:
+                # Scan and delete all rate-limit keys
+                async for redis_key in client.scan_iter("rl:*"):
+                    await client.delete(redis_key)
+        except Exception:
+            self._fallback.clear(key)
+
+
+def get_rate_limit_store():
+    """
+    Build the configured rate limit store.
+
+    Returns a :class:`RedisRateLimitStore` when ``REDIS_URL`` is configured
+    (multi-instance shared limits) and the global in-memory store otherwise.
+    """
+    from interntrack.config import get_settings
+
+    settings = get_settings()
+    if settings.redis_url:
+        try:
+            return RedisRateLimitStore(settings.redis_url)
+        except Exception:
+            logger.warning(
+                "Redis rate limit store init failed; using in-memory store",
+            )
+    return rate_limit_store
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -116,7 +274,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     Limits:
     - Per IP: 100 requests per minute (default)
     - Per API key: 1000 requests per minute (default)
-    - Health/docs/root endpoints: Exempt from rate limiting
+    - Health/docs/root/metrics endpoints: Exempt from rate limiting
     """
 
     def __init__(
@@ -127,12 +285,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         api_key_limit: int = 1000,
         api_key_header: str = "X-API-Key",
         exempt_paths: list[str] | None = None,
+        store=None,
     ):
         super().__init__(app)
         self.default_limit = default_limit
         self.default_window = default_window
         self.api_key_limit = api_key_limit
         self.api_key_header = api_key_header
+        self.store = store or rate_limit_store
         self.exempt_paths = exempt_paths or [
             "/",
             "/health",
@@ -160,7 +320,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             limit = self.default_limit
 
         # Check rate limit
-        allowed, headers = rate_limit_store.is_allowed(key, limit, self.default_window)
+        allowed, headers = await self.store.is_allowed_async(
+            key,
+            limit,
+            self.default_window,
+        )
 
         if not allowed:
             logger.warning("Rate limit exceeded for %s", key)

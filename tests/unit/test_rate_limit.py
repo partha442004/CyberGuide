@@ -1,17 +1,28 @@
 """
-Tests for the InternTrack rate limiting middleware and store.
+Tests for the InternTrack rate limiting middleware and stores.
+
+Covers both the in-memory :class:`RateLimitStore` and the Redis-backed
+:class:`RedisRateLimitStore` (via fakeredis) plus the store factory and
+middleware wiring.
 """
 
 import time
 
 import pytest
+from fakeredis.aioredis import FakeRedis
 from fastapi.middleware.cors import CORSMiddleware
 from httpx import ASGITransport, AsyncClient
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-from interntrack.middleware.rate_limit import RateLimitMiddleware, rate_limit_store
+from interntrack.middleware.rate_limit import (
+    RateLimitMiddleware,
+    RateLimitStore,
+    RedisRateLimitStore,
+    get_rate_limit_store,
+    rate_limit_store,
+)
 
 
 class TestRateLimitStore:
@@ -69,7 +80,7 @@ class TestRateLimitStore:
         assert allowed is True
 
 
-def _build_app(limit: int = 2, api_key_limit: int = 10):
+def _build_app(limit: int = 2, api_key_limit: int = 10, store=None):
     """Build a minimal Starlette app with the rate limit middleware."""
 
     async def ok(request):
@@ -87,8 +98,155 @@ def _build_app(limit: int = 2, api_key_limit: int = 10):
         RateLimitMiddleware,
         default_limit=limit,
         api_key_limit=api_key_limit,
+        store=store,
     )
     return app
+
+
+class TestRedisRateLimitStore:
+    """Tests for the Redis-backed sliding window store (via fakeredis)."""
+
+    @pytest.fixture
+    def store(self):
+        """A Redis-backed store pointed at a fakeredis server."""
+        store = RedisRateLimitStore("redis://localhost:6379/0")
+        store._client = FakeRedis()
+        return store
+
+    @pytest.mark.asyncio
+    async def test_allows_request_under_limit(self, store):
+        """Requests under the limit are allowed with remaining headers."""
+        allowed, headers = await store.is_allowed_async("it:1", 5, 60)
+        assert allowed is True
+        assert headers["X-RateLimit-Limit"] == "5"
+        assert headers["X-RateLimit-Remaining"] == "4"
+
+    @pytest.mark.asyncio
+    async def test_blocks_request_over_limit(self, store):
+        """Requests over the limit are blocked with Retry-After."""
+        for _ in range(5):
+            await store.is_allowed_async("it:2", 5, 60)
+        allowed, headers = await store.is_allowed_async("it:2", 5, 60)
+        assert allowed is False
+        assert headers["X-RateLimit-Remaining"] == "0"
+        assert "Retry-After" in headers
+
+    @pytest.mark.asyncio
+    async def test_different_keys_independent(self, store):
+        """Different keys have independent limits."""
+        for _ in range(3):
+            await store.is_allowed_async("it:3", 3, 60)
+        allowed, _ = await store.is_allowed_async("it:3b", 3, 60)
+        assert allowed is True
+
+    @pytest.mark.asyncio
+    async def test_window_expiry(self, store):
+        """Requests are allowed again after the window expires."""
+        for _ in range(2):
+            await store.is_allowed_async("it:4", 2, 0)
+        time.sleep(0.01)
+        allowed, _ = await store.is_allowed_async("it:4", 2, 0)
+        assert allowed is True
+
+    @pytest.mark.asyncio
+    async def test_clear_specific_key(self, store):
+        """Clearing one key does not affect others."""
+        await store.is_allowed_async("it:5a", 1, 60)
+        await store.is_allowed_async("it:5b", 1, 60)
+        await store.clear("it:5a")
+        allowed_a, _ = await store.is_allowed_async("it:5a", 1, 60)
+        assert allowed_a is True
+
+    @pytest.mark.asyncio
+    async def test_clear_all_keys(self, store):
+        """Clearing all keys resets every limit."""
+        for _ in range(5):
+            await store.is_allowed_async("it:6", 5, 60)
+        await store.clear()
+        allowed, _ = await store.is_allowed_async("it:6", 5, 60)
+        assert allowed is True
+
+
+class TestRedisRateLimitStoreFallback:
+    """Tests for the graceful degradation when Redis is unreachable."""
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_in_memory_when_redis_down(self):
+        """A Redis outage degrades to the in-memory store, not a 500."""
+
+        class _BrokenRedis:
+            """Fake client whose every command raises ConnectionError."""
+
+            async def eval(self, *args, **kwargs):
+                raise ConnectionError("connection refused")
+
+        store = RedisRateLimitStore("redis://localhost:6379/0")
+        store._client = _BrokenRedis()
+
+        allowed, headers = await store.is_allowed_async("it:9", 5, 60)
+        assert allowed is True
+        assert headers["X-RateLimit-Remaining"] == "4"
+
+    @pytest.mark.asyncio
+    async def test_fallback_clears_in_memory(self):
+        """clear() degrades to the in-memory fallback on Redis failure."""
+
+        class _BrokenRedis:
+            async def scan_iter(self, *args, **kwargs):
+                raise ConnectionError("connection refused")
+
+        store = RedisRateLimitStore("redis://localhost:6379/0")
+        store._client = _BrokenRedis()
+        # Should not raise
+        await store.clear()
+
+
+class TestRateLimitStoreAsyncAlias:
+    """The async alias on the in-memory store matches the sync result."""
+
+    @pytest.mark.asyncio
+    async def test_is_allowed_async_matches_sync(self):
+        """is_allowed_async produces the same result as is_allowed."""
+        # Separate stores: calling both methods on one store would double-count.
+        # Compare only the stable fields (X-RateLimit-Reset is a wall-clock
+        # timestamp and can straddle a second boundary between the two calls).
+        sync_store = RateLimitStore()
+        async_store = RateLimitStore()
+        sync_result = sync_store.is_allowed("it:10", 5, 60)
+        async_result = await async_store.is_allowed_async("it:10", 5, 60)
+        assert sync_result[0] == async_result[0]
+        assert (
+            sync_result[1]["X-RateLimit-Limit"] == async_result[1]["X-RateLimit-Limit"]
+        )
+        assert (
+            sync_result[1]["X-RateLimit-Remaining"]
+            == async_result[1]["X-RateLimit-Remaining"]
+        )
+
+
+class TestGetRateLimitStore:
+    """Tests for the store factory selection."""
+
+    @pytest.mark.asyncio
+    async def test_redis_store_used_when_redis_url_configured(self, monkeypatch):
+        """REDIS_URL configured -> Redis-backed store."""
+        # get_rate_limit_store() imports get_settings lazily, so patch the
+        # source module attribute.
+        monkeypatch.setattr(
+            "interntrack.config.get_settings",
+            lambda: type("S", (), {"redis_url": "redis://localhost:6379/0"})(),
+        )
+        store = get_rate_limit_store()
+        assert isinstance(store, RedisRateLimitStore)
+
+    @pytest.mark.asyncio
+    async def test_in_memory_used_without_redis_url(self, monkeypatch):
+        """No REDIS_URL -> the global in-memory store."""
+        monkeypatch.setattr(
+            "interntrack.config.get_settings",
+            lambda: type("S", (), {"redis_url": None})(),
+        )
+        assert get_rate_limit_store() is rate_limit_store
 
 
 class TestRateLimitMiddleware:
@@ -181,3 +339,19 @@ class TestRateLimitMiddleware:
         assert first.status_code == 200
         assert blocked.status_code == 429
         assert blocked.headers.get("access-control-allow-origin") == "*"
+
+    @pytest.mark.asyncio
+    async def test_middleware_with_redis_store(self):
+        """The middleware works end-to-end against a Redis-backed store."""
+        store = RedisRateLimitStore("redis://localhost:6379/0")
+        store._client = FakeRedis()
+        transport = ASGITransport(app=_build_app(limit=2, store=store))
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            first = await client.get("/api/v1/test")
+            second = await client.get("/api/v1/test")
+            blocked = await client.get("/api/v1/test")
+
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert blocked.status_code == 429
+        assert blocked.json()["error"]["code"] == "RATE_LIMITED"

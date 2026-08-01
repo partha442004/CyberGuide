@@ -4,6 +4,43 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.14.0] - 2026-08-01
+
+### Added
+
+#### Redis-Backed Rate Limiting (InternTrack)
+- New `RedisRateLimitStore` in `middleware/rate_limit.py` — multi-instance
+  safe sliding-window limiter using an atomic Lua script over a Redis ZSET
+  (prune, count, and record in one round trip); lazily connects via
+  `redis.asyncio` (already a dependency, `REDIS_URL` already in compose); the
+  `rl:{key}` ZSET **and** the `rl:{key}:seq` member counter both get an
+  `EXPIRE` in lockstep so neither leaks in Redis
+- On a Redis outage `is_allowed_async` falls back to an in-memory store
+  (once-only warning, never fails closed) so the API keeps serving with
+  per-instance limits during the outage (the store stays degraded until
+  process restart; it never re-attempts Redis to avoid hammering it with
+  2s timeouts)
+- `get_rate_limit_store()` factory: returns the Redis store when `REDIS_URL`
+  is configured, else the global in-memory store; `RateLimitMiddleware` now
+  takes a `store` parameter and `main.py` passes the factory result
+- `RateLimitStore` gained an async `is_allowed_async` alias so the middleware
+  shares one code path across both stores
+- `X-RateLimit-Reset` semantics aligned between the in-memory and Redis
+  stores (`int(now + window_seconds)` — the window end)
+- Tests (12 new): `TestRedisRateLimitStore` via fakeredis (allows, blocks,
+  independent keys, window expiry, clear specific/all), fallback tests
+  (broken Redis client degrades to in-memory), factory selection tests, the
+  async-alias parity test, and a middleware-over-Redis HTTP test
+- Dev dependency `fakeredis[lua]>=2.0.0` added to `requirements-dev.txt`
+  (lupa is required for the Lua script to run in fakeredis)
+- Smoke test now sets `REDIS_URL=''` so the live burst stays deterministic
+  even on machines with a local Redis running
+
+#### Version
+- Both packages, `.env`/`.env.example`, canaries, Helm chart, Oracle
+  deployment files, and docs bumped to `1.14.0`; root `pyproject.toml`
+  synced — verified by `make version-check` (exit 0)
+
 ## [1.13.0] - 2026-08-01
 
 ### Added
