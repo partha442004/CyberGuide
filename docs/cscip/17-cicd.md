@@ -42,7 +42,7 @@ CSCIP uses GitHub Actions for continuous integration and deployment with automat
 
 > ✅ **Implemented** in `.github/workflows/ci.yml` (2026-08-01). It runs ruff
 > lint + format check, mypy across both modules, the combined InternTrack +
-> CyberGuide test suite (817 tests) with coverage collection and an uploaded
+> CyberGuide test suite (827 tests) with coverage collection and an uploaded
 > `coverage.xml` artifact, plus a security gate (bandit static scan + safety
 > dependency scan + Trivy filesystem scan scoped to `src/`). Docker build
 > remains a CD concern; the CI pipeline is focused on lint/type/tests/coverage/security.

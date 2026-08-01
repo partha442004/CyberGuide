@@ -4,6 +4,33 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.18.0] - 2026-08-01
+
+### Added
+
+#### Loki + Promtail Log Monitoring (InternTrack)
+- `deploy/loki/loki-config.yml` — single-binary Loki (tsdb schema v13,
+  filesystem storage, 336h retention, `max_line_size` 1MB)
+- `deploy/loki/promtail-config.yml` — Docker-socket service discovery
+  (`docker_sd_configs`, 5s refresh) shipping to `http://loki:3100`; parses the
+  app's structlog JSON (`timestamp`/`level` labels + RFC3339 timestamp) and
+  relabels to `container`/`compose_service`/`compose_project`/`stream`
+- `docker-compose.yml` `loki` (3.4.2, port 3100) + `promtail` (3.4.2,
+  port 9080, docker.sock read-only, depends_on loki) services + `loki_data`
+  volume, all in the `monitoring` profile
+- Grafana provisioning adds a **Loki** datasource (uid `loki`,
+  `http://loki:3100`)
+- `deploy/grafana/dashboards/logs.json` — **InternTrack Logs** dashboard
+  (uid `interntrack-logs`): log volume by service, error-level rate,
+  top log producers, live `{job="docker"} | json` log panel + service template
+- `tests/unit/test_log_monitoring.py` (10 tests) pin the configs to each other
+  (loki layout, promtail→loki clients + docker socket, compose services,
+  loki datasource, valid LogQL exprs + template var)
+
+### Changed
+- Both packages + `.env`/`.env.example` + `pyproject.toml` + deployment
+  artifacts synced to **1.18.0**; `make version-check` exit 0
+
 ## [1.17.0] - 2026-08-01
 
 ### Added
