@@ -748,7 +748,20 @@ git checkout <previous-tag>
 docker-compose up -d
 ```
 
+## ✅ HARDENING PASS 8 (2026-08-01) — COMPLETED
+
+### Version Consistency Gate (both packages → 1.10.0)
+- [x] New `scripts/check_versions.py` — verifies `interntrack.__version__` ==
+      `cybershield.__version__` == `.env.example APP_VERSION` ==
+      `pyproject.toml version`; exits non-zero on any drift
+- [x] New CI **Version consistency** job (gates the test job) + `make version-check`
+- [x] New `tests/unit/test_version_check.py` (10 tests)
+- [x] Dashboard `About` now fetches the live version from `GET /health`
+      (`DEFAULT_VERSION` fallback = 1.10.0) instead of a hardcoded string
+- [x] Root `pyproject.toml` `version` 1.0.0 → **1.10.0** (was stale since the
+      first release); both packages + `.env`/`.env.example` synced to 1.10.0
+
 ---
 
 **Last Updated:** {{DATE}}
-**Version:** 1.9.0
+**Version:** 1.10.0

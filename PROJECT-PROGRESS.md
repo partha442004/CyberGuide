@@ -11,7 +11,7 @@
 | **ruff lint** | ✅ All checks passed (was 1,294 errors) |
 | **ruff format** | ✅ 212 files formatted |
 | **mypy** | ✅ 0 errors in 177 source files (fixed 107 in cybershield) |
-| **InternTrack tests** | ✅ 443 passing |
+| **InternTrack tests** | ✅ 453 passing |
 | **CyberGuide tests** | ✅ 323 passing |
 | **Smoke test** | ✅ Live uvicorn boot verified: / (200), /health (200 healthy), /docs (404 prod), CORS preflight, 404, rate-limit burst (200/200/429/429/429) + RATE_LIMITED contract |
 | **CI pipeline** | ✅ .github/workflows/ci.yml (lint + typecheck + tests + coverage + security) |
@@ -29,7 +29,7 @@
 - **Pre-commit**: `.pre-commit-config.yaml` added (ruff, mypy with PYTHONPATH, commitizen)
 - **Health check**: `/health` creates its own session via `async_session_factory` — engine-down now returns **503 degraded** (was 500); 200 healthy (version, database) / 503 degraded; conftest points the factory at the in-memory test engine
 - **Metrics**: `GET /metrics` (request counts, error rate, avg latency, status histogram) via in-memory `MetricsStore` + middleware; 429s recorded, /metrics exempt from both recording and rate limiting
-- **Version**: both packages single-source-of-truth at **1.9.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example; canary tests in both test suites
+- **Version**: both packages single-source-of-truth at **1.10.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate
 - **Live smoke test**: real uvicorn boot — all endpoints verified over HTTP incl. rate-limit burst 200/200/429/429/429
 - **Report service**: template dir now module-relative (works from any CWD); 10 new tests (`test_report_service.py`) for rendering + generation
 - **Real bugs fixed**: httpx 0.28 `allow_redirects` removal, `NotificationPriority.NORMAL`, `SkillTrend.recorded_at`, `Company.is_trusted` (models + migration), `Job.company` relationship shadowing the string column (broke search), scheduler `not Job.is_verified` filter
@@ -51,7 +51,7 @@
 | **Engines** | ✅ Complete | 100% | Dedup, verify, classify |
 | **Notifications** | ✅ Complete | 100% | Telegram, Email, Discord |
 | **Dashboard** | ✅ Complete | 100% | Streamlit with charts |
-| **Tests** | ✅ Complete | 100% | 766 tests passing |
+| **Tests** | ✅ Complete | 100% | 776 tests passing |
 | **CI/CD** | ✅ Complete | 100% | GitHub Actions ready |
 | **Documentation** | ✅ Complete | 100% | All docs created |
 | **Docker** | ✅ Complete | 100% | Compose ready |
@@ -62,10 +62,10 @@
 ## 📊 FINAL TEST RESULTS
 
 ```
-======================== 766 passed ========================
-InternTrack: 443 passed
+======================== 776 passed ========================
+InternTrack: 453 passed
 CyberGuide (cybershield): 323 passed
-Total: 766 tests passing
+Total: 776 tests passing
 ```
 
 ### Coverage Improvement Summary
@@ -84,6 +84,7 @@ Total: 766 tests passing
 | **Pass 5** | **429** | — | +1 readiness probe failure-path test |
 | **Pass 6** | **443** | — | +14 (metrics 10, version 2, worker 2) |
 | **Pass 7** | **443** | — | version sync to 1.9.0 (no new InternTrack tests) |
+| **Pass 8** | **453** | — | version consistency gate (+10 script tests) |
 | **CyberGuide** | **323** | — | Full cleanup + engine/ES tests + version test (+2) |
 | **Combined** | **766** | **67%** | interntrack + cybershield measured together |
 
@@ -126,7 +127,7 @@ Total: 766 tests passing
 - [x] `src/interntrack/utils/` - 4 utility files
 - [x] `src/interntrack/reports/templates/` - 3 report templates
 
-### Tests (766 total: 443 InternTrack + 323 CyberGuide)
+### Tests (776 total: 453 InternTrack + 323 CyberGuide)
 - [x] `tests/conftest.py` - Test fixtures
 - [x] `tests/unit/test_job_service.py` - 8 tests
 - [x] `tests/unit/test_application_service.py` - 8 tests
