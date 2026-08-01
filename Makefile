@@ -23,17 +23,20 @@ dashboard: ## Run the Streamlit dashboard
 
 # Testing
 test: ## Run all tests with coverage
-	pytest --cov=interntrack --cov-report=term-missing -v
+	PYTHONPATH=src pytest tests src/cybershield/tests -q -p no:cacheprovider -o addopts='' --cov=interntrack --cov=cybershield --cov-report=term-missing
 
 test-unit: ## Run unit tests only
-	pytest tests/unit -v
+	PYTHONPATH=src pytest tests/unit -q -p no:cacheprovider -o addopts='' -v
 
 test-integration: ## Run integration tests only
-	pytest tests/integration -v
+	PYTHONPATH=src pytest tests/integration -q -p no:cacheprovider -o addopts='' -v
 
 test-cov: ## Generate HTML coverage report
-	pytest --cov=interntrack --cov-report=html
+	PYTHONPATH=src pytest tests src/cybershield/tests -q -p no:cacheprovider -o addopts='' --cov=interntrack --cov=cybershield --cov-report=html
 	open htmlcov/index.html
+
+smoke: ## Boot the real API and verify /health version, /metrics, CORS, rate limit
+	python scripts/smoke_test.py
 
 # Code Quality
 lint: ## Run linter (ruff)
@@ -52,13 +55,13 @@ version-check: ## Verify all version sources agree (packages + .env.example + py
 	python scripts/check_versions.py
 
 security: ## Run static security scan (bandit)
-	bandit -r src/ -ll -q
+	bandit -r src/ scripts/ dashboard/ -ll -q
 
 deps-check: ## Check dependencies for known vulnerabilities (safety)
 	safety check -r requirements.txt -r requirements-dev.txt --full-report
 
 security-report: ## Generate HTML security report (bandit)
-	bandit -r src/ -f html -o bandit-report.html
+	bandit -r src/ scripts/ dashboard/ -f html -o bandit-report.html
 
 # Database
 db-migrate: ## Run database migrations

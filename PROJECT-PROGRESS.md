@@ -29,10 +29,14 @@
 - **Pre-commit**: `.pre-commit-config.yaml` added (ruff, mypy with PYTHONPATH, commitizen)
 - **Health check**: `/health` creates its own session via `async_session_factory` — engine-down now returns **503 degraded** (was 500); 200 healthy (version, database) / 503 degraded; conftest points the factory at the in-memory test engine
 - **Metrics**: `GET /metrics` (request counts, error rate, avg latency, status histogram) via in-memory `MetricsStore` + middleware; 429s recorded, /metrics exempt from both recording and rate limiting
-- **Version**: both packages single-source-of-truth at **1.11.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate
+- **Version**: both packages single-source-of-truth at **1.12.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate
 - **Lint**: `dashboard/` now in CI ruff scope — all 24 pre-existing dashboard
   errors fixed (S110→suppress, C408, PIE810, ARG001, E501, COM812, unused
   imports/locals); `make lint/format/format-check` cover `src/ tests/ dashboard/`
+- **Smoke**: `scripts/smoke_test.py` boots the real API (temp DB/port) and
+  verifies `/health` version == `__version__`, `/metrics`, CORS, 404, rate
+  burst `200 200 429 429 429`; wired into CI **smoke** job + `make smoke`;
+  bandit scope now covers `src/ scripts/ dashboard/`
 - **Live smoke test**: real uvicorn boot — all endpoints verified over HTTP incl. rate-limit burst 200/200/429/429/429
 - **Report service**: template dir now module-relative (works from any CWD); 10 new tests (`test_report_service.py`) for rendering + generation
 - **Real bugs fixed**: httpx 0.28 `allow_redirects` removal, `NotificationPriority.NORMAL`, `SkillTrend.recorded_at`, `Company.is_trusted` (models + migration), `Job.company` relationship shadowing the string column (broke search), scheduler `not Job.is_verified` filter

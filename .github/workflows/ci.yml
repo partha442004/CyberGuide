@@ -67,7 +67,7 @@ jobs:
         run: python -m pip install bandit "safety>=2.3.0,<3"
 
       - name: Bandit scan (medium+ severities)
-        run: bandit -r src/ -ll -q
+        run: bandit -r src/ scripts/ dashboard/ -ll -q
 
       - name: Safety dependency scan
         run: safety check -r requirements.txt -r requirements-dev.txt --full-report
@@ -126,3 +126,23 @@ jobs:
         with:
           name: coverage-report
           path: coverage.xml
+
+  smoke:
+    name: Smoke (live API boot)
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, security, version, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Boot API and run smoke checks
+        run: python scripts/smoke_test.py
