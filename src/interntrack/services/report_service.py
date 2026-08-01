@@ -90,7 +90,7 @@ class ReportService:
     async def generate_monthly_report(self) -> dict[str, Any]:
         """Generate monthly report with complete analytics."""
         weekly_report = await self.generate_weekly_report()
-        new_jobs = await self.job_repo.get_recent_jobs(days=30)
+        await self.job_repo.get_recent_jobs(days=30)
         salary_stats = await self.job_repo.get_salary_statistics()
 
         return {

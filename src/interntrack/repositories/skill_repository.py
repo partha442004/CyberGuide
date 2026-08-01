@@ -42,7 +42,7 @@ class SkillRepository(BaseRepository[Skill]):
     async def get_active_skills(self) -> list[Skill]:
         """Get all active skills."""
         result = await self.session.execute(
-            select(Skill).where(Skill.is_active == True),
+            select(Skill).where(Skill.is_active),
         )
         return list(result.scalars().all())
 

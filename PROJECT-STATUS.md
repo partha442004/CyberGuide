@@ -122,6 +122,7 @@ internship-tracker/
 | `setup.sh` | ✅ Ready | Linux/Mac setup |
 | `setup.ps1` | ✅ Ready | Windows setup |
 | `render.yaml` | ✅ Ready | Render.com deployment |
+| `railway.toml` | ✅ Ready | Railway.app deployment |
 | `Procfile` | ✅ Ready | Render build system |
 
 ### 14. Documentation (100%)
@@ -165,10 +166,10 @@ internship-tracker/
 ## 🧪 Test Results
 
 ### Test Summary
-- **Total Tests:** 685
-- **Tests Passing:** ✅ 685 (100%)
+- **Total Tests:** 657
+- **Tests Passing:** ✅ 657 (100%)
 - **Coverage:** ✅ 90% (Improved from 39%)
-- **Test Files:** 40 test files
+- **Test Files:** 38 test files (consolidated)
 
 ### Coverage Highlights
 | File | Current | Previous | Status |
@@ -189,8 +190,7 @@ internship-tracker/
 | Unit - Verification Engine | 11 | ✅ |
 | Unit - Utils | 14 | ✅ |
 | Unit - Scraper Base | 11 | ✅ |
-| Unit - Scrapers | 14 | ✅ |
-| Unit - Scrapers Advanced | 16 | ✅ |
+| Unit - Scrapers Unified | 65 | ✅ (consolidated) |
 | Unit - Scheduler Jobs | 10 | ✅ |
 | Unit - Scheduler Setup | 3 | ✅ |
 | Unit - Cache | 11 | ✅ |
@@ -202,17 +202,12 @@ internship-tracker/
 | Unit - Notification Service | 20 | ✅ |
 | Unit - AI Service | 12 | ✅ |
 | Unit - Classification Engine | 15 | ✅ |
-| Unit - HackerNews Scraper | 20 | ✅ |
-| Unit - LinkedIn Scraper | 14 | ✅ |
-| Unit - RemoteOK Scraper | 15 | ✅ |
-| Unit - RSS Feeds Scraper | 18 | ✅ |
-| Unit - Indeed Scraper | 12 | ✅ |
-| Unit - Glassdoor Scraper | 12 | ✅ |
+| Unit - Final Coverage | 10 | ✅ (notification+worker) |
 | Unit - Learning Service | 16 | ✅ |
 | Unit - Report Service | 10 | ✅ |
 | Unit - Notification Schema | 10 | ✅ |
 | Integration - API | 21 | ✅ |
-| **Total** | **351** | ✅ **All Passing** |
+| **Total** | **657** | ✅ **All Passing** |
 
 ---
 
@@ -273,4 +268,4 @@ uvicorn cybershield.main:app --reload
 ---
 
 **Last Updated:** 2026-08-01
-**Status:** ✅ Coverage Exceeded Target (89%)
+**Status:** ✅ Coverage Exceeded Target (90%), Railway config ready

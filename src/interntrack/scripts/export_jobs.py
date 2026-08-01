@@ -22,7 +22,7 @@ async def export_jobs(
     async with get_db_session() as session:
         from sqlalchemy import select
 
-        query = select(Job).where(Job.is_active == True)
+        query = select(Job).where(Job.is_active)
 
         if source:
             from interntrack.domain.enums import JobSource

@@ -52,7 +52,7 @@ class JobRepository(BaseRepository[Job]):
         company: str | None = None,
     ) -> list[Job]:
         """Get active jobs with filters."""
-        query = select(Job).where(Job.is_active == True)
+        query = select(Job).where(Job.is_active)
 
         if job_type:
             query = query.where(Job.job_type == job_type)
@@ -95,7 +95,7 @@ class JobRepository(BaseRepository[Job]):
                     Job.expires_at.isnot(None),
                     Job.expires_at <= cutoff,
                     Job.expires_at >= now,
-                    Job.is_active == True,
+                    Job.is_active,
                 ),
             )
             .order_by(Job.expires_at)
@@ -107,7 +107,7 @@ class JobRepository(BaseRepository[Job]):
         """Get top companies by job count."""
         query = (
             select(Job.company, func.count(Job.id).label("count"))
-            .where(Job.is_active == True)
+            .where(Job.is_active)
             .group_by(Job.company)
             .order_by(func.count(Job.id).desc())
             .limit(limit)
@@ -122,7 +122,7 @@ class JobRepository(BaseRepository[Job]):
             select(Job)
             .where(
                 and_(
-                    Job.is_active == True,
+                    Job.is_active,
                     (
                         Job.title.ilike(search_term)
                         | Job.company.ilike(search_term)
@@ -159,7 +159,7 @@ class JobRepository(BaseRepository[Job]):
         """Get job type distribution."""
         query = (
             select(Job.job_type, func.count(Job.id).label("count"))
-            .where(Job.is_active == True)
+            .where(Job.is_active)
             .group_by(Job.job_type)
             .order_by(func.count(Job.id).desc())
         )
@@ -176,7 +176,7 @@ class JobRepository(BaseRepository[Job]):
                 and_(
                     Job.expires_at.isnot(None),
                     Job.expires_at < datetime.now(UTC),
-                    Job.is_active == True,
+                    Job.is_active,
                 ),
             )
             .values(is_active=False),

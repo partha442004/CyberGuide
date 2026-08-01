@@ -88,7 +88,7 @@ class UserRepository:
 
     async def get_watchlists(self, watch_type: str | None = None) -> list[Watchlist]:
         """Get watchlists."""
-        query = select(Watchlist).where(Watchlist.is_active == True)
+        query = select(Watchlist).where(Watchlist.is_active)
         if watch_type:
             query = query.where(Watchlist.watch_type == watch_type)
         result = await self.session.execute(query)
