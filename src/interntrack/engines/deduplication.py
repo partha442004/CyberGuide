@@ -106,7 +106,7 @@ class DeduplicationEngine:
         """Find potential duplicates in the database."""
         from sqlalchemy import select
 
-        query = select(Job).where(Job.is_active == True)
+        query = select(Job).where(Job.is_active)
         result = await self.session.execute(query)
         all_jobs = list(result.scalars().all())
 

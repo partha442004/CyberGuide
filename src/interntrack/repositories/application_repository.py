@@ -77,7 +77,7 @@ class ApplicationRepository(BaseRepository[Application]):
             select(Application)
             .where(
                 and_(
-                    Application.reminded == False,
+                    not Application.reminded,
                     Application.status.in_([
                         ApplicationStatus.APPLIED,
                         ApplicationStatus.INTERVIEW,

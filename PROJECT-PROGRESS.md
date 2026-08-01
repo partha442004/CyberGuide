@@ -18,7 +18,7 @@
 | **Engines** | ✅ Complete | 100% | Dedup, verify, classify |
 | **Notifications** | ✅ Complete | 100% | Telegram, Email, Discord |
 | **Dashboard** | ✅ Complete | 100% | Streamlit with charts |
-| **Tests** | ✅ Complete | 90% coverage | 685 tests passing |
+| **Tests** | ✅ Complete | 90% coverage | 657 tests passing |
 | **CI/CD** | ✅ Complete | 100% | GitHub Actions ready |
 | **Documentation** | ✅ Complete | 100% | All docs created |
 | **Docker** | ✅ Complete | 100% | Compose ready |
@@ -30,7 +30,7 @@
 ## 📊 CURRENT TEST RESULTS
 
 ```
-======================== 685 tests passing ========================
+======================== 657 tests passing ========================
 Total coverage: 90% (2600 statements, 272 missing)
 ```
 
@@ -156,12 +156,15 @@ Total coverage: 90% (2600 statements, 272 missing)
 - [x] Add tests for `ai_service.py` (76% → 83%)
 - [x] Add tests for `api/v1/` endpoints (39% → 86%)
 - [x] Add tests for `engines/matching.py` (0% → 57%)
-- [ ] Add tests for `api/v1/*.py` endpoints (optional, for 85%+)
+- [x] Consolidate 4 overlapping scraper test files into `test_scrapers_unified.py`
+- [x] Fix 14 ruff lint issues (E712 equality comparisons)
+- [x] Add `railway.toml` deployment config
 
-### Priority 2: Deploy to Render.com
-- [ ] Create Neon PostgreSQL database (free, no credit card)
-- [ ] Connect GitHub repository to Render.com
-- [ ] Set environment variables in Render dashboard
+### Priority 2: Deploy to Railway.app
+- [x] Create `railway.toml` deployment config
+- [ ] Connect GitHub repository to Railway.app
+- [ ] Add PostgreSQL plugin in Railway dashboard
+- [ ] Set environment variables (SECRET_KEY, etc.)
 - [ ] Verify deployment works
 
 ### Priority 3: Final Verification

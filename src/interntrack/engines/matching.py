@@ -143,7 +143,7 @@ class MatchingEngine:
         # Get all active jobs with their skills
         jobs_query = (
             select(Job)
-            .where(Job.is_active == True)
+            .where(Job.is_active)
             .limit(100)  # Limit for performance
         )
         jobs_result = await self.session.execute(jobs_query)

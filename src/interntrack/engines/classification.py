@@ -165,7 +165,7 @@ class ClassificationEngine:
             )
             .join(JobSkill, Skill.id == JobSkill.skill_id)
             .join(Job, JobSkill.job_id == Job.id)
-            .where(Job.is_active == True)
+            .where(Job.is_active)
             .group_by(Skill.id)
             .order_by(func.count(JobSkill.job_id).desc())
             .limit(20)
