@@ -77,6 +77,80 @@ class TestDeduplicationEngine:
         assert result.success
         assert result.data["duplicate_groups_count"] >= 1
 
+    def test_normalize_url_removes_fragment_and_slash(self, engine):
+        """Normalization strips fragments and trailing slashes."""
+        normalized = engine._normalize_url("https://example.com/job/1/#section")
+        assert "section" not in normalized
+        assert normalized.endswith("/job/1")
+
+    def test_normalize_url_empty(self, engine):
+        """Empty URL normalizes to empty string."""
+        assert engine._normalize_url("") == ""
+        assert engine._normalize_url(None) == ""
+
+    def test_generate_hash_case_insensitive_and_blank_skipped(self, engine):
+        """Hashes ignore case, whitespace, and blank parts."""
+        h1 = engine._generate_hash("Security Analyst", "Tech Corp")
+        h2 = engine._generate_hash("security analyst", "tech corp")
+        h3 = engine._generate_hash("Security Analyst", "", "Tech Corp")
+        assert h1 == h2
+        assert h1 == h3
+        assert len(h1) == 64  # sha256 hex digest
+
+    def test_calculate_similarity_empty_inputs(self, engine):
+        """Empty similarity inputs score zero."""
+        assert engine._calculate_similarity("", "hello") == 0.0
+        assert engine._calculate_similarity("hello", "") == 0.0
+        assert engine._calculate_similarity("", "") == 0.0
+
+    def test_select_canonical_prefers_complete_official_job(self, engine):
+        """Canonical selection prefers official URLs and richer data."""
+        scraped = {
+            "id": "scraped",
+            "title": "Security Analyst",
+            "company_name": "Acme Corp",
+            "url": "https://jobboard.example/job/1",
+        }
+        official = {
+            "id": "official",
+            "title": "Security Analyst",
+            "company_name": "Acme Corp",
+            "url": "https://acmecorp.com/careers/job/1",
+            "description": "Full description",
+            "salary_min": 90000,
+            "deadline": "2026-12-31",
+            "apply_url": "https://acmecorp.com/apply/1",
+            "source": "company_acme",
+        }
+        canonical = engine._select_canonical([scraped, official])
+        assert canonical["id"] == "official"
+
+    def test_select_canonical_single_job(self, engine):
+        """A single job is its own canonical."""
+        job = {"id": "only", "title": "T"}
+        assert engine._select_canonical([job]) is job
+
+    @pytest.mark.asyncio
+    async def test_find_duplicates_not_duplicate(self, engine):
+        """find_duplicates returns is_duplicate False for distinct jobs."""
+        new_job = {
+            "id": "new",
+            "title": "Unique Role",
+            "company_name": "Distinct Corp",
+            "url": "https://distinct.example/job/new",
+        }
+        existing = [
+            {
+                "id": "old",
+                "title": "Security Analyst",
+                "company_name": "Tech Corp",
+                "url": "https://example.com/job/old",
+            }
+        ]
+        result = await engine.find_duplicates(new_job, existing)
+        assert result.success
+        assert result.data["is_duplicate"] is False
+
 
 class TestVerificationEngine:
     """Tests for VerificationEngine."""
@@ -107,6 +181,29 @@ class TestVerificationEngine:
         """Test None deadline."""
         result = engine._check_deadline(None)
         assert result["active"] is True
+
+    def test_check_deadline_naive_datetime(self, engine):
+        """Naive datetimes are treated as UTC."""
+        from datetime import datetime, timedelta
+
+        future_naive = datetime.now() + timedelta(days=3)
+        result = engine._check_deadline(future_naive)
+        assert result["active"] is True
+
+    def test_calculate_verification_score_empty(self, engine):
+        """Empty checks score zero."""
+        assert engine._calculate_verification_score([]) == 0.0
+
+    def test_calculate_verification_score_weighted(self, engine):
+        """Weights only count toward passed checks."""
+        checks = [
+            {"type": "url_valid", "passed": True},
+            {"type": "apply_url_valid", "passed": False},
+            {"type": "deadline_active", "passed": True},
+        ]
+        score = engine._calculate_verification_score(checks)
+        # passed weights (0.3 + 0.2) / total weight (0.3 + 0.2 + 0.2)
+        assert score == round(0.5 / 0.7, 2)
 
     @pytest.mark.asyncio
     async def test_process_job(self, engine):
@@ -151,6 +248,95 @@ class TestScamDetectionEngine:
         """Test disposable email detection."""
         result = engine._analyze_email("test@mailinator.com")
         assert result["suspicious"] is True
+
+    def test_email_none_and_professional(self, engine):
+        """Missing or professional emails are not suspicious."""
+        assert engine._analyze_email("")["suspicious"] is False
+        assert engine._analyze_email(None)["suspicious"] is False
+        assert engine._analyze_email("hr@acmecorp.com")["suspicious"] is False
+
+    def test_email_personal_provider(self, engine):
+        """Personal email providers in professional context are suspicious."""
+        result = engine._analyze_email("recruiter@gmail.com")
+        assert result["suspicious"] is True
+
+    def test_domain_typosquatting(self, engine):
+        """Typosquatting of known companies is suspicious."""
+        result = engine._analyze_domain("https://microsoft-jobs.xyz/careers")
+        assert result["suspicious"] is True
+
+    def test_domain_legit(self, engine):
+        """Legit non-company domains are not suspicious."""
+        result = engine._analyze_domain("https://jobs.acmecorp.com/job/1")
+        assert result["suspicious"] is False
+
+    def test_domain_empty(self, engine):
+        """Empty URL is suspicious."""
+        result = engine._analyze_domain("")
+        assert result["suspicious"] is True
+
+    def test_calculate_scam_score_risk_levels(self, engine):
+        """Risk levels and actions map correctly."""
+        clean = {"score": 0.0}
+        assert (
+            engine._calculate_scam_score(clean, {"suspicious": False}, {"suspicious": False})[
+                "risk_level"
+            ]
+            == "low"
+        )
+
+        medium = {"score": 35.0}
+        medium_res = engine._calculate_scam_score(
+            medium, {"suspicious": False}, {"suspicious": False}
+        )
+        assert medium_res["risk_level"] == "medium"
+        assert medium_res["action"] == "flag"
+
+        high = {"score": 55.0}
+        high_res = engine._calculate_scam_score(high, {"suspicious": False}, {"suspicious": False})
+        assert high_res["risk_level"] == "high"
+        assert high_res["action"] == "warn"
+
+        critical = {"score": 80.0}
+        critical_res = engine._calculate_scam_score(
+            critical, {"suspicious": False}, {"suspicious": False}
+        )
+        assert critical_res["risk_level"] == "critical"
+        assert critical_res["action"] == "block"
+
+    def test_calculate_scam_score_breakdown(self, engine):
+        """Breakdown reports content score plus domain/email penalties."""
+        content = {"score": 40.0}
+        result = engine._calculate_scam_score(content, {"suspicious": True}, {"suspicious": True})
+        breakdown = result["breakdown"]
+        assert breakdown["content_score"] == 40.0
+        assert breakdown["domain_penalty"] == 25
+        assert breakdown["email_penalty"] == 15
+        # 40 + 25 + 15 capped at 100
+        assert result["score"] == 80.0
+
+    @pytest.mark.asyncio
+    async def test_analyze_batch_counts_scams(self, engine):
+        """Batch analysis reports scam vs safe counts."""
+        scam_job = {
+            "id": "s1",
+            "title": "Easy Money",
+            "company_name": "",
+            "description": "Training fee required. Guaranteed income.",
+            "url": "https://suspicious.xyz/job/1",
+        }
+        safe_job = {
+            "id": "ok1",
+            "title": "Security Analyst",
+            "company_name": "Microsoft",
+            "description": "Join our security team.",
+            "url": "https://careers.microsoft.com/job/1",
+        }
+        result = await engine.analyze_batch([scam_job, safe_job])
+        assert result.success
+        assert result.data["total_analyzed"] == 2
+        assert result.data["scam_detected"] == 1
+        assert result.data["safe_jobs"] == 1
 
     @pytest.mark.asyncio
     async def test_process_scam_job(self, engine):
@@ -230,3 +416,32 @@ class TestClassificationEngine:
         assert "experience_level" in result.data
         assert "security_domains" in result.data
         assert "skills" in result.data
+
+    def test_classify_experience_years_extraction(self, engine):
+        """Explicit years fall into experience buckets."""
+        assert (
+            engine._classify_experience_level("Requires 10 years experience")["level"] == "senior"
+        )
+        assert engine._classify_experience_level("3-5 years experience")["level"] == "mid"
+        assert engine._classify_experience_level("No years mentioned")["level"] == "entry"
+
+    @pytest.mark.asyncio
+    async def test_classify_batch_aggregates(self, engine):
+        """Batch classification aggregates domains and skills."""
+        jobs = [
+            {
+                "id": "c1",
+                "title": "SOC Analyst",
+                "description": "Python and SIEM experience.",
+            },
+            {
+                "id": "c2",
+                "title": "Cloud Security Engineer",
+                "description": "AWS and Docker experience.",
+            },
+        ]
+        result = await engine.classify_batch(jobs)
+        assert result.success
+        assert result.data["total_classified"] == 2
+        assert result.data["top_domains"]
+        assert result.data["top_skills"]

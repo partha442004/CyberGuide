@@ -8,7 +8,8 @@
 
 - ✅ **mypy**: 0 errors across 177 source files (107 cybershield errors fixed)
 - ✅ **ruff**: all checks pass, 212 files formatted
-- ✅ **Tests**: 358 InternTrack + 295 CyberGuide = **653 passing**
+- ✅ **Tests**: 358 InternTrack + 321 CyberGuide = **679 passing**
+- ✅ **CI**: `.github/workflows/ci.yml` added (ruff, mypy, full test suite)
 - ✅ **Error handling**: `AppException` handler + consistent error payload; CORS settings-driven
 - ✅ **Real runtime bugs fixed**: httpx 0.28 `follow_redirects`, `NotificationPriority.NORMAL`, `SkillTrend.recorded_at`, `Company.is_trusted` (model + migration), `Job.company` relationship shadowing the string column, scheduler verification filter
 - ✅ **New tests**: exception handlers, CORS config parsing, CORS middleware (11 new tests)
@@ -172,8 +173,8 @@ internship-tracker/
 ## 🧪 Test Results
 
 ### Test Summary
-- **Total Tests:** 653 (358 InternTrack + 295 CyberGuide)
-- **Tests Passing:** ✅ 653 (100%)
+- **Total Tests:** 679 (358 InternTrack + 321 CyberGuide)
+- **Tests Passing:** ✅ 679 (100%)
 - **Test Files:** 29+ test files
 
 ### Test Breakdown
@@ -208,8 +209,8 @@ internship-tracker/
 | Unit - Main/Error Handling | 9 | ✅ **NEW** |
 | Integration - API | 23 | ✅ (incl. CORS middleware) |
 | **Total (InternTrack)** | **358** | ✅ **All Passing** |
-| **CyberGuide (cybershield)** | **295** | ✅ **All Passing** |
-| **Grand Total** | **653** | ✅ **All Passing** |
+| **CyberGuide (cybershield)** | **321** | ✅ **All Passing** |
+| **Grand Total** | **679** | ✅ **All Passing** |
 
 ---
 
@@ -290,7 +291,7 @@ uvicorn interntrack.main:app --reload
 ✅ Dashboard with charts
 ✅ Docker deployment ready
 ✅ Documentation complete
-✅ 653 tests passing (358 InternTrack + 295 CyberGuide)
+✅ 679 tests passing (358 InternTrack + 321 CyberGuide)
 ✅ CI/CD pipelines configured
 ✅ Security documentation
 

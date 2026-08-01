@@ -4,6 +4,13 @@
 
 CSCIP uses pytest for unit and integration testing with comprehensive coverage tracking.
 
+> 📌 **Actual layout (2026-08-01):** CyberGuide tests live in
+> `src/cybershield/tests/` (e.g. `test_engines.py`, `test_elasticsearch_service.py`,
+> `test_scrapers.py`, `test_api.py`, `test_middleware.py`) and are run together with
+> the InternTrack suite via:
+> `pytest tests src/cybershield/tests -q -p no:cacheprovider -o addopts=''`.
+> The `tests/unit/...` tree below is the InternTrack layout; it is illustrative.
+
 ---
 
 ## Test Structure

@@ -247,6 +247,33 @@ docker-compose ps
 
 ---
 
+## Schema Upgrades for Existing Deployments
+
+> Applies to deployments that already ran `001_initial_schema` **before** the
+> 2026-08-01 hardening pass.
+
+`001_initial_schema.py` was updated to include the `companies.is_trusted` column.
+Fresh installs get it automatically, but an existing database that already applied
+the old migration will **not** — edit the initial migration only works for new
+schemas. Apply this manually once on the running database:
+
+```sql
+ALTER TABLE companies ADD COLUMN is_trusted BOOLEAN DEFAULT 0;
+```
+
+PostgreSQL equivalent:
+
+```sql
+ALTER TABLE companies ADD COLUMN is_trusted BOOLEAN NOT NULL DEFAULT FALSE;
+```
+
+Then verify the company trust-status read/update endpoints respond normally. If
+you prefer a tracked migration, generate a new revision with
+`alembic revision -m "add companies.is_trusted"` and add the same `op.add_column`
+step.
+
+---
+
 ## Production Checklist
 
 - [ ] Set secure SECRET_KEY

@@ -375,13 +375,40 @@ class Settings(BaseSettings):
     
     # Security
     secret_key: str = "change-me"
-    
+
+    # CORS
+    cors_origins: list[str] = ["*"]
+    cors_allow_all: bool = True
+    cors_allow_methods: list[str] = ["*"]
+    cors_allow_headers: list[str] = ["*"]
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
 
 settings = Settings()
 ```
+
+### 6.3 CORS Configuration
+
+CORS is settings-driven (`src/interntrack/config.py`) and parsed from comma-separated
+environment variables:
+
+```env
+# Comma-separated list of allowed origins
+CORS_ORIGINS=https://app.example.com,https://admin.example.com
+CORS_ALLOW_ALL=false
+CORS_ALLOW_METHODS=GET,POST,PUT,PATCH,DELETE
+CORS_ALLOW_HEADERS=*
+```
+
+When `CORS_ALLOW_ALL=true` (default) `allow_credentials` is `False` — the
+spec-correct combination with the `*` wildcard. When origins are restricted,
+`allow_credentials` becomes `True`.
+
+`Settings.validate_security()` logs warnings at startup when the default secret
+key is still in use or CORS allows all origins, so misconfiguration surfaces
+early in production.
 
 ---
 
@@ -444,6 +471,15 @@ class AppException(Exception):
         self.code = code
         self.status = status
 
+    def to_dict(self) -> dict:
+        return {
+            "error": {
+                "code": self.code,
+                "message": self.message,
+                "details": {},
+            }
+        }
+
 class NotFoundError(AppException):
     def __init__(self, resource: str, id: str):
         super().__init__(
@@ -451,6 +487,7 @@ class NotFoundError(AppException):
             "NOT_FOUND",
             404
         )
+        self.details = {"resource": resource, "identifier": id}
 
 class ScrapingError(AppException):
     def __init__(self, source: str, reason: str):
@@ -469,7 +506,34 @@ class NotificationError(AppException):
         )
 ```
 
-### 8.2 Retry Strategy
+### 8.2 Exception Handlers (FastAPI)
+
+`main.py` registers two handlers:
+
+1. **`domain_exception_handler`** for `AppException` — returns `exc.status` and
+   `exc.to_dict()` so domain errors (404/409/422/502) surface with their correct
+   HTTP status instead of being masked as 500.
+2. **`global_exception_handler`** for unexpected `Exception` — returns 500 with a
+   consistent payload and debug detail gated behind `settings.debug`.
+
+Both handlers share one error contract:
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Job with identifier 'abc' not found",
+    "details": { "resource": "Job", "identifier": "abc" }
+  }
+}
+```
+
+> ⚠️ Exception-handler ordering matters: Starlette routes `Exception` to
+> `ServerErrorMiddleware` (outermost) while `HTTPException` (4xx) and `AppException`
+> handlers run inside `ExceptionMiddleware`, so FastAPI's built-in HTTPException
+> responses are preserved.
+
+### 8.3 Retry Strategy
 
 ```python
 from tenacity import retry, stop_after_attempt, wait_exponential

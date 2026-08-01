@@ -287,3 +287,115 @@ class TestElasticsearchIndexing:
         assert es._es_client is None
         assert es._es_available is False
         mock_client.close.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_close_elasticsearch_handles_error(self):
+        """Should not raise when closing a broken client."""
+        mock_client = AsyncMock()
+        mock_client.close.side_effect = RuntimeError("boom")
+        es._es_client = mock_client
+        es._es_available = True
+
+        await es.close_elasticsearch()
+        assert es._es_client is None
+        assert es._es_available is False
+
+    @pytest.mark.asyncio
+    async def test_index_jobs_skips_missing_ids(self):
+        """Bulk indexing should skip jobs without an ID and return 0."""
+        mock_client = AsyncMock()
+        es._es_client = mock_client
+        es._es_available = True
+
+        result = await es.index_jobs([{"title": "no id"}, {"title": "also no id"}])
+        assert result == 0
+
+        # Clean up
+        es._es_client = None
+        es._es_available = False
+
+    @pytest.mark.asyncio
+    async def test_index_jobs_handles_bulk_error(self):
+        """Bulk indexing should fall back to 0 when async_bulk raises."""
+        import sys
+        import types
+
+        mock_client = AsyncMock()
+        es._es_client = mock_client
+        es._es_available = True
+
+        # Inject a fake elasticsearch module whose async_bulk raises
+        fake_helpers = types.ModuleType("elasticsearch.helpers")
+        fake_helpers.async_bulk = AsyncMock(side_effect=RuntimeError("es down"))  # type: ignore[attr-defined]
+        fake_es = types.ModuleType("elasticsearch")
+        fake_es.helpers = fake_helpers  # type: ignore[attr-defined]
+        sys.modules["elasticsearch"] = fake_es
+        sys.modules["elasticsearch.helpers"] = fake_helpers
+        try:
+            result = await es.index_jobs([{"id": "1", "title": "Test"}])
+        finally:
+            del sys.modules["elasticsearch"]
+            del sys.modules["elasticsearch.helpers"]
+        assert result == 0
+
+        # Clean up
+        es._es_client = None
+        es._es_available = False
+
+    @pytest.mark.asyncio
+    async def test_search_without_query_uses_match_all(self):
+        """A search without a text query uses match_all."""
+        mock_response = {
+            "hits": {"hits": [], "total": {"value": 0}},
+            "aggregations": {},
+        }
+        mock_client = AsyncMock()
+        mock_client.search.return_value = mock_response
+
+        es._es_client = mock_client
+        es._es_available = True
+
+        await es.search_jobs()
+
+        call_kwargs = mock_client.search.call_args
+        query = call_kwargs.kwargs.get("query") or call_kwargs[1].get("query")
+        must = query["bool"]["must"]
+        assert any("match_all" in clause for clause in must)
+
+        # Clean up
+        es._es_client = None
+        es._es_available = False
+
+    @pytest.mark.asyncio
+    async def test_delete_job_success(self):
+        """Should delete a job and return True."""
+        mock_client = AsyncMock()
+        mock_client.delete.return_value = {"result": "deleted"}
+        es._es_client = mock_client
+        es._es_available = True
+
+        result = await es.delete_job("123")
+        assert result is True
+        mock_client.delete.assert_called_once()
+
+        # Clean up
+        es._es_client = None
+        es._es_available = False
+
+    @pytest.mark.asyncio
+    async def test_get_index_stats_success(self):
+        """Should return document count from stats API."""
+        mock_client = AsyncMock()
+        mock_client.indices.stats.return_value = {
+            "indices": {"cybershield_jobs": {"total": {"docs": {"count": 42}}}}
+        }
+        es._es_client = mock_client
+        es._es_available = True
+
+        stats = await es.get_index_stats()
+        assert stats["available"] is True
+        assert stats["document_count"] == 42
+
+        # Clean up
+        es._es_client = None
+        es._es_available = False
