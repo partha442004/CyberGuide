@@ -148,6 +148,29 @@ SCRAPE_INTERVAL_MINUTES=30
 | PATCH | `/api/v1/applications/{id}/status` | Update status |
 | GET | `/api/v1/applications/metrics/overview` | Get metrics |
 
+### Skills
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/skills/` | List skills |
+| GET | `/api/v1/skills/demand` | Get skill demand |
+| POST | `/api/v1/skills/match` | Match job/user skills |
+| GET | `/api/v1/skills/learning-path` | Get learning path |
+
+### Notifications
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/notifications/channels` | Get configured channels |
+| POST | `/api/v1/notifications/test` | Test notification |
+| POST | `/api/v1/notifications/send` | Send notification |
+
+### Dashboard
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/dashboard/overview` | Dashboard overview |
+| GET | `/api/v1/dashboard/charts/job-types` | Job type chart |
+| GET | `/api/v1/dashboard/charts/application-timeline` | Application timeline |
+| GET | `/api/v1/dashboard/recent-activity` | Recent activity |
+
 ### Reports
 | Method | Endpoint | Description |
 |--------|----------|-------------|
