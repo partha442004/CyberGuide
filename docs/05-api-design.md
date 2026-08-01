@@ -633,8 +633,13 @@ standard error contract:
 }
 ```
 
-> The store is in-memory and process-local; for multi-instance deployments use
-> an external store (e.g. Redis) as a future enhancement.
+**Backing store:** when `REDIS_URL` is configured (docker-compose sets
+`redis://redis:6379/0`), the middleware uses `RedisRateLimitStore` — an
+atomic Lua sliding window over a Redis ZSET (`rl:{key}` + a `:seq` member
+counter, both with `EXPIRE`) so limits are **shared across API replicas**.
+Without `REDIS_URL`, it uses the in-memory `RateLimitStore` (per-process
+limits). On a Redis outage the store falls back to in-memory (once-only
+warning, stays degraded until process restart) so the API never fails closed.
 
 ### Scraper Rate Limits
 
