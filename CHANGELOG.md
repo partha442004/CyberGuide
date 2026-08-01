@@ -4,6 +4,28 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.6.0] - 2026-08-01
+
+### Added
+
+#### Dependency Security Scan (safety)
+- `safety check -r requirements.txt -r requirements-dev.txt --full-report` wired
+  into the CI `security` job (installed as `safety>=2.3.0,<3` to avoid the v3
+  `check`→`scan` migration drift, matching `requirements-dev.txt`)
+- Local scan result: **22 packages scanned, 0 vulnerabilities**
+  (`requirements.txt`) and 9 scanned, 0 vulnerabilities (`requirements-dev.txt`)
+- Makefile: new `deps-check` target for the dependency scan
+
+#### Report Service Hardening (InternTrack)
+- `report_service.py`: template directory is now resolved module-relative
+  (`Path(__file__).resolve().parent.parent / "reports" / "templates"`) instead of
+  CWD-relative, so rendering works from any working directory
+- New `tests/unit/test_report_service.py` (10 tests): template dir resolution,
+  Jinja env loading of all 3 templates, async `render_report` HTML assertions
+  for daily/weekly/monthly (incl. the `{:,.0f}` salary formatting), unknown-type
+  raises `jinja2.TemplateNotFound`, autoescape blocks `<script>` injection, and
+  `generate_daily/weekly/monthly` shape tests with mocked repositories
+
 ## [1.5.0] - 2026-08-01
 
 ### Added

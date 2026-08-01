@@ -48,8 +48,11 @@ format-check: ## Check formatting without making changes
 typecheck: ## Run type checker (mypy)
 	mypy src/interntrack
 
-security: ## Run security scan (bandit)
+security: ## Run static security scan (bandit)
 	bandit -r src/ -ll -q
+
+deps-check: ## Check dependencies for known vulnerabilities (safety)
+	safety check -r requirements.txt -r requirements-dev.txt --full-report
 
 security-report: ## Generate HTML security report (bandit)
 	bandit -r src/ -f html -o bandit-report.html
