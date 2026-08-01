@@ -3,11 +3,10 @@ builder = "nixpacks"
 buildCommand = "pip install -r requirements.txt"
 
 [deploy]
-startCommand = "alembic upgrade head && PYTHONPATH=src uvicorn interntrack.main:app --host 0.0.0.0 --port $PORT"
+startCommand = "alembic upgrade head && uvicorn interntrack.main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
-# PYTHONPATH is set in startCommand above
 [variables]
 PYTHONPATH = "src"
