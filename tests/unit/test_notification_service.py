@@ -16,7 +16,6 @@ class TestNotificationChannel:
         with pytest.raises(TypeError):
             NotificationChannel()
 
-            assert result is True
 
     @pytest.mark.asyncio
     async def test_send_failure(self):
