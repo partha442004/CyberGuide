@@ -42,8 +42,9 @@ CSCIP uses GitHub Actions for continuous integration and deployment with automat
 
 > ✅ **Implemented** in `.github/workflows/ci.yml` (2026-08-01). It runs ruff
 > lint + format check, mypy across both modules, and the combined InternTrack +
-> CyberGuide test suite (679 tests). Docker build + Trivy scan are future
-> enhancements; the current pipeline is focused on lint/type/tests.
+> CyberGuide test suite (737 tests) with coverage collection and an uploaded
+> `coverage.xml` artifact. Docker build + Trivy scan are future enhancements;
+> the current pipeline is focused on lint/type/tests/coverage.
 
 ```yaml
 # .github/workflows/ci.yml
@@ -108,7 +109,15 @@ jobs:
         env:
           PYTHONPATH: src
         run: |
-          pytest tests src/cybershield/tests -q -p no:cacheprovider -o addopts=''
+          pytest tests src/cybershield/tests -q -p no:cacheprovider -o addopts='' \
+            --cov=interntrack --cov=cybershield \
+            --cov-report=term-missing --cov-report=xml:coverage.xml
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
 ```
 
 ### CD Workflow

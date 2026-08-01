@@ -505,7 +505,41 @@ GET /api/v1/dashboard/recent-activity
 
 ## Rate Limiting
 
-Rate limits are applied per source for scrapers:
+### API Request Rate Limiting
+
+InternTrack applies API-level rate limiting via `RateLimitMiddleware`
+(`src/interntrack/middleware/rate_limit.py`) using an in-memory sliding window:
+
+| Scope | Limit (default) | Env override |
+|-------|-----------------|--------------|
+| Per IP | 100 req/min | `RATE_LIMIT_PER_MINUTE` |
+| Per API key (`X-API-Key`) | 1000 req/min | `RATE_LIMIT_API_KEY_PER_MINUTE` |
+
+- **Exempt paths:** `/`, `/health`, `/docs`, `/redoc`, `/openapi.json`
+- **Disable:** set `RATE_LIMIT_ENABLED=false`
+
+Responses include `X-RateLimit-Limit`, `X-RateLimit-Remaining`,
+`X-RateLimit-Reset`; when blocked, `Retry-After` is also sent.
+
+When the limit is exceeded the API returns `429 Too Many Requests` with the
+standard error contract:
+
+```json
+{
+    "error": {
+        "code": "RATE_LIMITED",
+        "message": "Too many requests. Please try again later.",
+        "details": {}
+    }
+}
+```
+
+> The store is in-memory and process-local; for multi-instance deployments use
+> an external store (e.g. Redis) as a future enhancement.
+
+### Scraper Rate Limits
+
+Scrapers also apply their own conservative per-source rate limits:
 
 | Source | Rate Limit |
 |--------|------------|

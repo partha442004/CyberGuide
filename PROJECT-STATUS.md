@@ -8,11 +8,13 @@
 
 - ✅ **mypy**: 0 errors across 177 source files (107 cybershield errors fixed)
 - ✅ **ruff**: all checks pass, 212 files formatted
-- ✅ **Tests**: 358 InternTrack + 321 CyberGuide = **679 passing**
-- ✅ **CI**: `.github/workflows/ci.yml` added (ruff, mypy, full test suite)
+- ✅ **Tests**: 416 InternTrack + 321 CyberGuide = **737 passing**
+- ✅ **CI**: `.github/workflows/ci.yml` added (ruff, mypy, full test suite + coverage artifact)
 - ✅ **Error handling**: `AppException` handler + consistent error payload; CORS settings-driven
+- ✅ **API rate limiting**: `RateLimitMiddleware` (per-IP 100/min, per-API-key 1000/min) with 429 error contract, exempt paths, `RATE_LIMIT_*` env overrides
+- ✅ **Dashboard tests**: 46 tests for cards/forms/charts via fake streamlit + plotly modules
 - ✅ **Real runtime bugs fixed**: httpx 0.28 `follow_redirects`, `NotificationPriority.NORMAL`, `SkillTrend.recorded_at`, `Company.is_trusted` (model + migration), `Job.company` relationship shadowing the string column, scheduler verification filter
-- ✅ **New tests**: exception handlers, CORS config parsing, CORS middleware (11 new tests)
+- ✅ **New tests**: exception handlers, CORS config parsing, CORS middleware, rate limiting (58 new tests this pass)
 
 ---
 
@@ -173,9 +175,9 @@ internship-tracker/
 ## 🧪 Test Results
 
 ### Test Summary
-- **Total Tests:** 679 (358 InternTrack + 321 CyberGuide)
-- **Tests Passing:** ✅ 679 (100%)
-- **Test Files:** 29+ test files
+- **Total Tests:** 737 (416 InternTrack + 321 CyberGuide)
+- **Tests Passing:** ✅ 737 (100%)
+- **Test Files:** 32+ test files
 
 ### Test Breakdown
 | Category | Tests | Status |
@@ -206,11 +208,13 @@ internship-tracker/
 | Unit - Indeed Scraper | 12 | ✅ |
 | Unit - Glassdoor Scraper | 12 | ✅ |
 | Unit - Learning Service | 16 | ✅ |
-| Unit - Main/Error Handling | 9 | ✅ **NEW** |
+| Unit - Main/Error Handling | 11 | ✅ **NEW** |
+| Unit - Rate Limiting | 10 | ✅ **NEW** |
+| Unit - Dashboard Components | 46 | ✅ **NEW** |
 | Integration - API | 23 | ✅ (incl. CORS middleware) |
-| **Total (InternTrack)** | **358** | ✅ **All Passing** |
+| **Total (InternTrack)** | **416** | ✅ **All Passing** |
 | **CyberGuide (cybershield)** | **321** | ✅ **All Passing** |
-| **Grand Total** | **679** | ✅ **All Passing** |
+| **Grand Total** | **737** | ✅ **All Passing** |
 
 ---
 
@@ -257,7 +261,9 @@ uvicorn interntrack.main:app --reload
 | 2026-07-30 | 331 | 80% | Phase 6 |
 | **2026-07-30** | **347** | **82%** | InternTrack Final |
 | **2026-08-01** | **358** | — | InternTrack Hardened (+11 tests) |
-| **2026-08-01** | **295** | — | CyberGuide Hardened |
+| **2026-08-01** | **321** | — | CyberGuide Hardened |
+| **2026-08-01** | **416** | — | InternTrack + rate limiting + dashboard tests (+58) |
+| **2026-08-01** | **737** | **67%** | Combined (interntrack + cybershield) |
 
 ---
 
@@ -291,9 +297,10 @@ uvicorn interntrack.main:app --reload
 ✅ Dashboard with charts
 ✅ Docker deployment ready
 ✅ Documentation complete
-✅ 679 tests passing (358 InternTrack + 321 CyberGuide)
+✅ 737 tests passing (416 InternTrack + 321 CyberGuide)
 ✅ CI/CD pipelines configured
 ✅ Security documentation
+✅ API rate limiting enabled
 
 ### Ready for Production:
 1. ✅ All tests passing
@@ -304,5 +311,5 @@ uvicorn interntrack.main:app --reload
 
 ---
 
-**Last Updated:** 2026-07-30
+**Last Updated:** 2026-08-01
 **Status:** ✅ 100% Complete

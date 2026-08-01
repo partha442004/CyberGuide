@@ -4,6 +4,41 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.4.0] - 2026-08-01
+
+### Added
+
+#### API Rate Limiting (InternTrack)
+- New `src/interntrack/middleware/rate_limit.py`: in-memory sliding-window
+  `RateLimitStore` + `RateLimitMiddleware` (per-IP and per-API-key limits)
+- 429 responses follow the standard `{error: {code, message, details}}` contract
+  with `X-RateLimit-*` headers and `Retry-After`
+- Exempt paths: `/`, `/health`, `/docs`, `/redoc`, `/openapi.json`
+- Settings: `rate_limit_enabled`, `rate_limit_per_minute` (100), and
+  `rate_limit_api_key_per_minute` (1000); middleware wired in `main.py` when enabled
+- `tests/unit/test_rate_limit.py`: store behavior (windows, independence, cleanup,
+  clear) + HTTP middleware tests (429 contract, exempt paths, per-API-key limits)
+- `TestRateLimitConfig` in `tests/unit/test_main.py`; conftest disables rate
+  limiting for deterministic integration tests
+
+#### Dashboard Component Tests
+- `tests/unit/test_dashboard_components.py` (46 tests): cards, forms, and charts
+  logic tested with lightweight fakes injected into `sys.modules` (streamlit and
+  plotly are not required for the backend suite)
+- `tests/unit/test_rate_limit.py`: 10 tests including CORS-on-429 coverage
+  (RateLimitMiddleware registered before CORS so browser clients see
+  `access-control-allow-origin` on rate-limited responses)
+- Covers metric/job/application cards, skill badges, section headers, info/
+  warning cards, search/filter/notification/skill forms, and all chart
+  data-shaping helpers
+
+#### CI & Docs
+- `.github/workflows/ci.yml`: test job now collects coverage
+  (`--cov=interntrack --cov=cybershield`) and uploads `coverage.xml` artifact
+- `docs/05-api-design.md`: API rate limiting section (limits, headers, 429 contract)
+- `docs/cscip/17-cicd.md`: aligned with the actual coverage step
+- README badges updated: 737 tests, 67% coverage, CI workflow badge
+
 ## [1.3.0] - 2026-08-01
 
 ### Added

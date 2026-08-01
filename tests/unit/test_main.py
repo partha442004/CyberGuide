@@ -124,3 +124,28 @@ class TestValidateSecurity:
         """is_production is the inverse of debug."""
         assert Settings(debug=False).is_production is True
         assert Settings(debug=True).is_production is False
+
+
+class TestRateLimitConfig:
+    """Tests for rate limiting settings."""
+
+    def test_defaults(self, monkeypatch):
+        """Rate limiting is enabled with a 100/min default limit."""
+        # conftest disables rate limiting for integration determinism; test the
+        # real defaults by removing that env override.
+        monkeypatch.delenv("RATE_LIMIT_ENABLED", raising=False)
+        settings = Settings()
+        assert settings.rate_limit_enabled is True
+        assert settings.rate_limit_per_minute == 100
+        assert settings.rate_limit_api_key_per_minute == 1000
+
+    def test_env_values_override_defaults(self):
+        """Env-driven values override the defaults."""
+        settings = Settings(
+            rate_limit_enabled=False,
+            rate_limit_per_minute=50,
+            rate_limit_api_key_per_minute=500,
+        )
+        assert settings.rate_limit_enabled is False
+        assert settings.rate_limit_per_minute == 50
+        assert settings.rate_limit_api_key_per_minute == 500
