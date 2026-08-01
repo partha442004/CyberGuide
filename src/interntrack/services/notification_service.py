@@ -2,21 +2,23 @@
 Notification service for multi-channel notifications.
 """
 
+from abc import ABC, abstractmethod
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.config import get_settings
-from interntrack.domain.enums import NotificationChannel
 from interntrack.domain.exceptions import NotificationError
 
 settings = get_settings()
 
 
-class NotificationChannel:
+class NotificationChannel(ABC):
     """Base notification channel interface."""
 
+    @abstractmethod
     async def send(self, message: str, subject: str | None = None) -> bool:
-        raise NotImplementedError
+        """Send a notification. Must be implemented by subclasses."""
+        ...
 
 
 class TelegramChannel(NotificationChannel):
