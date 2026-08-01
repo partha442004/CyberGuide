@@ -84,7 +84,7 @@ def get_notification_orchestrator() -> NotificationOrchestrator:
             if settings.slack_webhook_url:
                 config["slack"] = {"webhook_url": settings.slack_webhook_url}
             _notification_orchestrator = create_default_orchestrator(config)
-        except (ImportError, ValueError, AttributeError) as e:
+        except (ImportError, ValueError, AttributeError, TypeError) as e:
             # Graceful fallback for expected settings initialization failures
             logger.warning(f"Failed to initialize notification orchestrator from settings: {e}")
             _notification_orchestrator = NotificationOrchestrator()
