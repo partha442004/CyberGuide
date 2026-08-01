@@ -34,20 +34,20 @@ class TestVersionSources:
         Canary: bump this string whenever a new CHANGELOG release is added.
         """
         assert check_versions.is_consistent(check_versions.sources())
-        assert check_versions.sources()["interntrack.__version__"] == "1.12.0"
+        assert check_versions.sources()["interntrack.__version__"] == "1.13.0"
 
     def test_version_from_init_parses(self):
         """Both package __init__.py files expose a parseable __version__."""
-        assert check_versions.version_from_init("interntrack") == "1.12.0"
-        assert check_versions.version_from_init("cybershield") == "1.12.0"
+        assert check_versions.version_from_init("interntrack") == "1.13.0"
+        assert check_versions.version_from_init("cybershield") == "1.13.0"
 
     def test_version_from_env_example_parses(self):
         """.env.example exposes a parseable APP_VERSION."""
-        assert check_versions.version_from_env_example() == "1.12.0"
+        assert check_versions.version_from_env_example() == "1.13.0"
 
     def test_version_from_pyproject_parses(self):
         """Root pyproject.toml exposes a parseable project.version."""
-        assert check_versions.version_from_pyproject() == "1.12.0"
+        assert check_versions.version_from_pyproject() == "1.13.0"
 
 
 class TestConsistencyDetection:
@@ -56,18 +56,18 @@ class TestConsistencyDetection:
     def test_is_consistent_true_when_all_match(self):
         assert check_versions.is_consistent(
             {
-                "a": "1.12.0",
-                "b": "1.12.0",
-                "c": "1.12.0",
+                "a": "1.13.0",
+                "b": "1.13.0",
+                "c": "1.13.0",
             },
         )
 
     def test_is_consistent_false_on_any_mismatch(self):
         assert not check_versions.is_consistent(
             {
-                "a": "1.12.0",
+                "a": "1.13.0",
                 "b": "1.9.0",
-                "c": "1.12.0",
+                "c": "1.13.0",
             },
         )
 
@@ -75,10 +75,10 @@ class TestConsistencyDetection:
         """main() returns 0 when all sources agree (real repo state)."""
         with mock.patch.object(check_versions, "sources") as mock_sources:
             mock_sources.return_value = {
-                "interntrack.__version__": "1.12.0",
-                "cybershield.__version__": "1.12.0",
-                ".env.example APP_VERSION": "1.12.0",
-                "pyproject.toml version": "1.12.0",
+                "interntrack.__version__": "1.13.0",
+                "cybershield.__version__": "1.13.0",
+                ".env.example APP_VERSION": "1.13.0",
+                "pyproject.toml version": "1.13.0",
             }
             assert check_versions.main() == 0
 
@@ -86,10 +86,10 @@ class TestConsistencyDetection:
         """main() returns 1 when any source disagrees."""
         with mock.patch.object(check_versions, "sources") as mock_sources:
             mock_sources.return_value = {
-                "interntrack.__version__": "1.12.0",
-                "cybershield.__version__": "1.12.0",
+                "interntrack.__version__": "1.13.0",
+                "cybershield.__version__": "1.13.0",
                 ".env.example APP_VERSION": "1.9.0",
-                "pyproject.toml version": "1.12.0",
+                "pyproject.toml version": "1.13.0",
             }
             assert check_versions.main() == 1
 

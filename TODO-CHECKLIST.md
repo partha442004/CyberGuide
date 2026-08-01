@@ -456,9 +456,9 @@ sqlite3 data/interntrack.db "PRAGMA integrity_check;"
 ## 14. MONITORING
 
 ### Application Metrics
-- [ ] API response times
-- [ ] Request counts
-- [ ] Error rates
+- [x] API response times — `interntrack_http_request_duration_ms` via `/metrics/prometheus`
+- [x] Request counts — `interntrack_http_requests_total` (total + per-path + per-status)
+- [x] Error rates — `interntrack_http_errors_total` + `interntrack_http_error_rate`
 - [ ] Database query times
 - [ ] Scraper success rates
 - [ ] Notification delivery rates
@@ -791,5 +791,23 @@ docker-compose up -d
 
 ---
 
-**Last Updated:** {{DATE}}
-**Version:** 1.12.0
+## ✅ HARDENING PASS 11 (2026-08-01) — COMPLETED
+
+### Prometheus Integration + v1.13.0
+- [x] `MetricsStore.render_prometheus()` — dependency-free Prometheus text
+      exposition format (`# HELP`/`# TYPE` + labeled samples, label escaping)
+- [x] New `GET /metrics/prometheus` endpoint (same in-memory counters as
+      `/metrics`); exempt from metrics recording + rate limiting
+- [x] `deploy/prometheus/prometheus.yml` scrape config + `prometheus` compose
+      service (`prom/prometheus:v2.53.0`, `monitoring` profile, volume)
+- [x] `prometheus.io/scrape|path|port` annotations on `k8s/raw/06-api.yaml`
+      Service for k8s scraping
+- [x] Tests: `TestRenderPrometheus` (format + escaping) + endpoint/exempt
+      coverage in `test_metrics.py` and `test_rate_limit.py`
+- [x] Both packages + `.env`/`.env.example` + `pyproject.toml` + deployment
+      artifacts synced to **1.13.0**; `make version-check` exit 0
+
+---
+
+**Last Updated:** 2026-08-01
+**Version:** 1.13.0

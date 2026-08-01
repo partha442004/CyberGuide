@@ -67,6 +67,46 @@ class TestMetricsStore:
         assert snapshot["status_codes"] == {}
 
 
+class TestRenderPrometheus:
+    """Tests for the dependency-free Prometheus text exposition renderer."""
+
+    def setup_method(self):
+        self.store = MetricsStore()
+
+    def test_empty_store_emits_help_and_zero_samples(self):
+        """Empty store still emits HELP/TYPE headers with zero counters."""
+        text = self.store.render_prometheus()
+        assert text.endswith("\n")
+        assert "# HELP interntrack_http_requests_total Total HTTP requests." in text
+        assert "# TYPE interntrack_http_requests_total counter" in text
+        assert "interntrack_http_requests_total 0" in text
+        assert "interntrack_http_errors_total 0" in text
+        assert "interntrack_http_error_rate 0.0" in text
+
+    def test_renders_recorded_samples(self):
+        """Recorded requests appear as labeled samples."""
+        self.store.record("/api/v1/jobs/", 200, 10.0)
+        self.store.record("/api/v1/boom", 500, 20.0)
+        text = self.store.render_prometheus()
+        assert "interntrack_http_requests_total 2" in text
+        assert "interntrack_http_errors_total 1" in text
+        assert 'interntrack_http_requests_by_path_total{path="/api/v1/jobs/"} 1' in text
+        assert 'interntrack_http_requests_by_path_total{path="/api/v1/boom"} 1' in text
+        assert 'interntrack_http_errors_by_path_total{path="/api/v1/boom"} 1' in text
+        assert 'interntrack_http_requests_by_status_total{status="200"} 1' in text
+        assert 'interntrack_http_requests_by_status_total{status="500"} 1' in text
+
+    def test_escapes_label_values(self):
+        """Label values escape backslash, double-quote and newline."""
+        self.store.record("/weird\\path", 200, 1.0)
+        self.store.record('/with"quote', 200, 1.0)
+        self.store.record("/with\nnewline", 200, 1.0)
+        text = self.store.render_prometheus()
+        assert 'path="/weird\\\\path"' in text
+        assert 'path="/with\\"quote"' in text
+        assert 'path="/with\\nnewline"' in text
+
+
 class TestMetricsMiddleware:
     """Tests for the MetricsMiddleware wiring and the /metrics endpoint."""
 
@@ -107,6 +147,39 @@ class TestMetricsMiddleware:
         assert snapshot["total_requests"] == 0
 
     @pytest.mark.asyncio
+    async def test_prometheus_endpoint_returns_text_format(self, client: AsyncClient):
+        """GET /metrics/prometheus returns Prometheus text exposition format."""
+        metrics_store.reset()
+        response = await client.get("/metrics/prometheus")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/plain")
+        text = response.text
+        assert "# HELP interntrack_http_requests_total" in text
+        assert "# TYPE interntrack_http_requests_total counter" in text
+        assert "interntrack_http_requests_total 0" in text
+
+    @pytest.mark.asyncio
+    async def test_prometheus_reflects_recorded_requests(self, client: AsyncClient):
+        """The Prometheus output reflects requests recorded so far."""
+        metrics_store.reset()
+        await client.get("/health")
+        await client.get("/api/v1/jobs/")
+        text = (await client.get("/metrics/prometheus")).text
+        assert "interntrack_http_requests_total 2" in text
+        assert 'interntrack_http_requests_by_path_total{path="/health"} 1' in text
+        assert 'interntrack_http_requests_by_path_total{path="/api/v1/jobs/"} 1' in text
+
+    @pytest.mark.asyncio
+    async def test_prometheus_endpoint_not_recorded(self, client: AsyncClient):
+        """The /metrics/prometheus endpoint itself is exempt from recording."""
+        metrics_store.reset()
+        await client.get("/metrics/prometheus")
+        snapshot = metrics_store.snapshot()
+        assert snapshot["total_requests"] == 0
+
+    @pytest.mark.asyncio
     async def test_middleware_exempt_paths_constant(self):
-        """/metrics is in the middleware exempt set."""
+        """/metrics and /metrics/prometheus are in the middleware exempt set."""
         assert "/metrics" in MetricsMiddleware.EXEMPT_PATHS
+        assert "/metrics/prometheus" in MetricsMiddleware.EXEMPT_PATHS

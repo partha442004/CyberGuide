@@ -80,6 +80,7 @@ def _build_app(limit: int = 2, api_key_limit: int = 10):
             Route("/api/v1/test", ok, methods=["GET"]),
             Route("/health", ok, methods=["GET"]),
             Route("/metrics", ok, methods=["GET"]),
+            Route("/metrics/prometheus", ok, methods=["GET"]),
         ],
     )
     app.add_middleware(
@@ -131,6 +132,10 @@ class TestRateLimitMiddleware:
             # scrapers stay reliable.
             for _ in range(5):
                 response = await client.get("/metrics")
+            assert response.status_code == 200
+            # /metrics/prometheus (scrape target) is exempt too.
+            for _ in range(5):
+                response = await client.get("/metrics/prometheus")
             assert response.status_code == 200
             # Exempt requests never count: the first limited-route request is
             # allowed and only the second is blocked (limit=1).

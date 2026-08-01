@@ -56,6 +56,14 @@ metadata:
   labels:
     app.kubernetes.io/name: cybershield
     app.kubernetes.io/component: api
+  annotations:
+    # Enable Prometheus discovery via the standard scrape annotations
+    # (works with prometheus-operator's podmonitor auto-discovery or a
+    # plain Prometheus using kubernetes_sd_configs). The API exposes
+    # Prometheus text format at /metrics/prometheus.
+    prometheus.io/scrape: "true"
+    prometheus.io/path: /metrics/prometheus
+    prometheus.io/port: "8000"
 spec:
   selector:
     app.kubernetes.io/name: cybershield

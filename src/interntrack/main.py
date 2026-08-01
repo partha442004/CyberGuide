@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import text
 
 from interntrack.api.router import api_router
@@ -142,6 +142,21 @@ async def metrics():
     recorded, and it is exempt from rate limiting so scrapers stay reliable.
     """
     return metrics_store.snapshot()
+
+
+@app.get("/metrics/prometheus")
+async def metrics_prometheus():
+    """Expose metrics in Prometheus text exposition format.
+
+    Lets a Prometheus server scrape the same in-memory counters via the
+    standard text format (``# HELP`` / ``# TYPE`` + samples) without pulling
+    in ``prometheus_client``. Like ``/metrics`` it is not recorded and is
+    exempt from rate limiting so scrapers stay reliable.
+    """
+    return Response(
+        content=metrics_store.render_prometheus(),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
 
 
 def cli():

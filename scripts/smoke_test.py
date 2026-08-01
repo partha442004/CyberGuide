@@ -8,6 +8,8 @@ correctly:
 - ``GET /health``  -> 200 ``status: healthy`` and ``version`` == package
   ``__version__`` (single source of truth)
 - ``GET /metrics`` -> 200 with the snapshot shape
+- ``GET /metrics/prometheus`` -> 200 text/plain with the ``# HELP``
+  exposition header
 - CORS preflight  -> 200 with ``access-control-allow-origin``
 - Rate limiting   -> burst yields ``200``s then ``429`` with the
   ``RATE_LIMITED`` error contract
@@ -130,6 +132,17 @@ def main() -> int:
                 "status_codes",
             ):
                 _check(f"metrics contains {key}", key in metrics)
+
+            response = client.get("/metrics/prometheus")
+            _check("GET /metrics/prometheus returns 200", response.status_code == 200)
+            _check(
+                "prometheus content-type is text/plain",
+                response.headers.get("content-type", "").startswith("text/plain"),
+            )
+            _check(
+                "prometheus body has HELP header",
+                "# HELP interntrack_http_requests_total" in response.text,
+            )
 
             response = client.options(
                 "/api/v1/jobs/",
