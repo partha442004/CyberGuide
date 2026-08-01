@@ -19,4 +19,4 @@ class TestVersionConsistency:
         Canary: bump this string whenever a new CHANGELOG release is added so
         the version can never silently lag the documented release history.
         """
-        assert cybershield.__version__ == "1.10.0"
+        assert cybershield.__version__ == "1.11.0"

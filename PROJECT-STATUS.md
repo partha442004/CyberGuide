@@ -16,7 +16,9 @@
 - ✅ **Security**: bandit clean at medium+ (MD5 `usedforsecurity=False`, `# nosec B104`); safety deps scan 0 vulnerabilities; pre-commit config added
 - ✅ **Health check**: `/health` creates its own session (`async_session_factory`) — engine-down returns **503 degraded** (was 500); 200 healthy / 503 degraded; conftest points factory at in-memory test engine
 - ✅ **Metrics**: `GET /metrics` (request counts, error rate, latency, status histogram) — new `MetricsStore` + middleware, 10 tests
-- ✅ **Version**: both packages single-source-of-truth at **1.10.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate; CONTRIBUTING release-bump checklist
+- ✅ **Version**: both packages single-source-of-truth at **1.11.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate; CONTRIBUTING release-bump checklist
+- ✅ **Lint**: dashboard in CI ruff scope; all 24 pre-existing dashboard errors
+  fixed; `make lint/format/format-check` cover `src/ tests/ dashboard/`
 - ✅ **Live smoke test**: real uvicorn boot verified /, /health, CORS, 404, rate-limit burst (200/200/429/429/429)
 - ✅ **Report service**: template dir module-relative fix + 10 new rendering/generation tests
 - ✅ **Real runtime bugs fixed**: httpx 0.28 `follow_redirects`, `NotificationPriority.NORMAL`, `SkillTrend.recorded_at`, `Company.is_trusted` (model + migration), `Job.company` relationship shadowing the string column, scheduler verification filter

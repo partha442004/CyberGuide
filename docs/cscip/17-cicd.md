@@ -72,9 +72,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
       - name: Ruff check
-        run: ruff check src/ tests/
+        run: ruff check src/ tests/ dashboard/
       - name: Ruff format check
-        run: ruff format --check src/ tests/
+        run: ruff format --check src/ tests/ dashboard/
 
   typecheck:
     name: Typecheck (mypy)

@@ -2,18 +2,24 @@
 Reusable card components for the dashboard.
 """
 
+from html import escape
+from typing import Any
+
 import streamlit as st
-from typing import Any, Optional, List
 
 
-def metric_card(title: str, value: Any, delta: Optional[str] = None, icon: str = ""):
+def metric_card(title: str, value: Any, delta: str | None = None, icon: str = ""):
     """Display a metric card with gradient background."""
     delta_html = ""
     if delta:
-        delta_color = "green" if delta.startswith("+") or delta.startswith("↑") else "red"
-        delta_html = f'<div style="font-size: 0.9em; color: {delta_color}; margin-top: 5px;">{delta}</div>'
+        delta_color = "green" if delta.startswith(("+", "↑")) else "red"
+        delta_html = (
+            f'<div style="font-size: 0.9em; color: {delta_color}; '
+            f'margin-top: 5px;">{delta}</div>'
+        )
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div style="
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 20px;
@@ -27,22 +33,25 @@ def metric_card(title: str, value: Any, delta: Optional[str] = None, icon: str =
         <div style="font-size: 2.2em; font-weight: bold; margin: 5px 0;">{value}</div>
         {delta_html}
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
 def job_card(
     title: str,
     company: str,
-    location: Optional[str] = None,
-    salary_min: Optional[int] = None,
-    salary_max: Optional[int] = None,
-    url: Optional[str] = None,
-    tags: Optional[List[str]] = None,
-    source: Optional[str] = None,
+    location: str | None = None,
+    salary_min: int | None = None,
+    salary_max: int | None = None,
+    url: str | None = None,
+    tags: list[str] | None = None,
+    source: str | None = None,
 ):
+    """Display a job listing card with an optional external link."""
     """Display a job listing card."""
     location_text = f"📍 {location}" if location else "📍 Remote"
-    
+
     salary_text = "💰 Salary not specified"
     if salary_min and salary_max:
         salary_text = f"💰 ${salary_min:,.0f} - ${salary_max:,.0f}"
@@ -51,10 +60,14 @@ def job_card(
 
     tags_html = ""
     if tags:
-        tags_html = " ".join([
-            f'<span style="background: #e2e8f0; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; margin-right: 5px;">{tag}</span>'
-            for tag in tags[:5]
-        ])
+        tags_html = " ".join(
+            [
+                f'<span style="background: #e2e8f0; padding: 2px 8px; '
+                f"border-radius: 4px; font-size: 0.8em; "
+                f'margin-right: 5px;">{tag}</span>'
+                for tag in tags[:5]
+            ],
+        )
 
     source_badge = ""
     if source:
@@ -67,9 +80,23 @@ def job_card(
             "rss_feed": "#f59e0b",
         }
         color = source_colors.get(source, "#6b7280")
-        source_badge = f'<span style="background: {color}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75em;">{source}</span>'
+        source_badge = (
+            f'<span style="background: {color}; color: white; padding: 2px '
+            f'8px; border-radius: 4px; font-size: 0.75em;">{source}</span>'
+        )
 
-    st.markdown(f"""
+    url_html = ""
+    if url:
+        url_html = (
+            f'<a href="{escape(url)}" target="_blank" '
+            f'rel="noopener noreferrer" '
+            f'style="display:inline-block; margin-top:10px; '
+            f"color:#667eea; text-decoration:none; "
+            f'font-weight:500;">View Job ↗</a>'
+        )
+
+    st.markdown(
+        f"""
     <div style="
         background: white;
         border: 1px solid #e2e8f0;
@@ -81,8 +108,8 @@ def job_card(
     ">
         <div style="display: flex; justify-content: space-between; align-items: start;">
             <div>
-                <h3 style="margin: 0; color: #1e293b; font-size: 1.2em;">{title}</h3>
-                <p style="margin: 5px 0; color: #64748b; font-size: 1em;">🏢 {company}</p>
+                <h3 style="margin:0; color:#1e293b; font-size:1.2em;">{title}</h3>
+                <p style="margin:5px 0; color:#64748b; font-size:1em;">🏢 {company}</p>
             </div>
             {source_badge}
         </div>
@@ -93,16 +120,19 @@ def job_card(
         <div style="margin-top: 10px;">
             {tags_html}
         </div>
+        {url_html}
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
 def application_card(
     job_title: str,
     company: str,
     status: str,
-    applied_at: Optional[str] = None,
-    notes: Optional[str] = None,
+    applied_at: str | None = None,
+    notes: str | None = None,
 ):
     """Display an application tracking card."""
     status_colors = {
@@ -115,41 +145,58 @@ def application_card(
         "joined": {"bg": "#a7f3d0", "text": "#064e3b", "icon": "🚀"},
     }
 
-    style = status_colors.get(status, {"bg": "#f1f5f9", "text": "#475569", "icon": "📋"})
+    style = status_colors.get(
+        status,
+        {"bg": "#f1f5f9", "text": "#475569", "icon": "📋"},
+    )
 
     applied_text = f"📅 Applied: {applied_at}" if applied_at else ""
     notes_text = f"📝 {notes}" if notes else ""
 
-    st.markdown(f"""
+    applied_html = (
+        f"<p style='margin:5px 0; color:#64748b; font-size:0.9em;'>{applied_text}</p>"
+        if applied_text
+        else ""
+    )
+    notes_html = (
+        f"<p style='margin:5px 0; color:#64748b; font-size:0.9em;'>{notes_text}</p>"
+        if notes_text
+        else ""
+    )
+
+    st.markdown(
+        f"""
     <div style="
         background: white;
-        border-left: 4px solid {style['text']};
+        border-left: 4px solid {style["text"]};
         border-radius: 8px;
         padding: 15px;
         margin-bottom: 10px;
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     ">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <h4 style="margin: 0; color: #1e293b;">{job_title}</h4>
                 <p style="margin: 3px 0; color: #64748b;">{company}</p>
             </div>
             <span style="
-                background: {style['bg']};
-                color: {style['text']};
+                background: {style["bg"]};
+                color: {style["text"]};
                 padding: 4px 12px;
                 border-radius: 20px;
                 font-size: 0.85em;
                 font-weight: 500;
-            ">{style['icon']} {status.title()}</span>
+            ">{style["icon"]} {status.title()}</span>
         </div>
-        {"<p style='margin: 5px 0; color: #64748b; font-size: 0.9em;'>" + applied_text + "</p>" if applied_text else ""}
-        {"<p style='margin: 5px 0; color: #64748b; font-size: 0.9em;'>" + notes_text + "</p>" if notes_text else ""}
+        {applied_html}
+        {notes_html}
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
-def skill_badge(name: str, category: str = "", proficiency: Optional[int] = None):
+def skill_badge(name: str, category: str = "", proficiency: int | None = None):
     """Display a skill badge."""
     category_colors = {
         "programming": "#3b82f6",
@@ -162,7 +209,8 @@ def skill_badge(name: str, category: str = "", proficiency: Optional[int] = None
     color = category_colors.get(category, "#6b7280")
     proficiency_dots = "●" * proficiency if proficiency else ""
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <span style="
         display: inline-block;
         background: {color}20;
@@ -175,24 +223,34 @@ def skill_badge(name: str, category: str = "", proficiency: Optional[int] = None
     ">
         {name} {proficiency_dots}
     </span>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
-def section_header(title: str, subtitle: Optional[str] = None):
+def section_header(title: str, subtitle: str | None = None):
     """Display a styled section header."""
-    subtitle_html = f'<p style="margin: 0; color: #94a3b8; font-size: 0.95em;">{subtitle}</p>' if subtitle else ""
-    
-    st.markdown(f"""
+    subtitle_html = (
+        f'<p style="margin: 0; color: #94a3b8; font-size: 0.95em;">{subtitle}</p>'
+        if subtitle
+        else ""
+    )
+
+    st.markdown(
+        f"""
     <div style="margin-bottom: 20px;">
         <h2 style="margin: 0; color: #1e293b;">{title}</h2>
         {subtitle_html}
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
 def info_card(title: str, content: str, icon: str = "ℹ️"):
     """Display an info card."""
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div style="
         background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
         border: 1px solid #bae6fd;
@@ -203,12 +261,15 @@ def info_card(title: str, content: str, icon: str = "ℹ️"):
         <strong>{icon} {title}</strong>
         <p style="margin: 5px 0 0 0; color: #475569;">{content}</p>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
 
 def warning_card(title: str, content: str):
     """Display a warning card."""
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div style="
         background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
         border: 1px solid #fcd34d;
@@ -219,4 +280,6 @@ def warning_card(title: str, content: str):
         <strong>⚠️ {title}</strong>
         <p style="margin: 5px 0 0 0; color: #92400e;">{content}</p>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )

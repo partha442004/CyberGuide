@@ -2,11 +2,11 @@
 InternTrack Dashboard - Streamlit Application
 """
 
-import streamlit as st
+from contextlib import suppress
+
 import httpx
 import plotly.express as px
-import plotly.graph_objects as go
-from datetime import datetime
+import streamlit as st
 
 # Page config
 st.set_page_config(
@@ -17,7 +17,8 @@ st.set_page_config(
 )
 
 # Custom CSS
-st.markdown("""
+st.markdown(
+    """
 <style>
     .metric-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -35,22 +36,22 @@ st.markdown("""
         opacity: 0.8;
     }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # API base URL
 API_URL = "http://localhost:8000/api/v1"
 HEALTH_URL = "http://localhost:8000/health"
-DEFAULT_VERSION = "1.10.0"
+DEFAULT_VERSION = "1.11.0"
 
 
 def fetch_data(endpoint: str):
-    """Fetch data from API."""
-    try:
+    """Fetch data from API; returns None when the API is unreachable."""
+    with suppress(Exception):
         response = httpx.get(f"{API_URL}{endpoint}", timeout=10)
         if response.status_code == 200:
             return response.json()
-    except Exception:
-        pass
     return None
 
 
@@ -62,14 +63,12 @@ def fetch_version() -> str:
     rerun; falls back to ``DEFAULT_VERSION`` when the API is unreachable so
     the dashboard still renders offline.
     """
-    try:
+    with suppress(Exception):
         response = httpx.get(HEALTH_URL, timeout=5)
         if response.status_code == 200:
             version = response.json().get("version")
             if version:
                 return version
-    except Exception:
-        pass
     return DEFAULT_VERSION
 
 
@@ -83,7 +82,7 @@ def main():
         st.header("Navigation")
         page = st.radio(
             "Go to",
-            ["Overview", "Jobs", "Applications", "Analytics", "Learning", "Settings"]
+            ["Overview", "Jobs", "Applications", "Analytics", "Learning", "Settings"],
         )
 
     if page == "Overview":
@@ -154,6 +153,7 @@ def show_overview():
         top_companies = jobs.get("top_companies", [])
         if top_companies:
             import pandas as pd
+
             df = pd.DataFrame(top_companies)
             st.dataframe(df, use_container_width=True)
     else:
@@ -171,7 +171,10 @@ def show_jobs():
         with st.spinner("Discovering jobs..."):
             result = fetch_data(f"/jobs/discovery/run?query={query}")
             if result:
-                st.success(f"Found {result.get('discovered', 0)} jobs, saved {result.get('saved', 0)}")
+                st.success(
+                    f"Found {result.get('discovered', 0)} jobs, "
+                    f"saved {result.get('saved', 0)}",
+                )
 
     # Job list
     jobs_data = fetch_data("/jobs/?limit=50")
@@ -181,7 +184,10 @@ def show_jobs():
                 col1, col2 = st.columns([3, 1])
                 with col1:
                     st.write(f"📍 {job.get('location', 'Remote')}")
-                    st.write(f"💰 {job.get('salary_min', 'N/A')} - {job.get('salary_max', 'N/A')}")
+                    st.write(
+                        f"💰 {job.get('salary_min', 'N/A')} - "
+                        f"{job.get('salary_max', 'N/A')}",
+                    )
                     if job.get("description"):
                         st.write(job["description"][:500] + "...")
                 with col2:
@@ -200,10 +206,23 @@ def show_applications():
     # Status filter
     status_filter = st.selectbox(
         "Filter by status",
-        ["All", "saved", "applied", "interview", "assessment", "rejected", "offer", "joined"]
+        [
+            "All",
+            "saved",
+            "applied",
+            "interview",
+            "assessment",
+            "rejected",
+            "offer",
+            "joined",
+        ],
     )
 
-    endpoint = "/applications/" if status_filter == "All" else f"/applications/?status={status_filter}"
+    endpoint = (
+        "/applications/"
+        if status_filter == "All"
+        else f"/applications/?status={status_filter}"
+    )
     apps_data = fetch_data(endpoint)
 
     if apps_data and apps_data.get("applications"):
@@ -215,8 +234,16 @@ def show_applications():
                 # Status update
                 new_status = st.selectbox(
                     "Update status",
-                    ["saved", "applied", "interview", "assessment", "rejected", "offer", "joined"],
-                    key=f"status_{app['id']}"
+                    [
+                        "saved",
+                        "applied",
+                        "interview",
+                        "assessment",
+                        "rejected",
+                        "offer",
+                        "joined",
+                    ],
+                    key=f"status_{app['id']}",
                 )
                 if st.button("Update", key=f"update_{app['id']}"):
                     st.success(f"Status updated to {new_status}")
@@ -236,6 +263,7 @@ def show_analytics():
         timeline = fetch_data("/dashboard/charts/application-timeline")
         if timeline and timeline.get("data"):
             import pandas as pd
+
             df = pd.DataFrame(timeline["data"])
             if not df.empty:
                 fig = px.line(df, x="date", y="count", color="status")
@@ -246,6 +274,7 @@ def show_analytics():
         companies = fetch_data("/dashboard/charts/top-companies")
         if companies and companies.get("data"):
             import pandas as pd
+
             df = pd.DataFrame(companies["data"])
             if not df.empty:
                 fig = px.bar(df, x="company", y="count")
@@ -258,13 +287,29 @@ def show_analytics():
         data = salary["data"]
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("Min Salary", f"${data.get('min_salary', 'N/A'):,}" if data.get('min_salary') else "N/A")
+            st.metric(
+                "Min Salary",
+                f"${data.get('min_salary', 'N/A'):,}"
+                if data.get("min_salary")
+                else "N/A",
+            )
         with col2:
-            st.metric("Max Salary", f"${data.get('max_salary', 'N/A'):,}" if data.get('max_salary') else "N/A")
+            st.metric(
+                "Max Salary",
+                f"${data.get('max_salary', 'N/A'):,}"
+                if data.get("max_salary")
+                else "N/A",
+            )
         with col3:
-            st.metric("Avg Min", f"${data.get('avg_min', 0):,.0f}" if data.get('avg_min') else "N/A")
+            st.metric(
+                "Avg Min",
+                f"${data.get('avg_min', 0):,.0f}" if data.get("avg_min") else "N/A",
+            )
         with col4:
-            st.metric("Avg Max", f"${data.get('avg_max', 0):,.0f}" if data.get('avg_max') else "N/A")
+            st.metric(
+                "Avg Max",
+                f"${data.get('avg_max', 0):,.0f}" if data.get("avg_max") else "N/A",
+            )
 
 
 def show_learning():
@@ -274,9 +319,17 @@ def show_learning():
     st.subheader("Recommended Platforms")
 
     platforms = [
-        {"name": "Google Cloud Skills Boost", "icon": "☁️", "url": "https://cloudskillsboost.google"},
+        {
+            "name": "Google Cloud Skills Boost",
+            "icon": "☁️",
+            "url": "https://cloudskillsboost.google",
+        },
         {"name": "OWASP", "icon": "🔒", "url": "https://owasp.org"},
-        {"name": "PortSwigger", "icon": "🎯", "url": "https://portswigger.net/web-security"},
+        {
+            "name": "PortSwigger",
+            "icon": "🎯",
+            "url": "https://portswigger.net/web-security",
+        },
         {"name": "TryHackMe", "icon": "🏴‍☠️", "url": "https://tryhackme.com"},
         {"name": "Hack The Box", "icon": "📦", "url": "https://hackthebox.com"},
         {"name": "OverTheWire", "icon": "🎯", "url": "https://overthewire.org"},
@@ -291,8 +344,8 @@ def show_learning():
 
     # Skill matching
     st.subheader("🎯 Skill Matching")
-    job_skills = st.text_input("Job Skills (comma-separated)", "python, react, docker")
-    user_skills = st.text_input("Your Skills (comma-separated)", "python, javascript")
+    st.text_input("Job Skills (comma-separated)", "python, react, docker")
+    st.text_input("Your Skills (comma-separated)", "python, javascript")
 
     if st.button("Match Skills"):
         st.info("Connect to API to use AI-powered skill matching")
@@ -308,16 +361,16 @@ def show_settings():
 
     with col1:
         st.write("**Telegram**")
-        telegram_token = st.text_input("Bot Token", type="password")
-        telegram_chat = st.text_input("Chat ID")
+        st.text_input("Bot Token", type="password")
+        st.text_input("Chat ID")
 
     with col2:
         st.write("**Discord**")
-        discord_webhook = st.text_input("Webhook URL", type="password")
+        st.text_input("Webhook URL", type="password")
 
     st.subheader("Email Settings")
-    smtp_user = st.text_input("SMTP User")
-    smtp_pass = st.text_input("SMTP Password", type="password")
+    st.text_input("SMTP User")
+    st.text_input("SMTP Password", type="password")
 
     if st.button("Save Settings"):
         st.success("Settings saved! (Restart API to apply)")
