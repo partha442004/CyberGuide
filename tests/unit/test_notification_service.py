@@ -9,13 +9,19 @@ class TestNotificationChannel:
     """Tests for base NotificationChannel class."""
 
     @pytest.mark.asyncio
-    async def test_base_send_raises_not_implemented(self):
+    def test_base_cannot_be_instantiated(self):
+        from abc import ABC
         from interntrack.services.notification_service import NotificationChannel
 
-        channel = NotificationChannel()
+        assert issubclass(NotificationChannel, ABC)
+        with pytest.raises(TypeError):
+            NotificationChannel()
 
-        with pytest.raises(NotImplementedError):
-            await channel.send("test")
+
+
+
+
+
 
 
 class TestTelegramChannel:
