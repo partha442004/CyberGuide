@@ -48,6 +48,7 @@ class NotificationResponse(BaseModel):
 
 class NotificationSendRequest(BaseModel):
     """Schema for sending a notification."""
+    """Schema for sending a notification."""
     channel: str = Field(
         default="unknown",
         pattern="^(telegram|email|discord|slack|push|unknown)$",
@@ -56,7 +57,7 @@ class NotificationSendRequest(BaseModel):
     content: str = Field(..., min_length=1, max_length=4096)
     priority: Optional[str] = Field(
         default="medium",
-        pattern="^(low|medium|high|urgent)$",
+        pattern="^(low|medium|high|urgent|normal)$",
     )
     url: Optional[str] = None
     data: Optional[Dict[str, Any]] = None
