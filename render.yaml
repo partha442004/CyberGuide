@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn cybershield.main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn interntrack.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: "3.12"
@@ -19,7 +19,7 @@ services:
       - key: DEBUG
         value: "false"
       - key: APP_NAME
-        value: "CyberGuide"
+        value: "InternTrack"
       - key: APP_VERSION
         value: "1.0.0"
       - key: REQUIRE_API_KEY

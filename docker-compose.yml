@@ -3,11 +3,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: cyberguide-api
+    container_name: interntrack-api
     ports:
       - "${API_PORT:-8000}:8000"
     environment:
-      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/cyberguide.db}
+      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/interntrack.db}
       - REDIS_URL=redis://redis:6379/0
       - ELASTICSEARCH_URL=http://elasticsearch:9200
       - OLLAMA_BASE_URL=http://ollama:11434
@@ -28,10 +28,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: cyberguide-worker
-    command: python -m cybershield.scheduler
+    container_name: interntrack-worker
+    command: python -m interntrack.scheduler
     environment:
-      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/cyberguide.db}
+      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/interntrack.db}
       - REDIS_URL=redis://redis:6379/0
       - ELASTICSEARCH_URL=http://elasticsearch:9200
     volumes:
@@ -46,11 +46,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dashboard
-    container_name: cyberguide-dashboard
+    container_name: interntrack-dashboard
     ports:
       - "${DASHBOARD_PORT:-8501}:8501"
     environment:
-      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/cyberguide.db}
+      - DATABASE_URL=${DATABASE_URL:-sqlite+aiosqlite:///./data/interntrack.db}
     volumes:
       - ./data:/app/data
       - ./.env:/app/.env:ro
@@ -60,7 +60,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: cyberguide-redis
+    container_name: interntrack-redis
     ports:
       - "6379:6379"
     volumes:
@@ -74,10 +74,10 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: cyberguide-postgres
+    container_name: interntrack-postgres
     environment:
-      POSTGRES_DB: cyberguide
-      POSTGRES_USER: cyberguide
+      POSTGRES_DB: interntrack
+      POSTGRES_USER: interntrack
       POSTGRES_PASSWORD: cyberguide_secret
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -90,7 +90,7 @@ services:
 
   elasticsearch:
     image: elasticsearch:8.12.0
-    container_name: cyberguide-elasticsearch
+    container_name: interntrack-elasticsearch
     environment:
       - discovery.type=single-node
       - "ES_JAVA_OPTS=-Xms256m -Xmx512m"
@@ -103,7 +103,7 @@ services:
 
   ollama:
     image: ollama/ollama:latest
-    container_name: cyberguide-ollama
+    container_name: interntrack-ollama
     ports:
       - "11434:11434"
     volumes:
