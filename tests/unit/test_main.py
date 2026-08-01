@@ -60,34 +60,89 @@ class TestDomainExceptionHandler:
 
 
 class TestHealthEndpoint:
-    """Tests for the /health endpoint with DB connectivity probe."""
+    """Tests for the /health readiness probe with its own session factory."""
 
     @pytest.mark.asyncio
-    async def test_healthy_when_db_ok(self):
-        """A working database yields a healthy payload."""
+    async def test_healthy_when_db_ok(self, monkeypatch):
+        """A working session factory yields a healthy payload."""
         from interntrack.main import health
 
-        class _OkDB:
+        class _OkSession:
             async def execute(self, *args, **kwargs):
                 return None
 
-        payload = await health(db=_OkDB())
+        class _OkFactory:
+            def __call__(self):
+                return self
+
+            async def __aenter__(self):
+                return _OkSession()
+
+            async def __aexit__(self, *args):
+                return False
+
+        monkeypatch.setattr(
+            "interntrack.database.session.async_session_factory",
+            _OkFactory(),
+        )
+        payload = await health()
         assert payload["status"] == "healthy"
         assert payload["database"] == "ok"
         assert "version" in payload
 
     @pytest.mark.asyncio
-    async def test_degraded_when_db_fails(self):
-        """A failing DB probe yields a 503 degraded payload."""
+    async def test_degraded_when_session_creation_fails(self, monkeypatch):
+        """Session-creation failure (engine down) yields a 503 degraded payload."""
         import json as jsonlib
 
         from interntrack.main import health
 
-        class _BrokenDB:
+        class _BrokenFactory:
+            def __call__(self):
+                return self
+
+            async def __aenter__(self):
+                raise RuntimeError("engine unreachable")
+
+            async def __aexit__(self, *args):
+                return False
+
+        monkeypatch.setattr(
+            "interntrack.database.session.async_session_factory",
+            _BrokenFactory(),
+        )
+        response = await health()
+        assert response.status_code == 503
+        data = jsonlib.loads(response.body)
+        assert data["status"] == "degraded"
+        assert data["database"] == "error"
+
+    @pytest.mark.asyncio
+    async def test_degraded_when_probe_fails(self, monkeypatch):
+        """A failing SELECT probe yields a 503 degraded payload."""
+        import json as jsonlib
+
+        from interntrack.main import health
+
+        class _BrokenSession:
             async def execute(self, *args, **kwargs):
                 raise RuntimeError("db unreachable")
 
-        response = await health(db=_BrokenDB())
+        class _BrokenProbeFactory:
+            def __call__(self):
+                return self
+
+            async def __aenter__(self):
+                return _BrokenSession()
+
+            async def __aexit__(self, *args):
+                return False
+
+        monkeypatch.setattr(
+            "interntrack.database.session.async_session_factory",
+            _BrokenProbeFactory(),
+        )
+        response = await health()
         assert response.status_code == 503
         data = jsonlib.loads(response.body)
         assert data["status"] == "degraded"
