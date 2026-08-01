@@ -44,7 +44,7 @@ API_KEY=$(openssl rand -hex 16)
 
 cat > .env << EOF
 APP_NAME=CyberGuide
-APP_VERSION=1.16.0
+APP_VERSION=1.17.0
 ENVIRONMENT=production
 DEBUG=false
 DATABASE_URL=postgresql+asyncpg://cyberguide:cyberguide_secret@postgres:5432/cyberguide

@@ -26,3 +26,11 @@ scrape_configs:
         labels:
           app: interntrack
           component: api
+
+  - job_name: node-exporter
+    static_configs:
+      - targets:
+          - node-exporter:9100
+        labels:
+          app: interntrack
+          component: node-exporter

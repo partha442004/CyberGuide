@@ -466,11 +466,11 @@ sqlite3 data/interntrack.db "PRAGMA integrity_check;"
 - [ ] Notification delivery rates
 
 ### System Metrics
-- [ ] CPU usage
-- [ ] Memory usage
-- [ ] Disk usage
-- [ ] Network traffic
-- [ ] Process count
+- [x] CPU usage — node-exporter `node_cpu_seconds_total` (host CPU panel + `CpuHigh` alert)
+- [x] Memory usage — node-exporter `node_memory_Mem*_bytes` (host memory panel + `MemoryHigh` alert)
+- [x] Disk usage — node-exporter `node_filesystem_*_bytes` (host disk panel + `DiskSpaceLow` alert)
+- [x] Network traffic — node-exporter `node_network_*_bytes_total` (network rate panel)
+- [x] Process count — node-exporter `node_load1` (load avg stat)
 
 ### Log Monitoring
 - [ ] Application logs
@@ -482,8 +482,9 @@ sqlite3 data/interntrack.db "PRAGMA integrity_check;"
 - [x] High error rate alert — `HighErrorRate` (5xx rate / request rate > 0.1, critical)
 - [x] High response time alert — `HighLatency` (avg latency > 1000ms, warning)
 - [x] Service down alert — `ServiceDown` (`up{job="interntrack-api"} == 0`, critical)
-- [ ] Disk space alert (needs node-exporter)
-- [ ] Memory alert (needs node-exporter)
+- [x] Disk space alert — `DiskSpaceLow` (root fs < 10%, critical, needs node-exporter ✓)
+- [x] Memory alert — `MemoryHigh` (RAM > 90%, warning, needs node-exporter ✓)
+- [x] CPU alert — `CpuHigh` (CPU > 90% for 10m, warning, needs node-exporter ✓)
 
 ---
 
@@ -863,5 +864,24 @@ docker-compose up -d
 
 ---
 
+## ✅ HARDENING PASS 15 (2026-08-01) — COMPLETED
+
+### Node-Exporter + System Monitoring + v1.17.0
+- [x] `docker-compose.yml` `node-exporter` service (v1.8.2, port 9100, host
+      `/proc`/`/sys`/`/` mounted ro, `monitoring` profile) — completes the
+      System Metrics checklist (CPU / memory / disk / network / load)
+- [x] `deploy/prometheus/prometheus.yml` `node-exporter` scrape job
+- [x] `deploy/prometheus/alerts.yml` `system` group — `DiskSpaceLow` (root fs
+      < 10%, critical), `MemoryHigh` (RAM > 90%, warning), `CpuHigh` (CPU
+      > 90% for 10m, warning) — clears the two "needs node-exporter" items
+- [x] `deploy/grafana/dashboards/system.json` — InternTrack System dashboard
+      (CPU / memory / disk / network rate / load avg panels)
+- [x] `tests/unit/test_system_monitoring.py` (7 tests) pin every PromQL expr
+      to real `node_*` metrics + wiring checks
+- [x] Both packages + `.env`/`.env.example` + `pyproject.toml` + deployment
+      artifacts synced to **1.17.0**; `make version-check` exit 0
+
+---
+
 **Last Updated:** 2026-08-01
-**Version:** 1.16.0
+**Version:** 1.17.0

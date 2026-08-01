@@ -617,6 +617,28 @@ Prometheus also loads **alerting rules** from `deploy/prometheus/alerts.yml`
 View them at `http://localhost:9090/alerts`. Every expression is pinned to
 an emitted `interntrack_http_*` metric by `tests/unit/test_prometheus_alerts.py`.
 
+#### Host system monitoring (node-exporter)
+
+The `monitoring` profile also ships a **node-exporter** service
+(`prom/node-exporter:v1.8.2`, port 9100, host `/proc`/`/sys`/`/` mounted
+read-only) scraped by Prometheus, so host CPU/memory/disk/network metrics are
+available:
+
+- `deploy/prometheus/prometheus.yml` adds a `node-exporter` scrape job
+- `deploy/prometheus/alerts.yml` adds a `system` alert group:
+  `DiskSpaceLow` (critical), `MemoryHigh` (warning), `CpuHigh` (warning)
+- `deploy/grafana/dashboards/system.json` — **InternTrack System** dashboard
+  (CPU / memory / disk stat panels + network traffic + system load)
+
+```bash
+docker compose --profile monitoring up -d prometheus grafana node-exporter
+```
+
+> **Linux-host requirement:** node-exporter's `/proc`/`/sys`/`/` host mounts
+> behave differently on Docker Desktop for macOS/Windows — the `DiskSpaceLow`,
+> `MemoryHigh` and `CpuHigh` alerts and the **InternTrack System** dashboard
+> are only representative on Linux hosts (a VM/cloud node or WSL2 backend).
+
 For Kubernetes, the API `Service` (`k8s/raw/06-api.yaml`) carries
 `prometheus.io/scrape: "true"` (+ `path`/`port`) annotations for
 `kubernetes_sd_configs`-based scraping.
