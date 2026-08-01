@@ -1,0 +1,16 @@
+# Railway.app deployment configuration for InternTrack
+[build]
+builder = "nixpacks"
+buildCommand = "pip install -r requirements.txt"
+
+[deploy]
+startCommand = "alembic upgrade head && uvicorn interntrack.main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+# Required: Add PostgreSQL plugin in Railway dashboard first
+# DATABASE_URL is auto-injected by Railway
+[variables]
+PYTHONPATH = "src"
+SECRET_KEY = "change-me-in-production"

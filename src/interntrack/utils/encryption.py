@@ -30,6 +30,8 @@ class SecretManager:
 
 def mask_sensitive(value: str, visible_chars: int = 4) -> str:
     """Mask sensitive value showing only last characters."""
+    if not value or visible_chars <= 0:
+        return "*" * len(value)
     if len(value) <= visible_chars:
         return "*" * len(value)
     return "*" * (len(value) - visible_chars) + value[-visible_chars:]

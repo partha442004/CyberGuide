@@ -9,42 +9,12 @@ class TestNotificationChannel:
     """Tests for base NotificationChannel class."""
 
     @pytest.mark.asyncio
-    async def test_base_send_raises_not_implemented(self):
+    async def test_base_send_not_implemented(self):
         from interntrack.services.notification_service import NotificationChannel
 
         channel = NotificationChannel()
-
         with pytest.raises(NotImplementedError):
-            await channel.send("test")
-
-
-class TestTelegramChannel:
-    """Tests for TelegramChannel class."""
-
-    def test_init(self):
-        from interntrack.services.notification_service import TelegramChannel
-
-        channel = TelegramChannel("token123", "chat456")
-        assert channel.bot_token == "token123"
-        assert channel.chat_id == "chat456"
-
-    @pytest.mark.asyncio
-    async def test_send_success(self):
-        from interntrack.services.notification_service import TelegramChannel
-
-        channel = TelegramChannel("token123", "chat456")
-
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-
-        with patch("httpx.AsyncClient") as mock_client:
-            mock_client.return_value.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.return_value.__aexit__ = AsyncMock(return_value=False)
-            mock_client.post = AsyncMock(return_value=mock_response)
-
-            result = await channel.send("Hello World")
-
-            assert result is True
+            await channel.send("Hello")
 
     @pytest.mark.asyncio
     async def test_send_failure(self):

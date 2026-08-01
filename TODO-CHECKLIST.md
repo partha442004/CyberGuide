@@ -551,7 +551,7 @@ sqlite3 data/interntrack.db "PRAGMA integrity_check;"
 - [x] `tests/unit/test_main.py` (9 tests): handlers, CORS parsing, security validation
 - [x] `TestCorsMiddleware` integration tests
 - [x] Smoke test of live API (health, CORS preflight, 404, docs-off in prod)
-- [x] 653 tests passing (358 InternTrack + 295 CyberGuide)
+- [x] 1247 tests passing (924 InternTrack + 323 CyberGuide)
 
 ---
 
