@@ -6,9 +6,9 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![CI](https://github.com/partha442004/CyberGuide/actions/workflows/ci.yml/badge.svg)
-![Tests](https://img.shields.io/badge/tests-749%20passed-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-764%20passed-brightgreen.svg)
 ![Coverage](https://img.shields.io/badge/coverage-67%25-yellow.svg)
-![Security](https://img.shields.io/badge/security-bandit%20%2B%20safety%20clean-brightgreen.svg)
+![Security](https://img.shields.io/badge/security-bandit%20%2B%20safety%20%2B%20trivy%20clean-brightgreen.svg)
 
 ---
 
@@ -154,6 +154,12 @@ SCRAPE_INTERVAL_MINUTES=30
 | GET | `/api/v1/reports/daily` | Daily report |
 | GET | `/api/v1/reports/weekly` | Weekly report |
 | GET | `/api/v1/reports/monthly` | Monthly report |
+
+### System
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Readiness probe (200 healthy / 503 degraded) |
+| GET | `/metrics` | Request metrics (counts, error rate, latency) |
 
 ---
 

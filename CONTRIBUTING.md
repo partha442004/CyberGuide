@@ -200,6 +200,22 @@ class TestJobService:
 4. Update documentation if needed
 5. Update CHANGELOG.md
 
+### Releasing (version bump checklist)
+
+When cutting a new release, keep the version single-source-of-truth in sync:
+
+1. Add the new entry to `CHANGELOG.md` (e.g. `## [1.x.0] - YYYY-MM-DD`)
+2. Bump `__version__` in `src/interntrack/__init__.py` **and**
+   `src/cybershield/__init__.py` to the same value
+3. Update `APP_VERSION` in `.env` and `.env.example`
+4. Update the version canaries in `tests/unit/test_main.py`
+   (`TestVersionConsistency.test_version_is_current_release`) and
+   `src/cybershield/tests/test_version.py` so CI validates the new release
+5. Sync hardcoded version strings in deployment artifacts:
+   `dashboard/app.py` (About line), `k8s/helm/Chart.yaml`
+   (`version`/`appVersion`), and `deploy/oracle-cloud/setup.sh`
+   (`APP_VERSION=`)
+
 ### PR Template
 
 ```markdown

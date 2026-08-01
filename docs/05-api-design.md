@@ -503,6 +503,47 @@ GET /api/v1/dashboard/recent-activity
 
 ---
 
+## System Endpoints
+
+### Health Check
+```
+GET /health
+```
+
+Runs a database connectivity probe by creating its own session via
+`async_session_factory` (so a fully unreachable engine still returns a proper
+503, not a 500 from the dependency layer):
+
+- **200 `healthy`** when the DB responds — payload includes `status`,
+  `version`, and `database: ok`
+- **503 `degraded`** when session creation or the `SELECT 1` probe fails
+
+### Request Metrics
+```
+GET /metrics
+```
+
+Exposes in-memory request metrics collected by `MetricsMiddleware`
+(`src/interntrack/metrics.py`) for monitoring and alerting:
+
+```json
+{
+    "total_requests": 100,
+    "total_errors": 2,
+    "error_rate": 0.02,
+    "avg_latency_ms": 12.345,
+    "requests_per_path": {"/api/v1/jobs/": 40},
+    "errors_per_path": {"/api/v1/boom": 2},
+    "status_codes": {"200": 98, "500": 2}
+}
+```
+
+- Counts are per-process and reset on restart (lightweight, dependency-free)
+- HTTP >= 500 responses count as errors; 4xx are not
+- `/metrics` itself is not recorded, and is exempt from rate limiting
+
+---
+
 ## Rate Limiting
 
 ### API Request Rate Limiting
@@ -515,7 +556,7 @@ InternTrack applies API-level rate limiting via `RateLimitMiddleware`
 | Per IP | 100 req/min | `RATE_LIMIT_PER_MINUTE` |
 | Per API key (`X-API-Key`) | 1000 req/min | `RATE_LIMIT_API_KEY_PER_MINUTE` |
 
-- **Exempt paths:** `/`, `/health`, `/docs`, `/redoc`, `/openapi.json`
+- **Exempt paths:** `/`, `/health`, `/metrics`, `/docs`, `/redoc`, `/openapi.json`
 - **Disable:** set `RATE_LIMIT_ENABLED=false`
 
 Responses include `X-RateLimit-Limit`, `X-RateLimit-Remaining`,

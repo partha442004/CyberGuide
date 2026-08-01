@@ -639,6 +639,21 @@ sqlite3 data/interntrack.db "PRAGMA integrity_check;"
 
 ---
 
+## ✅ HARDENING PASS 7 (2026-08-01) — COMPLETED
+
+### Version Sync (both packages → 1.9.0)
+- [x] `interntrack.__version__` 1.7.0 → **1.9.0** (was lagging the CHANGELOG)
+- [x] `cybershield.__version__` 1.0.0 → **1.9.0**; `config.py` `app_version` now reads the package version (single source of truth)
+- [x] `.env` + `.env.example` `APP_VERSION=1.9.0`
+- [x] Canaries updated in `tests/unit/test_main.py`; new `src/cybershield/tests/test_version.py` (2 tests)
+
+### Documentation
+- [x] `docs/05-api-design.md`: System Endpoints section (`/health`, `/metrics`) + `/metrics` in rate-limit exempt paths
+- [x] `README.md`: 766 tests badge, bandit/safety/trivy badge, System endpoint table
+- [x] `CONTRIBUTING.md`: **Releasing** section — version-bump checklist (CHANGELOG, both `__version__`s, .env, canaries)
+
+---
+
 ## 🔄 QUICK REFERENCE
 
 ### Common Commands
@@ -736,4 +751,4 @@ docker-compose up -d
 ---
 
 **Last Updated:** {{DATE}}
-**Version:** 1.0.0
+**Version:** 1.9.0
