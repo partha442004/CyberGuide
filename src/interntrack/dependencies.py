@@ -2,18 +2,18 @@
 Dependency injection module.
 """
 
+from collections.abc import AsyncGenerator
 from functools import lru_cache
-from typing import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from interntrack.config import get_settings, Settings
+from interntrack.config import Settings, get_settings
 from interntrack.database.session import get_db_session
-from interntrack.services.job_service import JobService
+from interntrack.services.ai_service import AIService
 from interntrack.services.application_service import ApplicationService
+from interntrack.services.job_service import JobService
 from interntrack.services.notification_service import NotificationManager
 from interntrack.services.report_service import ReportService
-from interntrack.services.ai_service import AIService
 
 
 @lru_cache

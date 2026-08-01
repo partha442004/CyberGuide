@@ -4,10 +4,7 @@ Export jobs to CSV format.
 
 import asyncio
 import csv
-import sys
-from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from interntrack.database.session import get_db_session, init_db
 from interntrack.domain.models import Job
@@ -16,8 +13,8 @@ from interntrack.domain.models import Job
 async def export_jobs(
     output_file: str = "jobs_export.csv",
     format: str = "csv",
-    limit: Optional[int] = None,
-    source: Optional[str] = None,
+    limit: int | None = None,
+    source: str | None = None,
 ) -> str:
     """Export jobs to CSV or JSON file."""
     await init_db()

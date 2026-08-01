@@ -2,11 +2,11 @@
 Matching engine for skill-based job matching and recommendations.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from interntrack.domain.models import Skill, JobSkill, UserSkill
+from interntrack.domain.models import JobSkill, Skill, UserSkill
 from interntrack.repositories.skill_repository import SkillRepository
 
 
@@ -21,10 +21,9 @@ class MatchingEngine:
         self,
         job_id: str,
         user_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Match a job's skill requirements against a user's skills."""
         from sqlalchemy import select
-        from interntrack.domain.models import JobSkill, UserSkill
 
         # Get job skills
         job_skills_query = (
@@ -99,10 +98,10 @@ class MatchingEngine:
         total_importance = sum(js["importance"] for js in job_skills) or 1
         matched_importance = sum(m["importance"] for m in matched)
         partial_importance = sum(p["importance"] * 0.5 for p in partial)
-        
+
         match_percentage = round(
             (matched_importance + partial_importance) / total_importance * 100,
-            2
+            2,
         )
 
         # Get recommendations for missing skills
@@ -123,10 +122,11 @@ class MatchingEngine:
         user_id: str,
         limit: int = 20,
         min_match: float = 50.0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Find jobs that match the user's skills."""
         from sqlalchemy import select
-        from interntrack.domain.models import Job, JobSkill, UserSkill, Skill
+
+        from interntrack.domain.models import Job, Skill
 
         # Get user skills
         user_skills_query = (
@@ -196,10 +196,11 @@ class MatchingEngine:
         self,
         user_id: str,
         target_role: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Analyze skill gaps for a target role."""
         from sqlalchemy import select
-        from interntrack.domain.models import UserSkill, Skill
+
+        from interntrack.domain.models import Skill
 
         # Get user skills
         user_skills_query = (
@@ -250,8 +251,8 @@ class MatchingEngine:
 
     async def _get_recommendations(
         self,
-        missing_skills: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+        missing_skills: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         """Get learning recommendations for missing skills."""
         recommendations = []
 
@@ -276,7 +277,7 @@ class MatchingEngine:
 
         return recommendations
 
-    async def _get_skills_for_role(self, role: str) -> Dict[str, str]:
+    async def _get_skills_for_role(self, role: str) -> dict[str, str]:
         """Get commonly required skills for a role."""
         # Default skill sets for common roles
         role_skills = {
@@ -363,25 +364,21 @@ class MatchingEngine:
 
         if skill_lower in high_priority:
             return 3
-        elif skill_lower in medium_priority:
+        if skill_lower in medium_priority or category == "programming":
             return 2
-        elif category == "programming":
-            return 2
-        else:
-            return 1
+        return 1
 
     def _get_readiness_level(self, percentage: float) -> str:
         """Get readiness level based on match percentage."""
         if percentage >= 80:
             return "excellent"
-        elif percentage >= 60:
+        if percentage >= 60:
             return "good"
-        elif percentage >= 40:
+        if percentage >= 40:
             return "moderate"
-        else:
-            return "needs_improvement"
+        return "needs_improvement"
 
-    def _get_default_resources(self, skill_name: str) -> List[Dict[str, str]]:
+    def _get_default_resources(self, skill_name: str) -> list[dict[str, str]]:
         """Get default learning resources for a skill."""
         resources = {
             "python": [

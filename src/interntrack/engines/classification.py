@@ -2,7 +2,7 @@
 Classification engine for job categorization.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +20,7 @@ class ClassificationEngine:
         self.skill_repo = SkillRepository(session)
         self.ai_service = AIService(session)
 
-    async def classify_job(self, job_data: dict) -> Dict[str, Any]:
+    async def classify_job(self, job_data: dict) -> dict[str, Any]:
         """Classify a job posting."""
         # Try AI classification first
         classification = await self.ai_service.classify_job(job_data)
@@ -41,8 +41,8 @@ class ClassificationEngine:
         }
 
     async def _extract_skills(
-        self, ai_skills: List[str], description: str
-    ) -> List[Dict[str, Any]]:
+        self, ai_skills: list[str], description: str,
+    ) -> list[dict[str, Any]]:
         """Extract and categorize skills from job."""
         skills = []
 
@@ -95,16 +95,14 @@ class ClassificationEngine:
 
         if skill_lower in programming:
             return SkillCategory.PROGRAMMING
-        elif skill_lower in frameworks:
+        if skill_lower in frameworks:
             return SkillCategory.FRAMEWORK
-        elif skill_lower in tools:
+        if skill_lower in tools:
             return SkillCategory.TOOL
-        else:
-            return SkillCategory.SOFT_SKILL
+        return SkillCategory.SOFT_SKILL
 
-    def _extract_skills_from_text(self, text: str) -> List[str]:
+    def _extract_skills_from_text(self, text: str) -> list[str]:
         """Extract skills from text using pattern matching."""
-        import re
 
         known_skills = [
             "python", "javascript", "typescript", "react", "vue", "angular",
@@ -122,7 +120,7 @@ class ClassificationEngine:
 
         return list(set(found_skills))
 
-    def _rule_based_classify(self, job_data: dict) -> Dict[str, Any]:
+    def _rule_based_classify(self, job_data: dict) -> dict[str, Any]:
         """Rule-based classification fallback."""
         title = job_data.get("title", "").lower()
         description = job_data.get("description", "").lower()
@@ -153,16 +151,17 @@ class ClassificationEngine:
             "confidence": 0.6,
         }
 
-    async def get_skill_demand(self) -> List[Dict[str, Any]]:
+    async def get_skill_demand(self) -> list[dict[str, Any]]:
         """Get skill demand statistics from job listings."""
-        from interntrack.domain.models import JobSkill, Job
         from sqlalchemy import func, select
+
+        from interntrack.domain.models import Job, JobSkill
 
         query = (
             select(
                 Skill.name,
                 Skill.category,
-                func.count(JobSkill.job_id).label("demand")
+                func.count(JobSkill.job_id).label("demand"),
             )
             .join(JobSkill, Skill.id == JobSkill.skill_id)
             .join(Job, JobSkill.job_id == Job.id)

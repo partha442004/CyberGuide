@@ -4,20 +4,20 @@ Users API Router
 Endpoints for user management and watchlists.
 """
 
-import bcrypt
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List
 
-from cybershield.dependencies import get_session, get_user_repository
+import bcrypt
+from fastapi import APIRouter, Depends, HTTPException
+
+from cybershield.dependencies import get_user_repository
 from cybershield.domain.models import User as UserModel
 from cybershield.repositories.user_repository import UserRepository
 from cybershield.schemas.user import (
-    UserCreate,
-    UserUpdate,
-    UserResponse,
     CompanyWatchlistCreate,
     KeywordWatchlistCreate,
+    UserCreate,
+    UserResponse,
+    UserUpdate,
 )
 
 router = APIRouter()
@@ -102,7 +102,7 @@ async def add_company_watchlist(
         )
         return {"message": "Company added to watchlist", "id": watchlist.id}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.delete("/{user_id}/company-watchlist/{company_id}")
@@ -143,7 +143,7 @@ async def add_keyword_watchlist(
         )
         return {"message": "Keyword added to watchlist", "id": watchlist.id}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.delete("/{user_id}/keyword-watchlist/{keyword}")

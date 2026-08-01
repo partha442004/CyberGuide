@@ -9,7 +9,6 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from typing import Any, Dict, List, Optional
 from cybershield.scrapers.base import BaseScraper, ScrapedJob, ScraperConfig
 
 logger = logging.getLogger(__name__)
@@ -63,14 +62,14 @@ class HackerNewsScraper(BaseScraper):
 
         items = []
         kid_ids = story.get("kids", [])[:max_comments]  # Limit to prevent N+1
-        
+
         # Fetch in batches using asyncio
         import asyncio
         async def fetch_item(item_id: int) -> Optional[Dict[str, Any]]:
             item_url = f"{self.HN_API}/item/{item_id}.json"
             item_response = await self._fetch(item_url)
             return item_response.json()
-        
+
         # Fetch up to 10 comments concurrently
         batch_size = 10
         for i in range(0, len(kid_ids), batch_size):
@@ -79,7 +78,7 @@ class HackerNewsScraper(BaseScraper):
             for result in results:
                 if isinstance(result, dict) and result.get("type") == "comment":
                     items.append(result)
-        
+
         return items
 
     def _parse_comment(self, comment: Dict[str, Any]) -> List[ScrapedJob]:

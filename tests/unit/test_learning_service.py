@@ -1,8 +1,8 @@
 """Unit tests for services/learning_service.py."""
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class TestLearningService:
@@ -240,7 +240,7 @@ class TestLearningService:
         service.skill_repo.get_by_name = AsyncMock(return_value=mock_skill)
 
         result = await service.get_recommendations(
-            ["javascript"], "Python Developer"
+            ["javascript"], "Python Developer",
         )
 
         assert result["target_role"] == "Python Developer"
@@ -265,7 +265,7 @@ class TestLearningService:
         service.skill_repo.get_by_name = AsyncMock(return_value=None)
 
         result = await service.get_recommendations(
-            ["javascript"], "Python Developer"
+            ["javascript"], "Python Developer",
         )
 
         assert result["target_role"] == "Python Developer"

@@ -9,9 +9,8 @@ Tests the McAfeeScraper class covering:
 - Location detection
 """
 
-import pytest
-from cybershield.scrapers.companies.mcafee import McAfeeScraper
 from cybershield.scrapers.base import ScrapedJob, ScraperConfig
+from cybershield.scrapers.companies.mcafee import McAfeeScraper
 
 
 class TestMcAfeeScraper:

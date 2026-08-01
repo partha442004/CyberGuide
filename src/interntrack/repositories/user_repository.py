@@ -2,13 +2,11 @@
 User repository for user profile and preferences.
 """
 
-from typing import List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from interntrack.domain.models import UserSkill, Bookmark, Watchlist
-from interntrack.repositories.base import BaseRepository
+from interntrack.domain.models import Bookmark, UserSkill, Watchlist
 
 
 class UserRepository:
@@ -17,15 +15,15 @@ class UserRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_user_skills(self, user_id: str) -> List[UserSkill]:
+    async def get_user_skills(self, user_id: str) -> list[UserSkill]:
         """Get all skills for a user."""
         result = await self.session.execute(
-            select(UserSkill).where(UserSkill.user_id == user_id)
+            select(UserSkill).where(UserSkill.user_id == user_id),
         )
         return list(result.scalars().all())
 
     async def add_user_skill(
-        self, user_id: str, skill_id: str, proficiency: int = 1
+        self, user_id: str, skill_id: str, proficiency: int = 1,
     ) -> UserSkill:
         """Add a skill to user profile."""
         user_skill = UserSkill(
@@ -38,14 +36,14 @@ class UserRepository:
         return user_skill
 
     async def update_skill_proficiency(
-        self, user_id: str, skill_id: str, proficiency: int
-    ) -> Optional[UserSkill]:
+        self, user_id: str, skill_id: str, proficiency: int,
+    ) -> UserSkill | None:
         """Update skill proficiency."""
         result = await self.session.execute(
             select(UserSkill).where(
                 UserSkill.user_id == user_id,
                 UserSkill.skill_id == skill_id,
-            )
+            ),
         )
         user_skill = result.scalar_one_or_none()
         if user_skill:
@@ -54,8 +52,8 @@ class UserRepository:
         return user_skill
 
     async def get_bookmarks(
-        self, user_id: str, item_type: Optional[str] = None
-    ) -> List[Bookmark]:
+        self, user_id: str, item_type: str | None = None,
+    ) -> list[Bookmark]:
         """Get user bookmarks."""
         query = select(Bookmark)
         if item_type:
@@ -64,7 +62,7 @@ class UserRepository:
         return list(result.scalars().all())
 
     async def add_bookmark(
-        self, item_type: str, item_id: str, notes: Optional[str] = None
+        self, item_type: str, item_id: str, notes: str | None = None,
     ) -> Bookmark:
         """Add a bookmark."""
         bookmark = Bookmark(
@@ -79,7 +77,7 @@ class UserRepository:
     async def remove_bookmark(self, bookmark_id: str) -> bool:
         """Remove a bookmark."""
         result = await self.session.execute(
-            select(Bookmark).where(Bookmark.id == bookmark_id)
+            select(Bookmark).where(Bookmark.id == bookmark_id),
         )
         bookmark = result.scalar_one_or_none()
         if bookmark:
@@ -88,7 +86,7 @@ class UserRepository:
             return True
         return False
 
-    async def get_watchlists(self, watch_type: Optional[str] = None) -> List[Watchlist]:
+    async def get_watchlists(self, watch_type: str | None = None) -> list[Watchlist]:
         """Get watchlists."""
         query = select(Watchlist).where(Watchlist.is_active == True)
         if watch_type:
@@ -97,7 +95,7 @@ class UserRepository:
         return list(result.scalars().all())
 
     async def add_watchlist(
-        self, watch_type: str, value: str, notification_channels: Optional[list] = None
+        self, watch_type: str, value: str, notification_channels: list | None = None,
     ) -> Watchlist:
         """Add a watchlist entry."""
         watchlist = Watchlist(

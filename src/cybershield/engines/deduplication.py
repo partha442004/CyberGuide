@@ -12,7 +12,7 @@ import hashlib
 import logging
 from difflib import SequenceMatcher
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from cybershield.engines.base import BaseEngine, EngineResult
 
@@ -282,10 +282,8 @@ class DeduplicationEngine(BaseEngine):
 
         data = result.data
         # Check if the new job ended up in any duplicate group
-        is_duplicate = False
         for group in data.get("duplicate_groups", []):
             if new_job in group.get("duplicates", []):
-                is_duplicate = True
                 return self._create_result(
                     success=True,
                     data={

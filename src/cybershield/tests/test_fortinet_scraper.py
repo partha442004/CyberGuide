@@ -9,9 +9,8 @@ Tests the FortinetScraper class covering:
 - Location detection
 """
 
-import pytest
-from cybershield.scrapers.companies.fortinet import FortinetScraper
 from cybershield.scrapers.base import ScrapedJob, ScraperConfig
+from cybershield.scrapers.companies.fortinet import FortinetScraper
 
 
 class TestFortinetScraper:

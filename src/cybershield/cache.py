@@ -8,8 +8,8 @@ Provides caching functionality with Redis backend and in-memory fallback.
 
 __all__ = ["CacheManager", "cache_manager", "get_cache", "InMemoryCache"]
 
-import json
 import hashlib
+import json
 import logging
 import time
 from typing import Any, Optional

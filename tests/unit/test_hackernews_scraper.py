@@ -1,8 +1,8 @@
 """Unit tests for scrapers/hackernews.py."""
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
 
 
 class TestHackerNewsScraper:
@@ -161,7 +161,7 @@ class TestHackerNewsScraper:
 
         mock_story_response = MagicMock()
         mock_story_response.json.return_value = {
-            "title": "Ask HN: Who is hiring? (July 2026)"
+            "title": "Ask HN: Who is hiring? (July 2026)",
         }
 
         scraper._get = AsyncMock(return_value=mock_stories_response)
@@ -188,7 +188,7 @@ class TestHackerNewsScraper:
 
         mock_story_response = MagicMock()
         mock_story_response.json.return_value = {
-            "title": "Ask HN: Best practices"
+            "title": "Ask HN: Best practices",
         }
 
         async def mock_get(url, **kwargs):

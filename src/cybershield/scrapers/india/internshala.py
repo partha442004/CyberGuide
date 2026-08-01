@@ -5,7 +5,6 @@ Scrapes cybersecurity internships from Internshala.com (India's top internship p
 """
 
 import logging
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 

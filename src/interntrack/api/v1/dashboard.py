@@ -6,9 +6,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.database.session import get_db
-from interntrack.services.job_service import JobService
 from interntrack.services.application_service import ApplicationService
-from interntrack.services.report_service import ReportService
+from interntrack.services.job_service import JobService
 
 router = APIRouter()
 

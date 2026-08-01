@@ -1,8 +1,8 @@
 """Unit tests for scrapers/rss_feeds.py."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
+
+import pytest
 
 
 class TestRSSFeedScraper:
@@ -28,7 +28,7 @@ class TestRSSFeedScraper:
         assert scraper.feeds == custom_feeds
 
     def test_default_feeds(self):
-        from interntrack.scrapers.rss_feeds import RSSFeedScraper, DEFAULT_FEEDS
+        from interntrack.scrapers.rss_feeds import DEFAULT_FEEDS, RSSFeedScraper
 
         scraper = RSSFeedScraper()
         assert scraper.feeds == DEFAULT_FEEDS
@@ -168,7 +168,7 @@ class TestRSSFeedScraper:
                     "title": "Python Developer at TechCorp",
                     "link": "https://example.com/123",
                     "summary": "Python and Django experience required",
-                }
+                },
             ]
             mock_parse.return_value.feed = {"title": "Test Feed"}
 

@@ -8,9 +8,8 @@ Tests the CheckPointScraper class covering:
 - HTML extraction
 """
 
-import pytest
-from cybershield.scrapers.companies.checkpoint import CheckPointScraper
 from cybershield.scrapers.base import ScrapedJob, ScraperConfig
+from cybershield.scrapers.companies.checkpoint import CheckPointScraper
 
 
 class TestCheckPointScraper:

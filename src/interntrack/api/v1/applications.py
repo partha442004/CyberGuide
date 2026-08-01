@@ -2,7 +2,6 @@
 Applications API endpoints.
 """
 
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,7 +22,7 @@ router = APIRouter()
 
 @router.get("/", response_model=ApplicationListResponse)
 async def list_applications(
-    status: Optional[str] = None,
+    status: str | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=200),
     db: AsyncSession = Depends(get_db),

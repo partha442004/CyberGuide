@@ -9,8 +9,10 @@ Tests the ConnectionManager and WebSocketNotifier classes covering:
 - Statistics
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
 from cybershield.notifications.websocket import ConnectionManager, WebSocketNotifier, ws_manager
 
 

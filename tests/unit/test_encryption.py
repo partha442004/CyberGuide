@@ -1,6 +1,7 @@
 """Unit tests for utils/encryption.py."""
 
 import pytest
+
 from interntrack.utils.encryption import SecretManager, mask_sensitive
 
 

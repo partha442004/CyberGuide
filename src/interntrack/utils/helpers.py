@@ -3,17 +3,16 @@ General helper functions.
 """
 
 from datetime import datetime
-from typing import Optional
 
 
-def format_datetime(dt: Optional[datetime], fmt: str = "%Y-%m-%d %H:%M") -> str:
+def format_datetime(dt: datetime | None, fmt: str = "%Y-%m-%d %H:%M") -> str:
     """Format datetime to string."""
     if dt:
         return dt.strftime(fmt)
     return "N/A"
 
 
-def format_currency(amount: Optional[int], currency: str = "USD") -> str:
+def format_currency(amount: int | None, currency: str = "USD") -> str:
     """Format currency amount."""
     if amount is None:
         return "N/A"

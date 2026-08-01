@@ -8,9 +8,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from interntrack.config import get_settings
-from interntrack.database.session import init_db, close_db
 from interntrack.api.router import api_router
+from interntrack.config import get_settings
+from interntrack.database.session import close_db, init_db
 
 settings = get_settings()
 
@@ -56,7 +56,7 @@ async def global_exception_handler(request: Request, exc: Exception):
             "error": {
                 "code": "INTERNAL_ERROR",
                 "message": str(exc) if settings.debug else "An error occurred",
-            }
+            },
         },
     )
 

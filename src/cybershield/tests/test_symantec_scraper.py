@@ -9,9 +9,8 @@ Tests the SymantecScraper class covering:
 - Location detection
 """
 
-import pytest
-from cybershield.scrapers.companies.symantec import SymantecScraper
 from cybershield.scrapers.base import ScrapedJob, ScraperConfig
+from cybershield.scrapers.companies.symantec import SymantecScraper
 
 
 class TestSymantecScraper:

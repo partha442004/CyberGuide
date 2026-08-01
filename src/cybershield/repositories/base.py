@@ -7,7 +7,7 @@ Provides generic CRUD operations for all repositories.
 from typing import Any, Dict, Generic, List, Optional, Sequence, Type, TypeVar
 from uuid import uuid4
 
-from sqlalchemy import select, func, desc, asc
+from sqlalchemy import asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 

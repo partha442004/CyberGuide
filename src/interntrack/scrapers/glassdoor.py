@@ -6,8 +6,6 @@ public job search functionality. Use responsibly and respect their ToS.
 """
 
 import re
-from datetime import datetime
-from typing import List, Optional
 from urllib.parse import urlencode
 
 from interntrack.domain.enums import JobSource
@@ -33,9 +31,9 @@ class GlassdoorScraper(BaseScraper):
     async def fetch(
         self,
         query: str,
-        location: Optional[str] = None,
+        location: str | None = None,
         limit: int = 25,
-    ) -> List[RawJob]:
+    ) -> list[RawJob]:
         """Fetch jobs from Glassdoor."""
         jobs = []
 
@@ -70,7 +68,7 @@ class GlassdoorScraper(BaseScraper):
 
         return jobs
 
-    def _parse_job_card(self, card) -> Optional[RawJob]:
+    def _parse_job_card(self, card) -> RawJob | None:
         """Parse a job card from Glassdoor HTML."""
         try:
             # Extract title
@@ -101,7 +99,7 @@ class GlassdoorScraper(BaseScraper):
             salary_min, salary_max = None, None
             if salary_elem:
                 salary_min, salary_max = self._parse_salary(
-                    salary_elem.get_text(strip=True)
+                    salary_elem.get_text(strip=True),
                 )
 
             # Extract rating
@@ -152,7 +150,7 @@ class GlassdoorScraper(BaseScraper):
                 max_val *= 1000
 
             return (min_val, max_val)
-        elif len(numbers) == 1:
+        if len(numbers) == 1:
             val = int(numbers[0])
             if "K" in salary_text.upper():
                 val *= 1000
@@ -160,7 +158,7 @@ class GlassdoorScraper(BaseScraper):
 
         return (None, None)
 
-    def _extract_tags(self, title: str, description: Optional[str]) -> List[str]:
+    def _extract_tags(self, title: str, description: str | None) -> list[str]:
         """Extract skill tags from job data."""
         tags = []
         text = f"{title} {description or ''}".lower()

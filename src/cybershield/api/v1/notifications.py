@@ -4,16 +4,22 @@ Notifications API Router
 Endpoints for notification configuration and testing.
 """
 
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from datetime import datetime, timezone
 
-from cybershield.dependencies import get_session
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from cybershield.dependencies import get_notification_orchestrator, get_session
+from cybershield.notifications.base import (
+    NotificationMessage,
+    NotificationPriority,
+    NotificationType,
+)
 from cybershield.schemas.notification import (
     NotificationConfig,
-    NotificationTest,
     NotificationResponse,
+    NotificationTest,
 )
 
 router = APIRouter()
@@ -26,7 +32,6 @@ async def get_notification_config(
 ):
     """Get user's notification configuration."""
     from cybershield.domain.models import NotificationConfig as NotificationConfigModel
-    from sqlalchemy import select
 
     result = await session.execute(
         select(NotificationConfigModel).where(NotificationConfigModel.user_id == user_id)
@@ -58,7 +63,6 @@ async def update_notification_config(
 ):
     """Update user's notification configuration."""
     from cybershield.domain.models import NotificationConfig as NotificationConfigModel
-    from sqlalchemy import select
 
     result = await session.execute(
         select(NotificationConfigModel).where(NotificationConfigModel.user_id == user_id)
@@ -87,11 +91,29 @@ async def test_notification(
     session: AsyncSession = Depends(get_session),
 ):
     """Send a test notification."""
-    # TODO: Implement actual notification sending
+    orchestrator = get_notification_orchestrator()
+    channel = orchestrator.get_channel(test_data.channel)
+
+    if not channel:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Notification channel '{test_data.channel}' is not configured",
+        )
+
+    message = NotificationMessage(
+        title="🧪 Test Notification",
+        content=test_data.message or "This is a test notification from CyberGuide.",
+        notification_type=NotificationType.INSTANT_ALERT,
+        priority=NotificationPriority.LOW,
+    )
+
+    success = await orchestrator.send_to_channel(test_data.channel, message)
+
     return {
-        "success": True,
-        "message": f"Test notification sent via {test_data.channel}",
+        "success": success,
+        "message": f"Test notification sent via {test_data.channel}" if success else f"Failed to send via {test_data.channel}",
         "channel": test_data.channel,
+        "sent_at": datetime.now(timezone.utc) if success else None,
     }
 
 
@@ -101,9 +123,30 @@ async def send_notification(
     session: AsyncSession = Depends(get_session),
 ):
     """Send a notification (internal use)."""
-    # TODO: Implement actual notification sending
+    orchestrator = get_notification_orchestrator()
+    channel_name = notification.get("channel", "unknown")
+    title = notification.get("title", "CyberGuide Notification")
+    content = notification.get("content", "")
+
+    message = NotificationMessage(
+        title=title,
+        content=content,
+        notification_type=NotificationType.INSTANT_ALERT,
+        priority=NotificationPriority.NORMAL,
+        data=notification.get("data"),
+        url=notification.get("url"),
+    )
+
+    # If a specific channel is requested, send to it; otherwise send to all
+    if channel_name != "unknown":
+        success = await orchestrator.send_to_channel(channel_name, message)
+    else:
+        results = await orchestrator.send_to_all(message)
+        success = any(results.values()) if results else False
+
     return {
-        "success": True,
-        "message": "Notification sent",
-        "channel": notification.get("channel", "unknown"),
+        "success": success,
+        "message": "Notification sent" if success else "Failed to send notification",
+        "channel": channel_name,
+        "sent_at": datetime.now(timezone.utc) if success else None,
     }

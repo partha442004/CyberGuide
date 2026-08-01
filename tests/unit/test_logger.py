@@ -1,8 +1,7 @@
 """Unit tests for utils/logger.py."""
 
-import pytest
-from unittest.mock import patch, MagicMock
 import logging
+from unittest.mock import MagicMock, patch
 
 
 class TestSetupLogging:

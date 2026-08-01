@@ -3,10 +3,12 @@ Tests for Rate Limiting and API Key Authentication Middleware
 """
 
 import time
+
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
+
 from cybershield.main import app
-from cybershield.middleware.rate_limit import RateLimitStore, rate_limit_store
+from cybershield.middleware.rate_limit import rate_limit_store
 
 
 class TestRateLimitStore:

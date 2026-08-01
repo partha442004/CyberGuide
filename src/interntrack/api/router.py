@@ -4,7 +4,14 @@ Main API router.
 
 from fastapi import APIRouter
 
-from interntrack.api.v1 import jobs, applications, reports, notifications, skills, dashboard
+from interntrack.api.v1 import (
+    applications,
+    dashboard,
+    jobs,
+    notifications,
+    reports,
+    skills,
+)
 
 api_router = APIRouter()
 

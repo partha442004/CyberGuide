@@ -2,11 +2,12 @@
 Unit tests for DeduplicationEngine.
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
-from interntrack.engines.deduplication import DeduplicationEngine
+import pytest
+
 from interntrack.domain.models import Job
+from interntrack.engines.deduplication import DeduplicationEngine
 
 
 class TestDeduplicationEngine:

@@ -2,9 +2,8 @@
 Skill repository for skill management.
 """
 
-from typing import List, Optional
 
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.domain.enums import SkillCategory
@@ -18,32 +17,32 @@ class SkillRepository(BaseRepository[Skill]):
     def __init__(self, session: AsyncSession):
         super().__init__(Skill, session)
 
-    async def get_by_name(self, name: str) -> Optional[Skill]:
+    async def get_by_name(self, name: str) -> Skill | None:
         """Get skill by name."""
         result = await self.session.execute(
-            select(Skill).where(Skill.name == name.lower())
+            select(Skill).where(Skill.name == name.lower()),
         )
         return result.scalar_one_or_none()
 
-    async def get_by_category(self, category: SkillCategory) -> List[Skill]:
+    async def get_by_category(self, category: SkillCategory) -> list[Skill]:
         """Get all skills in a category."""
         result = await self.session.execute(
-            select(Skill).where(Skill.category == category)
+            select(Skill).where(Skill.category == category),
         )
         return list(result.scalars().all())
 
-    async def search_skills(self, query_str: str) -> List[Skill]:
+    async def search_skills(self, query_str: str) -> list[Skill]:
         """Search skills by name."""
         search_term = f"%{query_str}%"
         result = await self.session.execute(
-            select(Skill).where(Skill.name.ilike(search_term))
+            select(Skill).where(Skill.name.ilike(search_term)),
         )
         return list(result.scalars().all())
 
-    async def get_active_skills(self) -> List[Skill]:
+    async def get_active_skills(self) -> list[Skill]:
         """Get all active skills."""
         result = await self.session.execute(
-            select(Skill).where(Skill.is_active == True)
+            select(Skill).where(Skill.is_active == True),
         )
         return list(result.scalars().all())
 

@@ -1,8 +1,8 @@
 """Unit tests for services/notification_service.py."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from sqlalchemy.ext.asyncio import AsyncSession
+
+import pytest
 
 
 class TestNotificationChannel:
@@ -48,8 +48,8 @@ class TestTelegramChannel:
 
     @pytest.mark.asyncio
     async def test_send_failure(self):
-        from interntrack.services.notification_service import TelegramChannel
         from interntrack.domain.exceptions import NotificationError
+        from interntrack.services.notification_service import TelegramChannel
 
         channel = TelegramChannel("token123", "chat456")
 
@@ -94,8 +94,8 @@ class TestEmailChannel:
 
     @pytest.mark.asyncio
     async def test_send_failure(self):
-        from interntrack.services.notification_service import EmailChannel
         from interntrack.domain.exceptions import NotificationError
+        from interntrack.services.notification_service import EmailChannel
 
         channel = EmailChannel("smtp.gmail.com", 587, "user", "pass", "from@test.com")
 
@@ -136,8 +136,8 @@ class TestDiscordChannel:
 
     @pytest.mark.asyncio
     async def test_send_failure(self):
-        from interntrack.services.notification_service import DiscordChannel
         from interntrack.domain.exceptions import NotificationError
+        from interntrack.services.notification_service import DiscordChannel
 
         channel = DiscordChannel("https://discord.com/api/webhooks/123/abc")
 
@@ -179,8 +179,8 @@ class TestSlackChannel:
 
     @pytest.mark.asyncio
     async def test_send_failure(self):
-        from interntrack.services.notification_service import SlackChannel
         from interntrack.domain.exceptions import NotificationError
+        from interntrack.services.notification_service import SlackChannel
 
         channel = SlackChannel("https://hooks.slack.com/services/xxx")
 

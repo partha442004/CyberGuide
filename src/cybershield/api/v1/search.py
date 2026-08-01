@@ -6,6 +6,7 @@ Falls back to database search when Elasticsearch is unavailable.
 """
 
 from typing import List, Optional
+
 from fastapi import APIRouter, Query
 
 from cybershield.services import elasticsearch_service as es

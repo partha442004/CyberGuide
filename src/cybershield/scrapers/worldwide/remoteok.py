@@ -101,7 +101,7 @@ class RemoteOKScraper(BaseScraper):
                 # Filter by security-related keywords
                 tags = [t.lower() for t in job_data.get("tags", [])]
                 position = job_data.get("position", "").lower()
-                company = job_data.get("company", "").lower()
+                job_data.get("company", "").lower()
 
                 # Check if job matches any keyword
                 matches = False

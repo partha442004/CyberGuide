@@ -2,14 +2,14 @@
 Unit tests for JobService.
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
+from unittest.mock import AsyncMock
 
-from interntrack.services.job_service import JobService
-from interntrack.domain.models import Job
+import pytest
+
 from interntrack.domain.enums import JobSource, JobType
 from interntrack.domain.exceptions import DuplicateJobError
+from interntrack.domain.models import Job
+from interntrack.services.job_service import JobService
 
 
 class TestJobService:

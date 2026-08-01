@@ -9,9 +9,8 @@ Tests the PaloAltoScraper class covering:
 - Location detection
 """
 
-import pytest
-from cybershield.scrapers.companies.paloalto import PaloAltoScraper
 from cybershield.scrapers.base import ScrapedJob, ScraperConfig
+from cybershield.scrapers.companies.paloalto import PaloAltoScraper
 
 
 class TestPaloAltoScraper:

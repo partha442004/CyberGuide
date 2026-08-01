@@ -2,8 +2,7 @@
 SQLAlchemy ORM models for the application.
 """
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy import (
@@ -32,14 +31,13 @@ from interntrack.domain.enums import (
 
 class Base(DeclarativeBase):
     """Base model for all database models."""
-    pass
 
 
 class TimestampMixin:
     """Mixin for timestamp fields."""
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     updated_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False,
     )
 
 
@@ -89,7 +87,7 @@ class Application(Base, TimestampMixin):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
     job_id = Column(String(36), ForeignKey("jobs.id"), nullable=False)
     status = Column(
-        Enum(ApplicationStatus), nullable=False, default=ApplicationStatus.SAVED
+        Enum(ApplicationStatus), nullable=False, default=ApplicationStatus.SAVED,
     )
     applied_at = Column(DateTime, nullable=True)
     interview_at = Column(DateTime, nullable=True)
@@ -124,11 +122,11 @@ class ApplicationStatusHistory(Base, TimestampMixin):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
     application_id = Column(
-        String(36), ForeignKey("applications.id"), nullable=False
+        String(36), ForeignKey("applications.id"), nullable=False,
     )
     old_status = Column(Enum(ApplicationStatus), nullable=True)
     new_status = Column(Enum(ApplicationStatus), nullable=False)
-    changed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    changed_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     notes = Column(Text, nullable=True)
 
     # Relationships
@@ -179,7 +177,7 @@ class UserSkill(Base, TimestampMixin):
 
     user_id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
     skill_id = Column(
-        String(36), ForeignKey("skills.id"), primary_key=True
+        String(36), ForeignKey("skills.id"), primary_key=True,
     )
     proficiency_level = Column(Integer, default=1)  # 1-5
     last_used = Column(DateTime, nullable=True)

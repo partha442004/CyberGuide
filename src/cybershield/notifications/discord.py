@@ -6,7 +6,6 @@ Sends notifications via Discord webhooks.
 
 import logging
 from typing import Any, Dict, Optional
-from datetime import datetime, timezone
 
 import httpx
 

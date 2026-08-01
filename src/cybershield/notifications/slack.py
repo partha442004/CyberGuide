@@ -4,10 +4,8 @@ Slack Notifier
 Sends notifications via Slack webhooks.
 """
 
-import json
 import logging
 from typing import Any, Dict, Optional
-from datetime import datetime, timezone
 
 import httpx
 

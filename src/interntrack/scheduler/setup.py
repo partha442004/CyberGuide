@@ -6,13 +6,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from interntrack.scheduler.jobs import (
-    run_job_discovery,
-    generate_daily_report,
-    verify_job_links,
-    deactivate_expired_jobs,
-)
 from interntrack.config import get_settings
+from interntrack.scheduler.jobs import (
+    deactivate_expired_jobs,
+    generate_daily_report,
+    run_job_discovery,
+    verify_job_links,
+)
 
 settings = get_settings()
 
