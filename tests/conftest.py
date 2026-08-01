@@ -4,6 +4,7 @@ Pytest configuration and test fixtures.
 
 import asyncio
 from collections.abc import AsyncGenerator, Generator
+from datetime import UTC, datetime
 
 import pytest
 import pytest_asyncio
@@ -14,7 +15,8 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from interntrack.domain.models import Base
+from interntrack.domain.enums import ExperienceLevel, JobSource, JobType
+from interntrack.domain.models import Base, Job
 from interntrack.main import app
 
 # Test database URL (in-memory SQLite)
@@ -69,6 +71,84 @@ async def client(db_session) -> AsyncGenerator[AsyncClient, None]:
         base_url="http://testserver",
     ) as client:
         yield client
+
+
+# ─── Shared Test Helpers ────────────────────────────────────────────────────
+
+
+def make_job(**overrides) -> Job:
+    """Create a Job instance with sensible defaults. Use for export/CSV/JSON tests."""
+    defaults = dict(
+        id="job-1",
+        title="Python Developer",
+        company="TechCorp",
+        url="https://example.com/job/1",
+        source=JobSource.LINKEDIN,
+        job_type=JobType.FULL_TIME,
+        experience_level=ExperienceLevel.MID,
+        location="Remote",
+        description="Build APIs",
+        salary_min=80000,
+        salary_max=120000,
+        salary_currency="USD",
+        is_remote=True,
+        is_active=True,
+        posted_at=datetime(2026, 1, 15, tzinfo=UTC),
+        expires_at=None,
+        created_at=datetime(2026, 1, 10, tzinfo=UTC),
+        updated_at=datetime(2026, 1, 10, tzinfo=UTC),
+        tags=["python", "fastapi"],
+    )
+    defaults.update(overrides)
+    return Job(**defaults)
+
+
+def make_job_mock(**overrides) -> dict:
+    """Create a Job-like dict that passes Pydantic validation. Use for API tests."""
+    defaults = dict(
+        id="job-1",
+        title="Python Developer",
+        company="TechCorp",
+        url="https://example.com/job/1",
+        source="manual",
+        location="Remote",
+        description="Build APIs",
+        job_type="full_time",
+        experience_level="mid",
+        salary_min=80000,
+        salary_max=120000,
+        salary_currency="USD",
+        is_remote=True,
+        is_active=True,
+        tags=["python"],
+        posted_at=None,
+        expires_at=None,
+        created_at="2026-01-01T00:00:00",
+        updated_at="2026-01-01T00:00:00",
+    )
+    defaults.update(overrides)
+    return defaults
+
+
+def make_app_mock(**overrides) -> dict:
+    """Create an Application-like dict that passes Pydantic validation. Use for API tests."""
+    defaults = dict(
+        id="app-1",
+        job_id="job-1",
+        status="saved",
+        applied_at=None,
+        interview_at=None,
+        notes=None,
+        resume_version=None,
+        priority=0,
+        created_at="2026-01-01T00:00:00",
+        updated_at="2026-01-01T00:00:00",
+    )
+    defaults.update(overrides)
+    return defaults
+
+
+# ─── Fixtures using shared helpers ──────────────────────────────────────────
 
 
 @pytest.fixture

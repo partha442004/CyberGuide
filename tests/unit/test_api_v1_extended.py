@@ -5,50 +5,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
-
-def _make_job_mock(**overrides):
-    """Create a Job-like mock that passes Pydantic validation."""
-    defaults = dict(
-        id="job-1",
-        title="Python Developer",
-        company="TechCorp",
-        url="https://example.com/job/1",
-        source="manual",
-        location="Remote",
-        description="Build APIs",
-        job_type="full_time",
-        experience_level="mid",
-        salary_min=80000,
-        salary_max=120000,
-        salary_currency="USD",
-        is_remote=True,
-        is_active=True,
-        tags=["python"],
-        posted_at=None,
-        expires_at=None,
-        created_at="2026-01-01T00:00:00",
-        updated_at="2026-01-01T00:00:00",
-    )
-    defaults.update(overrides)
-    return defaults
-
-
-def _make_app_mock(**overrides):
-    """Create an Application-like mock that passes Pydantic validation."""
-    defaults = dict(
-        id="app-1",
-        job_id="job-1",
-        status="saved",
-        applied_at=None,
-        interview_at=None,
-        notes=None,
-        resume_version=None,
-        priority=0,
-        created_at="2026-01-01T00:00:00",
-        updated_at="2026-01-01T00:00:00",
-    )
-    defaults.update(overrides)
-    return defaults
+from tests.conftest import make_app_mock as _make_app_mock
+from tests.conftest import make_job_mock as _make_job_mock
 
 
 class TestJobsAPIUnit:
