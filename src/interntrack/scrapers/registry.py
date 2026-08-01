@@ -2,7 +2,6 @@
 Scraper registry for managing multiple job sources.
 """
 
-
 from interntrack.scrapers.base import BaseScraper
 
 

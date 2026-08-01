@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 class NotificationConfig(BaseModel):
     """Notification channel configuration."""
+
     channel: str
     is_enabled: bool = True
     config: dict = {}
@@ -16,6 +17,7 @@ class NotificationConfig(BaseModel):
 
 class NotificationConfigResponse(BaseModel):
     """Notification configuration response."""
+
     id: str
     channel: str
     is_enabled: bool
@@ -27,23 +29,27 @@ class NotificationConfigResponse(BaseModel):
 
 class NotificationTestRequest(BaseModel):
     """Test notification request."""
+
     channels: list[str]
     message: str = "Test notification from InternTrack"
 
 
 class NotificationTestResponse(BaseModel):
     """Test notification response."""
+
     results: dict[str, bool]
     configured_channels: list[str]
 
 
 class NotificationChannelsResponse(BaseModel):
     """Available channels response."""
+
     channels: list[str]
 
 
 class NotificationHistoryItem(BaseModel):
     """Notification history item."""
+
     id: str
     channel: str
     subject: str | None = None
@@ -53,5 +59,6 @@ class NotificationHistoryItem(BaseModel):
 
 class NotificationHistoryResponse(BaseModel):
     """Notification history response."""
+
     history: list[NotificationHistoryItem]
     total: int

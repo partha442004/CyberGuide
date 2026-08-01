@@ -50,7 +50,9 @@ class ReportService:
                 {
                     "title": job.title,
                     "company": job.company,
-                    "expires_at": job.expires_at.isoformat() if job.expires_at else None,
+                    "expires_at": job.expires_at.isoformat()
+                    if job.expires_at
+                    else None,
                 }
                 for job in await self.job_repo.get_closing_soon(days=2)
             ],
@@ -76,14 +78,14 @@ class ReportService:
                 "response_rate": await self.app_repo.get_response_rate(),
             },
             "top_companies": [
-                {"company": company, "jobs": count}
-                for company, count in top_companies
+                {"company": company, "jobs": count} for company, count in top_companies
             ],
             "job_type_distribution": [
-                {"type": jtype.value, "count": count}
-                for jtype, count in job_types
+                {"type": jtype.value, "count": count} for jtype, count in job_types
             ],
-            "application_timeline": await self.app_repo.get_application_timeline(days=7),
+            "application_timeline": await self.app_repo.get_application_timeline(
+                days=7
+            ),
             "application_status": status_counts,
         }
 
@@ -97,7 +99,9 @@ class ReportService:
             **weekly_report,
             "report_type": "monthly",
             "salary_statistics": salary_stats,
-            "monthly_applications": await self.app_repo.get_recent_applications(days=30),
+            "monthly_applications": await self.app_repo.get_recent_applications(
+                days=30
+            ),
         }
 
     async def render_report(self, report_data: dict[str, Any]) -> str:

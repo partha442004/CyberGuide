@@ -35,9 +35,9 @@ class AIService:
         """Build prompt for job classification."""
         return f"""Classify this job posting:
 
-Title: {job_data.get('title', 'N/A')}
-Company: {job_data.get('company', 'N/A')}
-Description: {job_data.get('description', 'N/A')[:500]}
+Title: {job_data.get("title", "N/A")}
+Company: {job_data.get("company", "N/A")}
+Description: {job_data.get("description", "N/A")[:500]}
 
 Return JSON with:
 - job_type: internship|full_time|part_time|contract|freelance|remote
@@ -106,15 +106,15 @@ Return JSON with:
         }
 
     async def match_skills(
-        self, job_skills: list[str], user_skills: list[str],
+        self,
+        job_skills: list[str],
+        user_skills: list[str],
     ) -> dict[str, Any]:
         """Match job skills with user skills."""
         matched = set(job_skills) & set(user_skills)
         missing = set(job_skills) - set(user_skills)
 
-        match_percentage = (
-            len(matched) / len(job_skills) * 100 if job_skills else 0
-        )
+        match_percentage = len(matched) / len(job_skills) * 100 if job_skills else 0
 
         return {
             "matched_skills": list(matched),
@@ -129,21 +129,29 @@ Return JSON with:
         for skill_name in skills:
             skill = await self.skill_repo.get_by_name(skill_name)
             if skill and skill.learning_resources:
-                recommendations.append({
-                    "skill": skill_name,
-                    "category": skill.category.value,
-                    "resources": skill.learning_resources[:3],
-                })
+                recommendations.append(
+                    {
+                        "skill": skill_name,
+                        "category": skill.category.value,
+                        "resources": skill.learning_resources[:3],
+                    }
+                )
         return recommendations
 
     async def generate_learning_path(
-        self, current_skills: list[str], target_role: str,
+        self,
+        current_skills: list[str],
+        target_role: str,
     ) -> dict[str, Any]:
         """Generate a learning path for career progression."""
-        prompt = f"""Create a learning path for someone with skills: {', '.join(current_skills)}
-Target role: {target_role}
-Include courses from: Google Cloud Skills Boost, OWASP, PortSwigger, TryHackMe, Hack The Box, OverTheWire, PicoCTF
-Return JSON with steps, estimated time, and resources."""
+        skills_str = ", ".join(current_skills)
+        prompt = (
+            f"Create a learning path for someone with skills: {skills_str}\n"
+            f"Target role: {target_role}\n"
+            f"Include courses from: Google Cloud Skills Boost, OWASP, "
+            f"PortSwigger, TryHackMe, Hack The Box, OverTheWire, PicoCTF\n"
+            f"Return JSON with steps, estimated time, and resources."
+        )
 
         try:
             if settings.gemini_api_key:

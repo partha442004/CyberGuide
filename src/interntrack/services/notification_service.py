@@ -50,7 +50,12 @@ class EmailChannel(NotificationChannel):
     """Email notification channel via SMTP."""
 
     def __init__(
-        self, host: str, port: int, user: str, password: str, from_email: str,
+        self,
+        host: str,
+        port: int,
+        user: str,
+        password: str,
+        from_email: str,
     ):
         self.host = host
         self.port = port
@@ -93,7 +98,9 @@ class DiscordChannel(NotificationChannel):
             payload = {"content": message}
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    self.webhook_url, json=payload, timeout=10,
+                    self.webhook_url,
+                    json=payload,
+                    timeout=10,
                 )
                 return response.status_code in (200, 204)
         except Exception as e:
@@ -114,7 +121,9 @@ class SlackChannel(NotificationChannel):
             payload = {"text": message}
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    self.webhook_url, json=payload, timeout=10,
+                    self.webhook_url,
+                    json=payload,
+                    timeout=10,
                 )
                 return response.status_code == 200
         except Exception as e:
@@ -133,7 +142,8 @@ class NotificationManager:
         """Setup configured notification channels."""
         if settings.telegram_bot_token and settings.telegram_chat_id:
             self._channels["telegram"] = TelegramChannel(
-                settings.telegram_bot_token, settings.telegram_chat_id,
+                settings.telegram_bot_token,
+                settings.telegram_chat_id,
             )
 
         if settings.smtp_user and settings.smtp_password:
@@ -170,7 +180,9 @@ class NotificationManager:
                 results[channel_name] = False
         return results
 
-    async def notify_all(self, message: str, subject: str | None = None) -> dict[str, bool]:
+    async def notify_all(
+        self, message: str, subject: str | None = None
+    ) -> dict[str, bool]:
         """Send notification to all configured channels."""
         return await self.notify(list(self._channels.keys()), message, subject)
 

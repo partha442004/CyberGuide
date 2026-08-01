@@ -52,7 +52,10 @@ class RSSFeedScraper(BaseScraper):
         return jobs[:limit]
 
     async def _fetch_feed(
-        self, feed_url: str, query: str, source_name: str,
+        self,
+        feed_url: str,
+        query: str,
+        source_name: str,
     ) -> list[RawJob]:
         """Fetch and parse a single RSS feed."""
         jobs = []
@@ -68,7 +71,10 @@ class RSSFeedScraper(BaseScraper):
         return jobs
 
     def _parse_entry(
-        self, entry: dict, query: str, source_name: str,
+        self,
+        entry: dict,
+        query: str,
+        source_name: str,
     ) -> RawJob | None:
         """Parse RSS entry into RawJob."""
         title = entry.get("title", "")
@@ -124,8 +130,17 @@ class RSSFeedScraper(BaseScraper):
         text_lower = text.lower()
 
         common_tags = [
-            "python", "javascript", "react", "node", "aws", "docker",
-            "kubernetes", "remote", "fullstack", "backend", "frontend",
+            "python",
+            "javascript",
+            "react",
+            "node",
+            "aws",
+            "docker",
+            "kubernetes",
+            "remote",
+            "fullstack",
+            "backend",
+            "frontend",
         ]
 
         for tag in common_tags:

@@ -34,9 +34,8 @@ class ApplicationRepository(BaseRepository[Application]):
 
     async def get_status_counts(self) -> dict:
         """Get count of applications by status."""
-        query = (
-            select(Application.status, func.count(Application.id))
-            .group_by(Application.status)
+        query = select(Application.status, func.count(Application.id)).group_by(
+            Application.status
         )
         result = await self.session.execute(query)
         return {status: count for status, count in result.all()}
@@ -73,23 +72,23 @@ class ApplicationRepository(BaseRepository[Application]):
 
     async def get_pending_reminders(self) -> list[Application]:
         """Get applications that need reminders."""
-        query = (
-            select(Application)
-            .where(
-                and_(
-                    not Application.reminded,
-                    Application.status.in_([
+        query = select(Application).where(
+            and_(
+                not Application.reminded,
+                Application.status.in_(
+                    [
                         ApplicationStatus.APPLIED,
                         ApplicationStatus.INTERVIEW,
-                    ]),
+                    ]
                 ),
-            )
+            ),
         )
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
     async def get_priority_applications(
-        self, min_priority: int = 1,
+        self,
+        min_priority: int = 1,
     ) -> list[Application]:
         """Get high-priority applications."""
         query = (

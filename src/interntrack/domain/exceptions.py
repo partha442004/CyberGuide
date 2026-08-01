@@ -3,7 +3,6 @@ Domain exceptions for the application.
 """
 
 
-
 class AppException(Exception):
     """Base application exception."""
 

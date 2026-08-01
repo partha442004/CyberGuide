@@ -2,7 +2,6 @@
 Skills API endpoints.
 """
 
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,6 +26,7 @@ async def list_skills(
         skills = await repo.search_skills(search)
     elif category:
         from interntrack.domain.enums import SkillCategory
+
         skills = await repo.get_by_category(SkillCategory(category))
     else:
         skills = await repo.get_active_skills()
@@ -74,6 +74,3 @@ async def get_learning_path(
     """Get learning path for career progression."""
     service = AIService(db)
     return await service.generate_learning_path(current_skills, target_role)
-
-
-

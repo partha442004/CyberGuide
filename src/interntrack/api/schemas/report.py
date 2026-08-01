@@ -2,12 +2,12 @@
 Report API schemas.
 """
 
-
 from pydantic import BaseModel
 
 
 class ReportSummary(BaseModel):
     """Report summary."""
+
     new_jobs: int = 0
     new_applications: int = 0
     total_applications: int = 0
@@ -17,6 +17,7 @@ class ReportSummary(BaseModel):
 
 class JobSummary(BaseModel):
     """Job summary in report."""
+
     title: str
     company: str
     location: str | None = None
@@ -26,12 +27,14 @@ class JobSummary(BaseModel):
 
 class CompanySummary(BaseModel):
     """Company summary in report."""
+
     company: str
     jobs: int
 
 
 class ReportResponse(BaseModel):
     """Report response."""
+
     report_type: str
     generated_at: str
     summary: ReportSummary
@@ -46,11 +49,13 @@ class ReportResponse(BaseModel):
 
 class ReportListResponse(BaseModel):
     """List of reports."""
+
     reports: list[ReportResponse]
 
 
 class LearningResource(BaseModel):
     """Learning resource."""
+
     skill: str
     category: str
     resources: list[dict]
@@ -58,6 +63,7 @@ class LearningResource(BaseModel):
 
 class LearningPathResponse(BaseModel):
     """Learning path response."""
+
     steps: list[dict]
     estimated_hours: int | None = None
     resources: list[LearningResource] = []

@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 class JobBase(BaseModel):
     """Base job schema."""
+
     title: str = Field(..., min_length=1, max_length=500)
     company: str = Field(..., min_length=1, max_length=200)
     location: str | None = None
@@ -25,11 +26,13 @@ class JobBase(BaseModel):
 
 class JobCreate(JobBase):
     """Schema for creating a job."""
+
     source: str = "manual"
 
 
 class JobUpdate(BaseModel):
     """Schema for updating a job."""
+
     title: str | None = None
     company: str | None = None
     location: str | None = None
@@ -45,6 +48,7 @@ class JobUpdate(BaseModel):
 
 class JobResponse(JobBase):
     """Schema for job response."""
+
     id: str
     source: str
     posted_at: datetime | None = None
@@ -58,6 +62,7 @@ class JobResponse(JobBase):
 
 class JobListResponse(BaseModel):
     """Schema for job list response."""
+
     jobs: list[JobResponse]
     total: int
     skip: int
@@ -66,6 +71,7 @@ class JobListResponse(BaseModel):
 
 class JobSearchRequest(BaseModel):
     """Schema for job search request."""
+
     query: str = Field(..., min_length=1)
     location: str | None = None
     job_type: str | None = None
@@ -75,18 +81,21 @@ class JobSearchRequest(BaseModel):
 
 class CompanyStat(BaseModel):
     """Company statistic."""
+
     company: str
     jobs: int
 
 
 class JobTypeStat(BaseModel):
     """Job type statistic."""
+
     type: str
     count: int
 
 
 class JobStatistics(BaseModel):
     """Schema for job statistics."""
+
     total_jobs: int
     salary_stats: dict
     top_companies: list[CompanyStat]
