@@ -1,0 +1,57 @@
+# Loki configuration — single-binary mode for the InternTrack monitoring stack.
+# Runs alongside Prometheus/Grafana in the `monitoring` compose profile.
+#
+# Reference: https://grafana.com/docs/loki/latest/configure/
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-04-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  # Keep 14 days of logs locally.
+  retention_period: 336h
+  # The app logs structured JSON per line; keep lines intact.
+  max_line_size: 1MB
+  max_line_size_truncate: false
+
+compactor:
+  working_directory: /loki/compactor
+  compactor_ring:
+    kvstore:
+      store: inmemory
+  retention_enabled: true
+
+ruler:
+  storage:
+    type: local
+    local:
+      directory: /loki/rules
+  rule_path: /loki/rules-temp
+  ring:
+    kvstore:
+      store: inmemory
+  enable_api: true

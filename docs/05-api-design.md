@@ -639,6 +639,33 @@ docker compose --profile monitoring up -d prometheus grafana node-exporter
 > `MemoryHigh` and `CpuHigh` alerts and the **InternTrack System** dashboard
 > are only representative on Linux hosts (a VM/cloud node or WSL2 backend).
 
+#### Log monitoring (Loki + Promtail)
+
+The `monitoring` profile completes the observability story with a **Loki**
+log store and **Promtail** log collector, so every container's structured logs
+are searchable from Grafana:
+
+- `deploy/loki/loki-config.yml` — single-binary Loki (tsdb schema v13,
+  filesystem storage, 14-day retention)
+- `deploy/loki/promtail-config.yml` — discovers containers via the Docker
+  socket (`docker_sd_configs`, 5s refresh), parses the app's structlog JSON
+  (`timestamp`/`level` labels), and ships to `http://loki:3100`
+- `docker-compose.yml` `loki` (port 3100) + `promtail` (port 9080, mounts
+  the docker socket read-only) services in the `monitoring` profile
+- Grafana provisioning adds a **Loki** datasource (uid `loki`)
+- `deploy/grafana/dashboards/logs.json` — **InternTrack Logs** dashboard
+  (uid `interntrack-logs`): log volume by service, error-level rate,
+  top log producers and a live `{job="docker"} | json` panel with a
+  per-service template variable
+
+```bash
+docker compose --profile monitoring up -d prometheus grafana node-exporter loki promtail
+```
+
+Every config is pinned by `tests/unit/test_log_monitoring.py` (clients point
+at Loki, docker-socket discovery is wired, and the dashboard's LogQL
+references the emitted labels).
+
 For Kubernetes, the API `Service` (`k8s/raw/06-api.yaml`) carries
 `prometheus.io/scrape: "true"` (+ `path`/`port`) annotations for
 `kubernetes_sd_configs`-based scraping.

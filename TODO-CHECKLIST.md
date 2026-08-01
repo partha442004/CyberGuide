@@ -473,10 +473,14 @@ sqlite3 data/interntrack.db "PRAGMA integrity_check;"
 - [x] Process count — node-exporter `node_load1` (load avg stat)
 
 ### Log Monitoring
-- [ ] Application logs
-- [ ] Access logs
-- [ ] Error logs
-- [ ] Database logs
+- [x] Application logs — Loki + Promtail ships every container's structured
+      structlog JSON (label `level`, `timestamp`, `container`, `compose_service`)
+- [x] Access logs — uvicorn/dashboard access lines captured via docker_sd
+      (raw plain-text lines pass through, fall back to receive time)
+- [x] Error logs — InternTrack Logs dashboard error-level rate panel
+      (`| json | level="error"`) + live search
+- [x] Database logs — postgres/redis/elasticsearch container logs are
+      auto-discovered by promtail's docker_sd_configs
 
 ### Alerting
 - [x] High error rate alert — `HighErrorRate` (5xx rate / request rate > 0.1, critical)
@@ -883,5 +887,29 @@ docker-compose up -d
 
 ---
 
+## ✅ HARDENING PASS 16 (2026-08-01) — COMPLETED
+
+### Loki + Promtail Log Monitoring + v1.18.0
+- [x] `deploy/loki/loki-config.yml` — single-binary Loki (tsdb v13, filesystem
+      storage, 336h retention) — completes the Log Monitoring checklist
+      (application / access / error / database logs)
+- [x] `deploy/loki/promtail-config.yml` — docker_sd_configs (5s refresh) →
+      `http://loki:3100`; parses structlog JSON (`timestamp`/`level`) and
+      relabels `container`/`compose_service`/`compose_project`/`stream`
+- [x] `docker-compose.yml` `loki` (3.4.2, :3100) + `promtail` (3.4.2, :9080,
+      docker.sock ro, depends_on loki) services + `loki_data` volume, both in
+      the `monitoring` profile
+- [x] Grafana provisioning Loki datasource (uid `loki` → `http://loki:3100`)
+- [x] `deploy/grafana/dashboards/logs.json` — InternTrack Logs dashboard
+      (uid `interntrack-logs`): log volume by service, error-level rate,
+      top producers, live `{job="docker"} | json` panel + service template
+- [x] `tests/unit/test_log_monitoring.py` (10 tests) pin configs to each other
+      (loki layout, promtail→loki + docker socket, compose services,
+      loki datasource, valid LogQL + template var)
+- [x] Both packages + `.env`/`.env.example` + `pyproject.toml` + deployment
+      artifacts synced to **1.18.0**; `make version-check` exit 0
+
+---
+
 **Last Updated:** 2026-08-01
-**Version:** 1.17.0
+**Version:** 1.18.0
