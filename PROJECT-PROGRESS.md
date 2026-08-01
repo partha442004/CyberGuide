@@ -11,12 +11,14 @@
 | **ruff lint** | ✅ All checks passed (was 1,294 errors) |
 | **ruff format** | ✅ 212 files formatted |
 | **mypy** | ✅ 0 errors in 177 source files (fixed 107 in cybershield) |
-| **InternTrack tests** | ✅ 429 passing |
+| **InternTrack tests** | ✅ 443 passing |
 | **CyberGuide tests** | ✅ 321 passing |
-| **Smoke test** | ✅ /health (DB probe), /, CORS preflight, 404, docs (prod-off) verified |
+| **Smoke test** | ✅ Live uvicorn boot verified: / (200), /health (200 healthy), /docs (404 prod), CORS preflight, 404, rate-limit burst (200/200/429/429/429) + RATE_LIMITED contract |
 | **CI pipeline** | ✅ .github/workflows/ci.yml (lint + typecheck + tests + coverage + security) |
 | **Security scan** | ✅ bandit clean at medium+ (fixed 3x MD5 + 5x bind-all) |
 | **Dependency scan** | ✅ safety: 22+9 packages scanned, 0 vulnerabilities (CI gate) |
+| **Container scan** | ✅ Trivy fs scan of src/ (HIGH/CRITICAL, exit 1) in CI security job |
+| **CD pipeline** | ✅ .github/workflows/cd.yml (tag-based Docker build/push + SSH deploy) |
 
 ### Highlights
 - **Error handling**: dedicated `AppException` handler + consistent `{error: {code, message, details}}` payload; debug detail gated
@@ -26,6 +28,9 @@
 - **Security**: bandit scan clean at medium+ — MD5 `usedforsecurity=False` (cache/dedup), `# nosec B104` on dev binds; CI security job gates tests
 - **Pre-commit**: `.pre-commit-config.yaml` added (ruff, mypy with PYTHONPATH, commitizen)
 - **Health check**: `/health` creates its own session via `async_session_factory` — engine-down now returns **503 degraded** (was 500); 200 healthy (version, database) / 503 degraded; conftest points the factory at the in-memory test engine
+- **Metrics**: `GET /metrics` (request counts, error rate, avg latency, status histogram) via in-memory `MetricsStore` + middleware; 429s recorded, /metrics exempt from both recording and rate limiting
+- **Version**: `app_version` reads package `__version__` (single source of truth) = 1.7.0, synced with .env/.env.example; consistency tests
+- **Live smoke test**: real uvicorn boot — all endpoints verified over HTTP incl. rate-limit burst 200/200/429/429/429
 - **Report service**: template dir now module-relative (works from any CWD); 10 new tests (`test_report_service.py`) for rendering + generation
 - **Real bugs fixed**: httpx 0.28 `allow_redirects` removal, `NotificationPriority.NORMAL`, `SkillTrend.recorded_at`, `Company.is_trusted` (models + migration), `Job.company` relationship shadowing the string column (broke search), scheduler `not Job.is_verified` filter
 - New tests: `tests/unit/test_main.py` (11) + `tests/unit/test_rate_limit.py` (9) + `tests/unit/test_dashboard_components.py` (46) + `TestCorsMiddleware` integration tests
@@ -46,7 +51,7 @@
 | **Engines** | ✅ Complete | 100% | Dedup, verify, classify |
 | **Notifications** | ✅ Complete | 100% | Telegram, Email, Discord |
 | **Dashboard** | ✅ Complete | 100% | Streamlit with charts |
-| **Tests** | ✅ Complete | 100% | 750 tests passing |
+| **Tests** | ✅ Complete | 100% | 764 tests passing |
 | **CI/CD** | ✅ Complete | 100% | GitHub Actions ready |
 | **Documentation** | ✅ Complete | 100% | All docs created |
 | **Docker** | ✅ Complete | 100% | Compose ready |
@@ -57,10 +62,10 @@
 ## 📊 FINAL TEST RESULTS
 
 ```
-======================== 750 passed ========================
-InternTrack: 429 passed
+======================== 764 passed ========================
+InternTrack: 443 passed
 CyberGuide (cybershield): 321 passed
-Total: 750 tests passing
+Total: 764 tests passing
 ```
 
 ### Coverage Improvement Summary
@@ -77,8 +82,9 @@ Total: 750 tests passing
 | **Latest** | **418** | **82%+** | +60 tests (InternTrack, incl. rate limit + dashboard + health) |
 | **Pass 4** | **428** | — | +10 report service tests (render + generation) |
 | **Pass 5** | **429** | — | +1 readiness probe failure-path test |
+| **Pass 6** | **443** | — | +14 (metrics 10, version 2, worker 2) |
 | **CyberGuide** | **321** | — | Full cleanup + engine/ES tests added |
-| **Combined** | **750** | **67%** | interntrack + cybershield measured together |
+| **Combined** | **764** | **67%** | interntrack + cybershield measured together |
 
 ---
 
@@ -119,7 +125,7 @@ Total: 750 tests passing
 - [x] `src/interntrack/utils/` - 4 utility files
 - [x] `src/interntrack/reports/templates/` - 3 report templates
 
-### Tests (750 total: 429 InternTrack + 321 CyberGuide)
+### Tests (764 total: 443 InternTrack + 321 CyberGuide)
 - [x] `tests/conftest.py` - Test fixtures
 - [x] `tests/unit/test_job_service.py` - 8 tests
 - [x] `tests/unit/test_application_service.py` - 8 tests
@@ -235,14 +241,16 @@ uvicorn interntrack.main:app --reload
 | Unit - Indeed Scraper | 12 | ✅ |
 | Unit - Glassdoor Scraper | 12 | ✅ |
 | Unit - Learning Service | 16 | ✅ |
-| Unit - Main/Error Handling | 14 | ✅ (incl. readiness probe) |
+| Unit - Main/Error Handling | 16 | ✅ (incl. readiness probe + version consistency) |
 | Unit - Rate Limiting | 10 | ✅ **NEW** |
 | Unit - Dashboard Components | 46 | ✅ **NEW** |
 | Unit - Report Service | 10 | ✅ **NEW** |
+| Unit - Metrics | 10 | ✅ **NEW** |
+| Unit - Worker | 4 | ✅ (0% → 100% coverage) |
 | Integration - API | 23 | ✅ (incl. CORS middleware + health) |
-| **Total (InternTrack)** | **429** | ✅ **All Passing** |
+| **Total (InternTrack)** | **443** | ✅ **All Passing** |
 | **CyberGuide (cybershield)** | **321** | ✅ **All Passing** |
-| **Grand Total** | **750** | ✅ **All Passing** |
+| **Grand Total** | **764** | ✅ **All Passing** |
 
 ---
 

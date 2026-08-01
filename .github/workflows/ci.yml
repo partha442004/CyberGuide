@@ -51,7 +51,7 @@ jobs:
           mypy src/interntrack src/cybershield
 
   security:
-    name: Security (bandit)
+    name: Security (bandit + safety + trivy)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -71,6 +71,16 @@ jobs:
 
       - name: Safety dependency scan
         run: safety check -r requirements.txt -r requirements-dev.txt --full-report
+
+      - name: Trivy filesystem scan (HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          scan-type: fs
+          scan-ref: src/
+          skip-dirs: tests,dashboard,data,migrations
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          format: table
 
   test:
     name: Tests (pytest)

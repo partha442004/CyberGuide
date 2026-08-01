@@ -14,6 +14,7 @@ from interntrack.api.router import api_router
 from interntrack.config import get_settings
 from interntrack.database.session import close_db, init_db
 from interntrack.domain.exceptions import AppException
+from interntrack.metrics import MetricsMiddleware, metrics_store
 from interntrack.middleware.rate_limit import RateLimitMiddleware
 from interntrack.utils.logger import get_logger
 
@@ -52,6 +53,12 @@ if settings.rate_limit_enabled:
         api_key_limit=settings.rate_limit_api_key_per_minute,
         api_key_header=settings.api_key_header,
     )
+
+# Metrics middleware - records request counts/errors/latency for /metrics.
+# Registered after the rate limiter so it also captures 429 responses (the
+# rate limiter's own rejections are part of the error picture). /metrics itself
+# is exempt from recording.
+app.add_middleware(MetricsMiddleware)
 
 # CORS middleware - origins configurable via CORS_ORIGINS env var (comma-separated)
 app.add_middleware(
@@ -124,6 +131,17 @@ async def health():
     if not db_ok:
         return JSONResponse(status_code=503, content=payload)
     return payload
+
+
+@app.get("/metrics")
+async def metrics():
+    """Expose in-memory request metrics for monitoring.
+
+    Returns request counts per path, error counts/rate (HTTP >= 500), average
+    latency, and a status-code histogram. The metrics endpoint itself is not
+    recorded, and it is exempt from rate limiting so scrapers stay reliable.
+    """
+    return metrics_store.snapshot()
 
 
 def cli():
