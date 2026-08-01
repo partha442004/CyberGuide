@@ -615,6 +615,30 @@ sqlite3 data/interntrack.db "PRAGMA integrity_check;"
 
 ---
 
+## ✅ HARDENING PASS 6 (2026-08-01) — COMPLETED
+
+### Live Smoke Test
+- [x] Booted real uvicorn server on a temp port/DB; verified over HTTP: `GET /` (200), `GET /health` (200 healthy), `GET /docs` (404 prod), CORS preflight (allow-origin), 404 route, rate-limit burst 200/200/429/429/429, `RATE_LIMITED` 429 contract
+
+### Request Metrics (InternTrack)
+- [x] `src/interntrack/metrics.py`: `MetricsStore` (counts/errors/latency/path histogram/status codes, snapshot, reset) + `MetricsMiddleware`
+- [x] `GET /metrics` endpoint; middleware registered after rate limiter (records 429s) before CORS; /metrics exempt from recording + rate limiting
+- [x] `tests/unit/test_metrics.py` (10 tests)
+
+### Version Single Source of Truth
+- [x] `app_version` reads package `__version__` (= 1.7.0), synced with `.env` + `.env.example`
+- [x] `TestVersionConsistency` (2 tests) prevents silent drift
+
+### Deployment & CI
+- [x] `.github/workflows/cd.yml` (tag-based Docker build/push + SSH deploy)
+- [x] Trivy fs scan (HIGH/CRITICAL, exit 1) scoped to `src/` in CI security job; job renamed "Security (bandit + safety + trivy)"
+
+### Coverage Push
+- [x] `tests/unit/test_worker.py` rewritten (4 tests): worker.py coverage 0% → **100%**
+- [x] helpers.py already 100%; InternTrack 429 → 443; total **764**
+
+---
+
 ## 🔄 QUICK REFERENCE
 
 ### Common Commands

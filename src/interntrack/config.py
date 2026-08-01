@@ -8,6 +8,8 @@ from typing import Any
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from interntrack import __version__
+
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
@@ -20,7 +22,8 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = "InternTrack"
-    app_version: str = "1.0.0"
+    # Single source of truth: package __version__ (kept in sync with CHANGELOG)
+    app_version: str = __version__
     debug: bool = False
     secret_key: str = "change-me-in-production"  # noqa: S105 (dev default)
 

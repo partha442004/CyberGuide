@@ -4,6 +4,48 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.8.0] - 2026-08-01
+
+### Added
+
+#### Live Smoke Test ✅
+- Booted the real API (uvicorn) on a temp port/DB and verified over HTTP: `GET /`
+  (200 app info), `GET /health` (200 healthy, database ok), `GET /docs` (404 in
+  prod mode), CORS preflight (200 with allow-origin), 404 routes, and a
+  rate-limit burst (`req1:200 req2:200 req3:429 req4:429 req5:429` at 3/min)
+  with the `RATE_LIMITED` error contract
+
+#### Request Metrics Endpoint (InternTrack)
+- New `src/interntrack/metrics.py`: in-memory `MetricsStore` (total requests,
+  errors, latency, per-path counts, status histogram, `snapshot()`, `reset()`)
+  + `MetricsMiddleware` recording every request except `/metrics` itself
+- `GET /metrics` exposes the snapshot for monitoring (TODO-CHECKLIST §14)
+- Middleware registered after the rate limiter so 429s are recorded, before CORS
+- `/metrics` added to the rate-limiter exempt paths so scrapers stay reliable
+- `tests/unit/test_metrics.py` (10 tests): store counters/reset + endpoint
+  integration via the client fixture
+
+#### Version Single Source of Truth
+- `config.py` `app_version` now reads `__version__` from the package (was a
+  hardcoded `1.0.0` that had drifted from the CHANGELOG)
+- Bumped `interntrack.__version__` to `1.7.0`; updated `.env` and `.env.example`
+  `APP_VERSION` to match
+- `TestVersionConsistency` (2 tests) pins `app_version == __version__` and the
+  CHANGELOG release so the drift can never silently recur
+
+#### Deployment & CI
+- `.github/workflows/cd.yml` created (was only documented): tag-based Docker
+  build/push + SSH deploy, matching the target pipeline in 17-cicd.md
+- CI `security` job now runs a Trivy filesystem scan (HIGH/CRITICAL, exit-code
+  1) scoped to `src/` (skips tests/dashboard/data/migrations)
+- CI `security` job renamed to "Security (bandit + safety + trivy)"
+
+#### Test Coverage Push
+- `tests/unit/test_worker.py` rewritten: 4 meaningful tests (scheduler setup,
+  signal-handler registration, shutdown handler exit, entrypoint guard)
+  replacing a no-op test — `worker.py` coverage 0% → **100%**
+- `utils/helpers.py` already at 100%; combined InternTrack count 429 → **443**
+
 ## [1.7.0] - 2026-08-01
 
 ### Changed

@@ -136,6 +136,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.exempt_paths = exempt_paths or [
             "/",
             "/health",
+            "/metrics",
             "/docs",
             "/redoc",
             "/openapi.json",
