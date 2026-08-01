@@ -6,6 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Merged] - 2026-08-01 — origin/master reconciled into local master
 
+### Fixed
+
+#### CI Pipeline (GitHub Actions)
+- **trivy-action tag**: `aquasecurity/trivy-action@0.30.0` → `@v0.30.0`
+  (Actions resolves action refs to exact tags; the upstream repo only
+  publishes `v`-prefixed tags, so the Security job could not resolve the
+  action at all)
+- **mypy version drift**: `requirements-dev.txt` `mypy>=1.7.0` →
+  `mypy>=1.20,<2`. CI installs mypy fresh, which had resolved to the newly
+  released major version **2.3.0** and broke the `warn_unused_ignores`
+  typecheck build. Pinning to the validated 1.x line (resolves to 1.20.x)
+  restores a deterministic gate; local mypy upgraded to match
+- **mypy overrides**: `pyproject.toml` `ignore_missing_imports` now also
+  covers `elasticsearch`, `elasticsearch.*`, and `pymupdf` (optional,
+  lazy-imported runtime dependencies with graceful fallback)
+- **17 mypy 1.20.x version-drift fixes across 8 files**: `int(success)` in
+  `elasticsearch_service.py`; removed 3 unused `type: ignore[import-untyped]`
+  in `dashboard/app.py`; `doc: Any` for pymupdf + removed unused ignore in
+  `resume_service.py`; `deactivate_expired` rewritten to select-then-update
+  (avoids `CursorResult.rowcount` typing entirely, behaviorally equivalent);
+  `data: list[dict[str, Any]]` in `export_jobs.py`; `_parse_job_card(card:
+  Tag)` + `str(href)` coercion in `usa/indeed.py`; version-agnostic
+  `ASGITransport(app=cast(Any, app))` in `test_middleware.py` and
+  `conftest.py`
+- Pre-commit mypy hook aligned to `v1.20.2`
+- Validation: mypy 1.20.2 clean (182 files, local + fresh-CI venv), ruff
+  clean, format clean, 1247 tests passing, `make version-check` exit 0
+
+## [Merged] - 2026-08-01 — origin/master reconciled into local master
+
 ### Merged
 - Reconciled the divergent histories (local master had 18 commits: hardening
   v1.10 → v1.19; origin/master had 31 commits: notification system, coverage
