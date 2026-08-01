@@ -118,13 +118,30 @@ jobs:
         with:
           name: coverage-report
           path: coverage.xml
+
+  security:
+    name: Security (bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install bandit
+        run: python -m pip install bandit
+      - name: Bandit scan (medium+ severities)
+        run: bandit -r src/ -ll -q
 ```
+
+> The `test` job depends on `lint`, `typecheck`, and `security` — a medium+ or
+> high-severity bandit finding blocks the test run.
 
 ### CD Workflow
 
 > ⏳ **Planned / future enhancement.** Not yet implemented — shown here as the
 > target pipeline for tag-based releases. Requires Docker Hub credentials and a
-> deploy target with SSH access.
+> deploy target with SSH access. `safety` (dependency vulnerabilities) and
+> Trivy (container scan) are future additions to the security gate.
 
 ```yaml
 # .github/workflows/cd.yml
@@ -194,25 +211,38 @@ jobs:
 
 ## Pre-commit Configuration
 
+> ✅ **Implemented** in `.pre-commit-config.yaml` (2026-08-01): ruff `--fix` +
+> `ruff-format`, mypy (`PYTHONPATH=src`, both modules), and commitizen. Install
+> with `pip install pre-commit && pre-commit install`; run all with
+> `pre-commit run --all-files`.
+
 ```yaml
 # .pre-commit-config.yaml
 
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.0
+    rev: v0.9.7
     hooks:
       - id: ruff
-        args: [--fix]
+        args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
-  
+
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.7.0
+    rev: v1.15.0
     hooks:
       - id: mypy
-        additional_dependencies: [types-requests]
-  
+        entry: mypy
+        args: [src/interntrack, src/cybershield]
+        pass_filenames: false
+        env:
+          PYTHONPATH: src
+        additional_dependencies:
+          - pydantic>=2.5.0
+          - sqlalchemy>=2.0.23
+          - types-requests
+
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v3.13.0
+    rev: v3.31.0
     hooks:
       - id: commitizen
 ```
@@ -228,7 +258,9 @@ repos:
 | Type checking | mypy | 0 errors |
 | Tests | pytest | 100% pass |
 | Coverage | pytest-cov | ≥80% |
-| Security | trivy | 0 critical/high |
+| Security (static) | bandit | 0 medium/high |
+| Security (deps) | safety | future |
+| Security (container) | trivy | future |
 | Build | docker build | Success |
 
 ---

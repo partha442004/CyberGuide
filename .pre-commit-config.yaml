@@ -1,0 +1,31 @@
+# Pre-commit hooks for InternTrack / CyberGuide.
+# Install:  pip install pre-commit && pre-commit install
+# Run all:  pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.7
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.15.0
+    hooks:
+      - id: mypy
+        # Type-checks both modules exactly like the CI typecheck job.
+        entry: mypy
+        args: [src/interntrack, src/cybershield]
+        pass_filenames: false
+        env:
+          PYTHONPATH: src
+        additional_dependencies:
+          - pydantic>=2.5.0
+          - sqlalchemy>=2.0.23
+          - types-requests
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v3.31.0
+    hooks:
+      - id: commitizen

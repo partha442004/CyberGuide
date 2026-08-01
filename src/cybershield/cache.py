@@ -184,7 +184,8 @@ class CacheManager:
     def generate_cache_key(self, *args: Any, **kwargs: Any) -> str:
         """Generate a deterministic cache key from arguments."""
         content = json.dumps({"args": args, "kwargs": kwargs}, sort_keys=True)
-        return hashlib.md5(content.encode()).hexdigest()
+        # MD5 is used for cache-key fingerprinting, not security.
+        return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()
 
     @property
     def is_connected(self) -> bool:
