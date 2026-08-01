@@ -35,9 +35,13 @@ class Base(DeclarativeBase):
 
 class TimestampMixin:
     """Mixin for timestamp fields."""
+
     created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     updated_at = Column(
-        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False,
+        DateTime,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
     )
 
 
@@ -87,7 +91,9 @@ class Application(Base, TimestampMixin):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
     job_id = Column(String(36), ForeignKey("jobs.id"), nullable=False)
     status = Column(
-        Enum(ApplicationStatus), nullable=False, default=ApplicationStatus.SAVED,
+        Enum(ApplicationStatus),
+        nullable=False,
+        default=ApplicationStatus.SAVED,
     )
     applied_at = Column(DateTime, nullable=True)
     interview_at = Column(DateTime, nullable=True)
@@ -122,7 +128,9 @@ class ApplicationStatusHistory(Base, TimestampMixin):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
     application_id = Column(
-        String(36), ForeignKey("applications.id"), nullable=False,
+        String(36),
+        ForeignKey("applications.id"),
+        nullable=False,
     )
     old_status = Column(Enum(ApplicationStatus), nullable=True)
     new_status = Column(Enum(ApplicationStatus), nullable=False)
@@ -177,7 +185,9 @@ class UserSkill(Base, TimestampMixin):
 
     user_id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
     skill_id = Column(
-        String(36), ForeignKey("skills.id"), primary_key=True,
+        String(36),
+        ForeignKey("skills.id"),
+        primary_key=True,
     )
     proficiency_level = Column(Integer, default=1)  # 1-5
     last_used = Column(DateTime, nullable=True)
@@ -259,9 +269,7 @@ class Bookmark(Base, TimestampMixin):
     notes = Column(Text, nullable=True)
     tags = Column(JSON, nullable=True, default=list)
 
-    __table_args__ = (
-        Index("idx_bookmark_item", "item_type", "item_id"),
-    )
+    __table_args__ = (Index("idx_bookmark_item", "item_type", "item_id"),)
 
 
 class Watchlist(Base, TimestampMixin):
@@ -275,9 +283,7 @@ class Watchlist(Base, TimestampMixin):
     is_active = Column(Boolean, default=True)
     notification_channels = Column(JSON, nullable=True, default=list)
 
-    __table_args__ = (
-        Index("idx_watchlist_type_value", "watch_type", "value"),
-    )
+    __table_args__ = (Index("idx_watchlist_type_value", "watch_type", "value"),)
 
 
 class ActivityLog(Base, TimestampMixin):
@@ -291,6 +297,4 @@ class ActivityLog(Base, TimestampMixin):
     entity_id = Column(String(36), nullable=False)
     details = Column(JSON, nullable=True)
 
-    __table_args__ = (
-        Index("idx_activity_entity", "entity_type", "entity_id"),
-    )
+    __table_args__ = (Index("idx_activity_entity", "entity_type", "entity_id"),)

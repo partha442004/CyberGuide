@@ -70,29 +70,35 @@ class MatchingEngine:
                 proficiency = user_skills[skill_name]["proficiency"]
                 # Consider it a full match if proficiency >= importance
                 if proficiency >= importance:
-                    matched.append({
-                        "name": job_skill["name"],
-                        "category": job_skill["category"],
-                        "importance": importance,
-                        "proficiency": proficiency,
-                        "match_type": "full",
-                    })
+                    matched.append(
+                        {
+                            "name": job_skill["name"],
+                            "category": job_skill["category"],
+                            "importance": importance,
+                            "proficiency": proficiency,
+                            "match_type": "full",
+                        }
+                    )
                 else:
-                    partial.append({
+                    partial.append(
+                        {
+                            "name": job_skill["name"],
+                            "category": job_skill["category"],
+                            "importance": importance,
+                            "proficiency": proficiency,
+                            "gap": importance - proficiency,
+                            "match_type": "partial",
+                        }
+                    )
+            else:
+                missing.append(
+                    {
                         "name": job_skill["name"],
                         "category": job_skill["category"],
                         "importance": importance,
-                        "proficiency": proficiency,
-                        "gap": importance - proficiency,
-                        "match_type": "partial",
-                    })
-            else:
-                missing.append({
-                    "name": job_skill["name"],
-                    "category": job_skill["category"],
-                    "importance": importance,
-                    "match_type": "missing",
-                })
+                        "match_type": "missing",
+                    }
+                )
 
         # Calculate match percentage
         total_importance = sum(js["importance"] for js in job_skills) or 1
@@ -142,9 +148,7 @@ class MatchingEngine:
 
         # Get all active jobs with their skills
         jobs_query = (
-            select(Job)
-            .where(Job.is_active)
-            .limit(100)  # Limit for performance
+            select(Job).where(Job.is_active).limit(100)  # Limit for performance
         )
         jobs_result = await self.session.execute(jobs_query)
         jobs = list(jobs_result.scalars().all())
@@ -166,26 +170,27 @@ class MatchingEngine:
 
             # Calculate match
             matched_count = sum(
-                1 for _, skill in job_skills
-                if skill.name.lower() in user_skill_names
+                1 for _, skill in job_skills if skill.name.lower() in user_skill_names
             )
             match_percentage = (matched_count / len(job_skills)) * 100
 
             if match_percentage >= min_match:
-                matching_jobs.append({
-                    "job": {
-                        "id": job.id,
-                        "title": job.title,
-                        "company": job.company,
-                        "location": job.location,
-                        "url": job.url,
-                        "salary_min": job.salary_min,
-                        "salary_max": job.salary_max,
-                    },
-                    "match_percentage": round(match_percentage, 2),
-                    "matched_skills": matched_count,
-                    "total_skills": len(job_skills),
-                })
+                matching_jobs.append(
+                    {
+                        "job": {
+                            "id": job.id,
+                            "title": job.title,
+                            "company": job.company,
+                            "location": job.location,
+                            "url": job.url,
+                            "salary_min": job.salary_min,
+                            "salary_max": job.salary_max,
+                        },
+                        "match_percentage": round(match_percentage, 2),
+                        "matched_skills": matched_count,
+                        "total_skills": len(job_skills),
+                    }
+                )
 
         # Sort by match percentage
         matching_jobs.sort(key=lambda x: x["match_percentage"], reverse=True)
@@ -219,24 +224,26 @@ class MatchingEngine:
 
         for skill_name, category in target_skills.items():
             if skill_name.lower() in user_skills:
-                matched.append({
-                    "name": skill_name,
-                    "category": category,
-                })
+                matched.append(
+                    {
+                        "name": skill_name,
+                        "category": category,
+                    }
+                )
             else:
-                missing.append({
-                    "name": skill_name,
-                    "category": category,
-                    "priority": self._get_skill_priority(skill_name, category),
-                })
+                missing.append(
+                    {
+                        "name": skill_name,
+                        "category": category,
+                        "priority": self._get_skill_priority(skill_name, category),
+                    }
+                )
 
         # Sort missing by priority
         missing.sort(key=lambda x: x["priority"], reverse=True)
 
         match_percentage = (
-            (len(matched) / len(target_skills) * 100)
-            if target_skills
-            else 0
+            (len(matched) / len(target_skills) * 100) if target_skills else 0
         )
 
         return {
@@ -261,19 +268,23 @@ class MatchingEngine:
             skill = await self.skill_repo.get_by_name(skill_name)
 
             if skill and skill.learning_resources:
-                recommendations.append({
-                    "skill": skill_name,
-                    "category": skill_info["category"],
-                    "importance": skill_info["importance"],
-                    "resources": skill.learning_resources[:3],
-                })
+                recommendations.append(
+                    {
+                        "skill": skill_name,
+                        "category": skill_info["category"],
+                        "importance": skill_info["importance"],
+                        "resources": skill.learning_resources[:3],
+                    }
+                )
             else:
-                recommendations.append({
-                    "skill": skill_name,
-                    "category": skill_info["category"],
-                    "importance": skill_info["importance"],
-                    "resources": self._get_default_resources(skill_name),
-                })
+                recommendations.append(
+                    {
+                        "skill": skill_name,
+                        "category": skill_info["category"],
+                        "importance": skill_info["importance"],
+                        "resources": self._get_default_resources(skill_name),
+                    }
+                )
 
         return recommendations
 
@@ -382,11 +393,17 @@ class MatchingEngine:
         """Get default learning resources for a skill."""
         resources = {
             "python": [
-                {"name": "Python.org Tutorial", "url": "https://docs.python.org/3/tutorial/"},
+                {
+                    "name": "Python.org Tutorial",
+                    "url": "https://docs.python.org/3/tutorial/",
+                },
                 {"name": "Real Python", "url": "https://realpython.com/"},
             ],
             "javascript": [
-                {"name": "MDN Web Docs", "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript"},
+                {
+                    "name": "MDN Web Docs",
+                    "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript",
+                },
                 {"name": "JavaScript.info", "url": "https://javascript.info/"},
             ],
             "react": [
@@ -395,7 +412,10 @@ class MatchingEngine:
             ],
             "docker": [
                 {"name": "Docker Documentation", "url": "https://docs.docker.com/"},
-                {"name": "Docker Getting Started", "url": "https://docs.docker.com/get-started/"},
+                {
+                    "name": "Docker Getting Started",
+                    "url": "https://docs.docker.com/get-started/",
+                },
             ],
             "sql": [
                 {"name": "SQLBolt", "url": "https://sqlbolt.com/"},
@@ -408,5 +428,8 @@ class MatchingEngine:
             return resources[skill_lower]
 
         return [
-            {"name": f"Search for {skill_name} tutorials", "url": f"https://www.google.com/search?q={skill_name}+tutorial"},
+            {
+                "name": f"Search for {skill_name} tutorials",
+                "url": f"https://www.google.com/search?q={skill_name}+tutorial",
+            },
         ]

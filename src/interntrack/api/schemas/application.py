@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 class ApplicationBase(BaseModel):
     """Base application schema."""
+
     job_id: str
     status: str = "saved"
     notes: str | None = None
@@ -19,11 +20,13 @@ class ApplicationBase(BaseModel):
 
 class ApplicationCreate(BaseModel):
     """Schema for creating an application."""
+
     job_id: str
 
 
 class ApplicationUpdate(BaseModel):
     """Schema for updating an application."""
+
     status: str | None = None
     notes: str | None = None
     resume_version: str | None = None
@@ -33,6 +36,7 @@ class ApplicationUpdate(BaseModel):
 
 class ApplicationResponse(BaseModel):
     """Schema for application response."""
+
     id: str
     job_id: str
     status: str
@@ -49,6 +53,7 @@ class ApplicationResponse(BaseModel):
 
 class ApplicationWithJob(ApplicationResponse):
     """Application response with job details."""
+
     job_title: str | None = None
     job_company: str | None = None
     job_url: str | None = None
@@ -56,18 +61,21 @@ class ApplicationWithJob(ApplicationResponse):
 
 class ApplicationListResponse(BaseModel):
     """Schema for application list response."""
+
     applications: list[ApplicationResponse]
     total: int
 
 
 class ApplicationStatusUpdate(BaseModel):
     """Schema for status update."""
+
     status: str
     notes: str | None = None
 
 
 class ApplicationMetrics(BaseModel):
     """Schema for application metrics."""
+
     total_applications: int
     status_counts: dict
     rejection_rate: float
@@ -77,6 +85,7 @@ class ApplicationMetrics(BaseModel):
 
 class ApplicationTimeline(BaseModel):
     """Schema for application timeline."""
+
     date: str
     status: str
     count: int

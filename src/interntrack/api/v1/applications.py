@@ -2,7 +2,6 @@
 Applications API endpoints.
 """
 
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,6 +31,7 @@ async def list_applications(
 
     if status:
         from interntrack.domain.enums import ApplicationStatus
+
         apps = await service.get_applications_by_status(ApplicationStatus(status))
     else:
         apps = await service.app_repo.get_all(skip=skip, limit=limit)

@@ -2,7 +2,6 @@
 Application service for tracking job applications.
 """
 
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.domain.enums import ApplicationStatus
@@ -18,7 +17,9 @@ class ApplicationService:
         self.app_repo = ApplicationRepository(session)
 
     async def create_application(
-        self, job_id: str, status: ApplicationStatus = ApplicationStatus.SAVED,
+        self,
+        job_id: str,
+        status: ApplicationStatus = ApplicationStatus.SAVED,
     ) -> Application:
         """Create a new application."""
         application = Application(job_id=job_id, status=status)
@@ -42,7 +43,8 @@ class ApplicationService:
         return await self.app_repo.update_status(application_id, new_status, notes)
 
     async def get_applications_by_status(
-        self, status: ApplicationStatus,
+        self,
+        status: ApplicationStatus,
     ) -> list[Application]:
         """Get all applications with a specific status."""
         return await self.app_repo.get_by_status(status)
@@ -81,6 +83,8 @@ class ApplicationService:
         """Get applications needing reminders."""
         return await self.app_repo.get_pending_reminders()
 
-    async def set_priority(self, application_id: str, priority: int) -> Application | None:
+    async def set_priority(
+        self, application_id: str, priority: int
+    ) -> Application | None:
         """Set application priority."""
         return await self.app_repo.update(application_id, {"priority": priority})

@@ -95,13 +95,14 @@ class DeduplicationEngine:
     def _normalize_url(self, url: str) -> str:
         """Normalize URL for comparison."""
         url = url.lower()
-        url = re.sub(r'^https?://', '', url)
-        url = re.sub(r'^www\.', '', url)
-        url = url.rstrip('/')
+        url = re.sub(r"^https?://", "", url)
+        url = re.sub(r"^www\.", "", url)
+        url = url.rstrip("/")
         return url
 
     async def find_duplicates_in_database(
-        self, threshold: float = 0.85,
+        self,
+        threshold: float = 0.85,
     ) -> list[tuple[Job, Job]]:
         """Find potential duplicates in the database."""
         from sqlalchemy import select
@@ -114,7 +115,7 @@ class DeduplicationEngine:
         seen_pairs = set()
 
         for i, job1 in enumerate(all_jobs):
-            for job2 in all_jobs[i + 1:]:
+            for job2 in all_jobs[i + 1 :]:
                 pair_key = tuple(sorted([job1.id, job2.id]))
                 if pair_key in seen_pairs:
                     continue

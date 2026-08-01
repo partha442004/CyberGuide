@@ -2,7 +2,6 @@
 Job service for job management and discovery orchestration.
 """
 
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.domain.enums import JobType
@@ -75,7 +74,10 @@ class JobService:
             "total_jobs": await self.job_repo.count({"is_active": True}),
             "salary_stats": await self.job_repo.get_salary_statistics(),
             "top_companies": [{"company": c, "jobs": n} for c, n in top_companies_raw],
-            "job_types": [{"type": t.value if hasattr(t, 'value') else str(t), "count": n} for t, n in job_types_raw],
+            "job_types": [
+                {"type": t.value if hasattr(t, "value") else str(t), "count": n}
+                for t, n in job_types_raw
+            ],
         }
 
     async def get_closing_soon(self, days: int = 2) -> list[Job]:

@@ -2,7 +2,6 @@
 User repository for user profile and preferences.
 """
 
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +22,10 @@ class UserRepository:
         return list(result.scalars().all())
 
     async def add_user_skill(
-        self, user_id: str, skill_id: str, proficiency: int = 1,
+        self,
+        user_id: str,
+        skill_id: str,
+        proficiency: int = 1,
     ) -> UserSkill:
         """Add a skill to user profile."""
         user_skill = UserSkill(
@@ -36,7 +38,10 @@ class UserRepository:
         return user_skill
 
     async def update_skill_proficiency(
-        self, user_id: str, skill_id: str, proficiency: int,
+        self,
+        user_id: str,
+        skill_id: str,
+        proficiency: int,
     ) -> UserSkill | None:
         """Update skill proficiency."""
         result = await self.session.execute(
@@ -52,7 +57,9 @@ class UserRepository:
         return user_skill
 
     async def get_bookmarks(
-        self, user_id: str, item_type: str | None = None,
+        self,
+        user_id: str,
+        item_type: str | None = None,
     ) -> list[Bookmark]:
         """Get user bookmarks."""
         query = select(Bookmark)
@@ -62,7 +69,10 @@ class UserRepository:
         return list(result.scalars().all())
 
     async def add_bookmark(
-        self, item_type: str, item_id: str, notes: str | None = None,
+        self,
+        item_type: str,
+        item_id: str,
+        notes: str | None = None,
     ) -> Bookmark:
         """Add a bookmark."""
         bookmark = Bookmark(
@@ -95,7 +105,10 @@ class UserRepository:
         return list(result.scalars().all())
 
     async def add_watchlist(
-        self, watch_type: str, value: str, notification_channels: list | None = None,
+        self,
+        watch_type: str,
+        value: str,
+        notification_channels: list | None = None,
     ) -> Watchlist:
         """Add a watchlist entry."""
         watchlist = Watchlist(

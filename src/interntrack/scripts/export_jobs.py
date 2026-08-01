@@ -26,6 +26,7 @@ async def export_jobs(
 
         if source:
             from interntrack.domain.enums import JobSource
+
             query = query.where(Job.source == JobSource(source))
 
         query = query.order_by(Job.created_at.desc())
@@ -92,7 +93,9 @@ def _export_csv(jobs: list[Job], output_path: Path):
                 "url": job.url,
                 "source": job.source.value if job.source else "",
                 "job_type": job.job_type.value if job.job_type else "",
-                "experience_level": job.experience_level.value if job.experience_level else "",
+                "experience_level": job.experience_level.value
+                if job.experience_level
+                else "",
                 "salary_min": job.salary_min or "",
                 "salary_max": job.salary_max or "",
                 "salary_currency": job.salary_currency or "USD",
@@ -113,27 +116,31 @@ def _export_json(jobs: list[Job], output_path: Path):
 
     data = []
     for job in jobs:
-        data.append({
-            "id": job.id,
-            "title": job.title,
-            "company": job.company,
-            "location": job.location,
-            "description": job.description,
-            "url": job.url,
-            "source": job.source.value if job.source else None,
-            "job_type": job.job_type.value if job.job_type else None,
-            "experience_level": job.experience_level.value if job.experience_level else None,
-            "salary_min": job.salary_min,
-            "salary_max": job.salary_max,
-            "salary_currency": job.salary_currency,
-            "is_remote": job.is_remote,
-            "posted_at": job.posted_at.isoformat() if job.posted_at else None,
-            "expires_at": job.expires_at.isoformat() if job.expires_at else None,
-            "is_active": job.is_active,
-            "tags": job.tags or [],
-            "created_at": job.created_at.isoformat() if job.created_at else None,
-            "updated_at": job.updated_at.isoformat() if job.updated_at else None,
-        })
+        data.append(
+            {
+                "id": job.id,
+                "title": job.title,
+                "company": job.company,
+                "location": job.location,
+                "description": job.description,
+                "url": job.url,
+                "source": job.source.value if job.source else None,
+                "job_type": job.job_type.value if job.job_type else None,
+                "experience_level": job.experience_level.value
+                if job.experience_level
+                else None,
+                "salary_min": job.salary_min,
+                "salary_max": job.salary_max,
+                "salary_currency": job.salary_currency,
+                "is_remote": job.is_remote,
+                "posted_at": job.posted_at.isoformat() if job.posted_at else None,
+                "expires_at": job.expires_at.isoformat() if job.expires_at else None,
+                "is_active": job.is_active,
+                "tags": job.tags or [],
+                "created_at": job.created_at.isoformat() if job.created_at else None,
+                "updated_at": job.updated_at.isoformat() if job.updated_at else None,
+            }
+        )
 
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
@@ -143,38 +150,46 @@ def main():
     """CLI entry point."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Export jobs from InternTrack database")
+    parser = argparse.ArgumentParser(
+        description="Export jobs from InternTrack database"
+    )
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         default="jobs_export.csv",
         help="Output file path (default: jobs_export.csv)",
     )
     parser.add_argument(
-        "-f", "--format",
+        "-f",
+        "--format",
         choices=["csv", "json"],
         default="csv",
         help="Export format (default: csv)",
     )
     parser.add_argument(
-        "-l", "--limit",
+        "-l",
+        "--limit",
         type=int,
         default=None,
         help="Limit number of jobs to export",
     )
     parser.add_argument(
-        "-s", "--source",
+        "-s",
+        "--source",
         default=None,
         help="Filter by job source (e.g., linkedin, indeed, remote_ok)",
     )
 
     args = parser.parse_args()
 
-    asyncio.run(export_jobs(
-        output_file=args.output,
-        format=args.format,
-        limit=args.limit,
-        source=args.source,
-    ))
+    asyncio.run(
+        export_jobs(
+            output_file=args.output,
+            format=args.format,
+            limit=args.limit,
+            source=args.source,
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -41,7 +41,9 @@ class ClassificationEngine:
         }
 
     async def _extract_skills(
-        self, ai_skills: list[str], description: str,
+        self,
+        ai_skills: list[str],
+        description: str,
     ) -> list[dict[str, Any]]:
         """Extract and categorize skills from job."""
         skills = []
@@ -52,11 +54,13 @@ class ClassificationEngine:
                 skill_name.lower(),
                 self._categorize_skill(skill_name),
             )
-            skills.append({
-                "id": skill.id,
-                "name": skill.name,
-                "category": skill.category.value,
-            })
+            skills.append(
+                {
+                    "id": skill.id,
+                    "name": skill.name,
+                    "category": skill.category.value,
+                }
+            )
 
         # Also extract from description using patterns
         pattern_skills = self._extract_skills_from_text(description)
@@ -66,11 +70,13 @@ class ClassificationEngine:
                     skill_name.lower(),
                     self._categorize_skill(skill_name),
                 )
-                skills.append({
-                    "id": skill.id,
-                    "name": skill.name,
-                    "category": skill.category.value,
-                })
+                skills.append(
+                    {
+                        "id": skill.id,
+                        "name": skill.name,
+                        "category": skill.category.value,
+                    }
+                )
 
         return skills
 
@@ -79,18 +85,52 @@ class ClassificationEngine:
         skill_lower = skill_name.lower()
 
         programming = [
-            "python", "javascript", "typescript", "java", "c++", "go", "rust",
-            "ruby", "php", "swift", "kotlin", "scala", "r", "matlab",
+            "python",
+            "javascript",
+            "typescript",
+            "java",
+            "c++",
+            "go",
+            "rust",
+            "ruby",
+            "php",
+            "swift",
+            "kotlin",
+            "scala",
+            "r",
+            "matlab",
         ]
 
         frameworks = [
-            "react", "vue", "angular", "django", "flask", "fastapi", "express",
-            "spring", "rails", "laravel", "nextjs", "nuxt", "svelte",
+            "react",
+            "vue",
+            "angular",
+            "django",
+            "flask",
+            "fastapi",
+            "express",
+            "spring",
+            "rails",
+            "laravel",
+            "nextjs",
+            "nuxt",
+            "svelte",
         ]
 
         tools = [
-            "docker", "kubernetes", "aws", "gcp", "azure", "git", "linux",
-            "jenkins", "terraform", "ansible", "redis", "postgresql", "mysql",
+            "docker",
+            "kubernetes",
+            "aws",
+            "gcp",
+            "azure",
+            "git",
+            "linux",
+            "jenkins",
+            "terraform",
+            "ansible",
+            "redis",
+            "postgresql",
+            "mysql",
         ]
 
         if skill_lower in programming:
@@ -105,10 +145,32 @@ class ClassificationEngine:
         """Extract skills from text using pattern matching."""
 
         known_skills = [
-            "python", "javascript", "typescript", "react", "vue", "angular",
-            "node.js", "django", "flask", "fastapi", "postgresql", "mysql",
-            "redis", "docker", "kubernetes", "aws", "gcp", "azure", "git",
-            "linux", "sql", "html", "css", "rest", "graphql", "ci/cd",
+            "python",
+            "javascript",
+            "typescript",
+            "react",
+            "vue",
+            "angular",
+            "node.js",
+            "django",
+            "flask",
+            "fastapi",
+            "postgresql",
+            "mysql",
+            "redis",
+            "docker",
+            "kubernetes",
+            "aws",
+            "gcp",
+            "azure",
+            "git",
+            "linux",
+            "sql",
+            "html",
+            "css",
+            "rest",
+            "graphql",
+            "ci/cd",
         ]
 
         found_skills = []

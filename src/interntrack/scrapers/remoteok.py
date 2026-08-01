@@ -85,7 +85,7 @@ class RemoteOKScraper(BaseScraper):
         """Parse salary from text."""
         import re
 
-        numbers = re.findall(r'[\d,]+', salary_text)
+        numbers = re.findall(r"[\d,]+", salary_text)
         if len(numbers) >= 2:
             return (
                 int(numbers[0].replace(",", "")),

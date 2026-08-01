@@ -29,6 +29,7 @@ def truncate_text(text: str, max_length: int = 100) -> str:
 def slugify(text: str) -> str:
     """Convert text to slug."""
     import re
+
     text = text.lower().strip()
     text = re.sub(r"[^\w\s-]", "", text)
     text = re.sub(r"[\s_-]+", "-", text)
@@ -38,4 +39,5 @@ def slugify(text: str) -> str:
 def generate_id() -> str:
     """Generate a unique ID."""
     from uuid import uuid4
+
     return str(uuid4())

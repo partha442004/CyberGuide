@@ -20,7 +20,8 @@ class LearningService:
         self.ai_service = AIService(session)
 
     async def get_learning_paths(
-        self, skill_id: str | None = None,
+        self,
+        skill_id: str | None = None,
     ) -> list[LearningPath]:
         """Get learning paths."""
         from sqlalchemy import select
@@ -40,12 +41,15 @@ class LearningService:
         return path
 
     async def get_recommendations(
-        self, user_skills: list[str], target_role: str,
+        self,
+        user_skills: list[str],
+        target_role: str,
     ) -> dict[str, Any]:
         """Get personalized learning recommendations."""
         # Get missing skills for target role
         ai_result = await self.ai_service.generate_learning_path(
-            user_skills, target_role,
+            user_skills,
+            target_role,
         )
 
         # Get available learning resources
@@ -53,11 +57,13 @@ class LearningService:
         for skill_name in ai_result.get("skills", []):
             skill = await self.skill_repo.get_by_name(skill_name)
             if skill:
-                recommendations.append({
-                    "skill": skill.name,
-                    "category": skill.category.value,
-                    "resources": skill.learning_resources or [],
-                })
+                recommendations.append(
+                    {
+                        "skill": skill.name,
+                        "category": skill.category.value,
+                        "resources": skill.learning_resources or [],
+                    }
+                )
 
         return {
             "target_role": target_role,
@@ -87,7 +93,9 @@ class LearningService:
         ]
 
     async def get_skill_gap_analysis(
-        self, user_skills: list[str], job_skills: list[str],
+        self,
+        user_skills: list[str],
+        job_skills: list[str],
     ) -> dict[str, Any]:
         """Analyze skill gaps between user and job requirements."""
         user_set = set(s.lower() for s in user_skills)

@@ -115,20 +115,20 @@ class HackerNewsScraper(BaseScraper):
     def _extract_title(self, text: str) -> str | None:
         """Extract job title from text."""
         # Common patterns: "Company | Title | Location | ..."
-        parts = re.split(r'\||-', text)
+        parts = re.split(r"\||-", text)
         if len(parts) >= 2:
             # Usually title is after company
             for part in parts[:3]:
-                part = re.sub(r'<[^>]+>', '', part).strip()
+                part = re.sub(r"<[^>]+>", "", part).strip()
                 if len(part) > 5 and len(part) < 100:
                     return part
         return None
 
     def _extract_company(self, text: str) -> str | None:
         """Extract company name from text."""
-        parts = re.split(r'\||-', text)
+        parts = re.split(r"\||-", text)
         if parts:
-            return re.sub(r'<[^>]+>', '', parts[0]).strip()
+            return re.sub(r"<[^>]+>", "", parts[0]).strip()
         return None
 
     def _extract_tags(self, text: str) -> list[str]:

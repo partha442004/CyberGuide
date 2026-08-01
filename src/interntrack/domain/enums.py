@@ -7,6 +7,7 @@ from enum import Enum
 
 class JobType(str, Enum):
     """Job type enumeration."""
+
     INTERNSHIP = "internship"
     FULL_TIME = "full_time"
     PART_TIME = "part_time"
@@ -18,6 +19,7 @@ class JobType(str, Enum):
 
 class ExperienceLevel(str, Enum):
     """Experience level enumeration."""
+
     ENTRY = "entry"
     JUNIOR = "junior"
     MID = "mid"
@@ -29,6 +31,7 @@ class ExperienceLevel(str, Enum):
 
 class ApplicationStatus(str, Enum):
     """Application status enumeration."""
+
     SAVED = "saved"
     APPLIED = "applied"
     INTERVIEW = "interview"
@@ -40,6 +43,7 @@ class ApplicationStatus(str, Enum):
 
 class NotificationChannel(str, Enum):
     """Notification channel enumeration."""
+
     TELEGRAM = "telegram"
     EMAIL = "email"
     DISCORD = "discord"
@@ -49,6 +53,7 @@ class NotificationChannel(str, Enum):
 
 class ReportType(str, Enum):
     """Report type enumeration."""
+
     DAILY = "daily"
     WEEKLY = "weekly"
     MONTHLY = "monthly"
@@ -56,6 +61,7 @@ class ReportType(str, Enum):
 
 class JobSource(str, Enum):
     """Job source enumeration."""
+
     LINKEDIN = "linkedin"
     INDEED = "indeed"
     GLASSDOOR = "glassdoor"
@@ -69,6 +75,7 @@ class JobSource(str, Enum):
 
 class SkillCategory(str, Enum):
     """Skill category enumeration."""
+
     PROGRAMMING = "programming"
     FRAMEWORK = "framework"
     TOOL = "tool"

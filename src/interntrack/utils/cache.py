@@ -20,6 +20,7 @@ class InMemoryCache:
     async def get(self, key: str) -> Any | None:
         """Get value from cache."""
         import time
+
         item = self._cache.get(key)
         if item and item["expires"] > time.time():
             return item["value"]
@@ -30,6 +31,7 @@ class InMemoryCache:
     async def set(self, key: str, value: Any, ttl: int = 300) -> None:
         """Set value in cache."""
         import time
+
         self._cache[key] = {
             "value": value,
             "expires": time.time() + ttl,
@@ -49,6 +51,7 @@ class RedisCache:
 
     def __init__(self, redis_url: str):
         import redis.asyncio as redis
+
         self.client = redis.from_url(redis_url)
 
     async def get(self, key: str) -> Any | None:
@@ -86,6 +89,7 @@ cache = get_cache()
 
 def cached(ttl: int = 300, prefix: str = ""):
     """Cache decorator."""
+
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -101,5 +105,7 @@ def cached(ttl: int = 300, prefix: str = ""):
             result = await func(*args, **kwargs)
             await cache.set(key, result, ttl=ttl)
             return result
+
         return wrapper
+
     return decorator
