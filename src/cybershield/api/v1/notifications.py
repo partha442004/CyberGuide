@@ -19,6 +19,7 @@ from cybershield.notifications.base import (
 from cybershield.schemas.notification import (
     NotificationConfig,
     NotificationResponse,
+    NotificationSendRequest,
     NotificationTest,
 )
 
@@ -119,22 +120,29 @@ async def test_notification(
 
 @router.post("/send", response_model=NotificationResponse)
 async def send_notification(
-    notification: dict,
+    notification: NotificationSendRequest,
     session: AsyncSession = Depends(get_session),
 ):
     """Send a notification (internal use)."""
     orchestrator = get_notification_orchestrator()
-    channel_name = notification.get("channel", "unknown")
-    title = notification.get("title", "CyberGuide Notification")
-    content = notification.get("content", "")
+    channel_name = notification.channel
+
+    # Map priority string to enum
+    priority_map = {
+        "low": NotificationPriority.LOW,
+        "normal": NotificationPriority.NORMAL,
+        "high": NotificationPriority.HIGH,
+        "urgent": NotificationPriority.URGENT,
+    }
+    priority = priority_map.get(notification.priority or "normal", NotificationPriority.NORMAL)
 
     message = NotificationMessage(
-        title=title,
-        content=content,
+        title=notification.title,
+        content=notification.content,
         notification_type=NotificationType.INSTANT_ALERT,
-        priority=NotificationPriority.NORMAL,
-        data=notification.get("data"),
-        url=notification.get("url"),
+        priority=priority,
+        data=notification.data,
+        url=notification.url,
     )
 
     # If a specific channel is requested, send to it; otherwise send to all

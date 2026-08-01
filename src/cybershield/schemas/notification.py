@@ -5,7 +5,7 @@ Pydantic models for notification configuration and testing.
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -44,6 +44,22 @@ class NotificationResponse(BaseModel):
     message: str
     channel: str
     sent_at: Optional[datetime] = None
+
+
+class NotificationSendRequest(BaseModel):
+    """Schema for sending a notification."""
+    channel: str = Field(
+        default="unknown",
+        pattern="^(telegram|email|discord|slack|push|unknown)$",
+    )
+    title: str = Field(default="CyberGuide Notification", max_length=200)
+    content: str = Field(..., min_length=1, max_length=4096)
+    priority: Optional[str] = Field(
+        default="normal",
+        pattern="^(low|normal|high|urgent)$",
+    )
+    url: Optional[str] = None
+    data: Optional[Dict[str, Any]] = None
 
 
 class NotificationHistory(BaseModel):
