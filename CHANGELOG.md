@@ -4,6 +4,38 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.10.0] - 2026-08-01
+
+### Added
+
+#### Version Consistency Gate
+- New `scripts/check_versions.py` — standalone checker verifying
+  `interntrack.__version__ == cybershield.__version__ == .env.example
+  APP_VERSION == pyproject.toml version`; exits non-zero on any drift so CI
+  fails on the kind of silent version skew that historically crept in
+- Wired into CI as a new **Version consistency** job (gates the test job) and
+  a `make version-check` target
+- `tests/unit/test_version_check.py` (10 tests) covering all four sources,
+  mismatch detection, exit codes, and missing-source handling
+
+#### Dashboard Live Version
+- `dashboard/app.py` now fetches the version from `GET /health` (single
+  source of truth) instead of a hardcoded string; falls back to
+  `DEFAULT_VERSION` when the API is unreachable so the dashboard still renders
+
+### Changed
+
+#### Version Sync (root pyproject.toml + 1.10.0)
+- Root `pyproject.toml` `version` bumped from `1.0.0` (stale since the very
+  first release) to `1.10.0`; now enforced by the consistency gate
+- Both packages bumped to `1.10.0`; `.env`/`.env.example`
+  `APP_VERSION=1.10.0`; canaries updated in `tests/unit/test_main.py` and
+  `src/cybershield/tests/test_version.py`
+- `README.md` badge refreshed to 776 tests
+- `CONTRIBUTING.md` Releasing checklist: step 5 notes the dashboard now reads
+  from `/health` (the `DEFAULT_VERSION` fallback still needs syncing) and adds
+  `make version-check` as the final verification step
+
 ## [1.9.0] - 2026-08-01
 
 ### Changed

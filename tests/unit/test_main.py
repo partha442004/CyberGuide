@@ -234,7 +234,7 @@ class TestVersionConsistency:
         """
         import interntrack
 
-        assert interntrack.__version__ == "1.9.0"
+        assert interntrack.__version__ == "1.10.0"
 
 
 class TestRateLimitConfig:

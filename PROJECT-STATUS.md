@@ -8,7 +8,7 @@
 
 - ✅ **mypy**: 0 errors across 177 source files (107 cybershield errors fixed)
 - ✅ **ruff**: all checks pass, 212 files formatted
-- ✅ **Tests**: 443 InternTrack + 323 CyberGuide = **766 passing**
+- ✅ **Tests**: 453 InternTrack + 323 CyberGuide = **776 passing**
 - ✅ **CI**: `.github/workflows/ci.yml` (ruff, mypy, full test suite + coverage + bandit + safety + Trivy security jobs); `.github/workflows/cd.yml` (tag-based deploy)
 - ✅ **Error handling**: `AppException` handler + consistent error payload; CORS settings-driven
 - ✅ **API rate limiting**: `RateLimitMiddleware` (per-IP 100/min, per-API-key 1000/min) with 429 error contract, exempt paths, `RATE_LIMIT_*` env overrides
@@ -16,7 +16,7 @@
 - ✅ **Security**: bandit clean at medium+ (MD5 `usedforsecurity=False`, `# nosec B104`); safety deps scan 0 vulnerabilities; pre-commit config added
 - ✅ **Health check**: `/health` creates its own session (`async_session_factory`) — engine-down returns **503 degraded** (was 500); 200 healthy / 503 degraded; conftest points factory at in-memory test engine
 - ✅ **Metrics**: `GET /metrics` (request counts, error rate, latency, status histogram) — new `MetricsStore` + middleware, 10 tests
-- ✅ **Version**: both packages single-source-of-truth at **1.9.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example; canary tests in both suites; CONTRIBUTING release-bump checklist added
+- ✅ **Version**: both packages single-source-of-truth at **1.10.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate; CONTRIBUTING release-bump checklist
 - ✅ **Live smoke test**: real uvicorn boot verified /, /health, CORS, 404, rate-limit burst (200/200/429/429/429)
 - ✅ **Report service**: template dir module-relative fix + 10 new rendering/generation tests
 - ✅ **Real runtime bugs fixed**: httpx 0.28 `follow_redirects`, `NotificationPriority.NORMAL`, `SkillTrend.recorded_at`, `Company.is_trusted` (model + migration), `Job.company` relationship shadowing the string column, scheduler verification filter
@@ -181,8 +181,8 @@ internship-tracker/
 ## 🧪 Test Results
 
 ### Test Summary
-- **Total Tests:** 766 (443 InternTrack + 323 CyberGuide)
-- **Tests Passing:** ✅ 766 (100%)
+- **Total Tests:** 776 (453 InternTrack + 323 CyberGuide)
+- **Tests Passing:** ✅ 776 (100%)
 - **Test Files:** 32+ test files
 
 ### Test Breakdown
@@ -221,9 +221,9 @@ internship-tracker/
 | Unit - Metrics | 10 | ✅ **NEW** |
 | Unit - Worker | 4 | ✅ (0% → 100% coverage) |
 | Integration - API | 23 | ✅ (incl. CORS middleware + health) |
-| **Total (InternTrack)** | **443** | ✅ **All Passing** |
+| **Total (InternTrack)** | **453** | ✅ **All Passing** |
 | **CyberGuide (cybershield)** | **323** | ✅ **All Passing** |
-| **Grand Total** | **766** | ✅ **All Passing** |
+| **Grand Total** | **776** | ✅ **All Passing** |
 
 ---
 
@@ -276,6 +276,7 @@ uvicorn interntrack.main:app --reload
 | **2026-08-01** | **429** | — | InternTrack + readiness probe failure-path test (+1) |
 | **2026-08-01** | **443** | — | InternTrack + metrics (10) + version (2) + worker (2) (+14) |
 | **2026-08-01** | **323** | — | CyberGuide + version consistency test (+2) |
+| **2026-08-01** | **453** | — | InternTrack + version consistency gate script tests (+10) |
 | **2026-08-01** | **766** | **67%** | Combined (interntrack + cybershield) |
 
 ---

@@ -39,6 +39,8 @@ st.markdown("""
 
 # API base URL
 API_URL = "http://localhost:8000/api/v1"
+HEALTH_URL = "http://localhost:8000/health"
+DEFAULT_VERSION = "1.10.0"
 
 
 def fetch_data(endpoint: str):
@@ -50,6 +52,25 @@ def fetch_data(endpoint: str):
     except Exception:
         pass
     return None
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def fetch_version() -> str:
+    """Fetch the live API version from /health (single source of truth).
+
+    Cached for 60s so the About section doesn't hit /health on every Streamlit
+    rerun; falls back to ``DEFAULT_VERSION`` when the API is unreachable so
+    the dashboard still renders offline.
+    """
+    try:
+        response = httpx.get(HEALTH_URL, timeout=5)
+        if response.status_code == 200:
+            version = response.json().get("version")
+            if version:
+                return version
+    except Exception:
+        pass
+    return DEFAULT_VERSION
 
 
 def main():
@@ -302,7 +323,7 @@ def show_settings():
         st.success("Settings saved! (Restart API to apply)")
 
     st.subheader("About")
-    st.write(f"**InternTrack** v1.9.0")
+    st.write(f"**InternTrack** v{fetch_version()}")
     st.write("AI-powered internship and job tracking platform")
 
 

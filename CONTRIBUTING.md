@@ -212,9 +212,12 @@ When cutting a new release, keep the version single-source-of-truth in sync:
    (`TestVersionConsistency.test_version_is_current_release`) and
    `src/cybershield/tests/test_version.py` so CI validates the new release
 5. Sync hardcoded version strings in deployment artifacts:
-   `dashboard/app.py` (About line), `k8s/helm/Chart.yaml`
+   `dashboard/app.py` (`DEFAULT_VERSION` fallback — the About line now reads
+   the live version from `/health`), `k8s/helm/Chart.yaml`
    (`version`/`appVersion`), and `deploy/oracle-cloud/setup.sh`
    (`APP_VERSION=`)
+6. Run `make version-check` (or `python scripts/check_versions.py`) to confirm
+   every source agrees before committing
 
 ### PR Template
 

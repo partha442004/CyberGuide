@@ -48,6 +48,9 @@ format-check: ## Check formatting without making changes
 typecheck: ## Run type checker (mypy)
 	mypy src/interntrack
 
+version-check: ## Verify all version sources agree (packages + .env.example + pyproject)
+	python scripts/check_versions.py
+
 security: ## Run static security scan (bandit)
 	bandit -r src/ -ll -q
 
