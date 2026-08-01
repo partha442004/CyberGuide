@@ -5,14 +5,14 @@
 ![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Tests](https://img.shields.io/badge/tests-347%20passed-brightgreen.svg)
-![Coverage](https://img.shields.io/badge/coverage-82%25-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-734%20passed-brightgreen.svg)
+![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen.svg)
 
 ---
 
 ## ✨ Features
 
-- 🔍 **Automated Job Discovery** - Scrape jobs from HackerNews, RemoteOK, RSS feeds
+- 🔍 **Automated Job Discovery** - Scrape jobs from HackerNews, RemoteOK, RSS feeds, LinkedIn, Indeed, Glassdoor
 - 📋 **Application Tracking** - Kanban-style pipeline (Saved → Applied → Interview → Offer)
 - 📊 **Analytics Dashboard** - Real-time charts, trends, and insights
 - 🔔 **Multi-channel Notifications** - Telegram, Email, Discord, Slack
@@ -78,8 +78,10 @@ curl http://localhost:8000/health
 |----------|-------------|
 | [Architecture](docs/01-software-architecture.md) | System design and patterns |
 | [Folder Structure](docs/02-folder-structure.md) | Project organization |
+| [Database Schema](docs/03-database-schema.md) | Database design |
 | [Security Guide](docs/SECURITY-AND-METHODOLOGIES.md) | Security best practices |
 | [TODO Checklist](TODO-CHECKLIST.md) | Complete development checklist |
+| [Changelog](CHANGELOG.md) | Version history |
 
 ---
 

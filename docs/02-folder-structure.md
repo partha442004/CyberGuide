@@ -42,7 +42,6 @@ internship-tracker/
 │       │   ├── 📄 indeed.py
 │       │   ├── 📄 glassdoor.py
 │       │   ├── 📄 remoteok.py
-│       │   ├── 📄 we_work_remotely.py
 │       │   ├── 📄 hackernews.py
 │       │   └── 📄 rss_feeds.py
 │       │
@@ -53,30 +52,17 @@ internship-tracker/
 │       │   ├── 📄 classification.py     # AI classification
 │       │   └── 📄 matching.py           # Skill matching
 │       │
-│       ├── 📁 notifications/             # Notification Infrastructure
+│       ├── 📁 reports/                   # Report Generation
 │       │   ├── 📄 __init__.py
-│       │   ├── 📄 base.py               # Base channel
-│       │   ├── 📄 manager.py            # Notification manager
-│       │   ├── 📄 telegram.py
-│       │   ├── 📄 email.py
-│       │   ├── 📄 discord.py
-│       │   ├── 📄 slack.py
-│       │   └── 📄 templates/            # Message templates
-│       │       ├── 📄 new_job.html
+│       │   └── 📁 templates/            # Jinja2 templates
 │       │       ├── 📄 daily_report.html
 │       │       ├── 📄 weekly_report.html
 │       │       └── 📄 monthly_report.html
 │       │
-│       ├── 📁 reports/                   # Report Generation
+│       ├── 📁 scripts/                   # Utility Scripts
 │       │   ├── 📄 __init__.py
-│       │   ├── 📄 generator.py          # Report generator
-│       │   ├── 📄 daily.py
-│       │   ├── 📄 weekly.py
-│       │   ├── 📄 monthly.py
-│       │   └── 📄 templates/            # Jinja2 templates
-│       │       ├── 📄 daily_report.html
-│       │       ├── 📄 weekly_report.html
-│       │       └── 📄 monthly_report.html
+│       │   ├── 📄 export_jobs.py        # Export utilities
+│       │   └── 📄 seed_data.py          # Database seeding
 │       │
 │       ├── 📁 api/                       # API Layer
 │       │   ├── 📄 __init__.py
@@ -107,13 +93,7 @@ internship-tracker/
 │       │   ├── 📄 jobs.py               # Scheduled jobs
 │       │   └── 📄 setup.py              # Scheduler setup
 │       │
-│       ├── 📁 integrations/              # External Integrations
-│       │   ├── 📄 __init__.py
-│       │   ├── 📄 ollama.py             # Ollama client
-│       │   ├── 📄 gemini.py             # Gemini API
-│       │   └── 📄 rss.py                # RSS parser
-│       │
-│       └── 📁 utils/                     # Utilities
+│       ├── 📁 utils/                     # Utilities
 │           ├── 📄 __init__.py
 │           ├── 📄 logger.py             # Structured logging
 │           ├── 📄 cache.py              # Cache utilities
@@ -151,40 +131,55 @@ internship-tracker/
 │   ├── 📁 unit/
 │   │   ├── 📄 __init__.py
 │   │   ├── 📄 test_job_service.py
+│   │   ├── 📄 test_application_service.py
 │   │   ├── 📄 test_deduplication.py
-│   │   └── 📄 test_notification.py
+│   │   ├── 📄 test_verification.py
+│   │   ├── 📄 test_classification_engine.py
+│   │   ├── 📄 test_matching_engine.py
+│   │   ├── 📄 test_engines_extended.py
+│   │   ├── 📄 test_scrapers_unified.py
+│   │   ├── 📄 test_edge_cases.py
+│   │   ├── 📄 test_api_v1_extended.py
+│   │   ├── 📄 test_api_v1_full.py
+│   │   ├── 📄 test_services_extended.py
+│   │   ├── 📄 test_coverage_boost.py
+│   │   ├── 📄 test_final_coverage_push.py
+│   │   ├── 📄 test_export_jobs.py
+│   │   ├── 📄 test_seed_data.py
+│   │   ├── 📄 test_ai_service.py
+│   │   ├── 📄 test_ai_service_extended.py
+│   │   ├── 📄 test_notification_service.py
+│   │   ├── 📄 test_notification_service_v2.py
+│   │   ├── 📄 test_report_service.py
+│   │   ├── 📄 test_learning_service.py
+│   │   ├── 📄 test_cache.py
+│   │   ├── 📄 test_cache_utils.py
+│   │   ├── 📄 test_encryption.py
+│   │   ├── 📄 test_encryption_utils.py
+│   │   ├── 📄 test_helpers.py
+│   │   ├── 📄 test_helpers_utils.py
+│   │   ├── 📄 test_utils.py
+│   │   ├── 📄 test_utils_extended.py
+│   │   ├── 📄 test_logger.py
+│   │   ├── 📄 test_dependencies.py
+│   │   ├── 📄 test_worker.py
+│   │   ├── 📄 test_scheduler_jobs.py
+│   │   ├── 📄 test_scheduler_jobs_v2.py
+│   │   ├── 📄 test_scheduler_setup.py
+│   │   ├── 📄 test_scraper_base.py
+│   │   └── [40+ more test files]
 │   ├── 📁 integration/
 │   │   ├── 📄 __init__.py
-│   │   ├── 📄 test_database.py
 │   │   └── 📄 test_api.py
-│   └── 📁 fixtures/                      # Test data
-│       ├── 📄 jobs.json
-│       └── 📄 applications.json
+│   └── 📁 fixtures/
+│       └── 📄 __init__.py
 │
 ├── 📁 docs/                              # Documentation
 │   ├── 📄 01-software-architecture.md
 │   ├── 📄 02-folder-structure.md
 │   ├── 📄 03-database-schema.md
-│   ├── 📄 04-er-diagram.md
-│   ├── 📄 05-api-design.md
-│   ├── 📄 06-scheduler.md
-│   ├── 📄 07-discovery-engine.md
-│   ├── 📄 08-verification-engine.md
-│   ├── 📄 09-deduplication-engine.md
-│   ├── 📄 10-ai-classification.md
-│   ├── 📄 11-notification-engine.md
-│   ├── 📄 12-dashboard.md
-│   ├── 📄 13-authentication.md
-│   ├── 📄 14-deployment.md
-│   ├── 📄 15-docker.md
-│   ├── 📄 16-cicd.md
-│   ├── 📄 17-testing.md
-│   └── 📄 18-documentation.md
-│
-├── 📁 scripts/                           # Utility Scripts
-│   ├── 📄 setup.sh                       # Initial setup
-│   ├── 📄 seed_data.py                   # Database seeding
-│   └── 📄 export_jobs.py                 # Export utilities
+│   ├── 📄 SECURITY-AND-METHODOLOGIES.md
+│   └── 📁 cscip/                          # Detailed architecture docs
 │
 ├── 📁 .github/                           # GitHub Configuration
 │   └── 📁 workflows/
@@ -194,13 +189,24 @@ internship-tracker/
 ├── 📄 .env.example                       # Environment template
 ├── 📄 .gitignore                         # Git ignore rules
 ├── 📄 .dockerignore                      # Docker ignore rules
-├── 📄 Dockerfile                         # Docker image
+├── 📄 Dockerfile                         # API container
+├── 📄 Dockerfile.dashboard               # Dashboard container
 ├── 📄 docker-compose.yml                 # Docker Compose
+├── 📄 railway.toml                       # Railway.app deployment
+├── 📄 render.yaml                        # Render.com deployment
+├── 📄 Procfile                           # Render build system
 ├── 📄 pyproject.toml                     # Project configuration
 ├── 📄 requirements.txt                   # Dependencies
 ├── 📄 requirements-dev.txt               # Dev dependencies
 ├── 📄 Makefile                           # Common commands
 ├── 📄 README.md                          # Project documentation
+├── 📄 CHANGELOG.md                       # Version history
+├── 📄 CONTRIBUTING.md                    # Contribution guidelines
+├── 📄 SECURITY.md                        # Security policy
+├── 📄 SETUP.md                           # Setup guide
+├── 📄 PROJECT-STATUS.md                  # Project status
+├── 📄 PROJECT-PROGRESS.md                # Progress tracking
+├── 📄 TODO-CHECKLIST.md                  # Development checklist
 └── 📄 LICENSE                            # MIT License
 ```
 

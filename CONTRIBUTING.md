@@ -156,7 +156,7 @@ pytest -v
 - Test both success and failure cases
 - Use descriptive test names
 - Mock external dependencies
-- Aim for 80% coverage on new code
+- Aim for 90%+ coverage on new code
 
 ### Test Structure
 
@@ -195,10 +195,11 @@ class TestJobService:
 ### Before Submitting
 
 1. Run all tests: `pytest`
-2. Run linter: `ruff check .`
-3. Run formatter: `ruff format .`
-4. Update documentation if needed
-5. Update CHANGELOG.md
+2. Run linter: `ruff check src/interntrack/`
+3. Run formatter: `ruff format src/interntrack/`
+4. Verify coverage: `pytest --cov=interntrack`
+5. Update documentation if needed
+6. Update CHANGELOG.md
 
 ### PR Template
 
