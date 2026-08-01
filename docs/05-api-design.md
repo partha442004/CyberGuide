@@ -50,6 +50,49 @@ X-API-Key: your-api-key
 }
 ```
 
+### Error Contract
+
+All errors follow one shape: `{ "error": { "code", "message", "details" } }`.
+
+| HTTP Status | `code` | Meaning |
+|-------------|--------|---------|
+| 400 | `VALIDATION_ERROR` | Bad request / invalid input |
+| 404 | `NOT_FOUND` | Resource does not exist |
+| 409 | `DUPLICATE` | Conflict (e.g. duplicate job) |
+| 422 | `SCRAPING_ERROR` | Upstream scraping/processing failure |
+| 502 | `NOTIFICATION_ERROR` | Notification channel failure |
+| 500 | `INTERNAL_ERROR` | Unexpected error (debug detail gated) |
+
+> FastAPI's `HTTPException` 4xx responses are preserved by the middleware stack;
+> domain `AppException`s surface via a dedicated handler using `exc.status`;
+> unexpected exceptions become 500 with a consistent payload.
+
+---
+
+## CORS
+
+CORS is configured via environment variables (see `Settings` in `config.py`):
+
+```env
+CORS_ORIGINS=https://app.example.com,https://admin.example.com
+CORS_ALLOW_ALL=false
+```
+
+- `CORS_ORIGINS` — comma-separated list; each entry is trimmed when parsed
+- `CORS_ALLOW_ALL=true` (default) → `allow_origins=["*"]`, `allow_credentials=false`
+  (the spec-correct combination for the wildcard)
+- Restricted origins → `allow_credentials=true`
+
+Example preflight:
+```
+OPTIONS /api/v1/jobs/ HTTP/1.1
+Origin: https://app.example.com
+Access-Control-Request-Method: GET
+
+HTTP/1.1 200 OK
+access-control-allow-origin: *
+```
+
 ---
 
 ## Endpoints

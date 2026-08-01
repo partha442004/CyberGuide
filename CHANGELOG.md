@@ -4,6 +4,33 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.3.0] - 2026-08-01
+
+### Added
+
+#### CI/CD
+- Added `.github/workflows/ci.yml` — ruff lint + format check, mypy on both
+  modules, and the combined InternTrack + CyberGuide test suite (679 tests)
+
+#### Documentation
+- `docs/01-software-architecture.md` — exception `to_dict()` contract, exception
+  handler ordering, CORS settings & configuration
+- `docs/05-api-design.md` — error contract table (HTTP status → error code) and
+  CORS configuration + preflight example
+- `docs/cscip/15-deployment.md` — `is_trusted` migration note for existing
+  deployments (ALTER TABLE) since editing the initial migration only covers
+  fresh schemas
+
+#### Test Coverage (CyberGuide engines + Elasticsearch)
+- Scam detection: email/domain edge cases, risk-level boundaries (low/medium/
+  high/critical), score breakdown, batch analysis
+- Deduplication: URL fragment/empty normalization, hash case-insensitivity,
+  empty similarity, canonical selection, non-duplicate find
+- Verification: naive datetime deadlines, weighted score calculation
+- Classification: explicit years extraction, batch aggregation
+- Elasticsearch: close error handling, missing-ID bulk skip, bulk error via
+  injected fake module, match_all search, delete success, index stats
+
 ## [1.2.0] - 2026-08-01
 
 ### Added

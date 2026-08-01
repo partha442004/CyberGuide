@@ -12,8 +12,9 @@
 | **ruff format** | ✅ 212 files formatted |
 | **mypy** | ✅ 0 errors in 177 source files (fixed 107 in cybershield) |
 | **InternTrack tests** | ✅ 358 passing |
-| **CyberGuide tests** | ✅ 295 passing |
+| **CyberGuide tests** | ✅ 321 passing |
 | **Smoke test** | ✅ /health, /, CORS preflight, 404, docs (prod-off) verified |
+| **CI pipeline** | ✅ .github/workflows/ci.yml added (lint + typecheck + tests) |
 
 ### Highlights
 - **Error handling**: dedicated `AppException` handler + consistent `{error: {code, message, details}}` payload; debug detail gated
@@ -37,7 +38,7 @@
 | **Engines** | ✅ Complete | 100% | Dedup, verify, classify |
 | **Notifications** | ✅ Complete | 100% | Telegram, Email, Discord |
 | **Dashboard** | ✅ Complete | 100% | Streamlit with charts |
-| **Tests** | ✅ Complete | 100% | 358 tests passing |
+| **Tests** | ✅ Complete | 100% | 679 tests passing |
 | **CI/CD** | ✅ Complete | 100% | GitHub Actions ready |
 | **Documentation** | ✅ Complete | 100% | All docs created |
 | **Docker** | ✅ Complete | 100% | Compose ready |
@@ -65,7 +66,7 @@ Total: 653 tests passing
 | Phase 5 | 271 | 74% | +32 tests, +2% |
 | Phase 6 | 331 | 80% | +60 tests, +6% |
 | **Latest** | **358** | **82%+** | +11 tests (InternTrack) |
-| **CyberGuide** | **295** | — | Full cleanup + 295 passing |
+| **CyberGuide** | **321** | — | Full cleanup + engine/ES tests added |
 
 ---
 
@@ -106,7 +107,7 @@ Total: 653 tests passing
 - [x] `src/interntrack/utils/` - 4 utility files
 - [x] `src/interntrack/reports/templates/` - 3 report templates
 
-### Tests (653 total: 358 InternTrack + 295 CyberGuide)
+### Tests (679 total: 358 InternTrack + 321 CyberGuide)
 - [x] `tests/conftest.py` - Test fixtures
 - [x] `tests/unit/test_job_service.py` - 8 tests
 - [x] `tests/unit/test_application_service.py` - 8 tests

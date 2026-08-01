@@ -40,6 +40,11 @@ CSCIP uses GitHub Actions for continuous integration and deployment with automat
 
 ### CI Workflow
 
+> ✅ **Implemented** in `.github/workflows/ci.yml` (2026-08-01). It runs ruff
+> lint + format check, mypy across both modules, and the combined InternTrack +
+> CyberGuide test suite (679 tests). Docker build + Trivy scan are future
+> enhancements; the current pipeline is focused on lint/type/tests.
+
 ```yaml
 # .github/workflows/ci.yml
 
@@ -47,93 +52,70 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, master, develop]
   pull_request:
-    branches: [main]
+    branches: [main, master]
 
 jobs:
   lint:
+    name: Lint (ruff)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
       - name: Install dependencies
         run: |
-          pip install ruff mypy
-      
-      - name: Run Ruff linter
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Ruff check
         run: ruff check src/ tests/
-      
-      - name: Run Ruff formatter check
+      - name: Ruff format check
         run: ruff format --check src/ tests/
 
-  test:
-    runs-on: ubuntu-latest
-    needs: lint
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pytest pytest-asyncio pytest-cov
-      
-      - name: Run tests
-        run: pytest tests/ -v --cov=cybershield --cov-report=xml
-      
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
-        with:
-          file: ./coverage.xml
-
   typecheck:
+    name: Typecheck (mypy)
     runs-on: ubuntu-latest
-    needs: lint
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-          pip install mypy types-requests
-      
-      - name: Run mypy
-        run: mypy src/cybershield --ignore-missing-imports
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Mypy (interntrack + cybershield)
+        run: |
+          export PYTHONPATH=src
+          mypy src/interntrack src/cybershield
 
-  build:
+  test:
+    name: Tests (pytest)
     runs-on: ubuntu-latest
-    needs: [test, typecheck]
+    needs: [lint, typecheck]
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Build Docker image
-        run: docker build -t cybershield:test .
-      
-      - name: Run security scan
-        uses: aquasecurity/trivy-action@master
+      - uses: actions/setup-python@v5
         with:
-          image-ref: 'cybershield:test'
-          format: 'table'
-          exit-code: '1'
-          severity: 'CRITICAL,HIGH'
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Run full test suite (InternTrack + CyberGuide)
+        env:
+          PYTHONPATH: src
+        run: |
+          pytest tests src/cybershield/tests -q -p no:cacheprovider -o addopts=''
 ```
 
 ### CD Workflow
+
+> ⏳ **Planned / future enhancement.** Not yet implemented — shown here as the
+> target pipeline for tag-based releases. Requires Docker Hub credentials and a
+> deploy target with SSH access.
 
 ```yaml
 # .github/workflows/cd.yml
