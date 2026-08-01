@@ -11,16 +11,18 @@
 | **ruff lint** | ✅ All checks passed (was 1,294 errors) |
 | **ruff format** | ✅ 212 files formatted |
 | **mypy** | ✅ 0 errors in 177 source files (fixed 107 in cybershield) |
-| **InternTrack tests** | ✅ 358 passing |
+| **InternTrack tests** | ✅ 416 passing |
 | **CyberGuide tests** | ✅ 321 passing |
 | **Smoke test** | ✅ /health, /, CORS preflight, 404, docs (prod-off) verified |
-| **CI pipeline** | ✅ .github/workflows/ci.yml added (lint + typecheck + tests) |
+| **CI pipeline** | ✅ .github/workflows/ci.yml added (lint + typecheck + tests + coverage) |
 
 ### Highlights
 - **Error handling**: dedicated `AppException` handler + consistent `{error: {code, message, details}}` payload; debug detail gated
 - **CORS**: settings-driven with comma-separated env parsing + integration tests
+- **API rate limiting**: `RateLimitMiddleware` (per-IP 100/min, per-API-key 1000/min), 429 with error contract, exempt paths, `RATE_LIMIT_*` env overrides
+- **Dashboard component tests**: 46 tests for cards/forms/charts via fake streamlit + plotly modules
 - **Real bugs fixed**: httpx 0.28 `allow_redirects` removal, `NotificationPriority.NORMAL`, `SkillTrend.recorded_at`, `Company.is_trusted` (models + migration), `Job.company` relationship shadowing the string column (broke search), scheduler `not Job.is_verified` filter
-- New tests: `tests/unit/test_main.py` (9) + `TestCorsMiddleware` integration tests
+- New tests: `tests/unit/test_main.py` (11) + `tests/unit/test_rate_limit.py` (9) + `tests/unit/test_dashboard_components.py` (46) + `TestCorsMiddleware` integration tests
 
 ---
 
@@ -38,7 +40,7 @@
 | **Engines** | ✅ Complete | 100% | Dedup, verify, classify |
 | **Notifications** | ✅ Complete | 100% | Telegram, Email, Discord |
 | **Dashboard** | ✅ Complete | 100% | Streamlit with charts |
-| **Tests** | ✅ Complete | 100% | 679 tests passing |
+| **Tests** | ✅ Complete | 100% | 737 tests passing |
 | **CI/CD** | ✅ Complete | 100% | GitHub Actions ready |
 | **Documentation** | ✅ Complete | 100% | All docs created |
 | **Docker** | ✅ Complete | 100% | Compose ready |
@@ -49,9 +51,10 @@
 ## 📊 FINAL TEST RESULTS
 
 ```
-======================== 358 passed in 96.04s ========================
-CyberGuide (cybershield): 295 passed in 21.02s
-Total: 653 tests passing
+======================== 737 passed ========================
+InternTrack: 416 passed
+CyberGuide (cybershield): 321 passed
+Total: 737 tests passing
 ```
 
 ### Coverage Improvement Summary
@@ -65,8 +68,9 @@ Total: 653 tests passing
 | Phase 4 | 239 | 72% | +47 tests, +6% |
 | Phase 5 | 271 | 74% | +32 tests, +2% |
 | Phase 6 | 331 | 80% | +60 tests, +6% |
-| **Latest** | **358** | **82%+** | +11 tests (InternTrack) |
+| **Latest** | **416** | **82%+** | +58 tests (InternTrack, incl. rate limit + dashboard) |
 | **CyberGuide** | **321** | — | Full cleanup + engine/ES tests added |
+| **Combined** | **737** | **67%** | interntrack + cybershield measured together |
 
 ---
 
@@ -107,7 +111,7 @@ Total: 653 tests passing
 - [x] `src/interntrack/utils/` - 4 utility files
 - [x] `src/interntrack/reports/templates/` - 3 report templates
 
-### Tests (679 total: 358 InternTrack + 321 CyberGuide)
+### Tests (737 total: 416 InternTrack + 321 CyberGuide)
 - [x] `tests/conftest.py` - Test fixtures
 - [x] `tests/unit/test_job_service.py` - 8 tests
 - [x] `tests/unit/test_application_service.py` - 8 tests
@@ -223,11 +227,13 @@ uvicorn interntrack.main:app --reload
 | Unit - Indeed Scraper | 12 | ✅ |
 | Unit - Glassdoor Scraper | 12 | ✅ |
 | Unit - Learning Service | 16 | ✅ |
-| Unit - Main/Error Handling | 9 | ✅ **NEW** |
+| Unit - Main/Error Handling | 11 | ✅ **NEW** |
+| Unit - Rate Limiting | 10 | ✅ **NEW** |
+| Unit - Dashboard Components | 46 | ✅ **NEW** |
 | Integration - API | 23 | ✅ (incl. CORS middleware) |
-| **Total (InternTrack)** | **358** | ✅ **All Passing** |
-| **CyberGuide (cybershield)** | **295** | ✅ **All Passing** |
-| **Grand Total** | **653** | ✅ **All Passing** |
+| **Total (InternTrack)** | **416** | ✅ **All Passing** |
+| **CyberGuide (cybershield)** | **321** | ✅ **All Passing** |
+| **Grand Total** | **737** | ✅ **All Passing** |
 
 ---
 
@@ -250,4 +256,4 @@ uvicorn interntrack.main:app --reload
 ---
 
 **Project Completion: 100%**
-**Last Updated:** 2026-07-30
+**Last Updated:** 2026-08-01

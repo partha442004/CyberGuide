@@ -542,6 +542,34 @@ sqlite3 data/interntrack.db "PRAGMA integrity_check;"
 
 ---
 
+## ✅ HARDENING PASS 2 (2026-08-01) — COMPLETED
+
+### API Rate Limiting (InternTrack)
+- [x] `RateLimitMiddleware` + `RateLimitStore` (in-memory sliding window)
+- [x] Per-IP (100/min) and per-API-key (1000/min) limits with `RATE_LIMIT_*` env overrides
+- [x] 429 responses use the standard `{error: {code, message, details}}` contract
+- [x] `X-RateLimit-*` headers + `Retry-After` on responses
+- [x] Exempt paths: `/`, `/health`, `/docs`, `/redoc`, `/openapi.json`
+- [x] Middleware wired in `main.py`, gated by `rate_limit_enabled`
+- [x] Tests: `tests/unit/test_rate_limit.py` (10, incl. CORS-on-429) + `TestRateLimitConfig` in test_main.py
+- [x] conftest disables rate limiting for deterministic integration tests
+
+### Dashboard Component Tests
+- [x] `tests/unit/test_dashboard_components.py` (46 tests)
+- [x] cards.py: metric/job/application cards, skill badges, section headers, info/warning cards
+- [x] forms.py: search/filter/job-search/application/notification/skill forms
+- [x] charts.py: pie/bar/line/salary/skill-demand chart data shaping
+- [x] streamlit + plotly mocked via sys.modules (not required for backend suite)
+
+### CI & Documentation
+- [x] CI test job collects coverage (`--cov=interntrack --cov=cybershield`) and uploads `coverage.xml`
+- [x] README badges updated: 737 tests, 67% coverage, CI workflow badge
+- [x] `docs/05-api-design.md` rate limiting section (API + scraper limits)
+- [x] `docs/cscip/17-cicd.md` aligned with the actual coverage step
+- [x] CHANGELOG 1.4.0 entry; PROJECT-PROGRESS/STATUS updated to 736 tests
+
+---
+
 ## 🔄 QUICK REFERENCE
 
 ### Common Commands

@@ -137,6 +137,10 @@ module = [
     "google",
     "google.generativeai",
     "structlog",
+    "streamlit",
+    "plotly",
+    "plotly.*",
+    "pandas",
 ]
 ignore_missing_imports = true
 

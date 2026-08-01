@@ -13,6 +13,7 @@ from interntrack.api.router import api_router
 from interntrack.config import get_settings
 from interntrack.database.session import close_db, init_db
 from interntrack.domain.exceptions import AppException
+from interntrack.middleware.rate_limit import RateLimitMiddleware
 from interntrack.utils.logger import get_logger
 
 settings = get_settings()
@@ -39,6 +40,17 @@ app = FastAPI(
     docs_url="/docs" if settings.debug else None,
     redoc_url="/redoc" if settings.debug else None,
 )
+
+# Rate limiting middleware - limits configurable via env vars.
+# Registered BEFORE CORS so that CORS wraps it: rate-limited 429 responses
+# still pass through CORS and carry the allow-origin headers for browser clients.
+if settings.rate_limit_enabled:
+    app.add_middleware(
+        RateLimitMiddleware,
+        default_limit=settings.rate_limit_per_minute,
+        api_key_limit=settings.rate_limit_api_key_per_minute,
+        api_key_header=settings.api_key_header,
+    )
 
 # CORS middleware - origins configurable via CORS_ORIGINS env var (comma-separated)
 app.add_middleware(

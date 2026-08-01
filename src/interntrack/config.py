@@ -73,6 +73,11 @@ class Settings(BaseSettings):
     cors_methods: list[str] = ["*"]
     cors_headers: list[str] = ["*"]
 
+    # Rate Limiting
+    rate_limit_enabled: bool = True
+    rate_limit_per_minute: int = 100
+    rate_limit_api_key_per_minute: int = 1000
+
     @field_validator("cors_origins", "cors_methods", "cors_headers", mode="before")
     @classmethod
     def _parse_csv_lists(cls, value: Any) -> Any:

@@ -3,7 +3,12 @@ Pytest configuration and test fixtures.
 """
 
 import asyncio
+import os
 from collections.abc import AsyncGenerator, Generator
+
+# Disable rate limiting so the shared integration client stays deterministic.
+# Rate limiting is exercised explicitly in tests/unit/test_rate_limit.py.
+os.environ["RATE_LIMIT_ENABLED"] = "false"
 
 import pytest
 import pytest_asyncio
