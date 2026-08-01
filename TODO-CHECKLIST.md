@@ -604,6 +604,17 @@ sqlite3 data/interntrack.db "PRAGMA integrity_check;"
 
 ---
 
+## ✅ HARDENING PASS 5 (2026-08-01) — COMPLETED
+
+### Readiness Probe Fix (InternTrack)
+- [x] `GET /health` creates its own session via `async_session_factory` inside the handler (was `Depends(get_db)`)
+- [x] Fully unreachable engine now returns **503 `degraded`** (was 500 from the dependency layer)
+- [x] Unit tests monkeypatch `interntrack.database.session.async_session_factory`: healthy, session-creation failure, probe failure
+- [x] conftest `client` fixture points `async_session_factory` at the in-memory test engine (restored after)
+- [x] README badges: 750 tests + bandit/safety security badge
+
+---
+
 ## 🔄 QUICK REFERENCE
 
 ### Common Commands

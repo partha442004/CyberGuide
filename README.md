@@ -6,8 +6,9 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![CI](https://github.com/partha442004/CyberGuide/actions/workflows/ci.yml/badge.svg)
-![Tests](https://img.shields.io/badge/tests-737%20passed-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-749%20passed-brightgreen.svg)
 ![Coverage](https://img.shields.io/badge/coverage-67%25-yellow.svg)
+![Security](https://img.shields.io/badge/security-bandit%20%2B%20safety%20clean-brightgreen.svg)
 
 ---
 

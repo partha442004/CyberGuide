@@ -67,6 +67,7 @@ async def db_session(db_engine) -> AsyncGenerator[AsyncSession, None]:
 @pytest_asyncio.fixture(scope="function")
 async def client(db_engine, db_session) -> AsyncGenerator[AsyncClient, None]:
     """Create test HTTP client wired to the in-memory test database."""
+    import interntrack.database.session as session_module
     from interntrack.database.session import get_db
 
     app.dependency_overrides.clear()
@@ -76,12 +77,24 @@ async def client(db_engine, db_session) -> AsyncGenerator[AsyncClient, None]:
 
     app.dependency_overrides[get_db] = override_get_db
 
+    # The /health endpoint creates its own session via async_session_factory
+    # (so engine-down returns 503, not 500); point it at the in-memory test
+    # engine so the connectivity probe succeeds during tests.
+    test_factory = async_sessionmaker(
+        db_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    original_factory = session_module.async_session_factory
+    session_module.async_session_factory = test_factory
+
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://testserver",
     ) as client:
         yield client
 
+    session_module.async_session_factory = original_factory
     app.dependency_overrides.clear()
 
 

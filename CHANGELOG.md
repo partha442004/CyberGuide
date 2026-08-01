@@ -4,6 +4,23 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.7.0] - 2026-08-01
+
+### Changed
+
+#### Readiness Probe Fix (InternTrack)
+- `GET /health` no longer depends on `get_db` — it creates its own session via
+  `async_session_factory` inside the handler with a try/except
+- A fully unreachable database engine now returns **503 `degraded`** instead of
+  a 500 from the dependency layer (the previous readiness gap)
+- Unit tests rewritten to monkeypatch `interntrack.database.session.async_session_factory`
+  and cover three paths: healthy, session-creation failure (engine down), and
+  probe failure (`SELECT 1` raises)
+- `tests/conftest.py` `client` fixture points `async_session_factory` at the
+  in-memory test engine (restored after each test) so the integration health
+  probe succeeds
+- README badges refreshed: 749 tests → 750, added bandit + safety security badge
+
 ## [1.6.0] - 2026-08-01
 
 ### Added
