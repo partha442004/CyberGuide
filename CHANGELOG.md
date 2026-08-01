@@ -4,6 +4,39 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.17.0] - 2026-08-01
+
+### Added
+
+#### Node-Exporter System Monitoring (InternTrack)
+- `docker-compose.yml`: new `node-exporter` service
+  (`prom/node-exporter:v1.8.2`, port 9100, host `/proc`/`/sys`/`/` mounted
+  read-only with `--path.procfs`/`--path.sysfs`/`--path.rootfs`, `monitoring`
+  profile) so host CPU/memory/disk/network metrics are scrapeable
+- `deploy/prometheus/prometheus.yml`: new `node-exporter` scrape job
+  (target `node-exporter:9100`, `component: node-exporter` label)
+- `deploy/prometheus/alerts.yml`: new `system` alert group —
+  `DiskSpaceLow` (root filesystem free < 10%, critical, 5m), `MemoryHigh`
+  (memory usage > 90%, warning, 5m), `CpuHigh` (CPU usage > 90%, warning,
+  10m) — all targeting real `node_*` metrics (completes the TODO-CHECKLIST
+  System Metrics + disk/memory alerting items)
+- `deploy/grafana/dashboards/system.json`: **InternTrack System** dashboard
+  (uid `interntrack-system`) — CPU, memory, and disk stat panels plus
+  network traffic (`rate(node_network_receive/transmit_bytes_total[5m])`)
+  and system load (`node_load1`) timeseries
+- Tests: `tests/unit/test_system_monitoring.py` (7 tests) — node-exporter
+  service + scrape job wiring, the `system` alert group, and that every
+  PromQL expression (alerts + dashboard) references a real node-exporter
+  metric; `node_load1` used directly (it's a gauge — `rate()` would be
+  invalid PromQL)
+- `docs/SECURITY-AND-METHODOLOGIES.md` §7.3 note updated: system alerts now
+  ship with the node-exporter target (no longer a future requirement)
+
+#### Version
+- Both packages, `.env`/`.env.example`, canaries, Helm chart, Oracle
+  deployment files, and docs bumped to `1.17.0`; root `pyproject.toml`
+  synced — verified by `make version-check` (exit 0)
+
 ## [1.16.0] - 2026-08-01
 
 ### Added

@@ -34,7 +34,7 @@
   limiting; `deploy/prometheus/prometheus.yml` + compose `prometheus`
   service (`monitoring` profile); k8s `prometheus.io` Service annotations;
   6 new tests (renderer format/escaping + endpoint + exempt-path coverage)
-- **Version**: both packages single-source-of-truth at **1.16.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate
+- **Version**: both packages single-source-of-truth at **1.17.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate
 - **Grafana**: provisioned monitoring stack (`monitoring` profile) — Prometheus
   datasource (uid `prometheus`) + **InternTrack API** dashboard (request rate,
   5xx error rate, avg latency, requests by status, top paths); read-only
@@ -81,7 +81,7 @@
 | **Engines** | ✅ Complete | 100% | Dedup, verify, classify |
 | **Notifications** | ✅ Complete | 100% | Telegram, Email, Discord |
 | **Dashboard** | ✅ Complete | 100% | Streamlit with charts |
-| **Tests** | ✅ Complete | 100% | 810 tests passing |
+| **Tests** | ✅ Complete | 100% | 817 tests passing |
 | **CI/CD** | ✅ Complete | 100% | GitHub Actions ready |
 | **Documentation** | ✅ Complete | 100% | All docs created |
 | **Docker** | ✅ Complete | 100% | Compose ready |
@@ -92,10 +92,10 @@
 ## 📊 FINAL TEST RESULTS
 
 ```
-======================== 810 passed ========================
-InternTrack: 487 passed
+======================== 817 passed ========================
+InternTrack: 494 passed
 CyberGuide (cybershield): 323 passed
-Total: 810 tests passing
+Total: 817 tests passing
 ```
 
 ### Coverage Improvement Summary
@@ -157,7 +157,7 @@ Total: 810 tests passing
 - [x] `src/interntrack/utils/` - 4 utility files
 - [x] `src/interntrack/reports/templates/` - 3 report templates
 
-### Tests (810 total: 487 InternTrack + 323 CyberGuide)
+### Tests (817 total: 494 InternTrack + 323 CyberGuide)
 - [x] `tests/conftest.py` - Test fixtures
 - [x] `tests/unit/test_job_service.py` - 8 tests
 - [x] `tests/unit/test_application_service.py` - 8 tests

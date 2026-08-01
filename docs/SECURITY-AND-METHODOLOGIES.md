@@ -827,7 +827,7 @@ FROM python:3.11-slim
 services:
   api:
     # Don't use :latest
-    image: interntrack:1.16.0
+    image: interntrack:1.17.0
     
     # Use secrets
     secrets:
@@ -1050,8 +1050,11 @@ groups:
           description: "Prometheus cannot scrape the InternTrack API (job interntrack-api)."
 ```
 
-System-level alerts (disk/memory/CPU) require a node-exporter target and are
-not part of the app-level `interntrack-api` group.
+System-level alerts (`DiskSpaceLow`, `MemoryHigh`, `CpuHigh`) ship in the
+`system` group (see `deploy/prometheus/alerts.yml`), scraping the
+`node-exporter` service (`prom/node-exporter:v1.8.2`) added to the compose
+`monitoring` profile — see `deploy/grafana/dashboards/system.json` for the
+host dashboard.
 
 ---
 
@@ -1304,5 +1307,5 @@ async def cleanup_old_data():
 ---
 
 **Last Updated:** {{DATE}}
-**Version:** 1.16.0
+**Version:** 1.17.0
 **Owner:** Security Team
