@@ -16,7 +16,6 @@ class TestNotificationChannel:
         with pytest.raises(TypeError):
             NotificationChannel()
 
-
     @pytest.mark.asyncio
     async def test_send_failure(self):
         from interntrack.domain.exceptions import NotificationError
