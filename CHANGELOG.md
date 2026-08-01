@@ -34,6 +34,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Validation: mypy 1.20.2 clean (182 files, local + fresh-CI venv), ruff
   clean, format clean, 1247 tests passing, `make version-check` exit 0
 
+#### Trivy Security Gate (dependency CVEs)
+- `trivy-action@v0.30.0` replaced with `aquasecurity/setup-trivy@v0.3.1` +
+  a direct `trivy fs` run. Root cause: `trivy-action@v0.30.0`'s composite
+  action internally pins `aquasecurity/setup-trivy@v0.2.2`, which does not
+  exist (setup-trivy only publishes v0.2.6+) — GitHub Actions could not
+  resolve the transitive action and the Security job failed at the action
+  resolution stage
+- Once the scan actually ran, it surfaced **8 HIGH CVEs**, all in
+  `src/cybershield/requirements.txt` (the only exact-pinned pip manifest
+  under `src/`; the root `requirements.txt` uses `>=` ranges and is not
+  resolvable by trivy without a lockfile). Pins bumped to patched versions:
+  - `aiohttp 3.9.3 → 3.13.4` — CVE-2024-30251 (DoS, fix 3.9.4) +
+    CVE-2025-69223 (zip-bomb DoS, fix 3.13.3)
+  - `black 24.1.1 → 26.3.1` — CVE-2026-32274 (arbitrary file writes)
+  - `lxml 5.1.0 → 6.1.0` — CVE-2026-41066 (XXE local-file disclosure)
+  - `python-multipart 0.0.9 → 0.0.30` — CVE-2024-53981 (boundary DoS),
+    CVE-2026-24486 (path-traversal file write), CVE-2026-42561 (header DoS),
+    CVE-2026-53539 (urlencoded DoS)
+- `mypy==1.8.0` in the same file aligned to `mypy>=1.20,<2` to match the
+  repo-wide standard
+- Verified locally with trivy 0.72.0 (identical command + skip-dirs as CI):
+  `cybershield/requirements.txt` now reports **0 vulnerabilities**, exit 0
+
 ## [Merged] - 2026-08-01 — origin/master reconciled into local master
 
 ### Merged
