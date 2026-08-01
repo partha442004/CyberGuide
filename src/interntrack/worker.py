@@ -6,8 +6,8 @@ import asyncio
 import signal
 import sys
 
-from interntrack.scheduler.setup import setup_scheduler, scheduler
-from interntrack.utils.logger import setup_logging, get_logger
+from interntrack.scheduler.setup import setup_scheduler
+from interntrack.utils.logger import get_logger, setup_logging
 
 logger = get_logger(__name__)
 
@@ -24,7 +24,7 @@ async def main():
     logger.info("Worker started. Press Ctrl+C to stop.")
 
     # Handle shutdown
-    def shutdown_handler(signum, frame):
+    def shutdown_handler(_signum, _frame):
         logger.info("Shutting down worker...")
         scheduler_instance.shutdown()
         sys.exit(0)

@@ -8,7 +8,6 @@ Detects potential job scams using:
 - Confidence scoring
 """
 
-import re
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
@@ -31,41 +30,74 @@ class ScamDetectionEngine(BaseEngine):
 
     # High-risk scam indicators (score: 80-100)
     CRITICAL_INDICATORS = [
-        "training fee", "registration fee", "security deposit",
-        "advance payment", "upfront cost", "guaranteed income",
-        "work from home guaranteed", "no experience required high salary",
-        "mlm", "multi level marketing", "pyramid scheme",
-        "money transfer", "wire transfer", "western union",
-        "bank account details upfront", "credit card number",
+        "training fee",
+        "registration fee",
+        "security deposit",
+        "advance payment",
+        "upfront cost",
+        "guaranteed income",
+        "work from home guaranteed",
+        "no experience required high salary",
+        "mlm",
+        "multi level marketing",
+        "pyramid scheme",
+        "money transfer",
+        "wire transfer",
+        "western union",
+        "bank account details upfront",
+        "credit card number",
     ]
 
     # Medium-risk indicators (score: 50-79)
     HIGH_RISK_INDICATORS = [
-        "whatsapp number", "telegram only", "no official website",
-        "generic email", "gmail", "yahoo", "hotmail",
-        "unlimited earning", "earn lakhs", "earn millions",
-        "daily payment", "instant joining", "no interview",
-        "pay to apply", "refundable fee",
+        "whatsapp number",
+        "telegram only",
+        "no official website",
+        "generic email",
+        "gmail",
+        "yahoo",
+        "hotmail",
+        "unlimited earning",
+        "earn lakhs",
+        "earn millions",
+        "daily payment",
+        "instant joining",
+        "no interview",
+        "pay to apply",
+        "refundable fee",
     ]
 
     # Low-risk indicators (score: 30-49)
     MEDIUM_RISK_INDICATORS = [
-        "urgent hiring", "immediate join", "last date today",
-        "too good to be true", "no requirements",
-        "vague job description", "no company name",
-        "personal email contact", "no office address",
+        "urgent hiring",
+        "immediate join",
+        "last date today",
+        "too good to be true",
+        "no requirements",
+        "vague job description",
+        "no company name",
+        "personal email contact",
+        "no office address",
     ]
 
     # Suspicious domain patterns
     SUSPICIOUS_DOMAINS = [
-        "blogspot.com", "wordpress.com", "wix.com", "weebly.com",
-        "tinyurl.com", "bit.ly",
+        "blogspot.com",
+        "wordpress.com",
+        "wix.com",
+        "weebly.com",
+        "tinyurl.com",
+        "bit.ly",
     ]
 
     # Known disposable email domains
     DISPOSABLE_EMAIL_DOMAINS = [
-        "tempmail.com", "throwaway.email", "guerrillamail.com",
-        "mailinator.com", "yopmail.com", "temp-mail.org",
+        "tempmail.com",
+        "throwaway.email",
+        "guerrillamail.com",
+        "mailinator.com",
+        "yopmail.com",
+        "temp-mail.org",
     ]
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -122,7 +154,7 @@ class ScamDetectionEngine(BaseEngine):
             # Check for unusual TLDs
             suspicious_tlds = [".xyz", ".top", ".club", ".site", ".online"]
             if any(domain.endswith(tld) for tld in suspicious_tlds):
-                return {"suspicious": True, "reason": f"Unusual TLD"}
+                return {"suspicious": True, "reason": "Unusual TLD"}
 
             return {"suspicious": False}
 
@@ -166,7 +198,7 @@ class ScamDetectionEngine(BaseEngine):
 
         # Calculate content score
         if not all_indicators:
-            score = 0
+            score = 0.0
         else:
             max_score = max(score for _, score in all_indicators)
             # If any critical indicator found, use max score directly
@@ -192,9 +224,6 @@ class ScamDetectionEngine(BaseEngine):
     ) -> Dict[str, Any]:
         """Calculate final scam confidence score."""
         # Weighted scoring
-        content_weight = 0.5
-        domain_weight = 0.3
-        email_weight = 0.2
 
         base_score = content_analysis.get("score", 0)
 
@@ -231,7 +260,7 @@ class ScamDetectionEngine(BaseEngine):
             },
         }
 
-    async def process(
+    async def process(  # type: ignore[override]
         self,
         job: Dict[str, Any],
         **kwargs,
@@ -256,9 +285,7 @@ class ScamDetectionEngine(BaseEngine):
         email_analysis = self._analyze_email(email)
 
         # Calculate final score
-        scam_result = self._calculate_scam_score(
-            content_analysis, domain_analysis, email_analysis
-        )
+        scam_result = self._calculate_scam_score(content_analysis, domain_analysis, email_analysis)
 
         # Build flags list
         flags = []
@@ -301,12 +328,14 @@ class ScamDetectionEngine(BaseEngine):
                 is_scam = result.data.get("is_scam", False)
                 if is_scam:
                     scam_count += 1
-                results.append({
-                    "job_id": job.get("id"),
-                    "scam_score": result.data.get("scam_score"),
-                    "risk_level": result.data.get("risk_level"),
-                    "is_scam": is_scam,
-                })
+                results.append(
+                    {
+                        "job_id": job.get("id"),
+                        "scam_score": result.data.get("scam_score"),
+                        "risk_level": result.data.get("risk_level"),
+                        "is_scam": is_scam,
+                    }
+                )
 
         return self._create_result(
             success=True,
@@ -315,5 +344,5 @@ class ScamDetectionEngine(BaseEngine):
                 "scam_detected": scam_count,
                 "safe_jobs": len(jobs) - scam_count,
                 "results": results,
-            }
+            },
         )

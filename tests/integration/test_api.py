@@ -163,14 +163,17 @@ class TestApplicationsAPI:
         job_response = await client.post("/api/v1/jobs/", json=mock_job_data)
         job_id = job_response.json()["id"]
 
-        app_response = await client.post("/api/v1/applications/", json={"job_id": job_id})
+        app_response = await client.post(
+            "/api/v1/applications/",
+            json={"job_id": job_id},
+        )
         app_id = app_response.json()["id"]
 
         # Update status
         status_update = {"status": "applied", "notes": "Applied via website"}
         response = await client.patch(
             f"/api/v1/applications/{app_id}/status",
-            json=status_update
+            json=status_update,
         )
 
         assert response.status_code == 200
@@ -231,6 +234,35 @@ class TestNotificationsAPI:
         assert response.status_code == 200
         data = response.json()
         assert "channels" in data
+
+
+class TestCorsMiddleware:
+    """Tests for CORS middleware wiring."""
+
+    @pytest.mark.asyncio
+    async def test_cors_preflight(self, client: AsyncClient):
+        """OPTIONS preflight from an allowed origin returns CORS headers."""
+        response = await client.options(
+            "/api/v1/jobs/",
+            headers={
+                "Origin": "http://localhost:3000",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.headers.get("access-control-allow-origin") == "*"
+
+    @pytest.mark.asyncio
+    async def test_cors_headers_on_regular_request(self, client: AsyncClient):
+        """Regular requests from an allowed origin include CORS headers."""
+        response = await client.get(
+            "/health",
+            headers={"Origin": "http://localhost:3000"},
+        )
+
+        assert response.status_code == 200
+        assert response.headers.get("access-control-allow-origin") == "*"
 
 
 class TestDashboardAPI:

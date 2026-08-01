@@ -4,14 +4,14 @@ Job Repository
 Specialized repository for job-related operations.
 """
 
-from typing import List, Optional, Sequence
 from datetime import datetime, timedelta, timezone
+from typing import List, Optional, Sequence
 
-from sqlalchemy import select, func, desc, and_, or_
+from sqlalchemy import and_, desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from cybershield.domain.models import Job, ScamScore, DuplicateGroup
+from cybershield.domain.models import DuplicateGroup, Job, ScamScore
 from cybershield.repositories.base import BaseRepository
 
 
@@ -24,9 +24,7 @@ class JobRepository(BaseRepository[Job]):
     async def get_with_skills(self, id: str) -> Optional[Job]:
         """Get job with job_skills relationships."""
         result = await self.session.execute(
-            select(Job)
-            .options(selectinload(Job.skills))
-            .where(Job.id == id)
+            select(Job).options(selectinload(Job.skills)).where(Job.id == id)
         )
         return result.scalar_one_or_none()
 
@@ -51,10 +49,7 @@ class JobRepository(BaseRepository[Job]):
         limit: int = 20,
     ) -> Sequence[Job]:
         """Search jobs with multiple filters."""
-        stmt = (
-            select(Job)
-            .where(Job.is_active == True)
-        )
+        stmt = select(Job).where(Job.is_active)
 
         # Text search - search in title, description, and company name
         if query_text:
@@ -81,15 +76,10 @@ class JobRepository(BaseRepository[Job]):
         result = await self.session.execute(stmt)
         return result.scalars().all()
 
-    async def get_by_source(
-        self, source: str, limit: int = 100
-    ) -> Sequence[Job]:
+    async def get_by_source(self, source: str, limit: int = 100) -> Sequence[Job]:
         """Get jobs from a specific source."""
         result = await self.session.execute(
-            select(Job)
-            .where(Job.source == source)
-            .order_by(desc(Job.posted_at))
-            .limit(limit)
+            select(Job).where(Job.source == source).order_by(desc(Job.posted_at)).limit(limit)
         )
         return result.scalars().all()
 
@@ -102,7 +92,7 @@ class JobRepository(BaseRepository[Job]):
             select(Job)
             .where(
                 and_(
-                    Job.is_active == True,
+                    Job.is_active,
                     Job.expires_at <= future,
                     Job.expires_at >= now,
                 )
@@ -118,7 +108,7 @@ class JobRepository(BaseRepository[Job]):
             .join(ScamScore, Job.id == ScamScore.job_id)
             .where(
                 and_(
-                    Job.is_active == True,
+                    Job.is_active,
                     ScamScore.scam_score >= threshold,
                 )
             )
@@ -132,7 +122,7 @@ class JobRepository(BaseRepository[Job]):
             if job_id != canonical_id:
                 job = await self.get(job_id)
                 if job:
-                    job.is_active = False
+                    job.is_active = False  # type: ignore[assignment]
                     dup_group = DuplicateGroup(
                         canonical_job_id=canonical_id,
                         duplicate_job_id=job_id,
@@ -142,12 +132,10 @@ class JobRepository(BaseRepository[Job]):
                     self.session.add(dup_group)
         await self.session.flush()
 
-    async def update_verification_status(
-        self, job_id: str, is_verified: bool
-    ) -> Job:
+    async def update_verification_status(self, job_id: str, is_verified: bool) -> Job:
         """Update job verification status."""
         job = await self.get_or_raise(job_id)
-        job.is_verified = is_verified
-        job.updated_at = datetime.now(timezone.utc)
+        job.is_verified = is_verified  # type: ignore[assignment]
+        job.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
         await self.session.flush()
         return job

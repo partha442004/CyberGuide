@@ -1,8 +1,8 @@
 """Unit tests for services/learning_service.py."""
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class TestLearningService:
@@ -110,7 +110,7 @@ class TestLearningService:
             "difficulty_level": "beginner",
         }
 
-        result = await service.create_learning_path(data)
+        await service.create_learning_path(data)
 
         session.add.assert_called_once()
         session.flush.assert_called_once()
@@ -227,10 +227,12 @@ class TestLearningService:
         service = LearningService(session)
 
         # Mock AI service
-        service.ai_service.generate_learning_path = AsyncMock(return_value={
-            "skills": ["python"],
-            "steps": ["Step 1: Learn Python"],
-        })
+        service.ai_service.generate_learning_path = AsyncMock(
+            return_value={
+                "skills": ["python"],
+                "steps": ["Step 1: Learn Python"],
+            },
+        )
 
         # Mock skill repo
         mock_skill = MagicMock()
@@ -240,7 +242,8 @@ class TestLearningService:
         service.skill_repo.get_by_name = AsyncMock(return_value=mock_skill)
 
         result = await service.get_recommendations(
-            ["javascript"], "Python Developer"
+            ["javascript"],
+            "Python Developer",
         )
 
         assert result["target_role"] == "Python Developer"
@@ -256,16 +259,19 @@ class TestLearningService:
         service = LearningService(session)
 
         # Mock AI service
-        service.ai_service.generate_learning_path = AsyncMock(return_value={
-            "skills": ["python"],
-            "steps": [],
-        })
+        service.ai_service.generate_learning_path = AsyncMock(
+            return_value={
+                "skills": ["python"],
+                "steps": [],
+            },
+        )
 
         # Mock skill repo returning None
         service.skill_repo.get_by_name = AsyncMock(return_value=None)
 
         result = await service.get_recommendations(
-            ["javascript"], "Python Developer"
+            ["javascript"],
+            "Python Developer",
         )
 
         assert result["target_role"] == "Python Developer"

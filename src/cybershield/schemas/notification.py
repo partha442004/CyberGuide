@@ -5,12 +5,14 @@ Pydantic models for notification configuration and testing.
 """
 
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
 class NotificationConfig(BaseModel):
     """Schema for user notification configuration."""
+
     telegram_enabled: bool = False
     telegram_chat_id: Optional[str] = None
     email_enabled: bool = True
@@ -33,12 +35,14 @@ class NotificationConfig(BaseModel):
 
 class NotificationTest(BaseModel):
     """Schema for testing notification channels."""
+
     channel: str = Field(..., pattern="^(telegram|email|discord|slack|push)$")
     message: Optional[str] = "This is a test notification from CyberGuide."
 
 
 class NotificationResponse(BaseModel):
     """Schema for notification send response."""
+
     success: bool
     message: str
     channel: str
@@ -47,6 +51,7 @@ class NotificationResponse(BaseModel):
 
 class NotificationHistory(BaseModel):
     """Schema for notification history."""
+
     id: str
     channel: str
     notification_type: str

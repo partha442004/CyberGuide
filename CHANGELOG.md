@@ -4,6 +4,32 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.2.0] - 2026-08-01
+
+### Added
+
+#### Error Handling Architecture (InternTrack)
+- Registered a dedicated `AppException` handler in `main.py` (`exc.status` + `exc.to_dict()`) so domain errors (404/409/422/503) surface correctly instead of being masked as 500
+- Global fallback handler returns a consistent `{error: {code, message, details}}` payload with debug detail gated by `settings.debug`
+- CORS middleware is now settings-driven with comma-separated env parsing (`CORS_ORIGINS`)
+- `Settings.is_production` property and `validate_security()` startup warnings (secret key + CORS hardening)
+- New tests: `tests/unit/test_main.py` (9 tests) covering the exception handlers, CORS parsing, and security validation; `TestCorsMiddleware` integration tests
+- Smoke-tested live API: /health, /, docs (404 in prod), CORS preflight, 404 routes
+
+#### CyberGuide (cybershield) Quality Hardening
+- Fixed 107 mypy errors across 37 files; mypy now clean on all 177 source files
+- Fixed real runtime bugs:
+  - httpx 0.28 `allow_redirects` removed → client now uses `follow_redirects=True`
+  - `NotificationPriority.NORMAL` doesn't exist → `MEDIUM`
+  - `SkillTrend.recorded_at` → `period_start` (non-existent column)
+  - `Company.is_trusted` column added to models + migration; `Company.jobs` relationship added
+  - `Job.company` relationship renamed to `company_ref` (was shadowing the string column and breaking `Job.company.ilike` search)
+  - `NotFoundError(resource, identifier)` two-arg calls fixed in repositories
+  - Scheduler `not Job.is_verified` (evaluated a Python bool) → proper SQL filter
+  - `NotificationPriority` typing, scam score float init, dedup sha256 hashing
+- Alembic `001_initial_schema.py` updated to include `is_trusted` column
+- ruff: 1,294 errors fixed; all checks pass; 212 files formatted
+
 ## [1.1.0] - 2026-07-30
 
 ### Added

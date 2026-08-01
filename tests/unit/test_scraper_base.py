@@ -2,10 +2,9 @@
 Unit tests for scraper base class and registry.
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
-from interntrack.scrapers.base import BaseScraper, RawJob
+from interntrack.scrapers.base import RawJob
 from interntrack.scrapers.registry import ScraperRegistry, get_default_registry
 
 

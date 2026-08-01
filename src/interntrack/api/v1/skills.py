@@ -2,8 +2,6 @@
 Skills API endpoints.
 """
 
-from typing import List, Optional
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,8 +15,8 @@ router = APIRouter()
 
 @router.get("/")
 async def list_skills(
-    category: Optional[str] = None,
-    search: Optional[str] = None,
+    category: str | None = None,
+    search: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     """List skills with optional filters."""
@@ -28,6 +26,7 @@ async def list_skills(
         skills = await repo.search_skills(search)
     elif category:
         from interntrack.domain.enums import SkillCategory
+
         skills = await repo.get_by_category(SkillCategory(category))
     else:
         skills = await repo.get_active_skills()
@@ -57,8 +56,8 @@ async def get_skill_demand(
 
 @router.post("/match")
 async def match_skills(
-    job_skills: List[str],
-    user_skills: List[str],
+    job_skills: list[str],
+    user_skills: list[str],
     db: AsyncSession = Depends(get_db),
 ):
     """Match job skills with user skills."""
@@ -68,13 +67,10 @@ async def match_skills(
 
 @router.get("/learning-path")
 async def get_learning_path(
-    current_skills: List[str] = Query(...),
+    current_skills: list[str] = Query(...),
     target_role: str = Query(...),
     db: AsyncSession = Depends(get_db),
 ):
     """Get learning path for career progression."""
     service = AIService(db)
     return await service.generate_learning_path(current_skills, target_role)
-
-
-

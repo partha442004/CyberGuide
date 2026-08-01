@@ -7,19 +7,20 @@ Configures Alembic for async SQLAlchemy migrations.
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from cybershield.config import settings
+from alembic import context
+from cybershield.config import get_settings
 from cybershield.domain.models import Base
 
 # Alembic Config object
 config = context.config
+settings = get_settings()
 
 # Set sqlalchemy.url from app settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", settings.database_url)
 
 # Interpret the config file for Python logging
 if config.config_file_name is not None:

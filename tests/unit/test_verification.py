@@ -2,8 +2,9 @@
 Unit tests for VerificationEngine.
 """
 
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 
 from interntrack.engines.verification import VerificationEngine
 
@@ -94,7 +95,11 @@ class TestVerificationEngine:
         """Test that verify_jobs filters out invalid jobs."""
         jobs = [
             {"title": "Valid Job", "company": "C1", "url": "https://example.com/1"},
-            {"title": "", "company": "C2", "url": "https://example.com/2"},  # Missing title
+            {
+                "title": "",
+                "company": "C2",
+                "url": "https://example.com/2",
+            },  # Missing title
             {"title": "Another Valid", "company": "C3", "url": "https://example.com/3"},
         ]
 

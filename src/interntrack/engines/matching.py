@@ -2,11 +2,11 @@
 Matching engine for skill-based job matching and recommendations.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from interntrack.domain.models import Skill, JobSkill, UserSkill
+from interntrack.domain.models import JobSkill, Skill, UserSkill
 from interntrack.repositories.skill_repository import SkillRepository
 
 
@@ -21,10 +21,9 @@ class MatchingEngine:
         self,
         job_id: str,
         user_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Match a job's skill requirements against a user's skills."""
         from sqlalchemy import select
-        from interntrack.domain.models import JobSkill, UserSkill
 
         # Get job skills
         job_skills_query = (
@@ -60,8 +59,8 @@ class MatchingEngine:
 
         # Calculate match
         matched = []
-        missing = []
-        partial = []
+        missing: list[dict[str, Any]] = []
+        partial: list[dict[str, Any]] = []
 
         for job_skill in job_skills:
             skill_name = job_skill["name"].lower()
@@ -71,38 +70,44 @@ class MatchingEngine:
                 proficiency = user_skills[skill_name]["proficiency"]
                 # Consider it a full match if proficiency >= importance
                 if proficiency >= importance:
-                    matched.append({
-                        "name": job_skill["name"],
-                        "category": job_skill["category"],
-                        "importance": importance,
-                        "proficiency": proficiency,
-                        "match_type": "full",
-                    })
+                    matched.append(
+                        {
+                            "name": job_skill["name"],
+                            "category": job_skill["category"],
+                            "importance": importance,
+                            "proficiency": proficiency,
+                            "match_type": "full",
+                        },
+                    )
                 else:
-                    partial.append({
+                    partial.append(
+                        {
+                            "name": job_skill["name"],
+                            "category": job_skill["category"],
+                            "importance": importance,
+                            "proficiency": proficiency,
+                            "gap": importance - proficiency,
+                            "match_type": "partial",
+                        },
+                    )
+            else:
+                missing.append(
+                    {
                         "name": job_skill["name"],
                         "category": job_skill["category"],
                         "importance": importance,
-                        "proficiency": proficiency,
-                        "gap": importance - proficiency,
-                        "match_type": "partial",
-                    })
-            else:
-                missing.append({
-                    "name": job_skill["name"],
-                    "category": job_skill["category"],
-                    "importance": importance,
-                    "match_type": "missing",
-                })
+                        "match_type": "missing",
+                    },
+                )
 
         # Calculate match percentage
         total_importance = sum(js["importance"] for js in job_skills) or 1
         matched_importance = sum(m["importance"] for m in matched)
         partial_importance = sum(p["importance"] * 0.5 for p in partial)
-        
+
         match_percentage = round(
             (matched_importance + partial_importance) / total_importance * 100,
-            2
+            2,
         )
 
         # Get recommendations for missing skills
@@ -123,10 +128,11 @@ class MatchingEngine:
         user_id: str,
         limit: int = 20,
         min_match: float = 50.0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Find jobs that match the user's skills."""
         from sqlalchemy import select
-        from interntrack.domain.models import Job, JobSkill, UserSkill, Skill
+
+        from interntrack.domain.models import Job, Skill
 
         # Get user skills
         user_skills_query = (
@@ -142,14 +148,12 @@ class MatchingEngine:
 
         # Get all active jobs with their skills
         jobs_query = (
-            select(Job)
-            .where(Job.is_active == True)
-            .limit(100)  # Limit for performance
+            select(Job).where(Job.is_active).limit(100)  # Limit for performance
         )
         jobs_result = await self.session.execute(jobs_query)
         jobs = list(jobs_result.scalars().all())
 
-        matching_jobs = []
+        matching_jobs: list[dict[str, Any]] = []
 
         for job in jobs:
             # Get job skills
@@ -166,26 +170,27 @@ class MatchingEngine:
 
             # Calculate match
             matched_count = sum(
-                1 for _, skill in job_skills
-                if skill.name.lower() in user_skill_names
+                1 for _, skill in job_skills if skill.name.lower() in user_skill_names
             )
             match_percentage = (matched_count / len(job_skills)) * 100
 
             if match_percentage >= min_match:
-                matching_jobs.append({
-                    "job": {
-                        "id": job.id,
-                        "title": job.title,
-                        "company": job.company,
-                        "location": job.location,
-                        "url": job.url,
-                        "salary_min": job.salary_min,
-                        "salary_max": job.salary_max,
+                matching_jobs.append(
+                    {
+                        "job": {
+                            "id": job.id,
+                            "title": job.title,
+                            "company": job.company,
+                            "location": job.location,
+                            "url": job.url,
+                            "salary_min": job.salary_min,
+                            "salary_max": job.salary_max,
+                        },
+                        "match_percentage": round(match_percentage, 2),
+                        "matched_skills": matched_count,
+                        "total_skills": len(job_skills),
                     },
-                    "match_percentage": round(match_percentage, 2),
-                    "matched_skills": matched_count,
-                    "total_skills": len(job_skills),
-                })
+                )
 
         # Sort by match percentage
         matching_jobs.sort(key=lambda x: x["match_percentage"], reverse=True)
@@ -196,10 +201,11 @@ class MatchingEngine:
         self,
         user_id: str,
         target_role: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Analyze skill gaps for a target role."""
         from sqlalchemy import select
-        from interntrack.domain.models import UserSkill, Skill
+
+        from interntrack.domain.models import Skill
 
         # Get user skills
         user_skills_query = (
@@ -213,29 +219,31 @@ class MatchingEngine:
         # Get skills commonly required for the target role
         target_skills = await self._get_skills_for_role(target_role)
 
-        matched = []
-        missing = []
+        matched: list[dict[str, Any]] = []
+        missing: list[dict[str, Any]] = []
 
         for skill_name, category in target_skills.items():
             if skill_name.lower() in user_skills:
-                matched.append({
-                    "name": skill_name,
-                    "category": category,
-                })
+                matched.append(
+                    {
+                        "name": skill_name,
+                        "category": category,
+                    },
+                )
             else:
-                missing.append({
-                    "name": skill_name,
-                    "category": category,
-                    "priority": self._get_skill_priority(skill_name, category),
-                })
+                missing.append(
+                    {
+                        "name": skill_name,
+                        "category": category,
+                        "priority": self._get_skill_priority(skill_name, category),
+                    },
+                )
 
         # Sort missing by priority
         missing.sort(key=lambda x: x["priority"], reverse=True)
 
         match_percentage = (
-            (len(matched) / len(target_skills) * 100)
-            if target_skills
-            else 0
+            (len(matched) / len(target_skills) * 100) if target_skills else 0
         )
 
         return {
@@ -250,8 +258,8 @@ class MatchingEngine:
 
     async def _get_recommendations(
         self,
-        missing_skills: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+        missing_skills: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         """Get learning recommendations for missing skills."""
         recommendations = []
 
@@ -260,23 +268,27 @@ class MatchingEngine:
             skill = await self.skill_repo.get_by_name(skill_name)
 
             if skill and skill.learning_resources:
-                recommendations.append({
-                    "skill": skill_name,
-                    "category": skill_info["category"],
-                    "importance": skill_info["importance"],
-                    "resources": skill.learning_resources[:3],
-                })
+                recommendations.append(
+                    {
+                        "skill": skill_name,
+                        "category": skill_info["category"],
+                        "importance": skill_info["importance"],
+                        "resources": skill.learning_resources[:3],
+                    },
+                )
             else:
-                recommendations.append({
-                    "skill": skill_name,
-                    "category": skill_info["category"],
-                    "importance": skill_info["importance"],
-                    "resources": self._get_default_resources(skill_name),
-                })
+                recommendations.append(
+                    {
+                        "skill": skill_name,
+                        "category": skill_info["category"],
+                        "importance": skill_info["importance"],
+                        "resources": self._get_default_resources(skill_name),
+                    },
+                )
 
         return recommendations
 
-    async def _get_skills_for_role(self, role: str) -> Dict[str, str]:
+    async def _get_skills_for_role(self, role: str) -> dict[str, str]:
         """Get commonly required skills for a role."""
         # Default skill sets for common roles
         role_skills = {
@@ -363,33 +375,35 @@ class MatchingEngine:
 
         if skill_lower in high_priority:
             return 3
-        elif skill_lower in medium_priority:
+        if skill_lower in medium_priority or category == "programming":
             return 2
-        elif category == "programming":
-            return 2
-        else:
-            return 1
+        return 1
 
     def _get_readiness_level(self, percentage: float) -> str:
         """Get readiness level based on match percentage."""
         if percentage >= 80:
             return "excellent"
-        elif percentage >= 60:
+        if percentage >= 60:
             return "good"
-        elif percentage >= 40:
+        if percentage >= 40:
             return "moderate"
-        else:
-            return "needs_improvement"
+        return "needs_improvement"
 
-    def _get_default_resources(self, skill_name: str) -> List[Dict[str, str]]:
+    def _get_default_resources(self, skill_name: str) -> list[dict[str, str]]:
         """Get default learning resources for a skill."""
         resources = {
             "python": [
-                {"name": "Python.org Tutorial", "url": "https://docs.python.org/3/tutorial/"},
+                {
+                    "name": "Python.org Tutorial",
+                    "url": "https://docs.python.org/3/tutorial/",
+                },
                 {"name": "Real Python", "url": "https://realpython.com/"},
             ],
             "javascript": [
-                {"name": "MDN Web Docs", "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript"},
+                {
+                    "name": "MDN Web Docs",
+                    "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript",
+                },
                 {"name": "JavaScript.info", "url": "https://javascript.info/"},
             ],
             "react": [
@@ -398,7 +412,10 @@ class MatchingEngine:
             ],
             "docker": [
                 {"name": "Docker Documentation", "url": "https://docs.docker.com/"},
-                {"name": "Docker Getting Started", "url": "https://docs.docker.com/get-started/"},
+                {
+                    "name": "Docker Getting Started",
+                    "url": "https://docs.docker.com/get-started/",
+                },
             ],
             "sql": [
                 {"name": "SQLBolt", "url": "https://sqlbolt.com/"},
@@ -411,5 +428,8 @@ class MatchingEngine:
             return resources[skill_lower]
 
         return [
-            {"name": f"Search for {skill_name} tutorials", "url": f"https://www.google.com/search?q={skill_name}+tutorial"},
+            {
+                "name": f"Search for {skill_name} tutorials",
+                "url": f"https://www.google.com/search?q={skill_name}+tutorial",
+            },
         ]

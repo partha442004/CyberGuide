@@ -2,8 +2,6 @@
 Jobs API endpoints.
 """
 
-from typing import List, Optional
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,8 +14,8 @@ from interntrack.api.schemas.job import (
     JobUpdate,
 )
 from interntrack.database.session import get_db
-from interntrack.services.job_service import JobService
 from interntrack.domain.exceptions import DuplicateJobError
+from interntrack.services.job_service import JobService
 
 router = APIRouter()
 
@@ -26,17 +24,25 @@ router = APIRouter()
 async def list_jobs(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=200),
-    job_type: Optional[str] = None,
-    is_remote: Optional[bool] = None,
-    company: Optional[str] = None,
+    job_type: str | None = None,
+    is_remote: bool | None = None,
+    company: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
     """List jobs with filters."""
+    from interntrack.domain.enums import JobType
+
     service = JobService(db)
+    parsed_job_type = None
+    if job_type:
+        try:
+            parsed_job_type = JobType(job_type)
+        except ValueError:
+            parsed_job_type = None
     jobs = await service.get_jobs(
         skip=skip,
         limit=limit,
-        job_type=job_type,
+        job_type=parsed_job_type,
         is_remote=is_remote,
         company=company,
     )
@@ -67,12 +73,11 @@ async def create_job(
     try:
         job_dict = job_data.model_dump()
         job_dict.setdefault("source", "manual")
-        job = await service.create_job(job_dict)
-        return job
+        return await service.create_job(job_dict)
     except DuplicateJobError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to create job")
+        raise HTTPException(status_code=500, detail="Failed to create job") from e
 
 
 @router.put("/{job_id}", response_model=JobResponse)
@@ -122,7 +127,7 @@ async def get_job_statistics(
     return await service.get_job_statistics()
 
 
-@router.get("/closing/soon", response_model=List[JobResponse])
+@router.get("/closing/soon", response_model=list[JobResponse])
 async def get_closing_soon(
     days: int = Query(2, ge=1, le=7),
     db: AsyncSession = Depends(get_db),
@@ -134,7 +139,7 @@ async def get_closing_soon(
 
 @router.post("/discovery/run")
 async def run_discovery(
-    source: Optional[str] = None,
+    source: str | None = None,
     query: str = "python developer",
     db: AsyncSession = Depends(get_db),
 ):

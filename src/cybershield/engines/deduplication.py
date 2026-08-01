@@ -12,7 +12,7 @@ import hashlib
 import logging
 from difflib import SequenceMatcher
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from cybershield.engines.base import BaseEngine, EngineResult
 
@@ -47,19 +47,28 @@ class DeduplicationEngine(BaseEngine):
 
             # Remove tracking parameters
             tracking_params = {
-                "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
-                "ref", "source", "from", "track", "click", "spm", "fbclid", "gclid",
+                "utm_source",
+                "utm_medium",
+                "utm_campaign",
+                "utm_content",
+                "utm_term",
+                "ref",
+                "source",
+                "from",
+                "track",
+                "click",
+                "spm",
+                "fbclid",
+                "gclid",
             }
             cleaned_params = {k: v for k, v in params.items() if k.lower() not in tracking_params}
 
             # Normalize path
             path = parsed.path.rstrip("/")
 
-            return urlunparse(parsed._replace(
-                path=path,
-                query=urlencode(cleaned_params, doseq=True),
-                fragment=""
-            ))
+            return urlunparse(
+                parsed._replace(path=path, query=urlencode(cleaned_params, doseq=True), fragment="")
+            )
         except Exception:
             return url.lower().strip()
 
@@ -129,15 +138,13 @@ class DeduplicationEngine(BaseEngine):
         }
 
         score = (
-            url_similarity * weights["url"] +
-            title_similarity * weights["title"] +
-            (1.0 if company_match else 0.0) * weights["company"]
+            url_similarity * weights["url"]
+            + title_similarity * weights["title"]
+            + (1.0 if company_match else 0.0) * weights["company"]
         )
         return score
 
-    def _select_canonical(
-        self, jobs: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    def _select_canonical(self, jobs: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Select the best job as canonical from a group of duplicates."""
         if len(jobs) == 1:
             return jobs[0]
@@ -168,7 +175,7 @@ class DeduplicationEngine(BaseEngine):
 
         return max(jobs, key=score_job)
 
-    async def process(
+    async def process(  # type: ignore[override]
         self,
         jobs: List[Dict[str, Any]],
         **kwargs,
@@ -220,15 +227,13 @@ class DeduplicationEngine(BaseEngine):
                 )
 
                 # Calculate combined score
-                combined_score = self._calculate_combined_score(
-                    url_sim, title_sim, company_match
-                )
+                combined_score = self._calculate_combined_score(url_sim, title_sim, company_match)
 
                 # Determine if duplicate
                 is_duplicate = (
-                    (url_match and company_match) or
-                    (combined_score >= self.combined_threshold) or
-                    (title_match and company_match and url_sim > 0.5)
+                    (url_match and company_match)
+                    or (combined_score >= self.combined_threshold)
+                    or (title_match and company_match and url_sim > 0.5)
                 )
 
                 if is_duplicate:
@@ -238,8 +243,8 @@ class DeduplicationEngine(BaseEngine):
             groups.append(group)
 
         # Select canonical jobs and build results
-        duplicate_groups = []
-        unique_jobs = []
+        duplicate_groups: List[Dict[str, Any]] = []
+        unique_jobs: List[Dict[str, Any]] = []
 
         for group_indices in groups:
             group_jobs = [jobs[i] for i in group_indices]
@@ -248,12 +253,14 @@ class DeduplicationEngine(BaseEngine):
                 canonical = self._select_canonical(group_jobs)
                 duplicates = [jobs[i] for i in group_indices if jobs[i] is not canonical]
 
-                duplicate_groups.append({
-                    "canonical": canonical,
-                    "duplicates": duplicates,
-                    "duplicate_ids": [d.get("id") or d.get("source_id") for d in duplicates],
-                    "group_size": len(group_jobs),
-                })
+                duplicate_groups.append(
+                    {
+                        "canonical": canonical,
+                        "duplicates": duplicates,
+                        "duplicate_ids": [d.get("id") or d.get("source_id") for d in duplicates],
+                        "group_size": len(group_jobs),
+                    }
+                )
             else:
                 unique_jobs.append(group_jobs[0])
 
@@ -266,7 +273,7 @@ class DeduplicationEngine(BaseEngine):
                 "duplicate_groups_count": len(duplicate_groups),
                 "total_duplicates": sum(g["group_size"] - 1 for g in duplicate_groups),
                 "total_processed": len(jobs),
-            }
+            },
         )
 
     async def find_duplicates(
@@ -282,20 +289,15 @@ class DeduplicationEngine(BaseEngine):
 
         data = result.data
         # Check if the new job ended up in any duplicate group
-        is_duplicate = False
         for group in data.get("duplicate_groups", []):
             if new_job in group.get("duplicates", []):
-                is_duplicate = True
                 return self._create_result(
                     success=True,
                     data={
                         "is_duplicate": True,
                         "canonical": group["canonical"],
                         "similarity_score": data.get("combined_score", 0),
-                    }
+                    },
                 )
 
-        return self._create_result(
-            success=True,
-            data={"is_duplicate": False}
-        )
+        return self._create_result(success=True, data={"is_duplicate": False})

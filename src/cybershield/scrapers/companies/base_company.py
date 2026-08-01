@@ -47,18 +47,26 @@ class BaseCompanyScraper(BaseScraper):
     def _is_security_role(self, job: ScrapedJob) -> bool:
         """Check if job is security-related."""
         security_keywords = [
-            "security", "cyber", "soc", "infosec", "penetration",
-            "vulnerability", "threat", "incident", "forensic", "malware",
-            "devsecops", "compliance", "governance", "risk",
+            "security",
+            "cyber",
+            "soc",
+            "infosec",
+            "penetration",
+            "vulnerability",
+            "threat",
+            "incident",
+            "forensic",
+            "malware",
+            "devsecops",
+            "compliance",
+            "governance",
+            "risk",
         ]
 
         title_lower = (job.title or "").lower()
         desc_lower = (job.description or "").lower()
 
-        return any(
-            kw in title_lower or kw in desc_lower
-            for kw in security_keywords
-        )
+        return any(kw in title_lower or kw in desc_lower for kw in security_keywords)
 
     @abstractmethod
     async def scrape(self, **kwargs) -> List[ScrapedJob]:

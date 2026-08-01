@@ -1,7 +1,8 @@
 """Unit tests for dependencies.py."""
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
 
 
 class TestGetSettingsCached:
@@ -104,7 +105,11 @@ class TestServiceFactories:
     @pytest.mark.asyncio
     @patch("interntrack.dependencies.ApplicationService")
     @patch("interntrack.dependencies.get_db_session")
-    async def test_get_application_service_without_db(self, mock_get_db, mock_service_cls):
+    async def test_get_application_service_without_db(
+        self,
+        mock_get_db,
+        mock_service_cls,
+    ):
         from interntrack.dependencies import get_application_service
 
         mock_session = AsyncMock()
@@ -118,7 +123,11 @@ class TestServiceFactories:
     @pytest.mark.asyncio
     @patch("interntrack.dependencies.get_db_session")
     @patch("interntrack.dependencies.NotificationManager")
-    async def test_get_notification_manager_with_db(self, mock_service_cls, mock_get_db):
+    async def test_get_notification_manager_with_db(
+        self,
+        mock_service_cls,
+        mock_get_db,
+    ):
         from interntrack.dependencies import get_notification_manager
 
         mock_db = AsyncMock()
@@ -130,7 +139,11 @@ class TestServiceFactories:
     @pytest.mark.asyncio
     @patch("interntrack.dependencies.NotificationManager")
     @patch("interntrack.dependencies.get_db_session")
-    async def test_get_notification_manager_without_db(self, mock_get_db, mock_service_cls):
+    async def test_get_notification_manager_without_db(
+        self,
+        mock_get_db,
+        mock_service_cls,
+    ):
         from interntrack.dependencies import get_notification_manager
 
         mock_session = AsyncMock()

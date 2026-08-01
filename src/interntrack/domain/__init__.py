@@ -2,17 +2,17 @@
 
 from interntrack.domain.enums import (
     ApplicationStatus,
-    JobType,
     ExperienceLevel,
+    JobType,
     NotificationChannel,
     ReportType,
 )
 from interntrack.domain.exceptions import (
     AppException,
-    NotFoundError,
-    ScrapingError,
-    NotificationError,
     DuplicateJobError,
+    NotFoundError,
+    NotificationError,
+    ScrapingError,
 )
 
 __all__ = [

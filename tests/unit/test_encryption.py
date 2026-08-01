@@ -1,6 +1,8 @@
 """Unit tests for utils/encryption.py."""
 
 import pytest
+from cryptography.fernet import InvalidToken
+
 from interntrack.utils.encryption import SecretManager, mask_sensitive
 
 
@@ -100,7 +102,7 @@ class TestSecretManager:
 
         encrypted = manager1.encrypt("secret")
 
-        with pytest.raises(Exception):
+        with pytest.raises(InvalidToken):
             manager2.decrypt(encrypted)
 
 

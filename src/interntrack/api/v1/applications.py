@@ -2,8 +2,6 @@
 Applications API endpoints.
 """
 
-from typing import List, Optional
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +21,7 @@ router = APIRouter()
 
 @router.get("/", response_model=ApplicationListResponse)
 async def list_applications(
-    status: Optional[str] = None,
+    status: str | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
@@ -33,6 +31,7 @@ async def list_applications(
 
     if status:
         from interntrack.domain.enums import ApplicationStatus
+
         apps = await service.get_applications_by_status(ApplicationStatus(status))
     else:
         apps = await service.app_repo.get_all(skip=skip, limit=limit)
@@ -60,8 +59,7 @@ async def create_application(
 ):
     """Create a new application."""
     service = ApplicationService(db)
-    app = await service.create_application(app_data.job_id)
-    return app
+    return await service.create_application(app_data.job_id)
 
 
 @router.put("/{application_id}", response_model=ApplicationResponse)

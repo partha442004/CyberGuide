@@ -9,9 +9,8 @@ Tests the SymantecScraper class covering:
 - Location detection
 """
 
-import pytest
-from cybershield.scrapers.companies.symantec import SymantecScraper
 from cybershield.scrapers.base import ScrapedJob, ScraperConfig
+from cybershield.scrapers.companies.symantec import SymantecScraper
 
 
 class TestSymantecScraper:
@@ -75,7 +74,7 @@ class TestSymantecScraper:
         assert job.location == "Austin, TX (US)"
         assert job.country == "USA"
         assert job.job_type == "full_time"
-        assert "broadcom" in job.url.lower()
+        assert "broadcom" in (job.url or "").lower()
 
     def test_parse_job_data_remote(self):
         """Should detect remote jobs."""

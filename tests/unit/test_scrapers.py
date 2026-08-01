@@ -3,7 +3,6 @@ Unit tests for scraper implementations.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from interntrack.scrapers.hackernews import HackerNewsScraper
 from interntrack.scrapers.remoteok import RemoteOKScraper

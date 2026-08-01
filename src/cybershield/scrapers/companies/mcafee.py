@@ -4,11 +4,10 @@ McAfee Careers Scraper
 Scrapes cybersecurity jobs from McAfee's Workday-powered career page.
 """
 
-from typing import List, Optional
+from typing import Optional
 
-from cybershield.scrapers.base import ScrapedJob, ScraperConfig
+from cybershield.scrapers.base import ScraperConfig
 from cybershield.scrapers.companies.base_workday import BaseWorkdayScraper
-
 
 __all__ = ["McAfeeScraper"]
 

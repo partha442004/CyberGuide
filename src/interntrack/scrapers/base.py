@@ -5,7 +5,7 @@ Base scraper class for job discovery.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -22,18 +22,18 @@ class RawJob:
     title: str
     company: str
     url: str
-    description: Optional[str] = None
-    location: Optional[str] = None
-    salary_min: Optional[int] = None
-    salary_max: Optional[int] = None
+    description: str | None = None
+    location: str | None = None
+    salary_min: int | None = None
+    salary_max: int | None = None
     salary_currency: str = "USD"
-    job_type: Optional[str] = None
+    job_type: str | None = None
     is_remote: bool = False
-    posted_at: Optional[datetime] = None
-    expires_at: Optional[datetime] = None
-    tags: List[str] = field(default_factory=list)
+    posted_at: datetime | None = None
+    expires_at: datetime | None = None
+    tags: list[str] = field(default_factory=list)
     source: str = "unknown"
-    raw_data: Optional[Dict[str, Any]] = None
+    raw_data: dict[str, Any] | None = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
@@ -70,7 +70,6 @@ class BaseScraper(ABC):
     @abstractmethod
     def source_name(self) -> str:
         """Name of the job source."""
-        pass
 
     @property
     def rate_limit(self) -> int:
@@ -81,11 +80,10 @@ class BaseScraper(ABC):
     async def fetch(
         self,
         query: str,
-        location: Optional[str] = None,
+        location: str | None = None,
         limit: int = 100,
-    ) -> List[RawJob]:
+    ) -> list[RawJob]:
         """Fetch jobs from the source."""
-        pass
 
     async def close(self):
         """Close HTTP client."""

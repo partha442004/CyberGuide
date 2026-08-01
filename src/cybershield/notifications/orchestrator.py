@@ -6,13 +6,13 @@ Manages and coordinates all notification channels.
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional
 
 from cybershield.notifications.base import (
     BaseNotifier,
     NotificationMessage,
-    NotificationType,
     NotificationPriority,
+    NotificationType,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,10 +55,7 @@ class NotificationOrchestrator:
 
     def get_enabled_channels(self) -> List[str]:
         """List all enabled channels."""
-        return [
-            name for name, channel in self._channels.items()
-            if channel.enabled
-        ]
+        return [name for name, channel in self._channels.items() if channel.enabled]
 
     async def send_to_channel(
         self,
@@ -90,15 +87,12 @@ class NotificationOrchestrator:
         """Send notification to multiple channels."""
         results = {}
 
-        tasks = [
-            self.send_to_channel(name, message)
-            for name in channel_names
-        ]
+        tasks = [self.send_to_channel(name, message) for name in channel_names]
 
         outcomes = await asyncio.gather(*tasks, return_exceptions=True)
 
-        for name, outcome in zip(channel_names, outcomes):
-            if isinstance(outcome, Exception):
+        for name, outcome in zip(channel_names, outcomes, strict=False):
+            if isinstance(outcome, BaseException):
                 logger.error(f"Error sending to {name}: {outcome}")
                 results[name] = False
             else:
@@ -113,10 +107,7 @@ class NotificationOrchestrator:
     ) -> Dict[str, bool]:
         """Send notification to all enabled channels."""
         exclude = exclude or []
-        channels = [
-            name for name in self.get_enabled_channels()
-            if name not in exclude
-        ]
+        channels = [name for name in self.get_enabled_channels() if name not in exclude]
         return await self.send_to_channels(channels, message)
 
     async def send_job_alert(
@@ -138,7 +129,7 @@ class NotificationOrchestrator:
                 "company": job.get("company_name"),
                 "location": job.get("location"),
                 "source": job.get("source"),
-            }
+            },
         )
 
         if channels:
@@ -171,7 +162,9 @@ class NotificationOrchestrator:
 
         if channels:
             return await self.send_to_channels(channels, message)
-        return await self.send_to_all(message, exclude=["telegram"])  # Don't spam Telegram with scam alerts
+        return await self.send_to_all(
+            message, exclude=["telegram"]
+        )  # Don't spam Telegram with scam alerts
 
     async def send_daily_digest(
         self,
@@ -202,7 +195,9 @@ class NotificationOrchestrator:
 
         if job.get("salary_min"):
             currency = job.get("salary_currency", "USD")
-            lines.append(f"💰 {currency} {job['salary_min']:,.0f} - {job.get('salary_max', job['salary_min']):,.0f}")
+            lines.append(
+                f"💰 {currency} {job['salary_min']:,.0f} - {job.get('salary_max', job['salary_min']):,.0f}"
+            )
 
         if job.get("is_remote"):
             lines.append("🌐 Remote Available")
@@ -247,7 +242,7 @@ class NotificationOrchestrator:
         priority_map = {
             "daily": NotificationPriority.LOW,
             "weekly": NotificationPriority.LOW,
-            "monthly": NotificationPriority.NORMAL,
+            "monthly": NotificationPriority.MEDIUM,
         }
 
         message = NotificationMessage(
@@ -321,10 +316,10 @@ class NotificationOrchestrator:
 
 def create_default_orchestrator(config: Dict[str, Any]) -> NotificationOrchestrator:
     """Create a notification orchestrator with default channels."""
-    from cybershield.notifications.telegram import TelegramNotifier
-    from cybershield.notifications.email import EmailNotifier
     from cybershield.notifications.discord import DiscordNotifier
+    from cybershield.notifications.email import EmailNotifier
     from cybershield.notifications.slack import SlackNotifier
+    from cybershield.notifications.telegram import TelegramNotifier
 
     orchestrator = NotificationOrchestrator()
 

@@ -6,9 +6,8 @@ Specialized repository for user management operations.
 
 from typing import Optional, Sequence
 
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from cybershield.domain.models import User, Watchlist
 from cybershield.repositories.base import BaseRepository
@@ -22,24 +21,17 @@ class UserRepository(BaseRepository[User]):
 
     async def get_by_email(self, email: str) -> Optional[User]:
         """Get user by email address."""
-        result = await self.session.execute(
-            select(User).where(User.email == email)
-        )
+        result = await self.session.execute(select(User).where(User.email == email))
         return result.scalar_one_or_none()
 
     async def get_by_username(self, username: str) -> Optional[User]:
         """Get user by username."""
-        result = await self.session.execute(
-            select(User).where(User.username == username)
-        )
+        result = await self.session.execute(select(User).where(User.username == username))
         return result.scalar_one_or_none()
 
     async def get_with_preferences(self, id: str) -> Optional[User]:
         """Get user with preferences (watchlists)."""
-        result = await self.session.execute(
-            select(User)
-            .where(User.id == id)
-        )
+        result = await self.session.execute(select(User).where(User.id == id))
         return result.scalar_one_or_none()
 
     async def add_watchlist(self, user_id: str, watch_type: str, value: str) -> Watchlist:
@@ -84,7 +76,9 @@ class UserRepository(BaseRepository[User]):
             return True
         return False
 
-    async def get_watchlist(self, user_id: str, watch_type: Optional[str] = None) -> Sequence[Watchlist]:
+    async def get_watchlist(
+        self, user_id: str, watch_type: Optional[str] = None
+    ) -> Sequence[Watchlist]:
         """Get user's watchlist items."""
         query = select(Watchlist).where(Watchlist.user_id == user_id)
         if watch_type:
@@ -104,7 +98,9 @@ class UserRepository(BaseRepository[User]):
         """Add a company to user's watchlist."""
         return await self.add_watchlist(user_id, watch_type="company", value=company_id)
 
-    async def add_keyword_watchlist(self, user_id: str, keyword: str, category: Optional[str] = None) -> Watchlist:
+    async def add_keyword_watchlist(
+        self, user_id: str, keyword: str, category: Optional[str] = None
+    ) -> Watchlist:
         """Add a keyword to user's watchlist."""
         watchlist = await self.add_watchlist(user_id, watch_type="keyword", value=keyword)
         # Note: category could be stored if Watchlist model adds a tags column

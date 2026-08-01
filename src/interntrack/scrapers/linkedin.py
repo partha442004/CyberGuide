@@ -6,9 +6,7 @@ public job search page and extracts data from the HTML. Use responsibly
 and respect robots.txt.
 """
 
-import re
 from datetime import datetime
-from typing import List, Optional
 
 from interntrack.domain.enums import JobSource
 from interntrack.scrapers.base import BaseScraper, RawJob
@@ -33,9 +31,9 @@ class LinkedInScraper(BaseScraper):
     async def fetch(
         self,
         query: str,
-        location: Optional[str] = None,
+        location: str | None = None,
         limit: int = 25,
-    ) -> List[RawJob]:
+    ) -> list[RawJob]:
         """Fetch jobs from LinkedIn."""
         jobs = []
 
@@ -67,7 +65,7 @@ class LinkedInScraper(BaseScraper):
 
         return jobs
 
-    def _parse_job_card(self, card) -> Optional[RawJob]:
+    def _parse_job_card(self, card) -> RawJob | None:
         """Parse a job card from LinkedIn HTML."""
         try:
             # Extract title
@@ -91,7 +89,7 @@ class LinkedInScraper(BaseScraper):
             posted_at = None
             if date_elem and date_elem.get("datetime"):
                 posted_at = datetime.fromisoformat(
-                    date_elem["datetime"].replace("Z", "+00:00")
+                    date_elem["datetime"].replace("Z", "+00:00"),
                 )
 
             # Extract description
@@ -115,7 +113,7 @@ class LinkedInScraper(BaseScraper):
         except Exception:
             return None
 
-    def _extract_tags(self, title: str, description: Optional[str]) -> List[str]:
+    def _extract_tags(self, title: str, description: str | None) -> list[str]:
         """Extract skill tags from job data."""
         tags = []
         text = f"{title} {description or ''}".lower()

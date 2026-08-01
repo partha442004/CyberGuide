@@ -3,14 +3,12 @@ SQLAlchemy ORM models for CyberGuide (30+ tables).
 """
 
 from datetime import datetime, timezone
-from typing import Optional
 from uuid import uuid4
 
 from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
-    Enum,
     Float,
     ForeignKey,
     Index,
@@ -21,35 +19,31 @@ from sqlalchemy import (
 from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.orm import DeclarativeBase, relationship
 
-from cybershield.domain.enums import (
-    ApplicationStatus,
-    ExperienceLevel,
-    JobSource,
-    JobType,
-    SecurityDomain,
-    SkillCategory,
-    WorkMode,
-)
-
 
 class Base(DeclarativeBase):
     """Base model for all database models."""
+
     pass
 
 
 class TimestampMixin:
     """Mixin for timestamp fields."""
+
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc), 
-        onupdate=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
     )
 
 
 # ==================== CORE TABLES ====================
 
+
 class User(Base, TimestampMixin):
     """User accounts and profiles."""
+
     __tablename__ = "users"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -69,6 +63,7 @@ class User(Base, TimestampMixin):
 
 class Company(Base, TimestampMixin):
     """Company information for tracking."""
+
     __tablename__ = "companies"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -82,8 +77,12 @@ class Company(Base, TimestampMixin):
     rating = Column(Float, nullable=True)
     reviews_count = Column(Integer, default=0)
     is_watched = Column(Boolean, default=False)
+    is_trusted = Column(Boolean, default=False)
     tags = Column(JSON, nullable=True, default=list)
     social_links = Column(JSON, nullable=True)
+
+    # Relationships
+    jobs = relationship("Job", back_populates="company_ref", lazy="select")
 
     def __repr__(self) -> str:
         return f"<Company {self.name}>"
@@ -91,6 +90,7 @@ class Company(Base, TimestampMixin):
 
 class Job(Base, TimestampMixin):
     """Job listing model (50+ fields)."""
+
     __tablename__ = "jobs"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -141,6 +141,7 @@ class Job(Base, TimestampMixin):
     raw_data = Column(JSON, nullable=True)
 
     # Relationships
+    company_ref = relationship("Company", back_populates="jobs")
     applications = relationship("Application", back_populates="job", lazy="selectin")
     skills = relationship("JobSkill", back_populates="job", lazy="selectin")
     scam_score = relationship("ScamScore", back_populates="job", uselist=False, lazy="selectin")
@@ -156,6 +157,7 @@ class Job(Base, TimestampMixin):
 
 class Skill(Base, TimestampMixin):
     """Skills database for matching and recommendations."""
+
     __tablename__ = "skills"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -179,6 +181,7 @@ class Skill(Base, TimestampMixin):
 
 class Application(Base, TimestampMixin):
     """Application tracking with Kanban pipeline."""
+
     __tablename__ = "applications"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -198,7 +201,12 @@ class Application(Base, TimestampMixin):
     # Relationships
     user = relationship("User", backref="applications")
     job = relationship("Job", back_populates="applications")
-    status_history = relationship("ApplicationStatusHistory", back_populates="application", lazy="selectin", cascade="all, delete-orphan")
+    status_history = relationship(
+        "ApplicationStatusHistory",
+        back_populates="application",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         Index("idx_application_user", "user_id"),
@@ -211,12 +219,16 @@ class Application(Base, TimestampMixin):
 
 # ==================== TRACKING TABLES ====================
 
+
 class Watchlist(Base, TimestampMixin):
     """Keyword and company watchlists."""
+
     __tablename__ = "watchlists"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     watch_type = Column(String(50), nullable=False)
     value = Column(String(200), nullable=False)
     is_active = Column(Boolean, default=True)
@@ -224,9 +236,7 @@ class Watchlist(Base, TimestampMixin):
     match_count = Column(Integer, default=0)
     last_matched = Column(DateTime, nullable=True)
 
-    __table_args__ = (
-        Index("idx_watchlist_type_value", "watch_type", "value"),
-    )
+    __table_args__ = (Index("idx_watchlist_type_value", "watch_type", "value"),)
 
     def __repr__(self) -> str:
         return f"<Watchlist {self.watch_type}: {self.value}>"
@@ -234,10 +244,13 @@ class Watchlist(Base, TimestampMixin):
 
 class Bookmark(Base, TimestampMixin):
     """User bookmarks for jobs, companies, etc."""
+
     __tablename__ = "bookmarks"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     item_type = Column(String(50), nullable=False)
     item_id = Column(String(36), nullable=False)
     notes = Column(Text, nullable=True)
@@ -249,10 +262,13 @@ class Bookmark(Base, TimestampMixin):
 
 class ResumeData(Base, TimestampMixin):
     """User resume information."""
+
     __tablename__ = "resume_data"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     file_path = Column(String(500), nullable=True)
     file_hash = Column(String(64), nullable=False)
     skills = Column(JSON, default=list)
@@ -270,12 +286,16 @@ class ResumeData(Base, TimestampMixin):
 
 # ==================== AI ENGINE TABLES ====================
 
+
 class ScamScore(Base, TimestampMixin):
     """AI-generated scam analysis results."""
+
     __tablename__ = "scam_scores"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    job_id = Column(String(36), ForeignKey("jobs.id", ondelete="CASCADE"), unique=True, nullable=False)
+    job_id = Column(
+        String(36), ForeignKey("jobs.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
     scam_score = Column(Integer, nullable=False)
     confidence = Column(Float, nullable=False)
     flags = Column(JSON, default=list)
@@ -292,10 +312,13 @@ class ScamScore(Base, TimestampMixin):
 
 class Prediction(Base, TimestampMixin):
     """AI prediction results."""
+
     __tablename__ = "predictions"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     prediction_type = Column(String(50), nullable=False)
     target_entity = Column(String(100), nullable=True)
     prediction = Column(JSON, nullable=False)
@@ -308,10 +331,13 @@ class Prediction(Base, TimestampMixin):
 
 class SalaryEstimate(Base, TimestampMixin):
     """AI-estimated salary data."""
+
     __tablename__ = "salary_estimates"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    job_id = Column(String(36), ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    job_id = Column(
+        String(36), ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     estimated_min = Column(Integer, nullable=False)
     estimated_max = Column(Integer, nullable=False)
     currency = Column(String(10), nullable=False)
@@ -324,10 +350,13 @@ class SalaryEstimate(Base, TimestampMixin):
 
 class SkillTrend(Base, TimestampMixin):
     """Skill market trend data."""
+
     __tablename__ = "skill_trends"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    skill_id = Column(String(36), ForeignKey("skills.id", ondelete="CASCADE"), nullable=False, index=True)
+    skill_id = Column(
+        String(36), ForeignKey("skills.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     period = Column(String(20), nullable=False)
     period_start = Column(DateTime, nullable=False)
     demand_count = Column(Integer, default=0)
@@ -341,8 +370,10 @@ class SkillTrend(Base, TimestampMixin):
 
 # ==================== EVENT TABLES ====================
 
+
 class CTFEvent(Base, TimestampMixin):
     """CTF competition tracking."""
+
     __tablename__ = "ctf_events"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -363,6 +394,7 @@ class CTFEvent(Base, TimestampMixin):
 
 class BugBountyProgram(Base, TimestampMixin):
     """Bug bounty program tracking."""
+
     __tablename__ = "bug_bounty_programs"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -382,6 +414,7 @@ class BugBountyProgram(Base, TimestampMixin):
 
 class Event(Base, TimestampMixin):
     """Conferences, meetups, workshops."""
+
     __tablename__ = "events"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -404,6 +437,7 @@ class Event(Base, TimestampMixin):
 
 class Certification(Base, TimestampMixin):
     """Certification tracking."""
+
     __tablename__ = "certifications"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -423,8 +457,10 @@ class Certification(Base, TimestampMixin):
 
 # ==================== RELATIONSHIP TABLES ====================
 
+
 class JobSkill(Base):
     """Many-to-many relationship between jobs and skills."""
+
     __tablename__ = "job_skills"
 
     job_id = Column(String(36), ForeignKey("jobs.id", ondelete="CASCADE"), primary_key=True)
@@ -439,6 +475,7 @@ class JobSkill(Base):
 
 class UserSkill(Base, TimestampMixin):
     """User skill proficiency tracking."""
+
     __tablename__ = "user_skills"
 
     user_id = Column(String(36), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
@@ -453,10 +490,13 @@ class UserSkill(Base, TimestampMixin):
 
 class ApplicationStatusHistory(Base, TimestampMixin):
     """Application status change history."""
+
     __tablename__ = "application_status_history"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    application_id = Column(String(36), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False)
+    application_id = Column(
+        String(36), ForeignKey("applications.id", ondelete="CASCADE"), nullable=False
+    )
     old_status = Column(String(50), nullable=True)
     new_status = Column(String(50), nullable=False)
     changed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
@@ -468,6 +508,7 @@ class ApplicationStatusHistory(Base, TimestampMixin):
 
 class DuplicateGroup(Base, TimestampMixin):
     """Deduplication tracking."""
+
     __tablename__ = "duplicate_groups"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -479,8 +520,10 @@ class DuplicateGroup(Base, TimestampMixin):
 
 # ==================== ANALYTICS TABLES ====================
 
+
 class NewsAnalysis(Base, TimestampMixin):
     """Cybersecurity news analysis."""
+
     __tablename__ = "news_analyses"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -496,6 +539,7 @@ class NewsAnalysis(Base, TimestampMixin):
 
 class InterviewPrep(Base, TimestampMixin):
     """Interview preparation data."""
+
     __tablename__ = "interview_prep"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -510,6 +554,7 @@ class InterviewPrep(Base, TimestampMixin):
 
 class ResumeMatchResult(Base, TimestampMixin):
     """Resume-job match analysis results."""
+
     __tablename__ = "resume_match_results"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -524,6 +569,7 @@ class ResumeMatchResult(Base, TimestampMixin):
 
 class AnalyticsSnapshot(Base, TimestampMixin):
     """Analytics data snapshots."""
+
     __tablename__ = "analytics_snapshots"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -534,6 +580,7 @@ class AnalyticsSnapshot(Base, TimestampMixin):
 
 class NotificationConfig(Base, TimestampMixin):
     """User notification preferences."""
+
     __tablename__ = "notification_config"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -546,6 +593,7 @@ class NotificationConfig(Base, TimestampMixin):
 
 class ActivityLog(Base, TimestampMixin):
     """User activity tracking."""
+
     __tablename__ = "activity_log"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -559,6 +607,7 @@ class ActivityLog(Base, TimestampMixin):
 
 class ScheduledReport(Base, TimestampMixin):
     """Report scheduling configuration."""
+
     __tablename__ = "scheduled_reports"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
@@ -573,6 +622,7 @@ class ScheduledReport(Base, TimestampMixin):
 
 class GeneratedReport(Base, TimestampMixin):
     """Report generation history."""
+
     __tablename__ = "generated_reports"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))

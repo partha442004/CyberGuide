@@ -8,7 +8,7 @@ from cryptography.fernet import Fernet
 class SecretManager:
     """Manage encryption for sensitive configuration."""
 
-    def __init__(self, key: str):
+    def __init__(self, key: str | bytes):
         """Initialize with encryption key."""
         if isinstance(key, str):
             key = key.encode()

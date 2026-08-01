@@ -5,10 +5,11 @@ Tests for deduplication, verification, scam detection, and classification engine
 """
 
 import pytest
-from cybershield.engines.deduplication import DeduplicationEngine
-from cybershield.engines.verification import VerificationEngine
-from cybershield.engines.scam_detection import ScamDetectionEngine
+
 from cybershield.engines.classification import ClassificationEngine
+from cybershield.engines.deduplication import DeduplicationEngine
+from cybershield.engines.scam_detection import ScamDetectionEngine
+from cybershield.engines.verification import VerificationEngine
 
 
 class TestDeduplicationEngine:
@@ -53,9 +54,24 @@ class TestDeduplicationEngine:
     async def test_find_duplicates(self, engine):
         """Test duplicate detection."""
         jobs = [
-            {"id": "1", "title": "Security Analyst", "company_name": "Tech Corp", "url": "https://example.com/job/1"},
-            {"id": "2", "title": "Security Analyst", "company_name": "Tech Corp", "url": "https://example.com/job/1?utm_source=test"},
-            {"id": "3", "title": "Different Role", "company_name": "Other Corp", "url": "https://other.com/job/2"},
+            {
+                "id": "1",
+                "title": "Security Analyst",
+                "company_name": "Tech Corp",
+                "url": "https://example.com/job/1",
+            },
+            {
+                "id": "2",
+                "title": "Security Analyst",
+                "company_name": "Tech Corp",
+                "url": "https://example.com/job/1?utm_source=test",
+            },
+            {
+                "id": "3",
+                "title": "Different Role",
+                "company_name": "Other Corp",
+                "url": "https://other.com/job/2",
+            },
         ]
         result = await engine.process(jobs)
         assert result.success
@@ -72,6 +88,7 @@ class TestVerificationEngine:
     def test_check_deadline_active(self, engine):
         """Test active deadline check."""
         from datetime import datetime, timedelta, timezone
+
         future = datetime.now(timezone.utc) + timedelta(days=7)
         result = engine._check_deadline(future)
         assert result["active"] is True
@@ -80,6 +97,7 @@ class TestVerificationEngine:
     def test_check_deadline_expired(self, engine):
         """Test expired deadline check."""
         from datetime import datetime, timedelta, timezone
+
         past = datetime.now(timezone.utc) - timedelta(days=1)
         result = engine._check_deadline(past)
         assert result["active"] is False

@@ -7,6 +7,7 @@ from enum import Enum
 
 class JobType(str, Enum):
     """Job type enumeration."""
+
     INTERNSHIP = "internship"
     FULL_TIME = "full_time"
     PART_TIME = "part_time"
@@ -22,6 +23,7 @@ class JobType(str, Enum):
 
 class ExperienceLevel(str, Enum):
     """Experience level enumeration."""
+
     ENTRY = "entry"
     JUNIOR = "junior"
     MID = "mid"
@@ -35,6 +37,7 @@ class ExperienceLevel(str, Enum):
 
 class ApplicationStatus(str, Enum):
     """Application status enumeration."""
+
     SAVED = "saved"
     APPLIED = "applied"
     INTERVIEW = "interview"
@@ -46,6 +49,7 @@ class ApplicationStatus(str, Enum):
 
 class NotificationChannel(str, Enum):
     """Notification channel enumeration."""
+
     TELEGRAM = "telegram"
     EMAIL = "email"
     DISCORD = "discord"
@@ -55,6 +59,7 @@ class NotificationChannel(str, Enum):
 
 class ReportType(str, Enum):
     """Report type enumeration."""
+
     DAILY = "daily"
     WEEKLY = "weekly"
     MONTHLY = "monthly"
@@ -62,6 +67,7 @@ class ReportType(str, Enum):
 
 class JobSource(str, Enum):
     """Job source enumeration."""
+
     # India
     NAUKRI = "naukri"
     FOUNDIT = "foundit"
@@ -69,19 +75,19 @@ class JobSource(str, Enum):
     UNSTOP = "unstop"
     FRESHERSWORLD = "freshersworld"
     AICTE = "aicte"
-    
+
     # USA
     LINKEDIN = "linkedin"
     INDEED = "indeed"
     GLASSDOOR = "glassdoor"
-    
+
     # Global
     REMOTE_OK = "remote_ok"
     HACKER_NEWS = "hackernews"
     WE_WORK_REMOTELY = "we_work_remotely"
     GOOGLE_JOBS = "google_jobs"
     RSS_FEED = "rss_feed"
-    
+
     # Company Careers
     MICROSOFT = "microsoft"
     GOOGLE = "google"
@@ -89,11 +95,11 @@ class JobSource(str, Enum):
     CROWDSTRIKE = "crowdstrike"
     CLOUDFLARE = "cloudflare"
     PALO_ALTO = "palo_alto"
-    
+
     # Security Platforms
     OWASP = "owasp"
     GITHUB = "github"
-    
+
     # Other
     MANUAL = "manual"
     UNKNOWN = "unknown"
@@ -101,6 +107,7 @@ class JobSource(str, Enum):
 
 class SkillCategory(str, Enum):
     """Skill category enumeration."""
+
     PROGRAMMING = "programming"
     FRAMEWORK = "framework"
     TOOL = "tool"
@@ -111,6 +118,7 @@ class SkillCategory(str, Enum):
 
 class SecurityDomain(str, Enum):
     """Security domain enumeration."""
+
     SOC = "soc"
     BLUE_TEAM = "blue_team"
     RED_TEAM = "red_team"
@@ -132,6 +140,7 @@ class SecurityDomain(str, Enum):
 
 class WorkMode(str, Enum):
     """Work mode enumeration."""
+
     REMOTE = "remote"
     HYBRID = "hybrid"
     ONSITE = "onsite"
@@ -139,6 +148,7 @@ class WorkMode(str, Enum):
 
 class RiskLevel(str, Enum):
     """Risk level for scam detection."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -147,6 +157,7 @@ class RiskLevel(str, Enum):
 
 class WatchType(str, Enum):
     """Watchlist type enumeration."""
+
     KEYWORD = "keyword"
     COMPANY = "company"
     SKILL = "skill"
@@ -154,6 +165,7 @@ class WatchType(str, Enum):
 
 class CTFDifficulty(str, Enum):
     """CTF difficulty level."""
+
     EASY = "easy"
     MEDIUM = "medium"
     HARD = "hard"
@@ -162,6 +174,7 @@ class CTFDifficulty(str, Enum):
 
 class EventType(str, Enum):
     """Event type enumeration."""
+
     CONFERENCE = "conference"
     MEETUP = "meetup"
     WORKSHOP = "workshop"

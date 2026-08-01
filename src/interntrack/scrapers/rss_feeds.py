@@ -2,14 +2,13 @@
 RSS Feed job scraper.
 """
 
-from datetime import datetime
-from typing import List, Optional
+import contextlib
+from datetime import UTC, datetime
 
 import feedparser
 
 from interntrack.domain.enums import JobSource
 from interntrack.scrapers.base import BaseScraper, RawJob
-
 
 # Popular job RSS feeds
 DEFAULT_FEEDS = {
@@ -22,7 +21,7 @@ DEFAULT_FEEDS = {
 class RSSFeedScraper(BaseScraper):
     """Scraper for RSS job feeds."""
 
-    def __init__(self, feeds: Optional[dict] = None):
+    def __init__(self, feeds: dict | None = None):
         super().__init__()
         self.feeds = feeds or DEFAULT_FEEDS
 
@@ -37,9 +36,9 @@ class RSSFeedScraper(BaseScraper):
     async def fetch(
         self,
         query: str,
-        location: Optional[str] = None,
+        location: str | None = None,  # noqa: ARG002 (interface contract)
         limit: int = 100,
-    ) -> List[RawJob]:
+    ) -> list[RawJob]:
         """Fetch jobs from RSS feeds."""
         jobs = []
 
@@ -54,8 +53,11 @@ class RSSFeedScraper(BaseScraper):
         return jobs[:limit]
 
     async def _fetch_feed(
-        self, feed_url: str, query: str, source_name: str
-    ) -> List[RawJob]:
+        self,
+        feed_url: str,
+        query: str,
+        source_name: str,
+    ) -> list[RawJob]:
         """Fetch and parse a single RSS feed."""
         jobs = []
 
@@ -70,8 +72,11 @@ class RSSFeedScraper(BaseScraper):
         return jobs
 
     def _parse_entry(
-        self, entry: dict, query: str, source_name: str
-    ) -> Optional[RawJob]:
+        self,
+        entry: dict,
+        query: str,
+        source_name: str,
+    ) -> RawJob | None:
         """Parse RSS entry into RawJob."""
         title = entry.get("title", "")
         link = entry.get("link", "")
@@ -87,10 +92,16 @@ class RSSFeedScraper(BaseScraper):
         # Parse published date
         posted_at = None
         if published:
-            try:
-                posted_at = datetime(*published[:6])
-            except Exception:
-                pass
+            with contextlib.suppress(Exception):
+                posted_at = datetime(
+                    published[0],
+                    published[1],
+                    published[2],
+                    published[3],
+                    published[4],
+                    published[5],
+                    tzinfo=UTC,
+                )
 
         return RawJob(
             title=title,
@@ -120,14 +131,23 @@ class RSSFeedScraper(BaseScraper):
 
         return "Unknown"
 
-    def _extract_tags(self, text: str) -> List[str]:
+    def _extract_tags(self, text: str) -> list[str]:
         """Extract tags from text."""
         tags = []
         text_lower = text.lower()
 
         common_tags = [
-            "python", "javascript", "react", "node", "aws", "docker",
-            "kubernetes", "remote", "fullstack", "backend", "frontend",
+            "python",
+            "javascript",
+            "react",
+            "node",
+            "aws",
+            "docker",
+            "kubernetes",
+            "remote",
+            "fullstack",
+            "backend",
+            "frontend",
         ]
 
         for tag in common_tags:
@@ -140,6 +160,6 @@ class RSSFeedScraper(BaseScraper):
 class CustomRSSFeedScraper(RSSFeedScraper):
     """Scraper for custom RSS feeds."""
 
-    def __init__(self, feed_urls: List[str]):
+    def __init__(self, feed_urls: list[str]):
         feeds = {f"custom_{i}": url for i, url in enumerate(feed_urls)}
         super().__init__(feeds=feeds)

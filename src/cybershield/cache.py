@@ -8,8 +8,8 @@ Provides caching functionality with Redis backend and in-memory fallback.
 
 __all__ = ["CacheManager", "cache_manager", "get_cache", "InMemoryCache"]
 
-import json
 import hashlib
+import json
 import logging
 import time
 from typing import Any, Optional
@@ -21,7 +21,7 @@ class InMemoryCache:
     """Simple in-memory cache fallback when Redis is unavailable."""
 
     def __init__(self):
-        self._store: dict[str, tuple[Any, Optional[float]]] = {}
+        self._store: dict[str, tuple[str, Optional[float]]] = {}
 
     async def get(self, key: str) -> Optional[str]:
         """Get value by key."""
@@ -81,7 +81,7 @@ class CacheManager:
         self.prefix = prefix
         self.default_ttl = default_ttl
         self._redis_url = redis_url
-        self._redis_client = None
+        self._redis_client: Any = None
         self._memory_cache = InMemoryCache()
         self._use_redis = False
 
@@ -125,12 +125,11 @@ class CacheManager:
         full_key = self._make_key(key)
 
         if self._use_redis:
-            return await self._redis_client.get(full_key)
+            value = await self._redis_client.get(full_key)
+            return str(value) if value is not None else None
         return await self._memory_cache.get(full_key)
 
-    async def set(
-        self, key: str, value: str, ttl: Optional[int] = None
-    ) -> None:
+    async def set(self, key: str, value: str, ttl: Optional[int] = None) -> None:
         """Set value with optional TTL."""
         full_key = self._make_key(key)
         ttl = ttl or self.default_ttl
@@ -150,9 +149,7 @@ class CacheManager:
                 return None
         return None
 
-    async def set_json(
-        self, key: str, value: Any, ttl: Optional[int] = None
-    ) -> None:
+    async def set_json(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
         """Serialize and store JSON value."""
         await self.set(key, json.dumps(value), ttl)
 
@@ -168,7 +165,8 @@ class CacheManager:
         """Check if key exists."""
         full_key = self._make_key(key)
         if self._use_redis:
-            return await self._redis_client.exists(full_key) > 0
+            count = await self._redis_client.exists(full_key)
+            return bool(count > 0)
         return await self._memory_cache.exists(full_key)
 
     async def flush(self) -> None:

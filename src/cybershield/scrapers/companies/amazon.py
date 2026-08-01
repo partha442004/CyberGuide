@@ -47,6 +47,7 @@ class AmazonScraper(BaseCompanyScraper):
     def _build_search_url(self, keyword: str, page: int = 1) -> str:
         """Build search URL."""
         from urllib.parse import urlencode
+
         params = {
             "base": keyword,
             "locGroup": "",

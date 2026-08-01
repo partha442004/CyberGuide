@@ -9,9 +9,8 @@ Tests the CrowdStrikeScraper class covering:
 - Location detection
 """
 
-import pytest
-from cybershield.scrapers.companies.crowdstrike import CrowdStrikeScraper
 from cybershield.scrapers.base import ScrapedJob, ScraperConfig
+from cybershield.scrapers.companies.crowdstrike import CrowdStrikeScraper
 
 
 class TestCrowdStrikeScraper:
@@ -31,7 +30,10 @@ class TestCrowdStrikeScraper:
     def test_career_url(self):
         """Scraper should have correct career URL."""
         assert "crowdstrike" in self.scraper.CAREER_URL.lower()
-        assert "workday" in self.scraper.CAREER_URL.lower() or "myworkdayjobs" in self.scraper.CAREER_URL.lower()
+        assert (
+            "workday" in self.scraper.CAREER_URL.lower()
+            or "myworkdayjobs" in self.scraper.CAREER_URL.lower()
+        )
 
     def test_api_url(self):
         """Scraper should have correct API URL."""
@@ -74,7 +76,7 @@ class TestCrowdStrikeScraper:
         assert job.location == "Austin, TX (US)"
         assert job.country == "USA"
         assert job.job_type == "full_time"
-        assert "crowdstrike" in job.url.lower()
+        assert "crowdstrike" in (job.url or "").lower()
 
     def test_parse_job_data_remote(self):
         """Should detect remote jobs."""

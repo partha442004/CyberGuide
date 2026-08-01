@@ -54,7 +54,7 @@ class RSSFeedScraper(BaseScraper):
             # URL
             link = entry.get("link", "")
             job.url = self._normalize_url(link)
-            parsed_url = urlparse(link) if link else None
+            urlparse(link) if link else None
             job.source = f"rss_{feed_name.lower().replace(' ', '_')}"
             job.source_id = entry.get("id", link)
 
@@ -67,7 +67,7 @@ class RSSFeedScraper(BaseScraper):
             job.required_skills = self._extract_skills(combined_text)
 
             # Parse company from title if possible
-            title = job.title
+            title = job.title or ""
             if " - " in title:
                 parts = title.split(" - ")
                 if len(parts) >= 2:
@@ -80,8 +80,15 @@ class RSSFeedScraper(BaseScraper):
             job.posting_date = self._parse_date(published)
 
             # Check for security keywords in content
-            security_keywords = ["security", "cyber", "soc", "vulnerability",
-                               "threat", "penetration", "incident"]
+            security_keywords = [
+                "security",
+                "cyber",
+                "soc",
+                "vulnerability",
+                "threat",
+                "penetration",
+                "incident",
+            ]
             if not any(kw in combined_text.lower() for kw in security_keywords):
                 return None
 

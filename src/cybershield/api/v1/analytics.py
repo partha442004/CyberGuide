@@ -5,12 +5,13 @@ Endpoints for skill trends, salary insights, and predictions.
 """
 
 from typing import List, Optional
+
 from fastapi import APIRouter, Depends, Query
 
-from cybershield.dependencies import get_skill_repository, get_company_repository
-from cybershield.repositories.skill_repository import SkillRepository
+from cybershield.dependencies import get_company_repository, get_skill_repository
 from cybershield.repositories.company_repository import CompanyRepository
-from cybershield.schemas.analytics import SkillTrendResponse, MarketInsight
+from cybershield.repositories.skill_repository import SkillRepository
+from cybershield.schemas.analytics import MarketInsight
 
 router = APIRouter()
 

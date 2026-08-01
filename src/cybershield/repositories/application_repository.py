@@ -4,15 +4,15 @@ Application Repository
 Specialized repository for application tracking operations.
 """
 
-from typing import Optional, Sequence
 from datetime import datetime, timezone
+from typing import Optional, Sequence
 
-from sqlalchemy import select, func, desc, and_
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from cybershield.domain.models import Application, ApplicationStatusHistory, Job
 from cybershield.domain.enums import ApplicationStatus
+from cybershield.domain.models import Application, ApplicationStatusHistory
 from cybershield.repositories.base import BaseRepository
 
 
@@ -25,15 +25,11 @@ class ApplicationRepository(BaseRepository[Application]):
     async def get_with_job(self, id: str) -> Optional[Application]:
         """Get application with job details."""
         result = await self.session.execute(
-            select(Application)
-            .options(selectinload(Application.job))
-            .where(Application.id == id)
+            select(Application).options(selectinload(Application.job)).where(Application.id == id)
         )
         return result.scalar_one_or_none()
 
-    async def get_by_status(
-        self, user_id: str, status: ApplicationStatus
-    ) -> Sequence[Application]:
+    async def get_by_status(self, user_id: str, status: ApplicationStatus) -> Sequence[Application]:
         """Get all applications with a specific status."""
         result = await self.session.execute(
             select(Application)
@@ -80,10 +76,10 @@ class ApplicationRepository(BaseRepository[Application]):
         old_status = application.status
 
         # Update status
-        status_val = new_status.value if hasattr(new_status, 'value') else str(new_status)
-        application.status = status_val
+        status_val = new_status.value if hasattr(new_status, "value") else str(new_status)
+        application.status = status_val  # type: ignore[assignment]
         if notes:
-            application.notes = (application.notes or "") + f"\n\n{status_val}: {notes}"
+            application.notes = (application.notes or "") + f"\n\n{status_val}: {notes}"  # type: ignore[assignment]
 
         # Create history record
         history = ApplicationStatusHistory(
@@ -112,8 +108,7 @@ class ApplicationRepository(BaseRepository[Application]):
         status_counts = {}
         for status in ApplicationStatus:
             result = await self.session.execute(
-                select(func.count())
-                .where(
+                select(func.count()).where(
                     and_(
                         Application.user_id == user_id,
                         Application.status == status,
@@ -124,13 +119,16 @@ class ApplicationRepository(BaseRepository[Application]):
 
         # Total applications
         total_result = await self.session.execute(
-            select(func.count())
-            .where(Application.user_id == user_id)
+            select(func.count()).where(Application.user_id == user_id)
         )
-        total = total_result.scalar()
+        total = total_result.scalar() or 0
 
         # Success rate (interviews / total)
-        interviews = status_counts.get("interview", 0) + status_counts.get("offer", 0) + status_counts.get("joined", 0)
+        interviews = (
+            int(status_counts.get("interview", 0) or 0)
+            + int(status_counts.get("offer", 0) or 0)
+            + int(status_counts.get("joined", 0) or 0)
+        )
         success_rate = (interviews / total * 100) if total > 0 else 0
 
         return {
@@ -150,10 +148,12 @@ class ApplicationRepository(BaseRepository[Application]):
             .where(
                 and_(
                     Application.user_id == user_id,
-                    Application.status.in_([
-                        ApplicationStatus.INTERVIEW.value,
-                        ApplicationStatus.ASSESSMENT.value,
-                    ]),
+                    Application.status.in_(
+                        [
+                            ApplicationStatus.INTERVIEW.value,
+                            ApplicationStatus.ASSESSMENT.value,
+                        ]
+                    ),
                     Application.interview_at <= future,
                     Application.interview_at >= now,
                 )

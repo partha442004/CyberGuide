@@ -10,8 +10,6 @@ import re
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
-import httpx
-
 from cybershield.scrapers.base import ScrapedJob, ScraperConfig
 from cybershield.scrapers.companies.base_company import BaseCompanyScraper
 
@@ -137,15 +135,11 @@ class CheckPointScraper(BaseCompanyScraper):
 
         # Match job listing patterns from Check Point's HTML
         # Pattern: <a href="...joborderid=XXXX">Title</a> with location info
-        job_pattern = re.compile(
-            r'joborderid=(\d+)[^"]*"[^>]*>([^<]+)</a>',
-            re.IGNORECASE
-        )
+        job_pattern = re.compile(r'joborderid=(\d+)[^"]*"[^>]*>([^<]+)</a>', re.IGNORECASE)
 
         # Also try to extract location from nearby elements
         location_pattern = re.compile(
-            r'<td[^>]*class="[^"]*location[^"]*"[^>]*>([^<]+)</td>',
-            re.IGNORECASE
+            r'<td[^>]*class="[^"]*location[^"]*"[^>]*>([^<]+)</td>', re.IGNORECASE
         )
 
         matches = job_pattern.findall(html)
@@ -153,12 +147,14 @@ class CheckPointScraper(BaseCompanyScraper):
 
         for i, (job_id, title) in enumerate(matches):
             location = locations[i].strip() if i < len(locations) else ""
-            jobs.append({
-                "job_id": job_id,
-                "title": title.strip(),
-                "location": location,
-                "description": "",
-            })
+            jobs.append(
+                {
+                    "job_id": job_id,
+                    "title": title.strip(),
+                    "location": location,
+                    "description": "",
+                }
+            )
 
         return jobs
 

@@ -3,7 +3,9 @@ Application configuration management using Pydantic Settings.
 """
 
 from functools import lru_cache
+from typing import Any
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,20 +22,20 @@ class Settings(BaseSettings):
     app_name: str = "InternTrack"
     app_version: str = "1.0.0"
     debug: bool = False
-    secret_key: str = "change-me-in-production"
+    secret_key: str = "change-me-in-production"  # noqa: S105 (dev default)
 
     # API Server
-    api_host: str = "0.0.0.0"
+    api_host: str = "0.0.0.0"  # noqa: S104 (dev default)
     api_port: int = 8000
     api_key_header: str = "X-API-Key"
 
     # Database
     database_url: str = "sqlite+aiosqlite:///./data/interntrack.db"
 
-    # Redis (Optional)
+    # Redis optional
     redis_url: str | None = None
 
-    # Elasticsearch (Optional)
+    # Elasticsearch optional
     elasticsearch_url: str | None = None
 
     # AI Services
@@ -52,7 +54,7 @@ class Settings(BaseSettings):
     # Slack Notifications
     slack_webhook_url: str | None = None
 
-    # Email (SMTP)
+    # Email - SMTP
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
     smtp_user: str | None = None
@@ -64,6 +66,20 @@ class Settings(BaseSettings):
     max_concurrent_scrapers: int = 5
     request_timeout: int = 30
     user_agent: str = "InternTrack/1.0"
+
+    # CORS
+    cors_origins: list[str] = ["*"]
+    cors_allow_all: bool = True
+    cors_methods: list[str] = ["*"]
+    cors_headers: list[str] = ["*"]
+
+    @field_validator("cors_origins", "cors_methods", "cors_headers", mode="before")
+    @classmethod
+    def _parse_csv_lists(cls, value: Any) -> Any:
+        """Accept comma-separated env values (e.g. CORS_ORIGINS=https://a,https://b)."""
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
 
     # Dashboard
     dashboard_port: int = 8501
@@ -87,6 +103,23 @@ class Settings(BaseSettings):
     @property
     def is_ai_configured(self) -> bool:
         return bool(self.gemini_api_key) or bool(self.ollama_base_url)
+
+    @property
+    def is_production(self) -> bool:
+        return not self.debug
+
+    def validate_security(self) -> list[str]:
+        """Return a list of security configuration warnings."""
+        warnings: list[str] = []
+        if self.secret_key == "change-me-in-production":  # noqa: S105 (dev default)
+            warnings.append(
+                "SECRET_KEY is still the default value. Set a strong secret in .env.",
+            )
+        if self.cors_allow_all and self.cors_origins == ["*"]:
+            warnings.append(
+                "CORS allows all origins. Restrict CORS_ORIGINS in production.",
+            )
+        return warnings
 
 
 @lru_cache

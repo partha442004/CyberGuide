@@ -3,8 +3,7 @@ Hacker News 'Who is hiring?' scraper.
 """
 
 import re
-from datetime import datetime
-from typing import List, Optional
+from datetime import UTC, datetime
 
 from interntrack.domain.enums import JobSource
 from interntrack.scrapers.base import BaseScraper, RawJob
@@ -24,11 +23,11 @@ class HackerNewsScraper(BaseScraper):
     async def fetch(
         self,
         query: str,
-        location: Optional[str] = None,
+        location: str | None = None,  # noqa: ARG002 (interface contract)
         limit: int = 100,
-    ) -> List[RawJob]:
+    ) -> list[RawJob]:
         """Fetch jobs from Hacker News."""
-        jobs = []
+        jobs: list[RawJob] = []
 
         # Get "Who is hiring?" thread
         thread_id = await self._get_latest_hiring_thread()
@@ -45,7 +44,7 @@ class HackerNewsScraper(BaseScraper):
 
         return jobs
 
-    async def _get_latest_hiring_thread(self) -> Optional[str]:
+    async def _get_latest_hiring_thread(self) -> str | None:
         """Get the latest 'Who is hiring?' thread ID."""
         url = "https://hacker-news.firebaseio.com/v0/showstories.json"
         response = await self._get(url)
@@ -61,7 +60,7 @@ class HackerNewsScraper(BaseScraper):
 
         return None
 
-    async def _get_thread_comments(self, story_id: str) -> List[dict]:
+    async def _get_thread_comments(self, story_id: str) -> list[dict]:
         """Get comments from a thread."""
         url = f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json"
         response = await self._get(url)
@@ -79,7 +78,7 @@ class HackerNewsScraper(BaseScraper):
 
         return comments
 
-    def _parse_comment(self, comment: dict, query: str) -> Optional[RawJob]:
+    def _parse_comment(self, comment: dict, query: str) -> RawJob | None:
         """Parse a comment into a RawJob."""
         text = comment.get("text", "")
         if not text:
@@ -109,30 +108,30 @@ class HackerNewsScraper(BaseScraper):
             url=f"https://news.ycombinator.com/item?id={comment.get('id')}",
             description=text,
             source=self.source_name,
-            posted_at=datetime.fromtimestamp(comment.get("time", 0)),
+            posted_at=datetime.fromtimestamp(comment.get("time", 0), tz=UTC),
             tags=self._extract_tags(text),
         )
 
-    def _extract_title(self, text: str) -> Optional[str]:
+    def _extract_title(self, text: str) -> str | None:
         """Extract job title from text."""
         # Common patterns: "Company | Title | Location | ..."
-        parts = re.split(r'\||-', text)
+        parts = re.split(r"\||-", text)
         if len(parts) >= 2:
             # Usually title is after company
             for part in parts[:3]:
-                part = re.sub(r'<[^>]+>', '', part).strip()
+                part = re.sub(r"<[^>]+>", "", part).strip()
                 if len(part) > 5 and len(part) < 100:
                     return part
         return None
 
-    def _extract_company(self, text: str) -> Optional[str]:
+    def _extract_company(self, text: str) -> str | None:
         """Extract company name from text."""
-        parts = re.split(r'\||-', text)
+        parts = re.split(r"\||-", text)
         if parts:
-            return re.sub(r'<[^>]+>', '', parts[0]).strip()
+            return re.sub(r"<[^>]+>", "", parts[0]).strip()
         return None
 
-    def _extract_tags(self, text: str) -> List[str]:
+    def _extract_tags(self, text: str) -> list[str]:
         """Extract tags from job description."""
         tags = []
         text_lower = text.lower()

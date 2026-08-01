@@ -5,12 +5,14 @@ Pydantic models for analytics and insights API operations.
 """
 
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
+
 from pydantic import BaseModel
 
 
 class SkillTrendResponse(BaseModel):
     """Schema for skill trend data."""
+
     skill_name: str
     category: Optional[str] = None
     job_count: int
@@ -20,6 +22,7 @@ class SkillTrendResponse(BaseModel):
 
 class MarketInsight(BaseModel):
     """Schema for market insights."""
+
     total_skills_tracked: int
     top_demanding_skills: List[str]
     trending_skills: List[str]
@@ -29,6 +32,7 @@ class MarketInsight(BaseModel):
 
 class SalaryInsight(BaseModel):
     """Schema for salary insights."""
+
     skill_name: str
     avg_salary: float
     min_salary: float
@@ -39,6 +43,7 @@ class SalaryInsight(BaseModel):
 
 class HiringTrend(BaseModel):
     """Schema for hiring trends."""
+
     company_name: str
     job_count: int
     growth_rate: Optional[float] = None
@@ -47,6 +52,7 @@ class HiringTrend(BaseModel):
 
 class GeographicInsight(BaseModel):
     """Schema for geographic insights."""
+
     country: str
     city: Optional[str] = None
     job_count: int
@@ -56,6 +62,7 @@ class GeographicInsight(BaseModel):
 
 class PredictionResponse(BaseModel):
     """Schema for prediction results."""
+
     prediction_type: str
     confidence: float
     details: dict

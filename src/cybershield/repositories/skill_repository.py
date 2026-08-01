@@ -4,14 +4,14 @@ Skill Repository
 Specialized repository for skill operations and market analysis.
 """
 
-from typing import Optional, Sequence
 from datetime import datetime, timedelta, timezone
+from typing import Optional, Sequence
 
-from sqlalchemy import select, func, desc
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from cybershield.domain.models import Skill, SkillTrend, UserSkill, JobSkill
+from cybershield.domain.models import JobSkill, Skill, SkillTrend, UserSkill
 from cybershield.repositories.base import BaseRepository
 
 
@@ -23,9 +23,7 @@ class SkillRepository(BaseRepository[Skill]):
 
     async def get_by_name(self, name: str) -> Optional[Skill]:
         """Get skill by name (case-insensitive)."""
-        result = await self.session.execute(
-            select(Skill).where(Skill.name.ilike(name))
-        )
+        result = await self.session.execute(select(Skill).where(Skill.name.ilike(name)))
         return result.scalar_one_or_none()
 
     async def get_or_create_by_name(self, name: str, category: Optional[str] = None) -> Skill:
@@ -39,16 +37,11 @@ class SkillRepository(BaseRepository[Skill]):
         """Search skills by name."""
         search_pattern = f"%{query_text}%"
         result = await self.session.execute(
-            select(Skill)
-            .where(Skill.name.ilike(search_pattern))
-            .order_by(Skill.name)
-            .limit(limit)
+            select(Skill).where(Skill.name.ilike(search_pattern)).order_by(Skill.name).limit(limit)
         )
         return result.scalars().all()
 
-    async def get_trending_skills(
-        self, days: int = 30, limit: int = 10
-    ) -> Sequence[dict]:
+    async def get_trending_skills(self, days: int = 30, limit: int = 10) -> Sequence[dict]:
         """Get trending skills based on recent job postings."""
         from cybershield.domain.models import Job
 
@@ -59,17 +52,14 @@ class SkillRepository(BaseRepository[Skill]):
             )
             .join(JobSkill, Skill.id == JobSkill.skill_id)
             .join(Job, JobSkill.job_id == Job.id)
-            .where(Job.is_active == True)
+            .where(Job.is_active)
             .group_by(Skill.id)
             .order_by(desc("job_count"))
             .limit(limit)
         )
 
         result = await self.session.execute(query)
-        return [
-            {"skill": row[0], "job_count": row[1]}
-            for row in result.all()
-        ]
+        return [{"skill": row[0], "job_count": row[1]} for row in result.all()]
 
     async def get_user_skills(self, user_id: str) -> Sequence[UserSkill]:
         """Get all skills for a user."""
@@ -116,9 +106,7 @@ class SkillRepository(BaseRepository[Skill]):
             for row in result.all()
         ]
 
-    async def get_skill_trends(
-        self, skill_id: str, months: int = 12
-    ) -> Sequence[SkillTrend]:
+    async def get_skill_trends(self, skill_id: str, months: int = 12) -> Sequence[SkillTrend]:
         """Get historical trend data for a skill."""
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=months * 30)
 
@@ -126,8 +114,8 @@ class SkillRepository(BaseRepository[Skill]):
             select(SkillTrend)
             .where(
                 SkillTrend.skill_id == skill_id,
-                SkillTrend.recorded_at >= cutoff_date,
+                SkillTrend.period_start >= cutoff_date,
             )
-            .order_by(SkillTrend.recorded_at)
+            .order_by(SkillTrend.period_start)
         )
         return result.scalars().all()

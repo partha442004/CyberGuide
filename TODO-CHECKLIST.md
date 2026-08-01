@@ -511,6 +511,37 @@ sqlite3 data/interntrack.db "PRAGMA integrity_check;"
 
 ---
 
+## ✅ HARDENING PASS (2026-08-01) — COMPLETED
+
+### Static Analysis
+- [x] mypy clean across all 177 source files (fixed 107 cybershield errors)
+- [x] ruff lint: all checks passed (fixed 1,294 errors)
+- [x] ruff format: 212 files formatted
+
+### Error Handling & API Contract
+- [x] Dedicated `AppException` handler registered (status + `to_dict()` payload)
+- [x] Consistent `{error: {code, message, details}}` shape on all error paths
+- [x] Global fallback handler with debug-detail gating
+- [x] CORS settings-driven with comma-separated env parsing
+- [x] `validate_security()` startup warnings (secret key + CORS)
+
+### Real Bug Fixes
+- [x] httpx 0.28 `allow_redirects` → `follow_redirects` (verification engine)
+- [x] `NotificationPriority.NORMAL` → `MEDIUM` (orchestrator)
+- [x] `SkillTrend.recorded_at` → `period_start` (skill repository)
+- [x] `Company.is_trusted` added to model + migration
+- [x] `Job.company` relationship → `company_ref` (was shadowing string column, broke search)
+- [x] `NotFoundError(resource, identifier)` 2-arg calls
+- [x] Scheduler `not Job.is_verified` → proper SQL filter
+
+### Tests
+- [x] `tests/unit/test_main.py` (9 tests): handlers, CORS parsing, security validation
+- [x] `TestCorsMiddleware` integration tests
+- [x] Smoke test of live API (health, CORS preflight, 404, docs-off in prod)
+- [x] 653 tests passing (358 InternTrack + 295 CyberGuide)
+
+---
+
 ## 🔄 QUICK REFERENCE
 
 ### Common Commands

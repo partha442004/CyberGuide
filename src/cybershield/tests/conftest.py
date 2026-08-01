@@ -5,24 +5,25 @@ Shared fixtures for all tests.
 """
 
 import asyncio
-import pytest
-import pytest_asyncio
 from typing import AsyncGenerator, Generator
 
-from httpx import AsyncClient, ASGITransport
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+import pytest
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import (
+    async_sessionmaker,
+    create_async_engine,
+)
 
-from cybershield.main import app
-from cybershield.domain.models import Base
 from cybershield.dependencies import get_session
-
+from cybershield.domain.models import Base
+from cybershield.main import app
 
 # Use in-memory SQLite for tests
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-TestSessionLocal = sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+TestSessionLocal = async_sessionmaker(test_engine, expire_on_commit=False)
 
 
 @pytest.fixture(scope="session")
@@ -53,17 +54,17 @@ async def db_session():
 @pytest_asyncio.fixture
 async def client(db_session) -> AsyncGenerator[AsyncClient, None]:
     """Create a test HTTP client with database dependency override."""
-    
+
     async def override_get_session():
         yield db_session
-    
+
     # Override the database dependency
     app.dependency_overrides[get_session] = override_get_session
-    
-    transport = ASGITransport(app=app)
+
+    transport = ASGITransport(app=app)  # type: ignore[arg-type]
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
-    
+
     # Clear dependency overrides after test
     app.dependency_overrides.clear()
 

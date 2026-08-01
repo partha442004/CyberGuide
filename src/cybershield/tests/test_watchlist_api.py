@@ -19,10 +19,11 @@ async def create_test_user(client: AsyncClient) -> str:
     }
     response = await client.post("/api/v1/users/", json=user_data)
     assert response.status_code == 201
-    return response.json()["id"]
+    return str(response.json()["id"])
 
 
 # ==================== Company Watchlist Tests ====================
+
 
 @pytest.mark.asyncio
 async def test_add_company_watchlist(client: AsyncClient):
@@ -82,9 +83,7 @@ async def test_remove_company_watchlist(client: AsyncClient):
         json={"company_id": "cisco-id-101"},
     )
     # Remove it
-    response = await client.delete(
-        f"/api/v1/users/{user_id}/company-watchlist/cisco-id-101"
-    )
+    response = await client.delete(f"/api/v1/users/{user_id}/company-watchlist/cisco-id-101")
     assert response.status_code == 200
     data = response.json()
     assert data["message"] == "Company removed from watchlist"
@@ -94,13 +93,12 @@ async def test_remove_company_watchlist(client: AsyncClient):
 async def test_remove_nonexistent_company_watchlist(client: AsyncClient):
     """Test removing non-existent company from watchlist returns 404."""
     user_id = await create_test_user(client)
-    response = await client.delete(
-        f"/api/v1/users/{user_id}/company-watchlist/nonexistent-id"
-    )
+    response = await client.delete(f"/api/v1/users/{user_id}/company-watchlist/nonexistent-id")
     assert response.status_code == 404
 
 
 # ==================== Keyword Watchlist Tests ====================
+
 
 @pytest.mark.asyncio
 async def test_add_keyword_watchlist(client: AsyncClient):
@@ -160,9 +158,7 @@ async def test_remove_keyword_watchlist(client: AsyncClient):
         json={"keyword": "sentinel"},
     )
     # Remove it
-    response = await client.delete(
-        f"/api/v1/users/{user_id}/keyword-watchlist/sentinel"
-    )
+    response = await client.delete(f"/api/v1/users/{user_id}/keyword-watchlist/sentinel")
     assert response.status_code == 200
     data = response.json()
     assert data["message"] == "Keyword removed from watchlist"
@@ -172,13 +168,12 @@ async def test_remove_keyword_watchlist(client: AsyncClient):
 async def test_remove_nonexistent_keyword_watchlist(client: AsyncClient):
     """Test removing non-existent keyword from watchlist returns 404."""
     user_id = await create_test_user(client)
-    response = await client.delete(
-        f"/api/v1/users/{user_id}/keyword-watchlist/nonexistent"
-    )
+    response = await client.delete(f"/api/v1/users/{user_id}/keyword-watchlist/nonexistent")
     assert response.status_code == 404
 
 
 # ==================== Cross-Type Watchlist Tests ====================
+
 
 @pytest.mark.asyncio
 async def test_company_and_keyword_watchlists_independent(client: AsyncClient):

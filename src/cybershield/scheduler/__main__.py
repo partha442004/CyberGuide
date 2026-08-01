@@ -47,9 +47,8 @@ async def job_discovery():
             for scraped_job in jobs:
                 # Check if job already exists by URL
                 from sqlalchemy import select
-                existing = await session.execute(
-                    select(Job).where(Job.url == scraped_job.url)
-                )
+
+                existing = await session.execute(select(Job).where(Job.url == scraped_job.url))
                 if existing.scalar_one_or_none():
                     continue
 
@@ -92,18 +91,21 @@ async def link_verification():
     """Verify job links are still active."""
     logger.info("Starting link verification...")
     try:
-        from cybershield.engines.verification import VerificationEngine
         from sqlalchemy import select
+
+        from cybershield.engines.verification import VerificationEngine
 
         engine = VerificationEngine()
 
         async with get_db_session() as session:
             # Get jobs that haven't been verified
             result = await session.execute(
-                select(Job).where(
-                    Job.is_active == True,
-                    Job.is_verified == False,
-                ).limit(50)
+                select(Job)
+                .where(
+                    Job.is_active,
+                    Job.is_verified.is_(False),
+                )
+                .limit(50)
             )
             jobs_to_verify = result.scalars().all()
 
@@ -133,17 +135,20 @@ async def scam_analysis():
     """Analyze jobs for scam indicators."""
     logger.info("Starting scam analysis...")
     try:
-        from cybershield.engines.scam_detection import ScamDetectionEngine
         from sqlalchemy import select
+
+        from cybershield.engines.scam_detection import ScamDetectionEngine
 
         engine = ScamDetectionEngine()
 
         async with get_db_session() as session:
             # Get jobs without scam score
             result = await session.execute(
-                select(Job).where(
-                    Job.is_active == True,
-                ).limit(50)
+                select(Job)
+                .where(
+                    Job.is_active,
+                )
+                .limit(50)
             )
             jobs_to_analyze = result.scalars().all()
 
@@ -187,12 +192,13 @@ async def daily_report():
     """Generate and send daily digest."""
     logger.info("Generating daily report...")
     try:
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
+
         from cybershield.notifications.orchestrator import NotificationOrchestrator
 
         async with get_db_session() as session:
             # Get stats
-            total_jobs = await session.scalar(select(func.count(Job.id)))
+            await session.scalar(select(func.count(Job.id)))
             new_today = await session.scalar(
                 select(func.count(Job.id)).where(
                     Job.created_at >= datetime.now(timezone.utc).replace(hour=0, minute=0, second=0)
@@ -202,7 +208,7 @@ async def daily_report():
             # Get expiring soon (next 7 days)
             expiring = await session.scalar(
                 select(func.count(Job.id)).where(
-                    Job.is_active == True,
+                    Job.is_active,
                     Job.expires_at <= datetime.now(timezone.utc) + timedelta(days=7),
                     Job.expires_at >= datetime.now(timezone.utc),
                 )
@@ -211,7 +217,7 @@ async def daily_report():
             # Get high-match jobs
             high_match = await session.scalar(
                 select(func.count(Job.id)).where(
-                    Job.is_active == True,
+                    Job.is_active,
                 )
             )
 
@@ -220,18 +226,26 @@ async def daily_report():
             # Configure channels from settings
             if settings.telegram_bot_token:
                 from cybershield.notifications.telegram import TelegramNotifier
-                orchestrator.register("telegram", TelegramNotifier({
-                    "bot_token": settings.telegram_bot_token,
-                    "chat_id": settings.telegram_chat_id,
-                }))
 
-            await orchestrator.send_daily_digest({
-                "new_jobs": new_today or 0,
-                "expiring_soon": expiring or 0,
-                "high_match": high_match or 0,
-                "top_skills": ["Python", "SIEM", "AWS", "Cloud Security"],
-                "top_companies": ["Microsoft", "Google", "Amazon"],
-            })
+                orchestrator.register(
+                    "telegram",
+                    TelegramNotifier(
+                        {
+                            "bot_token": settings.telegram_bot_token,
+                            "chat_id": settings.telegram_chat_id,
+                        }
+                    ),
+                )
+
+            await orchestrator.send_daily_digest(
+                {
+                    "new_jobs": new_today or 0,
+                    "expiring_soon": expiring or 0,
+                    "high_match": high_match or 0,
+                    "top_skills": ["Python", "SIEM", "AWS", "Cloud Security"],
+                    "top_companies": ["Microsoft", "Google", "Amazon"],
+                }
+            )
 
         logger.info("Daily report completed")
 
@@ -243,9 +257,10 @@ async def weekly_report():
     """Generate and send weekly analytics report."""
     logger.info("Generating weekly report...")
     try:
-        from sqlalchemy import select, func
-        from cybershield.notifications.orchestrator import NotificationOrchestrator
+        from sqlalchemy import func, select
+
         from cybershield.domain.models import Application, SkillTrend
+        from cybershield.notifications.orchestrator import NotificationOrchestrator
 
         week_ago = datetime.now(timezone.utc) - timedelta(days=7)
 
@@ -264,6 +279,7 @@ async def weekly_report():
 
             # Top hiring companies
             from sqlalchemy import desc
+
             top_companies_result = await session.execute(
                 select(Job.company, func.count(Job.id).label("count"))
                 .where(Job.created_at >= week_ago)
@@ -287,7 +303,7 @@ async def weekly_report():
             next_week = datetime.now(timezone.utc) + timedelta(days=7)
             expiring_count = await session.scalar(
                 select(func.count(Job.id)).where(
-                    Job.is_active == True,
+                    Job.is_active,
                     Job.expires_at <= next_week,
                     Job.expires_at >= datetime.now(timezone.utc),
                 )
@@ -297,22 +313,31 @@ async def weekly_report():
             orchestrator = NotificationOrchestrator()
             if settings.telegram_bot_token:
                 from cybershield.notifications.telegram import TelegramNotifier
-                orchestrator.register("telegram", TelegramNotifier({
-                    "bot_token": settings.telegram_bot_token,
-                    "chat_id": settings.telegram_chat_id,
-                }))
 
-            await orchestrator.send_report("weekly", {
-                "title": "📊 Weekly Report",
-                "period": f"{week_ago.strftime('%b %d')} - {datetime.now(timezone.utc).strftime('%b %d, %Y')}",
-                "new_jobs": new_this_week or 0,
-                "total_jobs": total_jobs or 0,
-                "applications_submitted": apps_this_week or 0,
-                "total_applications": total_apps or 0,
-                "expiring_next_week": expiring_count or 0,
-                "top_companies": top_companies[:5],
-                "top_skills": [s[0] for s in top_skills[:5]],
-            })
+                orchestrator.register(
+                    "telegram",
+                    TelegramNotifier(
+                        {
+                            "bot_token": settings.telegram_bot_token,
+                            "chat_id": settings.telegram_chat_id,
+                        }
+                    ),
+                )
+
+            await orchestrator.send_report(
+                "weekly",
+                {
+                    "title": "📊 Weekly Report",
+                    "period": f"{week_ago.strftime('%b %d')} - {datetime.now(timezone.utc).strftime('%b %d, %Y')}",
+                    "new_jobs": new_this_week or 0,
+                    "total_jobs": total_jobs or 0,
+                    "applications_submitted": apps_this_week or 0,
+                    "total_applications": total_apps or 0,
+                    "expiring_next_week": expiring_count or 0,
+                    "top_companies": top_companies[:5],
+                    "top_skills": [s[0] for s in top_skills[:5]],
+                },
+            )
 
         logger.info("Weekly report completed")
 
@@ -324,9 +349,10 @@ async def monthly_report():
     """Generate and send monthly analytics report."""
     logger.info("Generating monthly report...")
     try:
-        from sqlalchemy import select, func, desc
-        from cybershield.notifications.orchestrator import NotificationOrchestrator
+        from sqlalchemy import desc, func, select
+
         from cybershield.domain.models import Application, SkillTrend
+        from cybershield.notifications.orchestrator import NotificationOrchestrator
 
         month_ago = datetime.now(timezone.utc) - timedelta(days=30)
 
@@ -338,7 +364,7 @@ async def monthly_report():
             )
 
             # Application stats
-            total_apps = await session.scalar(select(func.count(Application.id)))
+            await session.scalar(select(func.count(Application.id)))
             apps_this_month = await session.scalar(
                 select(func.count(Application.id)).where(Application.created_at >= month_ago)
             )
@@ -351,7 +377,7 @@ async def monthly_report():
                     Application.status.in_(success_statuses),
                 )
             )
-            success_rate = (success_count / apps_this_month * 100) if apps_this_month else 0
+            success_rate = ((success_count or 0) / apps_this_month * 100) if apps_this_month else 0
 
             # Top hiring companies
             top_companies_result = await session.execute(
@@ -397,36 +423,57 @@ async def monthly_report():
             job_types = [(row[0], row[1]) for row in job_type_result.all()]
 
             # Remote job percentage
-            total_with_mode = await session.scalar(
-                select(func.count(Job.id)).where(Job.created_at >= month_ago, Job.work_mode.isnot(None))
-            ) or 1
-            remote_count = await session.scalar(
-                select(func.count(Job.id)).where(Job.created_at >= month_ago, Job.work_mode == "remote")
-            ) or 0
+            total_with_mode = (
+                await session.scalar(
+                    select(func.count(Job.id)).where(
+                        Job.created_at >= month_ago, Job.work_mode.isnot(None)
+                    )
+                )
+                or 1
+            )
+            remote_count = (
+                await session.scalar(
+                    select(func.count(Job.id)).where(
+                        Job.created_at >= month_ago, Job.work_mode == "remote"
+                    )
+                )
+                or 0
+            )
             remote_pct = round(remote_count / total_with_mode * 100, 1)
 
             # Send notification
             orchestrator = NotificationOrchestrator()
             if settings.telegram_bot_token:
                 from cybershield.notifications.telegram import TelegramNotifier
-                orchestrator.register("telegram", TelegramNotifier({
-                    "bot_token": settings.telegram_bot_token,
-                    "chat_id": settings.telegram_chat_id,
-                }))
 
-            await orchestrator.send_report("monthly", {
-                "title": "📈 Monthly Report",
-                "period": f"{month_ago.strftime('%b %d')} - {datetime.now(timezone.utc).strftime('%b %d, %Y')}",
-                "new_jobs": new_this_month or 0,
-                "total_jobs": total_jobs or 0,
-                "applications_submitted": apps_this_month or 0,
-                "success_rate": round(success_rate, 1),
-                "avg_salary_range": f"{int(salary.avg_min or 0)}-{int(salary.avg_max or 0)}" if salary else "N/A",
-                "top_companies": top_companies[:10],
-                "top_skills": [s[0] for s in top_skills[:10]],
-                "job_types": job_types[:5],
-                "remote_percentage": remote_pct,
-            })
+                orchestrator.register(
+                    "telegram",
+                    TelegramNotifier(
+                        {
+                            "bot_token": settings.telegram_bot_token,
+                            "chat_id": settings.telegram_chat_id,
+                        }
+                    ),
+                )
+
+            await orchestrator.send_report(
+                "monthly",
+                {
+                    "title": "📈 Monthly Report",
+                    "period": f"{month_ago.strftime('%b %d')} - {datetime.now(timezone.utc).strftime('%b %d, %Y')}",
+                    "new_jobs": new_this_month or 0,
+                    "total_jobs": total_jobs or 0,
+                    "applications_submitted": apps_this_month or 0,
+                    "success_rate": round(success_rate, 1),
+                    "avg_salary_range": f"{int(salary.avg_min or 0)}-{int(salary.avg_max or 0)}"
+                    if salary
+                    else "N/A",
+                    "top_companies": top_companies[:10],
+                    "top_skills": [s[0] for s in top_skills[:10]],
+                    "job_types": job_types[:5],
+                    "remote_percentage": remote_pct,
+                },
+            )
 
         logger.info("Monthly report completed")
 

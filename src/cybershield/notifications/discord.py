@@ -6,7 +6,6 @@ Sends notifications via Discord webhooks.
 
 import logging
 from typing import Any, Dict, Optional
-from datetime import datetime, timezone
 
 import httpx
 
@@ -30,21 +29,19 @@ class DiscordNotifier(BaseNotifier):
     def _build_embed(self, message: NotificationMessage) -> Dict[str, Any]:
         """Build Discord embed from notification message."""
         priority_colors = {
-            "low": 0x6c757d,     # Gray
-            "medium": 0x0d6efd,  # Blue
-            "high": 0xffc107,    # Yellow
-            "urgent": 0xdc3545,  # Red
+            "low": 0x6C757D,  # Gray
+            "medium": 0x0D6EFD,  # Blue
+            "high": 0xFFC107,  # Yellow
+            "urgent": 0xDC3545,  # Red
         }
-        color = priority_colors.get(message.priority.value, 0x0d6efd)
+        color = priority_colors.get(message.priority.value, 0x0D6EFD)
 
         embed = {
             "title": message.title,
             "description": message.content[:4000],  # Discord limit
             "color": color,
             "timestamp": message.timestamp.isoformat(),
-            "footer": {
-                "text": "CyberGuide Career Intelligence Platform"
-            }
+            "footer": {"text": "CyberGuide Career Intelligence Platform"},
         }
 
         if message.url:
@@ -53,11 +50,13 @@ class DiscordNotifier(BaseNotifier):
         if message.data:
             fields = []
             for key, value in list(message.data.items())[:10]:  # Max 10 fields
-                fields.append({
-                    "name": key.replace("_", " ").title(),
-                    "value": str(value)[:100],
-                    "inline": True
-                })
+                fields.append(
+                    {
+                        "name": key.replace("_", " ").title(),
+                        "value": str(value)[:100],
+                        "inline": True,
+                    }
+                )
             if fields:
                 embed["fields"] = fields
 
@@ -72,7 +71,7 @@ class DiscordNotifier(BaseNotifier):
         payload = {
             "username": "CyberGuide",
             "avatar_url": "https://example.com/cybershield-avatar.png",
-            "embeds": [self._build_embed(message)]
+            "embeds": [self._build_embed(message)],
         }
 
         async with httpx.AsyncClient(timeout=30) as client:

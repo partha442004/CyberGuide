@@ -6,6 +6,7 @@ Falls back to database search when Elasticsearch is unavailable.
 """
 
 from typing import List, Optional
+
 from fastapi import APIRouter, Query
 
 from cybershield.services import elasticsearch_service as es
@@ -20,7 +21,9 @@ async def search_jobs(
     country: Optional[str] = Query(None, description="Filter by country"),
     location: Optional[str] = Query(None, description="Filter by location"),
     skills: Optional[List[str]] = Query(None, description="Filter by required skills"),
-    job_type: Optional[str] = Query(None, description="Filter by job type (full_time, part_time, contract)"),
+    job_type: Optional[str] = Query(
+        None, description="Filter by job type (full_time, part_time, contract)"
+    ),
     experience_level: Optional[str] = Query(None, description="Filter by experience level"),
     is_remote: Optional[bool] = Query(None, description="Filter remote jobs only"),
     min_salary: Optional[float] = Query(None, description="Minimum salary filter"),

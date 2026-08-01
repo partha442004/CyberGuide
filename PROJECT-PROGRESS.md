@@ -1,6 +1,25 @@
 # 📊 InternTrack - Final Project Progress
 
-> **Last Updated:** 2026-07-30 | **Status:** ✅ Complete (100%)
+> **Last Updated:** 2026-08-01 | **Status:** ✅ Complete (100%)
+
+---
+
+## 🛠️ 2026-08-01 Hardening Pass
+
+| Check | Result |
+|-------|--------|
+| **ruff lint** | ✅ All checks passed (was 1,294 errors) |
+| **ruff format** | ✅ 212 files formatted |
+| **mypy** | ✅ 0 errors in 177 source files (fixed 107 in cybershield) |
+| **InternTrack tests** | ✅ 358 passing |
+| **CyberGuide tests** | ✅ 295 passing |
+| **Smoke test** | ✅ /health, /, CORS preflight, 404, docs (prod-off) verified |
+
+### Highlights
+- **Error handling**: dedicated `AppException` handler + consistent `{error: {code, message, details}}` payload; debug detail gated
+- **CORS**: settings-driven with comma-separated env parsing + integration tests
+- **Real bugs fixed**: httpx 0.28 `allow_redirects` removal, `NotificationPriority.NORMAL`, `SkillTrend.recorded_at`, `Company.is_trusted` (models + migration), `Job.company` relationship shadowing the string column (broke search), scheduler `not Job.is_verified` filter
+- New tests: `tests/unit/test_main.py` (9) + `TestCorsMiddleware` integration tests
 
 ---
 
@@ -18,7 +37,7 @@
 | **Engines** | ✅ Complete | 100% | Dedup, verify, classify |
 | **Notifications** | ✅ Complete | 100% | Telegram, Email, Discord |
 | **Dashboard** | ✅ Complete | 100% | Streamlit with charts |
-| **Tests** | ✅ Complete | 100% | 347 tests passing |
+| **Tests** | ✅ Complete | 100% | 358 tests passing |
 | **CI/CD** | ✅ Complete | 100% | GitHub Actions ready |
 | **Documentation** | ✅ Complete | 100% | All docs created |
 | **Docker** | ✅ Complete | 100% | Compose ready |
@@ -29,8 +48,9 @@
 ## 📊 FINAL TEST RESULTS
 
 ```
-======================== 347 passed in 75.51s ========================
-Total coverage: 82% (2423 statements, ~436 missing)
+======================== 358 passed in 96.04s ========================
+CyberGuide (cybershield): 295 passed in 21.02s
+Total: 653 tests passing
 ```
 
 ### Coverage Improvement Summary
@@ -44,7 +64,8 @@ Total coverage: 82% (2423 statements, ~436 missing)
 | Phase 4 | 239 | 72% | +47 tests, +6% |
 | Phase 5 | 271 | 74% | +32 tests, +2% |
 | Phase 6 | 331 | 80% | +60 tests, +6% |
-| **Latest** | **347** | **82%** | +16 tests, +2% |
+| **Latest** | **358** | **82%+** | +11 tests (InternTrack) |
+| **CyberGuide** | **295** | — | Full cleanup + 295 passing |
 
 ---
 
@@ -85,7 +106,7 @@ Total coverage: 82% (2423 statements, ~436 missing)
 - [x] `src/interntrack/utils/` - 4 utility files
 - [x] `src/interntrack/reports/templates/` - 3 report templates
 
-### Tests (347 total)
+### Tests (653 total: 358 InternTrack + 295 CyberGuide)
 - [x] `tests/conftest.py` - Test fixtures
 - [x] `tests/unit/test_job_service.py` - 8 tests
 - [x] `tests/unit/test_application_service.py` - 8 tests
@@ -201,8 +222,11 @@ uvicorn interntrack.main:app --reload
 | Unit - Indeed Scraper | 12 | ✅ |
 | Unit - Glassdoor Scraper | 12 | ✅ |
 | Unit - Learning Service | 16 | ✅ |
-| Integration - API | 21 | ✅ |
-| **Total** | **347** | ✅ **All Passing** |
+| Unit - Main/Error Handling | 9 | ✅ **NEW** |
+| Integration - API | 23 | ✅ (incl. CORS middleware) |
+| **Total (InternTrack)** | **358** | ✅ **All Passing** |
+| **CyberGuide (cybershield)** | **295** | ✅ **All Passing** |
+| **Grand Total** | **653** | ✅ **All Passing** |
 
 ---
 

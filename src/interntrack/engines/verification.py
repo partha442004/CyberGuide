@@ -3,12 +3,14 @@ Verification engine for validating job postings.
 """
 
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from interntrack.domain.models import Job
 from interntrack.repositories.job_repository import JobRepository
+
+if TYPE_CHECKING:
+    from interntrack.domain.models import Job
 
 
 class VerificationEngine:
@@ -31,7 +33,7 @@ class VerificationEngine:
         self.session = session
         self.job_repo = JobRepository(session)
 
-    async def verify_job(self, job_data: dict) -> Tuple[bool, List[str]]:
+    async def verify_job(self, job_data: dict) -> tuple[bool, list[str]]:
         """Verify a job posting and return (is_valid, issues)."""
         issues = []
 
@@ -55,7 +57,7 @@ class VerificationEngine:
         is_valid = len(issues) == 0
         return is_valid, issues
 
-    async def verify_jobs(self, jobs: List[dict]) -> Tuple[List[dict], List[dict]]:
+    async def verify_jobs(self, jobs: list[dict]) -> tuple[list[dict], list[dict]]:
         """Verify multiple jobs and return (valid_jobs, invalid_jobs)."""
         valid_jobs = []
         invalid_jobs = []
@@ -69,7 +71,7 @@ class VerificationEngine:
 
         return valid_jobs, invalid_jobs
 
-    def _check_spam(self, job_data: dict) -> List[str]:
+    def _check_spam(self, job_data: dict) -> list[str]:
         """Check for spam patterns."""
         issues = []
         text = f"{job_data.get('title', '')} {job_data.get('description', '')}".lower()
@@ -81,7 +83,7 @@ class VerificationEngine:
 
         return issues
 
-    def _validate_url(self, url: str) -> List[str]:
+    def _validate_url(self, url: str) -> list[str]:
         """Validate job URL."""
         issues = []
 
@@ -97,7 +99,7 @@ class VerificationEngine:
 
         return issues
 
-    def _validate_salary(self, job_data: dict) -> List[str]:
+    def _validate_salary(self, job_data: dict) -> list[str]:
         """Validate salary information."""
         issues = []
         salary_min = job_data.get("salary_min")
@@ -113,7 +115,7 @@ class VerificationEngine:
 
         return issues
 
-    async def check_link_health(self, url: str) -> Dict[str, any]:
+    async def check_link_health(self, url: str) -> dict[str, Any]:
         """Check if job URL is still accessible."""
         import httpx
 
@@ -134,17 +136,18 @@ class VerificationEngine:
                 "error": str(e),
             }
 
-    async def verify_all_links(self, job_ids: Optional[List[str]] = None) -> List[dict]:
+    async def verify_all_links(self, job_ids: list[str] | None = None) -> list[dict]:
         """Verify links for multiple jobs."""
+        jobs: list[Job]
         if job_ids:
-            jobs = [await self.job_repo.get_by_id(jid) for jid in job_ids]
-            jobs = [j for j in jobs if j]
+            found = [await self.job_repo.get_by_id(jid) for jid in job_ids]
+            jobs = [j for j in found if j is not None]
         else:
             jobs = await self.job_repo.get_all(limit=100)
 
         results = []
         for job in jobs:
-            result = await self.check_link_health(job.url)
+            result = await self.check_link_health(str(job.url))
             result["job_id"] = job.id
             result["job_title"] = job.title
             results.append(result)

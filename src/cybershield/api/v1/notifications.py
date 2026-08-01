@@ -4,16 +4,15 @@ Notifications API Router
 Endpoints for notification configuration and testing.
 """
 
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from cybershield.dependencies import get_session
 from cybershield.schemas.notification import (
     NotificationConfig,
-    NotificationTest,
     NotificationResponse,
+    NotificationTest,
 )
 
 router = APIRouter()
@@ -26,7 +25,6 @@ async def get_notification_config(
 ):
     """Get user's notification configuration."""
     from cybershield.domain.models import NotificationConfig as NotificationConfigModel
-    from sqlalchemy import select
 
     result = await session.execute(
         select(NotificationConfigModel).where(NotificationConfigModel.user_id == user_id)
@@ -58,7 +56,6 @@ async def update_notification_config(
 ):
     """Update user's notification configuration."""
     from cybershield.domain.models import NotificationConfig as NotificationConfigModel
-    from sqlalchemy import select
 
     result = await session.execute(
         select(NotificationConfigModel).where(NotificationConfigModel.user_id == user_id)

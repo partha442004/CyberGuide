@@ -1,8 +1,9 @@
 """Unit tests for utils/cache.py."""
 
-import pytest
 import time
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestInMemoryCache:
@@ -91,7 +92,7 @@ class TestGetCache:
 
     @patch("interntrack.utils.cache.settings")
     def test_get_cache_returns_inmemory_when_no_redis(self, mock_settings):
-        from interntrack.utils.cache import get_cache, InMemoryCache
+        from interntrack.utils.cache import InMemoryCache, get_cache
 
         mock_settings.redis_url = None
         cache = get_cache()
@@ -99,7 +100,11 @@ class TestGetCache:
 
     @patch("interntrack.utils.cache.RedisCache")
     @patch("interntrack.utils.cache.settings")
-    def test_get_cache_returns_redis_when_configured(self, mock_settings, mock_redis_cache):
+    def test_get_cache_returns_redis_when_configured(
+        self,
+        mock_settings,
+        mock_redis_cache,
+    ):
         from interntrack.utils.cache import get_cache
 
         mock_settings.redis_url = "redis://localhost:6379"
@@ -109,8 +114,12 @@ class TestGetCache:
 
     @patch("interntrack.utils.cache.RedisCache")
     @patch("interntrack.utils.cache.settings")
-    def test_get_cache_fallback_to_inmemory_on_error(self, mock_settings, mock_redis_cache):
-        from interntrack.utils.cache import get_cache, InMemoryCache
+    def test_get_cache_fallback_to_inmemory_on_error(
+        self,
+        mock_settings,
+        mock_redis_cache,
+    ):
+        from interntrack.utils.cache import InMemoryCache, get_cache
 
         mock_settings.redis_url = "redis://invalid:9999"
         mock_redis_cache.side_effect = Exception("Connection refused")
@@ -123,8 +132,8 @@ class TestCachedDecorator:
 
     @pytest.mark.asyncio
     async def test_cached_decorator_caches_result(self):
-        from interntrack.utils.cache import InMemoryCache
         import interntrack.utils.cache as cache_mod
+        from interntrack.utils.cache import InMemoryCache
 
         # Replace global cache with InMemoryCache
         original_cache = cache_mod.cache
@@ -150,8 +159,8 @@ class TestCachedDecorator:
 
     @pytest.mark.asyncio
     async def test_cached_decorator_different_args(self):
-        from interntrack.utils.cache import InMemoryCache
         import interntrack.utils.cache as cache_mod
+        from interntrack.utils.cache import InMemoryCache
 
         original_cache = cache_mod.cache
         cache_mod.cache = InMemoryCache()

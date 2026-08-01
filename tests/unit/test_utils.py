@@ -2,17 +2,16 @@
 Unit tests for utility functions.
 """
 
-import pytest
 from datetime import datetime
 
-from interntrack.utils.helpers import (
-    format_datetime,
-    format_currency,
-    truncate_text,
-    slugify,
-    generate_id,
-)
 from interntrack.utils.encryption import SecretManager, mask_sensitive
+from interntrack.utils.helpers import (
+    format_currency,
+    format_datetime,
+    generate_id,
+    slugify,
+    truncate_text,
+)
 
 
 class TestHelpers:

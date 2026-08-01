@@ -5,12 +5,11 @@ Manages WebSocket connections for real-time job notifications.
 Supports user-specific channels, room-based broadcasting, and connection lifecycle.
 """
 
-import json
 import logging
-from typing import Any, Dict, List, Optional, Set
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Set
 
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
 
@@ -87,9 +86,7 @@ class ConnectionManager:
 
         # Clean up failed connections
         for ws in disconnected:
-            self._connections[user_id] = [
-                c for c in self._connections.get(user_id, []) if c != ws
-            ]
+            self._connections[user_id] = [c for c in self._connections.get(user_id, []) if c != ws]
 
         return sent
 

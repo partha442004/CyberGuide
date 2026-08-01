@@ -4,9 +4,7 @@ Naukri Scraper
 Scrapes cybersecurity jobs from Naukri.com (India's largest job portal).
 """
 
-import json
 import logging
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
@@ -80,8 +78,18 @@ class NaukriScraper(BaseScraper):
             job.country = "India"
             # Try to extract city from location
             location_lower = job.location.lower()
-            major_cities = ["mumbai", "delhi", "bangalore", "hyderabad", "pune", "chennai",
-                          "kolkata", "ahmedabad", "jaipur", "lucknow"]
+            major_cities = [
+                "mumbai",
+                "delhi",
+                "bangalore",
+                "hyderabad",
+                "pune",
+                "chennai",
+                "kolkata",
+                "ahmedabad",
+                "jaipur",
+                "lucknow",
+            ]
             for city in major_cities:
                 if city in location_lower:
                     job.city = city.title()
@@ -94,7 +102,9 @@ class NaukriScraper(BaseScraper):
             # Parse salary text (e.g., "₹3,00,000 - ₹6,00,000 PA")
             try:
                 # Remove currency symbols and parse
-                salary_text = salary_text.replace("₹", "").replace(",", "").replace("PA", "").strip()
+                salary_text = (
+                    salary_text.replace("₹", "").replace(",", "").replace("PA", "").strip()
+                )
                 if "-" in salary_text:
                     parts = salary_text.split("-")
                     if len(parts) == 2:

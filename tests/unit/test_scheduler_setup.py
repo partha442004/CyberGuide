@@ -1,8 +1,6 @@
 """Unit tests for scheduler/setup.py."""
 
-import pytest
-from unittest.mock import patch, MagicMock
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from unittest.mock import MagicMock, patch
 
 
 class TestSchedulerSetup:
@@ -41,7 +39,9 @@ class TestSchedulerSetup:
         setup_scheduler()
 
         # Verify job IDs
-        job_ids = [call.kwargs.get("id") for call in mock_scheduler.add_job.call_args_list]
+        job_ids = [
+            call.kwargs.get("id") for call in mock_scheduler.add_job.call_args_list
+        ]
         assert "job_discovery" in job_ids
         assert "daily_report" in job_ids
         assert "weekly_report" in job_ids

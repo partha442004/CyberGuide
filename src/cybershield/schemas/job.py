@@ -5,12 +5,14 @@ Pydantic models for job-related API operations.
 """
 
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class JobBase(BaseModel):
     """Base job schema with common fields."""
+
     title: str = Field(..., min_length=1, max_length=500)
     company: Optional[str] = None
     company_id: Optional[str] = None
@@ -39,6 +41,7 @@ class JobBase(BaseModel):
 
 class JobCreate(JobBase):
     """Schema for creating a new job."""
+
     id: Optional[str] = None
     job_id_external: Optional[str] = None
     source_url: Optional[str] = None
@@ -62,6 +65,7 @@ class JobCreate(JobBase):
 
 class JobUpdate(BaseModel):
     """Schema for updating a job."""
+
     title: Optional[str] = None
     description: Optional[str] = None
     url: Optional[str] = None
@@ -74,6 +78,7 @@ class JobUpdate(BaseModel):
 
 class JobResponse(BaseModel):
     """Schema for job response."""
+
     id: str
     title: str
     company: Optional[str] = None
@@ -125,6 +130,7 @@ class JobResponse(BaseModel):
 
 class JobListResponse(BaseModel):
     """Schema for paginated job list response."""
+
     items: List[JobResponse]
     total: int
     skip: int

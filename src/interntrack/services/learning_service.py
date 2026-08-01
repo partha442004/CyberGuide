@@ -2,12 +2,11 @@
 Learning service for skill development recommendations.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from interntrack.domain.enums import SkillCategory
-from interntrack.domain.models import LearningPath, Skill
+from interntrack.domain.models import LearningPath
 from interntrack.repositories.skill_repository import SkillRepository
 from interntrack.services.ai_service import AIService
 
@@ -21,8 +20,9 @@ class LearningService:
         self.ai_service = AIService(session)
 
     async def get_learning_paths(
-        self, skill_id: Optional[str] = None
-    ) -> List[LearningPath]:
+        self,
+        skill_id: str | None = None,
+    ) -> list[LearningPath]:
         """Get learning paths."""
         from sqlalchemy import select
 
@@ -41,12 +41,15 @@ class LearningService:
         return path
 
     async def get_recommendations(
-        self, user_skills: List[str], target_role: str
-    ) -> Dict[str, Any]:
+        self,
+        user_skills: list[str],
+        target_role: str,
+    ) -> dict[str, Any]:
         """Get personalized learning recommendations."""
         # Get missing skills for target role
         ai_result = await self.ai_service.generate_learning_path(
-            user_skills, target_role
+            user_skills,
+            target_role,
         )
 
         # Get available learning resources
@@ -54,11 +57,13 @@ class LearningService:
         for skill_name in ai_result.get("skills", []):
             skill = await self.skill_repo.get_by_name(skill_name)
             if skill:
-                recommendations.append({
-                    "skill": skill.name,
-                    "category": skill.category.value,
-                    "resources": skill.learning_resources or [],
-                })
+                recommendations.append(
+                    {
+                        "skill": skill.name,
+                        "category": skill.category.value,
+                        "resources": skill.learning_resources or [],
+                    },
+                )
 
         return {
             "target_role": target_role,
@@ -68,7 +73,7 @@ class LearningService:
             "learning_path": ai_result.get("steps", []),
         }
 
-    async def get_platform_resources(self, platform: str) -> List[dict]:
+    async def get_platform_resources(self, platform: str) -> list[dict]:
         """Get resources from a specific learning platform."""
         from sqlalchemy import select
 
@@ -88,11 +93,13 @@ class LearningService:
         ]
 
     async def get_skill_gap_analysis(
-        self, user_skills: List[str], job_skills: List[str]
-    ) -> Dict[str, Any]:
+        self,
+        user_skills: list[str],
+        job_skills: list[str],
+    ) -> dict[str, Any]:
         """Analyze skill gaps between user and job requirements."""
-        user_set = set(s.lower() for s in user_skills)
-        job_set = set(s.lower() for s in job_skills)
+        user_set = {s.lower() for s in user_skills}
+        job_set = {s.lower() for s in job_skills}
 
         matched = user_set & job_set
         missing = job_set - user_set
@@ -112,9 +119,8 @@ class LearningService:
         """Get readiness level based on match percentage."""
         if percentage >= 80:
             return "excellent"
-        elif percentage >= 60:
+        if percentage >= 60:
             return "good"
-        elif percentage >= 40:
+        if percentage >= 40:
             return "moderate"
-        else:
-            return "needs_improvement"
+        return "needs_improvement"

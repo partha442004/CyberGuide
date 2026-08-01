@@ -1,13 +1,13 @@
 """Unit tests for utils/helpers.py."""
 
-import pytest
 from datetime import datetime
+
 from interntrack.utils.helpers import (
-    format_datetime,
     format_currency,
-    truncate_text,
-    slugify,
+    format_datetime,
     generate_id,
+    slugify,
+    truncate_text,
 )
 
 
@@ -190,5 +190,6 @@ class TestGenerateId:
 
         # UUID format: 8-4-4-4-12 hex characters
         import re
+
         uuid_pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
         assert re.match(uuid_pattern, result)

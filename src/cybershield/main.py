@@ -7,13 +7,13 @@ FastAPI application entry point with all routes and middleware.
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
+import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import uvicorn
 
 from cybershield.config import get_settings
-from cybershield.middleware import RateLimitMiddleware, APIKeyMiddleware
+from cybershield.middleware import APIKeyMiddleware, RateLimitMiddleware
 
 settings = get_settings()
 from cybershield.database.session import init_db
@@ -66,9 +66,7 @@ if settings.require_api_key and settings.api_keys:
 
 
 @app.exception_handler(CyberGuideException)
-async def cybershield_exception_handler(
-    request: Request, exc: CyberGuideException
-) -> JSONResponse:
+async def cybershield_exception_handler(request: Request, exc: CyberGuideException) -> JSONResponse:
     """Handle CyberGuide custom exceptions."""
     return JSONResponse(
         status_code=exc.status_code,
@@ -81,9 +79,7 @@ async def cybershield_exception_handler(
 
 
 @app.exception_handler(Exception)
-async def global_exception_handler(
-    request: Request, exc: Exception
-) -> JSONResponse:
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle unexpected exceptions."""
     return JSONResponse(
         status_code=500,
@@ -117,9 +113,9 @@ async def health_check():
 
 
 # Import and include routers
-from cybershield.api.v1 import jobs, applications, users, analytics, notifications, resumes
-from cybershield.api.v1.websocket import router as ws_router
+from cybershield.api.v1 import analytics, applications, jobs, notifications, resumes, users
 from cybershield.api.v1.search import router as search_router
+from cybershield.api.v1.websocket import router as ws_router
 from cybershield.services import elasticsearch_service as es
 
 app.include_router(jobs.router, prefix="/api/v1/jobs", tags=["Jobs"])

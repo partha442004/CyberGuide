@@ -9,9 +9,8 @@ Tests the PaloAltoScraper class covering:
 - Location detection
 """
 
-import pytest
-from cybershield.scrapers.companies.paloalto import PaloAltoScraper
 from cybershield.scrapers.base import ScrapedJob, ScraperConfig
+from cybershield.scrapers.companies.paloalto import PaloAltoScraper
 
 
 class TestPaloAltoScraper:
@@ -35,7 +34,10 @@ class TestPaloAltoScraper:
     def test_api_url(self):
         """Scraper should have correct API URL."""
         assert "paloaltonetworks" in self.scraper.API_URL.lower()
-        assert "workday" in self.scraper.API_URL.lower() or "myworkdayjobs" in self.scraper.API_URL.lower()
+        assert (
+            "workday" in self.scraper.API_URL.lower()
+            or "myworkdayjobs" in self.scraper.API_URL.lower()
+        )
 
     def test_default_keywords(self):
         """Scraper should have security-related default keywords."""
@@ -74,7 +76,7 @@ class TestPaloAltoScraper:
         assert job.location == "Santa Clara, CA (US)"
         assert job.country == "USA"
         assert job.job_type == "full_time"
-        assert "paloaltonetworks" in job.url.lower()
+        assert "paloaltonetworks" in (job.url or "").lower()
 
     def test_parse_job_data_remote(self):
         """Should detect remote jobs."""

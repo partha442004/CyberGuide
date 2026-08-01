@@ -5,20 +5,30 @@ Endpoints for resume upload, parsing, matching, and skill extraction.
 """
 
 from datetime import datetime, timezone
-from typing import List
+from typing import Any, List
+
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from cybershield.dependencies import get_session
 from cybershield.domain.models import Job, ResumeData, ResumeMatchResult
-from cybershield.schemas.resume import ResumeUploadResponse, ResumeMatchResponse, ResumeBatchMatchResponse
+from cybershield.schemas.resume import (
+    ResumeBatchMatchResponse,
+    ResumeMatchResponse,
+    ResumeUploadResponse,
+)
 from cybershield.services.resume_service import ResumeParser
 
 router = APIRouter()
 
 # Max file size: 10MB
 MAX_FILE_SIZE = 10 * 1024 * 1024
+
+
+def _as_list(value: Any) -> list:
+    """Normalize a JSON column value to a list."""
+    return list(value or [])
 
 
 def _serialize_resume_response(resume: ResumeData) -> ResumeUploadResponse:
@@ -28,11 +38,11 @@ def _serialize_resume_response(resume: ResumeData) -> ResumeUploadResponse:
         user_id=resume.user_id,
         file_name=resume.file_path,
         file_hash=resume.file_hash,
-        skills=[s for s in (resume.skills or []) if s],
-        education=[e for e in (resume.education or []) if e],
-        experience=[x for x in (resume.experience or []) if x],
-        certifications=[c for c in (resume.certifications or []) if c],
-        projects=[p for p in (resume.projects or []) if p],
+        skills=[s for s in _as_list(resume.skills) if s],
+        education=[e for e in _as_list(resume.education) if e],
+        experience=[x for x in _as_list(resume.experience) if x],
+        certifications=[c for c in _as_list(resume.certifications) if c],
+        projects=[p for p in _as_list(resume.projects) if p],
         links={"github": resume.github_url or "", "linkedin": resume.linkedin_url or ""},
         parsed_at=resume.parsed_at,
     )
@@ -41,7 +51,7 @@ def _serialize_resume_response(resume: ResumeData) -> ResumeUploadResponse:
 def _extract_skill_names(skills_list) -> set:
     """Extract lowercase skill names from a list of skills."""
     result = set()
-    for s in (skills_list or []):
+    for s in skills_list or []:
         if isinstance(s, str) and s:
             result.add(s.lower())
         elif isinstance(s, dict):
@@ -97,7 +107,6 @@ def _calculate_job_match(resume_skills: set, job: Job) -> ResumeMatchResponse:
     )
 
 
-
 @router.post("/upload", response_model=ResumeUploadResponse)
 async def upload_resume(
     user_id: str,
@@ -118,18 +127,16 @@ async def upload_resume(
     try:
         parsed_data = await parser.parse_upload(content, file.filename)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to parse resume: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to parse resume: {str(e)}") from e
 
-    existing = await session.execute(
-        select(ResumeData).where(ResumeData.user_id == user_id)
-    )
+    existing = await session.execute(select(ResumeData).where(ResumeData.user_id == user_id))
     existing_resume = existing.scalar_one_or_none()
     skills_data = parsed_data.get("skills", [])
 
     if existing_resume:
-        existing_resume.file_path = file.filename
+        existing_resume.file_path = file.filename  # type: ignore[assignment]
         existing_resume.file_hash = parsed_data["file_hash"]
         existing_resume.skills = skills_data
         existing_resume.education = parsed_data.get("education", [])
@@ -138,7 +145,7 @@ async def upload_resume(
         existing_resume.certifications = parsed_data.get("certifications", [])
         existing_resume.github_url = parsed_data.get("links", {}).get("github")
         existing_resume.linkedin_url = parsed_data.get("links", {}).get("linkedin")
-        existing_resume.parsed_at = datetime.now(timezone.utc)
+        existing_resume.parsed_at = datetime.now(timezone.utc)  # type: ignore[assignment]
         resume = existing_resume
     else:
         resume = ResumeData(
@@ -170,7 +177,6 @@ async def get_resume(user_id: str, session: AsyncSession = Depends(get_session))
     return _serialize_resume_response(resume)
 
 
-
 @router.post("/match/{job_id}", response_model=ResumeMatchResponse)
 async def match_resume_to_job(
     user_id: str,
@@ -179,9 +185,7 @@ async def match_resume_to_job(
 ):
     """Match user's resume against a specific job and return match score."""
     # Get resume
-    resume_result = await session.execute(
-        select(ResumeData).where(ResumeData.user_id == user_id)
-    )
+    resume_result = await session.execute(select(ResumeData).where(ResumeData.user_id == user_id))
     resume = resume_result.scalar_one_or_none()
     if not resume:
         raise HTTPException(status_code=404, detail="No resume found. Upload a resume first.")
@@ -237,18 +241,14 @@ async def match_resume_batch(
         raise HTTPException(status_code=400, detail="Maximum 50 jobs per batch request.")
 
     # Get resume
-    resume_result = await session.execute(
-        select(ResumeData).where(ResumeData.user_id == user_id)
-    )
+    resume_result = await session.execute(select(ResumeData).where(ResumeData.user_id == user_id))
     resume = resume_result.scalar_one_or_none()
     if not resume:
         raise HTTPException(status_code=404, detail="No resume found. Upload a resume first.")
 
     # Get all jobs
-    job_result = await session.execute(
-        select(Job).where(Job.id.in_(job_ids))
-    )
-    jobs = {job.id: job for job in job_result.scalars().all()}
+    job_result = await session.execute(select(Job).where(Job.id.in_(job_ids)))
+    jobs = {str(job.id): job for job in job_result.scalars().all()}
 
     if not jobs:
         raise HTTPException(status_code=404, detail="No jobs found.")

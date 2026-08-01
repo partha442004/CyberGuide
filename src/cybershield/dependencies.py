@@ -10,11 +10,11 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cybershield.database.session import get_db_session
-from cybershield.repositories.job_repository import JobRepository
 from cybershield.repositories.application_repository import ApplicationRepository
-from cybershield.repositories.user_repository import UserRepository
 from cybershield.repositories.company_repository import CompanyRepository
+from cybershield.repositories.job_repository import JobRepository
 from cybershield.repositories.skill_repository import SkillRepository
+from cybershield.repositories.user_repository import UserRepository
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
@@ -28,7 +28,9 @@ def get_job_repository(session: AsyncSession = Depends(get_session)) -> JobRepos
     return JobRepository(session)
 
 
-def get_application_repository(session: AsyncSession = Depends(get_session)) -> ApplicationRepository:
+def get_application_repository(
+    session: AsyncSession = Depends(get_session),
+) -> ApplicationRepository:
     """Get application repository instance."""
     return ApplicationRepository(session)
 
