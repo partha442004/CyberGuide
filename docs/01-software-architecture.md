@@ -347,7 +347,7 @@ SMTP_PASSWORD=
 SCRAPE_INTERVAL_MINUTES=30
 MAX_CONCURRENT_SCRAPERS=5
 REQUEST_TIMEOUT=30
-USER_AGENT=InternTrack/1.0
+# user_agent is derived from the package __version__ (no USER_AGENT env override)
 
 # Security
 SECRET_KEY=change-me-in-production

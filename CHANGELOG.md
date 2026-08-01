@@ -4,6 +4,30 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.9.0] - 2026-08-01
+
+### Changed
+
+#### Version Sync (both packages)
+- `interntrack.__version__` bumped to `1.9.0` (was lagging the CHANGELOG at
+  1.7.0) — `app_version` already reads from the package (single source of truth)
+- `cybershield.__version__` bumped from `1.0.0` to `1.9.0` and `config.py`
+  `app_version` now reads the package version instead of a hardcoded string
+- `.env` + `.env.example` `APP_VERSION=1.9.0`; version canaries updated in
+  `tests/unit/test_main.py` and new `src/cybershield/tests/test_version.py`
+  (2 tests) so CI validates both packages report the current release
+
+#### Documentation
+- `docs/05-api-design.md`: new **System Endpoints** section documenting
+  `GET /health` (200 healthy / 503 degraded readiness probe) and `GET /metrics`
+  (counts, error rate, latency, status histogram); `/metrics` added to the
+  rate-limit exempt paths
+- `README.md`: badges refreshed to 764 tests + bandit/safety/trivy clean;
+  **System** endpoint table (`/health`, `/metrics`) added
+- `CONTRIBUTING.md`: new **Releasing** section — step-by-step version-bump
+  checklist (CHANGELOG, `__version__` in both packages, `.env`/`.env.example`,
+  version canaries) so future releases can't drift
+
 ## [1.8.0] - 2026-08-01
 
 ### Added

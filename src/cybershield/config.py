@@ -9,6 +9,8 @@ from typing import Optional
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from cybershield import __version__
+
 # Resolve project root (2 levels up from src/cybershield/config.py)
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 
@@ -24,7 +26,8 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = "CyberGuide"
-    app_version: str = "1.0.0"
+    # Single source of truth: package __version__ (kept in sync with CHANGELOG)
+    app_version: str = __version__
     debug: bool = False
     secret_key: str = "change-me-in-production"
 
@@ -69,7 +72,7 @@ class Settings(BaseSettings):
     scrape_interval_minutes: int = 30
     max_concurrent_scrapers: int = 5
     request_timeout: int = 30
-    user_agent: str = "CSCIP/1.0 (+https://github.com/cybershield/cybershield)"
+    user_agent: str = f"CyberGuide/{__version__} (+https://github.com/partha442004/CyberGuide)"
 
     # Dashboard
     dashboard_port: int = 8501

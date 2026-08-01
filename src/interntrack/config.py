@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     scrape_interval_minutes: int = 30
     max_concurrent_scrapers: int = 5
     request_timeout: int = 30
-    user_agent: str = "InternTrack/1.0"
+    user_agent: str = f"InternTrack/{__version__}"
 
     # CORS
     cors_origins: list[str] = ["*"]

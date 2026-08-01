@@ -302,7 +302,7 @@ def show_settings():
         st.success("Settings saved! (Restart API to apply)")
 
     st.subheader("About")
-    st.write(f"**InternTrack** v1.0.0")
+    st.write(f"**InternTrack** v1.9.0")
     st.write("AI-powered internship and job tracking platform")
 
 
