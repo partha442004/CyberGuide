@@ -2,8 +2,7 @@
 SQLAlchemy ORM models for the application.
 """
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy import (
@@ -32,14 +31,17 @@ from interntrack.domain.enums import (
 
 class Base(DeclarativeBase):
     """Base model for all database models."""
-    pass
 
 
 class TimestampMixin:
     """Mixin for timestamp fields."""
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     updated_at = Column(
-        DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+        nullable=False,
     )
 
 
@@ -54,9 +56,17 @@ class Job(Base, TimestampMixin):
     location = Column(String(200), nullable=True)
     description = Column(Text, nullable=True)
     url = Column(String(2000), nullable=False, unique=True)
-    source = Column(Enum(JobSource), nullable=False, default=JobSource.UNKNOWN)
-    job_type = Column(Enum(JobType), nullable=False, default=JobType.UNKNOWN)
-    experience_level = Column(Enum(ExperienceLevel), nullable=True)
+    source: Column = Column(
+        Enum(JobSource),
+        nullable=False,
+        default=JobSource.UNKNOWN,
+    )
+    job_type: Column = Column(
+        Enum(JobType),
+        nullable=False,
+        default=JobType.UNKNOWN,
+    )
+    experience_level: Column = Column(Enum(ExperienceLevel), nullable=True)
     salary_min = Column(Integer, nullable=True)
     salary_max = Column(Integer, nullable=True)
     salary_currency = Column(String(10), nullable=True, default="USD")
@@ -88,8 +98,10 @@ class Application(Base, TimestampMixin):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
     job_id = Column(String(36), ForeignKey("jobs.id"), nullable=False)
-    status = Column(
-        Enum(ApplicationStatus), nullable=False, default=ApplicationStatus.SAVED
+    status: Column = Column(
+        Enum(ApplicationStatus),
+        nullable=False,
+        default=ApplicationStatus.SAVED,
     )
     applied_at = Column(DateTime, nullable=True)
     interview_at = Column(DateTime, nullable=True)
@@ -124,11 +136,13 @@ class ApplicationStatusHistory(Base, TimestampMixin):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
     application_id = Column(
-        String(36), ForeignKey("applications.id"), nullable=False
+        String(36),
+        ForeignKey("applications.id"),
+        nullable=False,
     )
-    old_status = Column(Enum(ApplicationStatus), nullable=True)
-    new_status = Column(Enum(ApplicationStatus), nullable=False)
-    changed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    old_status: Column = Column(Enum(ApplicationStatus), nullable=True)
+    new_status: Column = Column(Enum(ApplicationStatus), nullable=False)
+    changed_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     notes = Column(Text, nullable=True)
 
     # Relationships
@@ -142,7 +156,7 @@ class Skill(Base, TimestampMixin):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
     name = Column(String(100), nullable=False, unique=True)
-    category = Column(Enum(SkillCategory), nullable=False)
+    category: Column = Column(Enum(SkillCategory), nullable=False)
     description = Column(Text, nullable=True)
     difficulty_level = Column(Integer, default=1)  # 1-5
     learning_resources = Column(JSON, nullable=True, default=list)
@@ -179,7 +193,9 @@ class UserSkill(Base, TimestampMixin):
 
     user_id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
     skill_id = Column(
-        String(36), ForeignKey("skills.id"), primary_key=True
+        String(36),
+        ForeignKey("skills.id"),
+        primary_key=True,
     )
     proficiency_level = Column(Integer, default=1)  # 1-5
     last_used = Column(DateTime, nullable=True)
@@ -261,9 +277,7 @@ class Bookmark(Base, TimestampMixin):
     notes = Column(Text, nullable=True)
     tags = Column(JSON, nullable=True, default=list)
 
-    __table_args__ = (
-        Index("idx_bookmark_item", "item_type", "item_id"),
-    )
+    __table_args__ = (Index("idx_bookmark_item", "item_type", "item_id"),)
 
 
 class Watchlist(Base, TimestampMixin):
@@ -277,9 +291,7 @@ class Watchlist(Base, TimestampMixin):
     is_active = Column(Boolean, default=True)
     notification_channels = Column(JSON, nullable=True, default=list)
 
-    __table_args__ = (
-        Index("idx_watchlist_type_value", "watch_type", "value"),
-    )
+    __table_args__ = (Index("idx_watchlist_type_value", "watch_type", "value"),)
 
 
 class ActivityLog(Base, TimestampMixin):
@@ -293,6 +305,4 @@ class ActivityLog(Base, TimestampMixin):
     entity_id = Column(String(36), nullable=False)
     details = Column(JSON, nullable=True)
 
-    __table_args__ = (
-        Index("idx_activity_entity", "entity_type", "entity_id"),
-    )
+    __table_args__ = (Index("idx_activity_entity", "entity_type", "entity_id"),)

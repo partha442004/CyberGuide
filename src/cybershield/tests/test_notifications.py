@@ -4,12 +4,13 @@ Tests for Notifications
 Tests for notification channels and orchestrator.
 """
 
-import pytest
-from cybershield.notifications.base import NotificationMessage, NotificationType, NotificationPriority
-from cybershield.notifications.orchestrator import NotificationOrchestrator
+from cybershield.notifications.base import (
+    NotificationMessage,
+    NotificationPriority,
+    NotificationType,
+)
 from cybershield.notifications.email import EmailNotifier
-from cybershield.notifications.discord import DiscordNotifier
-from cybershield.notifications.slack import SlackNotifier
+from cybershield.notifications.orchestrator import NotificationOrchestrator
 
 
 class TestNotificationMessage:

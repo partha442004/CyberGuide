@@ -5,6 +5,7 @@ Tests for base scraper and individual scrapers.
 """
 
 import pytest
+
 from cybershield.scrapers.base import BaseScraper, ScrapedJob, ScraperConfig
 from cybershield.scrapers.registry import ScraperRegistry
 
@@ -15,11 +16,11 @@ class TestBaseScraper:
     def test_normalize_url(self):
         """Test URL normalization."""
         config = ScraperConfig(name="test", base_url="https://test.com")
-        
+
         class TestScraper(BaseScraper):
             async def scrape(self, **kwargs):
                 return []
-        
+
         scraper = TestScraper(config)
         url = "https://example.com/job/123?utm_source=linkedin&ref=test"
         normalized = scraper._normalize_url(url)
@@ -29,11 +30,11 @@ class TestBaseScraper:
     def test_generate_content_hash(self):
         """Test content hash generation."""
         config = ScraperConfig(name="test", base_url="https://test.com")
-        
+
         class TestScraper(BaseScraper):
             async def scrape(self, **kwargs):
                 return []
-        
+
         scraper = TestScraper(config)
         hash1 = scraper._generate_content_hash("Title", "Company", "Location")
         hash2 = scraper._generate_content_hash("Title", "Company", "Location")
@@ -42,11 +43,11 @@ class TestBaseScraper:
     def test_extract_skills(self):
         """Test skill extraction from text."""
         config = ScraperConfig(name="test", base_url="https://test.com")
-        
+
         class TestScraper(BaseScraper):
             async def scrape(self, **kwargs):
                 return []
-        
+
         scraper = TestScraper(config)
         text = "Python and AWS experience required. SIEM knowledge preferred."
         skills = scraper._extract_skills(text)
@@ -60,7 +61,7 @@ class TestBaseScraper:
         job.company_name = "Tech Corp"
         job.source = "linkedin"
         job.required_skills = ["Python", "SIEM"]
-        
+
         data = job.to_dict()
         assert data["title"] == "Security Analyst"
         assert data["company_name"] == "Tech Corp"
@@ -83,7 +84,7 @@ class TestScraperRegistry:
         india = ScraperRegistry.get_scrapers_by_region("india")
         assert "naukri" in india
         assert "internshala" in india
-        
+
         usa = ScraperRegistry.get_scrapers_by_region("usa")
         assert "linkedin" in usa
         assert "indeed" in usa

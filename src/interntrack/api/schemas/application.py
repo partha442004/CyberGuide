@@ -3,44 +3,47 @@ Application API schemas.
 """
 
 from datetime import datetime
-from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class ApplicationBase(BaseModel):
     """Base application schema."""
+
     job_id: str
     status: str = "saved"
-    notes: Optional[str] = None
-    resume_version: Optional[str] = None
-    cover_letter: Optional[str] = None
+    notes: str | None = None
+    resume_version: str | None = None
+    cover_letter: str | None = None
     priority: int = 0
 
 
 class ApplicationCreate(BaseModel):
     """Schema for creating an application."""
+
     job_id: str
 
 
 class ApplicationUpdate(BaseModel):
     """Schema for updating an application."""
-    status: Optional[str] = None
-    notes: Optional[str] = None
-    resume_version: Optional[str] = None
-    cover_letter: Optional[str] = None
-    priority: Optional[int] = None
+
+    status: str | None = None
+    notes: str | None = None
+    resume_version: str | None = None
+    cover_letter: str | None = None
+    priority: int | None = None
 
 
 class ApplicationResponse(BaseModel):
     """Schema for application response."""
+
     id: str
     job_id: str
     status: str
-    applied_at: Optional[datetime] = None
-    interview_at: Optional[datetime] = None
-    notes: Optional[str] = None
-    resume_version: Optional[str] = None
+    applied_at: datetime | None = None
+    interview_at: datetime | None = None
+    notes: str | None = None
+    resume_version: str | None = None
     priority: int = 0
     created_at: datetime
     updated_at: datetime
@@ -50,25 +53,29 @@ class ApplicationResponse(BaseModel):
 
 class ApplicationWithJob(ApplicationResponse):
     """Application response with job details."""
-    job_title: Optional[str] = None
-    job_company: Optional[str] = None
-    job_url: Optional[str] = None
+
+    job_title: str | None = None
+    job_company: str | None = None
+    job_url: str | None = None
 
 
 class ApplicationListResponse(BaseModel):
     """Schema for application list response."""
-    applications: List[ApplicationResponse]
+
+    applications: list[ApplicationResponse]
     total: int
 
 
 class ApplicationStatusUpdate(BaseModel):
     """Schema for status update."""
+
     status: str
-    notes: Optional[str] = None
+    notes: str | None = None
 
 
 class ApplicationMetrics(BaseModel):
     """Schema for application metrics."""
+
     total_applications: int
     status_counts: dict
     rejection_rate: float
@@ -78,6 +85,7 @@ class ApplicationMetrics(BaseModel):
 
 class ApplicationTimeline(BaseModel):
     """Schema for application timeline."""
+
     date: str
     status: str
     count: int

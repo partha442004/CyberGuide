@@ -90,10 +90,55 @@ ignore = ["S101"]
 [tool.ruff.lint.isort]
 known-first-party = ["interntrack"]
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency injection uses function calls in argument defaults by design.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Header",
+    "fastapi.Body",
+    "fastapi.File",
+    "fastapi.Form",
+    "fastapi.Security",
+    "fastapi.Cookie",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# str+Enum subclasses are used deliberately for Pydantic compatibility.
+"src/interntrack/domain/enums.py" = ["UP042"]
+"src/cybershield/domain/enums.py" = ["UP042"]
+# Tests: private-member access, fixture arg names, and test secrets are idiomatic.
+"tests/**" = ["SLF001", "ARG001", "ARG002", "S105"]
+"tests/unit/test_*.py" = ["DTZ001", "DTZ006"]
+
 [tool.mypy]
 python_version = "3.11"
-strict = true
-plugins = ["pydantic.mypy"]
+plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
+# Pragmatic strictness: type-check untyped code for real errors without
+# requiring every function and generic to be fully annotated.
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+disallow_any_explicit = false
+disallow_any_generics = false
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+# Third-party modules without type stubs are imported at runtime only when
+# their optional feature is enabled.
+module = [
+    "apscheduler.*",
+    "bs4",
+    "feedparser",
+    "google",
+    "google.generativeai",
+    "structlog",
+]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

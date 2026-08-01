@@ -29,10 +29,14 @@ def start_api():
     try:
         proc = subprocess.Popen(
             [
-                sys.executable, "-m", "uvicorn",
+                sys.executable,
+                "-m",
+                "uvicorn",
                 "cybershield.main:app",
-                "--host", "0.0.0.0",
-                "--port", "8000",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000",
                 "--reload",
             ],
             cwd=str(PROJECT_ROOT),
@@ -50,11 +54,15 @@ def start_dashboard():
     try:
         proc = subprocess.Popen(
             [
-                sys.executable, "-m", "streamlit",
+                sys.executable,
+                "-m",
+                "streamlit",
                 "run",
                 "cybershield/dashboard/app.py",
-                "--server.port", "8501",
-                "--server.address", "0.0.0.0",
+                "--server.port",
+                "8501",
+                "--server.address",
+                "0.0.0.0",
             ],
             cwd=str(PROJECT_ROOT),
         )

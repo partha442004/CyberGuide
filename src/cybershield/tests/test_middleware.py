@@ -3,10 +3,12 @@ Tests for Rate Limiting and API Key Authentication Middleware
 """
 
 import time
+
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
+
 from cybershield.main import app
-from cybershield.middleware.rate_limit import RateLimitStore, rate_limit_store
+from cybershield.middleware.rate_limit import rate_limit_store
 
 
 class TestRateLimitStore:
@@ -73,7 +75,7 @@ class TestRateLimitStore:
 @pytest.mark.asyncio
 async def test_health_endpoint_exempt_from_rate_limit():
     """Health endpoint should work without rate limit issues."""
-    transport = ASGITransport(app=app)
+    transport = ASGITransport(app=app)  # type: ignore[arg-type]
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/health")
         assert response.status_code == 200
@@ -84,7 +86,7 @@ async def test_health_endpoint_exempt_from_rate_limit():
 @pytest.mark.asyncio
 async def test_root_endpoint_exempt_from_rate_limit():
     """Root endpoint should work without rate limit issues."""
-    transport = ASGITransport(app=app)
+    transport = ASGITransport(app=app)  # type: ignore[arg-type]
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/")
         assert response.status_code == 200
@@ -93,7 +95,7 @@ async def test_root_endpoint_exempt_from_rate_limit():
 @pytest.mark.asyncio
 async def test_rate_limit_headers_present():
     """Rate limit headers should be present in responses."""
-    transport = ASGITransport(app=app)
+    transport = ASGITransport(app=app)  # type: ignore[arg-type]
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/health")
         # Health is exempt, but check other endpoints

@@ -9,7 +9,6 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from typing import Any, Dict, List, Optional
 from cybershield.scrapers.base import BaseScraper, ScrapedJob, ScraperConfig
 
 logger = logging.getLogger(__name__)
@@ -40,7 +39,9 @@ class HackerNewsScraper(BaseScraper):
         )
         super().__init__(config)
 
-    async def _find_hiring_threads(self, query: str = "who is hiring", limit: int = 5) -> List[Dict[str, Any]]:
+    async def _find_hiring_threads(
+        self, query: str = "who is hiring", limit: int = 5
+    ) -> List[Dict[str, Any]]:
         """Find 'Who is hiring?' threads using Algolia API."""
         url = f"{self.HN_ALGOLIA}/search"
         params = {
@@ -50,9 +51,12 @@ class HackerNewsScraper(BaseScraper):
         }
         response = await self._fetch(url, params=params)
         data = response.json()
-        return data.get("hits", [])
+        hits = data.get("hits", [])
+        return [hit for hit in hits if isinstance(hit, dict)]
 
-    async def _get_comment_items(self, story_id: int, max_comments: int = 100) -> List[Dict[str, Any]]:
+    async def _get_comment_items(
+        self, story_id: int, max_comments: int = 100
+    ) -> List[Dict[str, Any]]:
         """Get all comments for a story (limited to prevent N+1)."""
         url = f"{self.HN_API}/item/{story_id}.json"
         response = await self._fetch(url)
@@ -63,28 +67,32 @@ class HackerNewsScraper(BaseScraper):
 
         items = []
         kid_ids = story.get("kids", [])[:max_comments]  # Limit to prevent N+1
-        
+
         # Fetch in batches using asyncio
         import asyncio
+
         async def fetch_item(item_id: int) -> Optional[Dict[str, Any]]:
             item_url = f"{self.HN_API}/item/{item_id}.json"
             item_response = await self._fetch(item_url)
-            return item_response.json()
-        
+            data = item_response.json()
+            return data if isinstance(data, dict) else None
+
         # Fetch up to 10 comments concurrently
         batch_size = 10
         for i in range(0, len(kid_ids), batch_size):
-            batch = kid_ids[i:i+batch_size]
-            results = await asyncio.gather(*[fetch_item(kid) for kid in batch], return_exceptions=True)
+            batch = kid_ids[i : i + batch_size]
+            results = await asyncio.gather(
+                *[fetch_item(kid) for kid in batch], return_exceptions=True
+            )
             for result in results:
                 if isinstance(result, dict) and result.get("type") == "comment":
                     items.append(result)
-        
+
         return items
 
     def _parse_comment(self, comment: Dict[str, Any]) -> List[ScrapedJob]:
         """Parse a comment (job posting) from HN thread."""
-        jobs = []
+        jobs: List[ScrapedJob] = []
         text = comment.get("text", "")
 
         if not text or len(text) < 50:
@@ -95,9 +103,20 @@ class HackerNewsScraper(BaseScraper):
         text_lower = text.lower()
 
         # Look for security-related keywords
-        security_keywords = ["security", "cyber", "soc", "infosec", "devsecops",
-                           "penetration", "vulnerability", "threat", "incident",
-                           "forensic", "malware", "compliance"]
+        security_keywords = [
+            "security",
+            "cyber",
+            "soc",
+            "infosec",
+            "devsecops",
+            "penetration",
+            "vulnerability",
+            "threat",
+            "incident",
+            "forensic",
+            "malware",
+            "compliance",
+        ]
 
         is_security_job = any(kw in text_lower for kw in security_keywords)
         if not is_security_job:
@@ -109,7 +128,7 @@ class HackerNewsScraper(BaseScraper):
         lines = text.split("<p>")
         first_line = lines[0] if lines else text
         # Clean HTML
-        first_line = re.sub(r'<[^>]+>', '', first_line).strip()
+        first_line = re.sub(r"<[^>]+>", "", first_line).strip()
 
         if "|" in first_line:
             parts = first_line.split("|")
@@ -128,8 +147,8 @@ class HackerNewsScraper(BaseScraper):
 
         # Title - try to extract role from text
         title_patterns = [
-            r'(?:hiring|looking for|seeking)\s+(?:a\s+)?(.+?)(?:\s*\.|<)',
-            r'(?:role|position)\s*:\s*(.+?)(?:\s*\.|<)',
+            r"(?:hiring|looking for|seeking)\s+(?:a\s+)?(.+?)(?:\s*\.|<)",
+            r"(?:role|position)\s*:\s*(.+?)(?:\s*\.|<)",
         ]
         for pattern in title_patterns:
             match = re.search(pattern, text_lower)
@@ -146,8 +165,8 @@ class HackerNewsScraper(BaseScraper):
         job.source_id = str(comment.get("id", ""))
 
         # Clean description
-        clean_text = re.sub(r'<[^>]+>', ' ', text)
-        clean_text = re.sub(r'\s+', ' ', clean_text).strip()
+        clean_text = re.sub(r"<[^>]+>", " ", text)
+        clean_text = re.sub(r"\s+", " ", clean_text).strip()
         job.description = clean_text[:2000]  # Limit length
 
         # Extract skills
@@ -160,9 +179,7 @@ class HackerNewsScraper(BaseScraper):
             job.country = "USA"  # HN is primarily USA
 
         job.job_type = "full_time"
-        job.posting_date = datetime.fromtimestamp(
-            comment.get("time", 0), tz=timezone.utc
-        )
+        job.posting_date = datetime.fromtimestamp(comment.get("time", 0), tz=timezone.utc)
 
         jobs.append(job)
         return jobs
@@ -182,13 +199,13 @@ class HackerNewsScraper(BaseScraper):
             threads = await self._find_hiring_threads(limit=max_threads)
 
             for thread in threads:
-                thread_id = thread.get("objectID")
+                raw_id = thread.get("objectID")
                 title = thread.get("title", "")
 
                 logger.info(f"Scraping HN thread: {title}")
 
                 # Get comments
-                comments = await self._get_comment_items(thread_id)
+                comments = await self._get_comment_items(int(raw_id)) if raw_id else []
 
                 for comment in comments:
                     jobs = self._parse_comment(comment)

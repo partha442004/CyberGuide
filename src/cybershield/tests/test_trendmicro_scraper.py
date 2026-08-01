@@ -9,9 +9,8 @@ Tests the TrendMicroScraper class covering:
 - Location detection
 """
 
-import pytest
-from cybershield.scrapers.companies.trendmicro import TrendMicroScraper
 from cybershield.scrapers.base import ScrapedJob, ScraperConfig
+from cybershield.scrapers.companies.trendmicro import TrendMicroScraper
 
 
 class TestTrendMicroScraper:
@@ -77,7 +76,7 @@ class TestTrendMicroScraper:
         assert job.location == "Austin, TX (US)"
         assert job.country == "USA"
         assert job.job_type == "full_time"
-        assert "trendmicro" in job.url.lower()
+        assert "trendmicro" in (job.url or "").lower()
 
     def test_parse_job_data_remote(self):
         """Should detect remote jobs."""

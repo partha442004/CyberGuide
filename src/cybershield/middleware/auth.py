@@ -8,7 +8,7 @@ Supports multiple API keys and optional bypass for public endpoints.
 import logging
 from typing import Optional, Set
 
-from fastapi import Request, HTTPException, status
+from fastapi import Request, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 

@@ -2,11 +2,12 @@
 Unit tests for DeduplicationEngine.
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
-from interntrack.engines.deduplication import DeduplicationEngine
+import pytest
+
 from interntrack.domain.models import Job
+from interntrack.engines.deduplication import DeduplicationEngine
 
 
 class TestDeduplicationEngine:
@@ -84,8 +85,16 @@ class TestDeduplicationEngine:
 
     def test_calculate_similarity_identical(self, engine):
         """Test similarity calculation for identical jobs."""
-        job1 = {"title": "Python Developer", "company": "TechCorp", "url": "https://example.com/1"}
-        job2 = {"title": "Python Developer", "company": "TechCorp", "url": "https://example.com/1"}
+        job1 = {
+            "title": "Python Developer",
+            "company": "TechCorp",
+            "url": "https://example.com/1",
+        }
+        job2 = {
+            "title": "Python Developer",
+            "company": "TechCorp",
+            "url": "https://example.com/1",
+        }
 
         similarity = engine.calculate_similarity(job1, job2)
 
@@ -93,8 +102,16 @@ class TestDeduplicationEngine:
 
     def test_calculate_similarity_different(self, engine):
         """Test similarity calculation for different jobs."""
-        job1 = {"title": "Python Developer", "company": "TechCorp", "url": "https://example.com/1"}
-        job2 = {"title": "Java Developer", "company": "OtherCorp", "url": "https://different.com/2"}
+        job1 = {
+            "title": "Python Developer",
+            "company": "TechCorp",
+            "url": "https://example.com/1",
+        }
+        job2 = {
+            "title": "Java Developer",
+            "company": "OtherCorp",
+            "url": "https://different.com/2",
+        }
 
         similarity = engine.calculate_similarity(job1, job2)
 

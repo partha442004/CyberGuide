@@ -2,8 +2,6 @@
 Scraper registry for managing multiple job sources.
 """
 
-from typing import Dict, List, Optional
-
 from interntrack.scrapers.base import BaseScraper
 
 
@@ -11,7 +9,7 @@ class ScraperRegistry:
     """Registry for managing scraper instances."""
 
     def __init__(self):
-        self._scrapers: Dict[str, BaseScraper] = {}
+        self._scrapers: dict[str, BaseScraper] = {}
 
     def register(self, scraper: BaseScraper) -> None:
         """Register a scraper."""
@@ -22,27 +20,26 @@ class ScraperRegistry:
         if source_name in self._scrapers:
             del self._scrapers[source_name]
 
-    def get(self, source_name: str) -> Optional[BaseScraper]:
+    def get(self, source_name: str) -> BaseScraper | None:
         """Get a scraper by source name."""
         return self._scrapers.get(source_name)
 
-    def get_all(self) -> List[BaseScraper]:
+    def get_all(self) -> list[BaseScraper]:
         """Get all registered scrapers."""
         return list(self._scrapers.values())
 
-    def list_sources(self) -> List[str]:
+    def list_sources(self) -> list[str]:
         """List all registered source names."""
         return list(self._scrapers.keys())
 
     async def fetch_all(
         self,
         query: str,
-        location: Optional[str] = None,
-        sources: Optional[List[str]] = None,
+        location: str | None = None,
+        sources: list[str] | None = None,
         limit: int = 100,
-    ) -> List[dict]:
+    ) -> list[dict]:
         """Fetch jobs from all or specified sources."""
-        from interntrack.scrapers.base import RawJob
 
         all_jobs = []
         scrapers = self.get_all()
@@ -71,12 +68,12 @@ def get_default_registry() -> ScraperRegistry:
     registry = ScraperRegistry()
 
     # Import and register scrapers
+    from interntrack.scrapers.glassdoor import GlassdoorScraper
     from interntrack.scrapers.hackernews import HackerNewsScraper
+    from interntrack.scrapers.indeed import IndeedScraper
+    from interntrack.scrapers.linkedin import LinkedInScraper
     from interntrack.scrapers.remoteok import RemoteOKScraper
     from interntrack.scrapers.rss_feeds import RSSFeedScraper
-    from interntrack.scrapers.linkedin import LinkedInScraper
-    from interntrack.scrapers.indeed import IndeedScraper
-    from interntrack.scrapers.glassdoor import GlassdoorScraper
 
     registry.register(HackerNewsScraper())
     registry.register(RemoteOKScraper())

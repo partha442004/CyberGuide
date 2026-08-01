@@ -3,23 +3,29 @@ InternTrack - Main FastAPI Application
 """
 
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from interntrack.config import get_settings
-from interntrack.database.session import init_db, close_db
 from interntrack.api.router import api_router
+from interntrack.config import get_settings
+from interntrack.database.session import close_db, init_db
+from interntrack.domain.exceptions import AppException
+from interntrack.utils.logger import get_logger
 
 settings = get_settings()
+logger = get_logger("interntrack.main")
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     """Application lifespan manager."""
     # Startup
     await init_db()
+    for warning in settings.validate_security():
+        logger.warning(warning)
     yield
     # Shutdown
     await close_db()
@@ -34,31 +40,36 @@ app = FastAPI(
     redoc_url="/redoc" if settings.debug else None,
 )
 
-# CORS middleware
+# CORS middleware - origins configurable via CORS_ORIGINS env var (comma-separated)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.cors_origins,
+    allow_credentials=not settings.cors_allow_all,
+    allow_methods=settings.cors_methods,
+    allow_headers=settings.cors_headers,
 )
 
 # Include API router
 app.include_router(api_router, prefix="/api")
 
 
+@app.exception_handler(AppException)
+async def domain_exception_handler(_request: Request, exc: AppException):
+    """Handle domain exceptions using their status codes and error payloads."""
+    return JSONResponse(status_code=exc.status, content=exc.to_dict())
+
+
 @app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    """Global exception handler."""
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": {
-                "code": "INTERNAL_ERROR",
-                "message": str(exc) if settings.debug else "An error occurred",
-            }
+async def global_exception_handler(_request: Request, exc: Exception):
+    """Global fallback exception handler."""
+    payload: dict[str, Any] = {
+        "error": {
+            "code": "INTERNAL_ERROR",
+            "message": "An error occurred",
+            "details": {"debug": str(exc)} if settings.debug else {},
         },
-    )
+    }
+    return JSONResponse(status_code=500, content=payload)
 
 
 @app.get("/")

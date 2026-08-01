@@ -5,11 +5,11 @@ Tests InMemoryCache and CacheManager functionality.
 """
 
 import asyncio
-import json
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
-from cybershield.cache import InMemoryCache, CacheManager, cache_manager
+import pytest
+
+from cybershield.cache import CacheManager, InMemoryCache
 
 
 class TestInMemoryCache:
@@ -247,12 +247,12 @@ class TestCacheIntegration:
         await cache.connect()
 
         # Use a very short TTL for faster testing
-        await cache.set("expiring_key", "value", ttl=0.1)
+        await cache.set("expiring_key", "value", ttl=0.1)  # type: ignore[arg-type]
         assert await cache.get("expiring_key") == "value"
 
         # Wait for expiration (0.2s > 0.1s TTL)
         await asyncio.sleep(0.2)
-        
+
         # Value should be expired
         result = await cache.get("expiring_key")
         assert result is None, "Value should have expired after TTL"

@@ -2,13 +2,12 @@
 Report service for generating daily, weekly, and monthly reports.
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from interntrack.domain.enums import ReportType
 from interntrack.repositories.application_repository import ApplicationRepository
 from interntrack.repositories.job_repository import JobRepository
 
@@ -21,10 +20,11 @@ class ReportService:
         self.job_repo = JobRepository(session)
         self.app_repo = ApplicationRepository(session)
         self.jinja_env = Environment(
-            loader=FileSystemLoader("src/interntrack/reports/templates")
+            loader=FileSystemLoader("src/interntrack/reports/templates"),
+            autoescape=select_autoescape(["html", "xml"]),
         )
 
-    async def generate_daily_report(self) -> Dict[str, Any]:
+    async def generate_daily_report(self) -> dict[str, Any]:
         """Generate daily report."""
         new_jobs = await self.job_repo.get_recent_jobs(days=1)
         new_apps = await self.app_repo.get_recent_applications(days=1)
@@ -32,7 +32,7 @@ class ReportService:
 
         return {
             "report_type": "daily",
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "summary": {
                 "new_jobs": len(new_jobs),
                 "new_applications": len(new_apps),
@@ -51,14 +51,16 @@ class ReportService:
                 {
                     "title": job.title,
                     "company": job.company,
-                    "expires_at": job.expires_at.isoformat() if job.expires_at else None,
+                    "expires_at": job.expires_at.isoformat()
+                    if job.expires_at
+                    else None,
                 }
                 for job in await self.job_repo.get_closing_soon(days=2)
             ],
             "application_status": status_counts,
         }
 
-    async def generate_weekly_report(self) -> Dict[str, Any]:
+    async def generate_weekly_report(self) -> dict[str, Any]:
         """Generate weekly report."""
         new_jobs = await self.job_repo.get_recent_jobs(days=7)
         new_apps = await self.app_repo.get_recent_applications(days=7)
@@ -68,7 +70,7 @@ class ReportService:
 
         return {
             "report_type": "weekly",
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "summary": {
                 "new_jobs": len(new_jobs),
                 "new_applications": len(new_apps),
@@ -77,31 +79,33 @@ class ReportService:
                 "response_rate": await self.app_repo.get_response_rate(),
             },
             "top_companies": [
-                {"company": company, "jobs": count}
-                for company, count in top_companies
+                {"company": company, "jobs": count} for company, count in top_companies
             ],
             "job_type_distribution": [
-                {"type": jtype.value, "count": count}
-                for jtype, count in job_types
+                {"type": jtype.value, "count": count} for jtype, count in job_types
             ],
-            "application_timeline": await self.app_repo.get_application_timeline(days=7),
+            "application_timeline": await self.app_repo.get_application_timeline(
+                days=7,
+            ),
             "application_status": status_counts,
         }
 
-    async def generate_monthly_report(self) -> Dict[str, Any]:
+    async def generate_monthly_report(self) -> dict[str, Any]:
         """Generate monthly report with complete analytics."""
         weekly_report = await self.generate_weekly_report()
-        new_jobs = await self.job_repo.get_recent_jobs(days=30)
+        await self.job_repo.get_recent_jobs(days=30)
         salary_stats = await self.job_repo.get_salary_statistics()
 
         return {
             **weekly_report,
             "report_type": "monthly",
             "salary_statistics": salary_stats,
-            "monthly_applications": await self.app_repo.get_recent_applications(days=30),
+            "monthly_applications": await self.app_repo.get_recent_applications(
+                days=30,
+            ),
         }
 
-    async def render_report(self, report_data: Dict[str, Any]) -> str:
+    async def render_report(self, report_data: dict[str, Any]) -> str:
         """Render report to HTML."""
         report_type = report_data.get("report_type", "daily")
         template = self.jinja_env.get_template(f"{report_type}_report.html")

@@ -5,12 +5,14 @@ Pydantic models for user management API operations.
 """
 
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserBase(BaseModel):
     """Base user schema with common fields."""
+
     username: str = Field(..., min_length=3, max_length=50)
     email: str = Field(..., min_length=5, max_length=255)
     full_name: Optional[str] = None
@@ -25,6 +27,7 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     """Schema for creating a new user."""
+
     id: Optional[str] = None
     password: str = Field(..., min_length=6, max_length=128)
     headline: Optional[str] = None
@@ -35,6 +38,7 @@ class UserCreate(UserBase):
 
 class UserUpdate(BaseModel):
     """Schema for updating user profile."""
+
     full_name: Optional[str] = None
     phone: Optional[str] = None
     location: Optional[str] = None
@@ -51,6 +55,7 @@ class UserUpdate(BaseModel):
 
 class UserResponse(UserBase):
     """Schema for user response."""
+
     id: str
     is_active: bool = True
     is_verified: bool = False
@@ -62,6 +67,7 @@ class UserResponse(UserBase):
 
 class CompanyWatchlistCreate(BaseModel):
     """Schema for adding company to watchlist."""
+
     company_id: str = Field(..., min_length=1)
     notify_new_jobs: bool = True
     notify_any_role: bool = True
@@ -71,6 +77,7 @@ class CompanyWatchlistCreate(BaseModel):
 
 class KeywordWatchlistCreate(BaseModel):
     """Schema for adding keyword to watchlist."""
+
     keyword: str = Field(..., min_length=1, max_length=100)
     category: Optional[str] = None
     notify_new_matches: bool = True

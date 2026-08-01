@@ -5,7 +5,7 @@ Scrapes cybersecurity jobs from Indeed.com (USA).
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 from urllib.parse import urlencode
 
 from bs4 import BeautifulSoup
@@ -42,7 +42,9 @@ class IndeedScraper(BaseScraper):
         )
         super().__init__(config)
 
-    def _build_search_url(self, keyword: str, location: str = "United States", start: int = 0) -> str:
+    def _build_search_url(
+        self, keyword: str, location: str = "United States", start: int = 0
+    ) -> str:
         """Build search URL for Indeed."""
         params = {
             "q": keyword,
@@ -76,13 +78,21 @@ class IndeedScraper(BaseScraper):
             job.country = "USA"
 
             # Salary
-            salary_elem = card.select_one("div.salary-snippet-container, div[data-testid='attribute_snippet_testid']")
+            salary_elem = card.select_one(
+                "div.salary-snippet-container, div[data-testid='attribute_snippet_testid']"
+            )
             if salary_elem:
                 salary_text = salary_elem.get_text(strip=True)
                 job.raw_data["salary_text"] = salary_text
                 # Try to parse salary
                 try:
-                    salary_clean = salary_text.replace("$", "").replace(",", "").replace(" a year", "").replace(" an hour", "").strip()
+                    salary_clean = (
+                        salary_text.replace("$", "")
+                        .replace(",", "")
+                        .replace(" a year", "")
+                        .replace(" an hour", "")
+                        .strip()
+                    )
                     if "a year" in salary_text:
                         job.salary_currency = "USD"
                     if "-" in salary_clean:
@@ -143,18 +153,19 @@ class IndeedScraper(BaseScraper):
             return ""
         # Indeed URLs typically have job IDs like /jk=abc123 or /viewjob?jk=abc123
         import re
-        match = re.search(r'jk=([a-f0-9]+)', url)
+
+        match = re.search(r"jk=([a-f0-9]+)", url)
         if match:
             return match.group(1)
-        match = re.search(r'/viewjob\?.*?jk=([^&]+)', url)
+        match = re.search(r"/viewjob\?.*?jk=([^&]+)", url)
         if match:
             return match.group(1)
         return url.split("/")[-1] if "/" in url else url
 
     def _parse_relative_date(self, text: str) -> Optional[Any]:
         """Parse relative date like 'Posted 3 days ago'."""
-        from datetime import datetime, timedelta, timezone
         import re
+        from datetime import datetime, timedelta, timezone
 
         text = text.lower().replace("posted", "").strip()
 
@@ -164,7 +175,7 @@ class IndeedScraper(BaseScraper):
             return datetime.now(timezone.utc) - timedelta(days=1)
 
         # Try to extract number of days/hours
-        match = re.search(r'(\d+)\s*(hour|day|week|month)s?\s*ago', text)
+        match = re.search(r"(\d+)\s*(hour|day|week|month)s?\s*ago", text)
         if match:
             num = int(match.group(1))
             unit = match.group(2)

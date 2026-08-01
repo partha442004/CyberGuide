@@ -3,21 +3,19 @@ Pytest configuration and test fixtures.
 """
 
 import asyncio
-from typing import AsyncGenerator, Generator
-from unittest.mock import AsyncMock, MagicMock
+from collections.abc import AsyncGenerator, Generator
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
-    create_async_engine,
     async_sessionmaker,
+    create_async_engine,
 )
 
-from interntrack.main import app
 from interntrack.domain.models import Base
-
+from interntrack.main import app
 
 # Test database URL (in-memory SQLite)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -62,9 +60,16 @@ async def db_session(db_engine) -> AsyncGenerator[AsyncSession, None]:
 
 
 @pytest_asyncio.fixture(scope="function")
-async def client(db_session) -> AsyncGenerator[AsyncClient, None]:
-    """Create test HTTP client."""
-    app.dependency_overrides = {}
+async def client(db_engine, db_session) -> AsyncGenerator[AsyncClient, None]:
+    """Create test HTTP client wired to the in-memory test database."""
+    from interntrack.database.session import get_db
+
+    app.dependency_overrides.clear()
+
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -72,11 +77,14 @@ async def client(db_session) -> AsyncGenerator[AsyncClient, None]:
     ) as client:
         yield client
 
+    app.dependency_overrides.clear()
+
 
 @pytest.fixture
 def mock_job_data() -> dict:
     """Sample job data for testing."""
     import uuid
+
     return {
         "title": "Python Developer",
         "company": "TechCorp",

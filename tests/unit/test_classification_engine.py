@@ -1,8 +1,8 @@
 """Unit tests for engines/classification.py."""
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class TestClassificationEngine:
@@ -19,8 +19,8 @@ class TestClassificationEngine:
         assert engine.ai_service is not None
 
     def test_categorize_skill_programming(self):
-        from interntrack.engines.classification import ClassificationEngine
         from interntrack.domain.enums import SkillCategory
+        from interntrack.engines.classification import ClassificationEngine
 
         session = AsyncMock()
         engine = ClassificationEngine(session)
@@ -32,8 +32,8 @@ class TestClassificationEngine:
         assert engine._categorize_skill("go") == SkillCategory.PROGRAMMING
 
     def test_categorize_skill_framework(self):
-        from interntrack.engines.classification import ClassificationEngine
         from interntrack.domain.enums import SkillCategory
+        from interntrack.engines.classification import ClassificationEngine
 
         session = AsyncMock()
         engine = ClassificationEngine(session)
@@ -45,8 +45,8 @@ class TestClassificationEngine:
         assert engine._categorize_skill("fastapi") == SkillCategory.FRAMEWORK
 
     def test_categorize_skill_tool(self):
-        from interntrack.engines.classification import ClassificationEngine
         from interntrack.domain.enums import SkillCategory
+        from interntrack.engines.classification import ClassificationEngine
 
         session = AsyncMock()
         engine = ClassificationEngine(session)
@@ -58,8 +58,8 @@ class TestClassificationEngine:
         assert engine._categorize_skill("linux") == SkillCategory.TOOL
 
     def test_categorize_skill_soft_skill(self):
-        from interntrack.engines.classification import ClassificationEngine
         from interntrack.domain.enums import SkillCategory
+        from interntrack.engines.classification import ClassificationEngine
 
         session = AsyncMock()
         engine = ClassificationEngine(session)
@@ -74,7 +74,10 @@ class TestClassificationEngine:
         session = AsyncMock()
         engine = ClassificationEngine(session)
 
-        text = "We need a Python developer with Django and PostgreSQL experience. Docker and AWS are pluses."
+        text = (
+            "We need a Python developer with Django and PostgreSQL "
+            "experience. Docker and AWS are pluses."
+        )
 
         skills = engine._extract_skills_from_text(text)
 
@@ -109,8 +112,8 @@ class TestClassificationEngine:
         assert skills.count("python") == 1
 
     def test_rule_based_classify_internship(self):
-        from interntrack.engines.classification import ClassificationEngine
         from interntrack.domain.enums import JobType
+        from interntrack.engines.classification import ClassificationEngine
 
         session = AsyncMock()
         engine = ClassificationEngine(session)
@@ -126,7 +129,6 @@ class TestClassificationEngine:
 
     def test_rule_based_classify_remote(self):
         from interntrack.engines.classification import ClassificationEngine
-        from interntrack.domain.enums import JobType
 
         session = AsyncMock()
         engine = ClassificationEngine(session)
@@ -141,8 +143,8 @@ class TestClassificationEngine:
         assert result["is_remote"] is True
 
     def test_rule_based_classify_contract(self):
-        from interntrack.engines.classification import ClassificationEngine
         from interntrack.domain.enums import JobType
+        from interntrack.engines.classification import ClassificationEngine
 
         session = AsyncMock()
         engine = ClassificationEngine(session)
@@ -157,8 +159,8 @@ class TestClassificationEngine:
         assert result["job_type"] == JobType.CONTRACT.value
 
     def test_rule_based_classify_senior(self):
-        from interntrack.engines.classification import ClassificationEngine
         from interntrack.domain.enums import ExperienceLevel
+        from interntrack.engines.classification import ClassificationEngine
 
         session = AsyncMock()
         engine = ClassificationEngine(session)
@@ -173,8 +175,8 @@ class TestClassificationEngine:
         assert result["experience_level"] == ExperienceLevel.SENIOR.value
 
     def test_rule_based_classify_junior(self):
-        from interntrack.engines.classification import ClassificationEngine
         from interntrack.domain.enums import ExperienceLevel
+        from interntrack.engines.classification import ClassificationEngine
 
         session = AsyncMock()
         engine = ClassificationEngine(session)
@@ -189,8 +191,8 @@ class TestClassificationEngine:
         assert result["experience_level"] == ExperienceLevel.JUNIOR.value
 
     def test_rule_based_classify_mid(self):
-        from interntrack.engines.classification import ClassificationEngine
         from interntrack.domain.enums import ExperienceLevel
+        from interntrack.engines.classification import ClassificationEngine
 
         session = AsyncMock()
         engine = ClassificationEngine(session)
@@ -205,8 +207,8 @@ class TestClassificationEngine:
         assert result["experience_level"] == ExperienceLevel.MID.value
 
     def test_rule_based_classify_unknown(self):
+        from interntrack.domain.enums import ExperienceLevel, JobType
         from interntrack.engines.classification import ClassificationEngine
-        from interntrack.domain.enums import JobType, ExperienceLevel
 
         session = AsyncMock()
         engine = ClassificationEngine(session)
@@ -229,13 +231,15 @@ class TestClassificationEngine:
         engine = ClassificationEngine(session)
 
         # Mock AI service
-        engine.ai_service.classify_job = AsyncMock(return_value={
-            "job_type": "full_time",
-            "experience_level": "mid",
-            "skills": ["python", "django"],
-            "is_remote": False,
-            "confidence": 0.9,
-        })
+        engine.ai_service.classify_job = AsyncMock(
+            return_value={
+                "job_type": "full_time",
+                "experience_level": "mid",
+                "skills": ["python", "django"],
+                "is_remote": False,
+                "confidence": 0.9,
+            },
+        )
 
         # Mock skill repo
         mock_skill = MagicMock()

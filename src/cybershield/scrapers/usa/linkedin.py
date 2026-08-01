@@ -69,7 +69,7 @@ class LinkedInScraper(BaseScraper):
             job.description = summary
 
             # Parse company and location from title (LinkedIn format: "Job at Company in Location")
-            title = job.title
+            title = job.title or ""
             if " at " in title and " in " in title:
                 parts = title.split(" at ")
                 if len(parts) == 2:
@@ -123,12 +123,13 @@ class LinkedInScraper(BaseScraper):
     def _extract_job_id(self, url: str) -> str:
         """Extract job ID from LinkedIn URL."""
         import re
+
         if not url:
             return ""
-        match = re.search(r'/view/[^/]*/(\d+)', url)
+        match = re.search(r"/view/[^/]*/(\d+)", url)
         if match:
             return match.group(1)
-        match = re.search(r'currentJob=(\d+)', url)
+        match = re.search(r"currentJob=(\d+)", url)
         if match:
             return match.group(1)
         return ""

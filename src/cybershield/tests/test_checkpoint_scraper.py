@@ -8,9 +8,8 @@ Tests the CheckPointScraper class covering:
 - HTML extraction
 """
 
-import pytest
-from cybershield.scrapers.companies.checkpoint import CheckPointScraper
 from cybershield.scrapers.base import ScrapedJob, ScraperConfig
+from cybershield.scrapers.companies.checkpoint import CheckPointScraper
 
 
 class TestCheckPointScraper:
@@ -59,7 +58,7 @@ class TestCheckPointScraper:
         assert job.location == "San Carlos, CA (US)"
         assert job.country == "USA"
         assert job.job_type == "full_time"
-        assert "checkpoint" in job.url.lower()
+        assert "checkpoint" in (job.url or "").lower()
 
     def test_parse_job_remote(self):
         """Should detect remote jobs."""
@@ -131,10 +130,10 @@ class TestCheckPointScraper:
 
     def test_extract_jobs_from_html(self):
         """Should extract jobs from HTML."""
-        html = '''
+        html = """
         <td><a href="index.php?m=cpcareers&a=show&joborderid=8070050">Security Engineer</a></td>
         <td><a href="index.php?m=cpcareers&a=show&joborderid=8070051">SOC Analyst</a></td>
-        '''
+        """
         jobs = self.scraper._extract_jobs_from_html(html)
         assert len(jobs) == 2
         assert jobs[0]["job_id"] == "8070050"

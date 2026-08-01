@@ -4,11 +4,10 @@ Email Notifier
 Sends notifications via SMTP (Gmail, Outlook, etc.).
 """
 
+import asyncio
 import logging
 from typing import Any, Dict, Optional
-from datetime import datetime, timezone
 
-import asyncio
 from cybershield.notifications.base import BaseNotifier, NotificationMessage
 
 logger = logging.getLogger(__name__)
@@ -57,17 +56,17 @@ class EmailNotifier(BaseNotifier):
         <div style="border-left: 4px solid {color}; padding-left: 15px; margin-bottom: 20px;">
             <h1 style="margin: 0; color: #333; font-size: 24px;">{message.title}</h1>
             <p style="margin: 5px 0 0; color: #666; font-size: 14px;">
-                {message.notification_type.value.replace('_', ' ').title()} • 
-                {message.timestamp.strftime('%B %d, %Y at %I:%M %p UTC')}
+                {message.notification_type.value.replace("_", " ").title()} •
+                {message.timestamp.strftime("%B %d, %Y at %I:%M %p UTC")}
             </p>
         </div>
-        
+
         <div style="color: #444; line-height: 1.6; font-size: 16px;">
-            {message.content.replace(chr(10), '<br>')}
+            {message.content.replace(chr(10), "<br>")}
         </div>
-        
-        {f'<div style="margin-top: 20px;"><a href="{message.url}" style="display: inline-block; background-color: {color}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">View Details</a></div>' if message.url else ''}
-        
+
+        {f'<div style="margin-top: 20px;"><a href="{message.url}" style="display: inline-block; background-color: {color}; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">View Details</a></div>' if message.url else ""}
+
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #999; font-size: 12px;">
             <p>CyberGuide Career Intelligence Platform</p>
             <p>To unsubscribe, update your notification preferences.</p>
@@ -89,11 +88,13 @@ class EmailNotifier(BaseNotifier):
         ]
         if message.url:
             lines.append(f"View Details: {message.url}")
-        lines.extend([
-            "",
-            "---",
-            "CyberGuide Career Intelligence Platform",
-        ])
+        lines.extend(
+            [
+                "",
+                "---",
+                "CyberGuide Career Intelligence Platform",
+            ]
+        )
         return "\n".join(lines)
 
     async def send(self, message: NotificationMessage) -> bool:
@@ -112,8 +113,8 @@ class EmailNotifier(BaseNotifier):
     def _send_email_sync(self, message: NotificationMessage) -> None:
         """Synchronous email sending (runs in thread)."""
         import smtplib
-        from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
 
         msg = MIMEMultipart("alternative")
         msg["Subject"] = message.title
@@ -142,6 +143,7 @@ class EmailNotifier(BaseNotifier):
         """Test SMTP connection."""
         try:
             import smtplib
+
             with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
                 server.starttls()
                 server.login(self.username, self.password)

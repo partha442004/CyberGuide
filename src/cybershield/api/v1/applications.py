@@ -68,9 +68,16 @@ async def update_application_status(
     repo: ApplicationRepository = Depends(get_application_repository),
 ):
     """Update application status with history tracking."""
+    try:
+        new_status = ApplicationStatus(status_update.status)
+    except ValueError:
+        raise HTTPException(
+            status_code=422, detail=f"Invalid status: {status_update.status}"
+        ) from None
+
     application = await repo.update_status(
         application_id=application_id,
-        new_status=status_update.status,
+        new_status=new_status,
         notes=status_update.notes,
     )
     return application

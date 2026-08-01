@@ -9,13 +9,14 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class NotificationType(str, Enum):
     """Types of notifications."""
+
     INSTANT_ALERT = "instant_alert"
     DAILY_DIGEST = "daily_digest"
     WEEKLY_REPORT = "weekly_report"
@@ -27,6 +28,7 @@ class NotificationType(str, Enum):
 
 class NotificationPriority(str, Enum):
     """Notification priority levels."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -36,6 +38,7 @@ class NotificationPriority(str, Enum):
 @dataclass
 class NotificationMessage:
     """Standardized notification message."""
+
     title: str
     content: str
     notification_type: NotificationType = NotificationType.INSTANT_ALERT
@@ -71,7 +74,7 @@ class BaseNotifier(ABC):
         self.name = name
         self.config = config or {}
         self.logger = logging.getLogger(f"cybershield.notifications.{name}")
-        self._enabled = config.get("enabled", True) if config else True
+        self._enabled: bool = config.get("enabled", True) if config else True
 
     @property
     def enabled(self) -> bool:
@@ -121,7 +124,9 @@ class BaseNotifier(ABC):
 
         if job.get("salary_min"):
             currency = job.get("salary_currency", "USD")
-            lines.append(f"💰 {currency} {job['salary_min']:,.0f} - {job.get('salary_max', job['salary_min']):,.0f}")
+            lines.append(
+                f"💰 {currency} {job['salary_min']:,.0f} - {job.get('salary_max', job['salary_min']):,.0f}"
+            )
 
         if job.get("is_remote"):
             lines.append("🌐 Remote Available")

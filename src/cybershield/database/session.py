@@ -34,12 +34,14 @@ def _get_engine_kwargs() -> dict:
 
     if "postgresql" in settings.database_url:
         # PostgreSQL connection pooling for production
-        kwargs.update({
-            "pool_size": 10,
-            "max_overflow": 20,
-            "pool_timeout": 30,
-            "pool_recycle": 1800,
-        })
+        kwargs.update(
+            {
+                "pool_size": 10,
+                "max_overflow": 20,
+                "pool_timeout": 30,
+                "pool_recycle": 1800,
+            }
+        )
         logger.info("Using PostgreSQL connection pool")
     else:
         # SQLite specific settings
@@ -73,7 +75,6 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
             expire_on_commit=False,
         )
     return _async_session_factory
-
 
 
 async def init_db() -> None:

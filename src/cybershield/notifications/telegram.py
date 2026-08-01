@@ -37,7 +37,26 @@ class TelegramNotifier(BaseNotifier):
 
     def _escape_markdown(self, text: str) -> str:
         """Escape markdown characters for Telegram."""
-        special_chars = ["_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"]
+        special_chars = [
+            "_",
+            "*",
+            "[",
+            "]",
+            "(",
+            ")",
+            "~",
+            "`",
+            ">",
+            "#",
+            "+",
+            "-",
+            "=",
+            "|",
+            "{",
+            "}",
+            ".",
+            "!",
+        ]
         for char in special_chars:
             text = text.replace(char, f"\\{char}")
         return text
@@ -67,9 +86,10 @@ class TelegramNotifier(BaseNotifier):
 
         if message.url:
             import json
-            payload["reply_markup"] = json.dumps({
-                "inline_keyboard": [[{"text": "View Details", "url": message.url}]]
-            })
+
+            payload["reply_markup"] = json.dumps(
+                {"inline_keyboard": [[{"text": "View Details", "url": message.url}]]}
+            )
 
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
@@ -77,11 +97,11 @@ class TelegramNotifier(BaseNotifier):
                 json=payload,
             )
             result = response.json()
-            return result.get("ok", False)
+            return bool(result.get("ok", False))
 
     async def test_connection(self) -> bool:
         """Test Telegram bot connection."""
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.get(self._get_api_url("getMe"))
             result = response.json()
-            return result.get("ok", False)
+            return bool(result.get("ok", False))

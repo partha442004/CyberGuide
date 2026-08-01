@@ -8,8 +8,10 @@ Tests the Elasticsearch service covering:
 - Graceful fallback behavior
 """
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+
 from cybershield.services import elasticsearch_service as es
 
 
@@ -43,6 +45,7 @@ class TestElasticsearchServiceAvailability:
         mock_es_module.AsyncElasticsearch.return_value = mock_client
 
         import sys
+
         sys.modules["elasticsearch"] = mock_es_module
         try:
             result = await es.init_elasticsearch("http://localhost:9200")
@@ -103,7 +106,7 @@ class TestElasticsearchSearchQuery:
         es._es_client = mock_client
         es._es_available = True
 
-        result = await es.search_jobs(query="security engineer")
+        await es.search_jobs(query="security engineer")
 
         # Verify search was called
         mock_client.search.assert_called_once()
@@ -132,7 +135,7 @@ class TestElasticsearchSearchQuery:
         es._es_client = mock_client
         es._es_available = True
 
-        result = await es.search_jobs(
+        await es.search_jobs(
             company="CrowdStrike",
             country="USA",
             is_remote=True,
@@ -168,14 +171,16 @@ class TestElasticsearchSearchQuery:
         es._es_client = mock_client
         es._es_available = True
 
-        result = await es.search_jobs(skills=["Python", "AWS"])
+        await es.search_jobs(skills=["Python", "AWS"])
 
         call_kwargs = mock_client.search.call_args
         query = call_kwargs.kwargs.get("query") or call_kwargs[1].get("query")
         filter_clauses = query["bool"]["filter"]
 
         # Should have terms filter for skills
-        skills_filter = [f for f in filter_clauses if "terms" in f and "required_skills" in f.get("terms", {})]
+        skills_filter = [
+            f for f in filter_clauses if "terms" in f and "required_skills" in f.get("terms", {})
+        ]
         assert len(skills_filter) == 1
         assert skills_filter[0]["terms"]["required_skills"] == ["Python", "AWS"]
 

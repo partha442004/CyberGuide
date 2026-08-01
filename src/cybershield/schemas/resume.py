@@ -5,12 +5,14 @@ Pydantic models for resume upload and parsing API operations.
 """
 
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class SkillItem(BaseModel):
     """A single skill extracted from resume."""
+
     name: str
     category: str
     confidence: float = 0.9
@@ -18,6 +20,7 @@ class SkillItem(BaseModel):
 
 class EducationItem(BaseModel):
     """Education information."""
+
     degree: Optional[str] = None
     institution: Optional[str] = None
     gpa: Optional[str] = None
@@ -26,12 +29,14 @@ class EducationItem(BaseModel):
 
 class ExperienceItem(BaseModel):
     """Work experience item."""
+
     role: str
     context: Optional[str] = None
 
 
 class CertificationItem(BaseModel):
     """Certification information."""
+
     name: str
     status: str = "completed"
     context: Optional[str] = None
@@ -39,6 +44,7 @@ class CertificationItem(BaseModel):
 
 class ProjectItem(BaseModel):
     """Project information."""
+
     name: str
     description: Optional[str] = None
     technologies: List[str] = []
@@ -46,6 +52,7 @@ class ProjectItem(BaseModel):
 
 class ResumeUploadResponse(BaseModel):
     """Response after uploading and parsing a resume."""
+
     id: Optional[str] = None
     user_id: Optional[str] = None
     file_name: Optional[str] = None
@@ -63,6 +70,7 @@ class ResumeUploadResponse(BaseModel):
 
 class ResumeMatchResponse(BaseModel):
     """Response for resume-job matching."""
+
     job_id: str
     job_title: str
     company: str
@@ -74,12 +82,14 @@ class ResumeMatchResponse(BaseModel):
 
 class ResumeMatchRequest(BaseModel):
     """Request to match resume against specific job."""
+
     resume_id: str = Field(..., min_length=1)
     job_id: str = Field(..., min_length=1)
 
 
 class ResumeBatchMatchResponse(BaseModel):
     """Response for batch resume-job matching."""
+
     user_id: str
     total_jobs_matched: int
     matches: List[ResumeMatchResponse] = []

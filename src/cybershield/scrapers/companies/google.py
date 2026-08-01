@@ -47,6 +47,7 @@ class GoogleScraper(BaseCompanyScraper):
     def _build_search_url(self, keyword: str, page: int = 0) -> str:
         """Build search URL."""
         from urllib.parse import urlencode
+
         params = {
             "q": keyword,
             "start": page * 10,

@@ -5,7 +5,6 @@ Deduplication engine for identifying and removing duplicate job postings.
 import hashlib
 import re
 from difflib import SequenceMatcher
-from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +19,7 @@ class DeduplicationEngine:
         self.session = session
         self.job_repo = JobRepository(session)
 
-    async def filter_unique(self, jobs: List[dict]) -> List[dict]:
+    async def filter_unique(self, jobs: list[dict]) -> list[dict]:
         """Filter out duplicate jobs from a list."""
         unique_jobs = []
         seen_hashes = set()
@@ -42,7 +41,7 @@ class DeduplicationEngine:
 
         return unique_jobs
 
-    async def _find_existing(self, job_data: dict) -> Optional[Job]:
+    async def _find_existing(self, job_data: dict) -> Job | None:
         """Find existing job that matches the given data."""
         url = job_data.get("url")
         if url:
@@ -70,7 +69,7 @@ class DeduplicationEngine:
             job_data.get("url", "").lower().strip(),
         ]
         key_string = "|".join(key_fields)
-        return hashlib.md5(key_string.encode()).hexdigest()
+        return hashlib.sha256(key_string.encode()).hexdigest()
 
     def calculate_similarity(self, job1: dict, job2: dict) -> float:
         """Calculate similarity score between two jobs."""
@@ -96,18 +95,18 @@ class DeduplicationEngine:
     def _normalize_url(self, url: str) -> str:
         """Normalize URL for comparison."""
         url = url.lower()
-        url = re.sub(r'^https?://', '', url)
-        url = re.sub(r'^www\.', '', url)
-        url = url.rstrip('/')
-        return url
+        url = re.sub(r"^https?://", "", url)
+        url = re.sub(r"^www\.", "", url)
+        return url.rstrip("/")
 
     async def find_duplicates_in_database(
-        self, threshold: float = 0.85
-    ) -> List[Tuple[Job, Job]]:
+        self,
+        threshold: float = 0.85,
+    ) -> list[tuple[Job, Job]]:
         """Find potential duplicates in the database."""
         from sqlalchemy import select
 
-        query = select(Job).where(Job.is_active == True)
+        query = select(Job).where(Job.is_active)
         result = await self.session.execute(query)
         all_jobs = list(result.scalars().all())
 
@@ -115,8 +114,8 @@ class DeduplicationEngine:
         seen_pairs = set()
 
         for i, job1 in enumerate(all_jobs):
-            for job2 in all_jobs[i + 1:]:
-                pair_key = tuple(sorted([job1.id, job2.id]))
+            for job2 in all_jobs[i + 1 :]:
+                pair_key = tuple(sorted([str(job1.id), str(job2.id)]))
                 if pair_key in seen_pairs:
                     continue
 

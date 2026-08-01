@@ -56,6 +56,7 @@ class MicrosoftScraper(BaseCompanyScraper):
         }
         # URL encode manually for complex params
         from urllib.parse import urlencode
+
         return f"{self.API_URL}?{urlencode(params, doseq=True)}"
 
     def _parse_job_data(self, job_data: Dict[str, Any]) -> ScrapedJob:

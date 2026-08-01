@@ -15,84 +15,214 @@ import logging
 import os
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
 # Comprehensive cybersecurity skill keywords
 SECURITY_SKILLS = {
     "vulnerability_assessment": [
-        "nessus", "openvas", "qualys", "nexpose", "retina",
-        "cvss", "risk rating", "vulnerability scan", "vulnerability assessment",
-        "cve", "cwe", "vulnerability management",
+        "nessus",
+        "openvas",
+        "qualys",
+        "nexpose",
+        "retina",
+        "cvss",
+        "risk rating",
+        "vulnerability scan",
+        "vulnerability assessment",
+        "cve",
+        "cwe",
+        "vulnerability management",
     ],
     "penetration_testing": [
-        "penetration testing", "pentest", "ethical hacking", "exploitation",
-        "metasploit", "burp suite", "owasp zap", "sqlmap", "nikto",
-        "web application testing", "network pentesting", "owasp top 10",
-        "web app testing", "vapt", "red team", "blue team",
+        "penetration testing",
+        "pentest",
+        "ethical hacking",
+        "exploitation",
+        "metasploit",
+        "burp suite",
+        "owasp zap",
+        "sqlmap",
+        "nikto",
+        "web application testing",
+        "network pentesting",
+        "owasp top 10",
+        "web app testing",
+        "vapt",
+        "red team",
+        "blue team",
     ],
     "security_tools": [
-        "nmap", "wireshark", "kali linux", "hydra", "john the ripper",
-        "hashcat", "aircrack-ng", "burp suite", "owasp zap",
-        "metasploit", "gobuster", "dirb", "subfinder", "httpx",
-        "sqlmap", "wpscan", "ffuf", "amass", "theHarvester",
+        "nmap",
+        "wireshark",
+        "kali linux",
+        "hydra",
+        "john the ripper",
+        "hashcat",
+        "aircrack-ng",
+        "burp suite",
+        "owasp zap",
+        "metasploit",
+        "gobuster",
+        "dirb",
+        "subfinder",
+        "httpx",
+        "sqlmap",
+        "wpscan",
+        "ffuf",
+        "amass",
+        "theHarvester",
     ],
     "reconnaissance": [
-        "recon", "passive recon", "active recon", "osint",
-        "google dorks", "shodan", "censys", "maltego",
-        "recon-ng", "subdomain enumeration",
+        "recon",
+        "passive recon",
+        "active recon",
+        "osint",
+        "google dorks",
+        "shodan",
+        "censys",
+        "maltego",
+        "recon-ng",
+        "subdomain enumeration",
     ],
     "privilege_escalation": [
-        "privilege escalation", "privesc", "suid", "sudo abuse",
-        "kernel exploit", "linux privesc", "windows privesc",
-        "linpeas", "winpeas",
+        "privilege escalation",
+        "privesc",
+        "suid",
+        "sudo abuse",
+        "kernel exploit",
+        "linux privesc",
+        "windows privesc",
+        "linpeas",
+        "winpeas",
     ],
     "forensics": [
-        "digital forensics", "incident response", "malware analysis",
-        "volatility", "autopsy", "ftk", "en_case", "dd", "foremost",
-        "reverse engineering", "ida pro", "ghidra", "binary analysis",
+        "digital forensics",
+        "incident response",
+        "malware analysis",
+        "volatility",
+        "autopsy",
+        "ftk",
+        "en_case",
+        "dd",
+        "foremost",
+        "reverse engineering",
+        "ida pro",
+        "ghidra",
+        "binary analysis",
     ],
     "cloud_security": [
-        "aws security", "azure security", "gcp security", "cloud security",
-        "iam", "identity and access management", "s3", "ec2", "lambda",
-        "cloudtrail", "guardduty", "security hub",
+        "aws security",
+        "azure security",
+        "gcp security",
+        "cloud security",
+        "iam",
+        "identity and access management",
+        "s3",
+        "ec2",
+        "lambda",
+        "cloudtrail",
+        "guardduty",
+        "security hub",
     ],
     "siem": [
-        "siem", "splunk", "microsoft sentinel", "elastic security",
-        "qradar", "wazuh", "log analysis", "log analytics",
-        "kql", "splunk query",
+        "siem",
+        "splunk",
+        "microsoft sentinel",
+        "elastic security",
+        "qradar",
+        "wazuh",
+        "log analysis",
+        "log analytics",
+        "kql",
+        "splunk query",
     ],
     "network_security": [
-        "firewall", "ids", "ips", "vpn", "network security",
-        "tcpdump", "netflow", "packet analysis", "tcp/ip",
-        "dns", "dhcp", "proxy",
+        "firewall",
+        "ids",
+        "ips",
+        "vpn",
+        "network security",
+        "tcpdump",
+        "netflow",
+        "packet analysis",
+        "tcp/ip",
+        "dns",
+        "dhcp",
+        "proxy",
     ],
     "web_security": [
-        "xss", "csrf", "sql injection", "ssrf", "xxe",
-        "idor", "authentication bypass", "session management",
-        "cors", "csp", "jwt", "oauth", "saml",
-        "portswigger", "juice shop", "dvwa", "hackthebox",
+        "xss",
+        "csrf",
+        "sql injection",
+        "ssrf",
+        "xxe",
+        "idor",
+        "authentication bypass",
+        "session management",
+        "cors",
+        "csp",
+        "jwt",
+        "oauth",
+        "saml",
+        "portswigger",
+        "juice shop",
+        "dvwa",
+        "hackthebox",
         "tryhackme",
     ],
     "scripting": [
-        "python", "bash", "powershell", "javascript", "go", "rust",
-        "automation", "scripting", "bash scripting",
+        "python",
+        "bash",
+        "powershell",
+        "javascript",
+        "go",
+        "rust",
+        "automation",
+        "scripting",
+        "bash scripting",
     ],
     "compliance": [
-        "gdpr", "hipaa", "pci dss", "iso 27001", "soc 2",
-        "grc", "compliance", "risk management", "policy",
-        "audit", "nist", "cis",
+        "gdpr",
+        "hipaa",
+        "pci dss",
+        "iso 27001",
+        "soc 2",
+        "grc",
+        "compliance",
+        "risk management",
+        "policy",
+        "audit",
+        "nist",
+        "cis",
     ],
     "certifications": [
-        "ceh", "comptia security+", "cissp", "oscp", "oswe", "osep",
-        "pnpt", "ejpt", "crtp", "crto", "gsec", "gpen",
-        "security+ certification", "advanced pentester",
+        "ceh",
+        "comptia security+",
+        "cissp",
+        "oscp",
+        "oswe",
+        "osep",
+        "pnpt",
+        "ejpt",
+        "crtp",
+        "crto",
+        "gsec",
+        "gpen",
+        "security+ certification",
+        "advanced pentester",
     ],
     "cicd_security": [
-        "devsecops", "cicd security", "container security",
-        "kubernetes security", "docker security", "sonarqube",
-        "snyk", "trivy", "fortify",
+        "devsecops",
+        "cicd security",
+        "container security",
+        "kubernetes security",
+        "docker security",
+        "sonarqube",
+        "snyk",
+        "trivy",
+        "fortify",
     ],
 }
 
@@ -129,7 +259,7 @@ class ResumeParser:
         # Extract text from PDF
         doc = pymupdf.open(file_path)
         full_text = ""
-        for page in doc:
+        for page in doc:  # type: ignore[attr-defined]
             full_text += page.get_text()
         doc.close()
 
@@ -181,11 +311,13 @@ class ResumeParser:
         for keyword, category in self._all_skills.items():
             if keyword in text_lower and keyword not in seen:
                 seen.add(keyword)
-                found.append({
-                    "name": keyword.title(),
-                    "category": category,
-                    "confidence": 0.9,
-                })
+                found.append(
+                    {
+                        "name": keyword.title(),
+                        "category": category,
+                        "confidence": 0.9,
+                    }
+                )
 
         return found
 
@@ -196,14 +328,16 @@ class ResumeParser:
         # Isolate the Education section (between EDUCATION header and next section)
         edu_section_match = re.search(
             r"EDUCATION\s*\n(.*?)(?=\n(?:SKILLS?|EXPERIENCE|CERTIFICATIONS?|PROJECTS?|ACTIVITIES|HANDS|SUMMARY|CONTACT)|$)",
-            text, re.IGNORECASE | re.DOTALL
+            text,
+            re.IGNORECASE | re.DOTALL,
         )
         edu_text = edu_section_match.group(1) if edu_section_match else text
 
         # Degree detection within education section - stop at newline
         degree_match = re.search(
             r"(b\.?tech|bachelor|b\.?e\.?|m\.?tech|master|mba|ph\.?d|diploma|b\.?sc|m\.?sc)[\s,]*([^\n]+)",
-            edu_text, re.IGNORECASE
+            edu_text,
+            re.IGNORECASE,
         )
         degree = degree_match.group(0).strip() if degree_match else None
 
@@ -213,30 +347,31 @@ class ResumeParser:
             line = line.strip()
             if re.search(r"(university|college|institute|academy|school)", line, re.IGNORECASE):
                 # Split on dash and take first part
-                parts = re.split(r'\s*[–-]\s*', line)
+                parts = re.split(r"\s*[–-]\s*", line)
                 institution = parts[0].strip()
                 break
 
         # GPA/CGPA
-        gpa_match = re.search(r"(cgpa|gpa|percentage|grades?)[\s:]*(\d+\.?\d*(?:/\d+)?)", edu_text, re.IGNORECASE)
+        gpa_match = re.search(
+            r"(cgpa|gpa|percentage|grades?)[\s:]*(\d+\.?\d*(?:/\d+)?)", edu_text, re.IGNORECASE
+        )
         gpa = gpa_match.group(2) if gpa_match else None
 
         # Year range - search within education section for B.Tech context
         years = None
-        year_match = re.search(
-            r"(20[12]\d)\s*[-–]\s*(20[12]\d|present)",
-            edu_text, re.IGNORECASE
-        )
+        year_match = re.search(r"(20[12]\d)\s*[-–]\s*(20[12]\d|present)", edu_text, re.IGNORECASE)
         if year_match:
             years = f"{year_match.group(1)} - {year_match.group(2)}"
 
         if degree or institution:
-            education.append({
-                "degree": degree,
-                "institution": institution,
-                "gpa": gpa,
-                "years": years,
-            })
+            education.append(
+                {
+                    "degree": degree,
+                    "institution": institution,
+                    "gpa": gpa,
+                    "years": years,
+                }
+            )
 
         return education
 
@@ -252,11 +387,13 @@ class ResumeParser:
         for pattern in role_patterns:
             matches = re.finditer(pattern, text, re.IGNORECASE)
             for match in matches:
-                context = text[max(0, match.start()-100):match.end()+100]
-                experience.append({
-                    "role": match.group(0).strip(),
-                    "context": context.strip()[:200],
-                })
+                context = text[max(0, match.start() - 100) : match.end() + 100]
+                experience.append(
+                    {
+                        "role": match.group(0).strip(),
+                        "context": context.strip()[:200],
+                    }
+                )
 
         # Deduplicate by role
         seen_roles = set()
@@ -273,9 +410,21 @@ class ResumeParser:
         """Extract certifications."""
         certs = []
         cert_keywords = [
-            "ceh", "comp security+", "cissp", "oscp", "oswe", "osep",
-            "pnpt", "ejpt", "crtp", "crto", "gsec", "gpen",
-            "security+", "advanced pentester", "certified",
+            "ceh",
+            "comp security+",
+            "cissp",
+            "oscp",
+            "oswe",
+            "osep",
+            "pnpt",
+            "ejpt",
+            "crtp",
+            "crto",
+            "gsec",
+            "gpen",
+            "security+",
+            "advanced pentester",
+            "certified",
         ]
 
         text_lower = text.lower()
@@ -283,12 +432,14 @@ class ResumeParser:
             if cert in text_lower:
                 # Find context around the certification
                 idx = text_lower.find(cert)
-                context = text[max(0, idx-50):idx+len(cert)+50]
-                certs.append({
-                    "name": cert.upper() if len(cert) <= 5 else cert.title(),
-                    "status": "in progress" if "progress" in context.lower() else "completed",
-                    "context": context.strip(),
-                })
+                context = text[max(0, idx - 50) : idx + len(cert) + 50]
+                certs.append(
+                    {
+                        "name": cert.upper() if len(cert) <= 5 else cert.title(),
+                        "status": "in progress" if "progress" in context.lower() else "completed",
+                        "context": context.strip(),
+                    }
+                )
 
         return certs
 
@@ -299,34 +450,47 @@ class ResumeParser:
         # Look for project sections
         project_section = re.search(
             r"(projects?|labs?|hands[- ]?on)[\s:]*\n(.*?)(?=\n(?:certifications?|education|skills?|experience|activities?)|$)",
-            text, re.IGNORECASE | re.DOTALL
+            text,
+            re.IGNORECASE | re.DOTALL,
         )
 
         if project_section:
             section_text = project_section.group(2)
             # Split by common separators
-            items = re.split(r'\n\s*[-•*]\s*|\n\s*\d+\.\s*', section_text)
+            items = re.split(r"\n\s*[-•*]\s*|\n\s*\d+\.\s*", section_text)
 
             for item in items:
                 item = item.strip()
                 if len(item) > 10:  # Skip very short items
                     # Extract title (first line or first sentence)
-                    title_match = re.match(r'^([^\n.]+)', item)
+                    title_match = re.match(r"^([^\n.]+)", item)
                     title = title_match.group(1).strip() if title_match else item[:50]
 
                     # Extract technologies mentioned
                     techs = []
-                    tech_keywords = ["nessus", "nmap", "metasploit", "burp", "wireshark",
-                                     "owasp", "dvwa", "portswigger", "hackthebox", "tryhackme"]
+                    tech_keywords = [
+                        "nessus",
+                        "nmap",
+                        "metasploit",
+                        "burp",
+                        "wireshark",
+                        "owasp",
+                        "dvwa",
+                        "portswigger",
+                        "hackthebox",
+                        "tryhackme",
+                    ]
                     for tech in tech_keywords:
                         if tech in item.lower():
                             techs.append(tech.title())
 
-                    projects.append({
-                        "name": title[:100],
-                        "description": item[:500],
-                        "technologies": techs,
-                    })
+                    projects.append(
+                        {
+                            "name": title[:100],
+                            "description": item[:500],
+                            "technologies": techs,
+                        }
+                    )
 
         return projects
 

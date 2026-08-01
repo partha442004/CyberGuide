@@ -5,11 +5,10 @@ Scrapes cybersecurity jobs from Broadcom/Symantec's Workday-powered career page.
 Symantec was acquired by Broadcom in 2019 and operates under Broadcom's unified Workday ATS.
 """
 
-from typing import List, Optional
+from typing import Optional
 
-from cybershield.scrapers.base import ScrapedJob, ScraperConfig
+from cybershield.scrapers.base import ScraperConfig
 from cybershield.scrapers.companies.base_workday import BaseWorkdayScraper
-
 
 __all__ = ["SymantecScraper"]
 

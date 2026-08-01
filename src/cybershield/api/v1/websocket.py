@@ -6,9 +6,8 @@ Provides WebSocket connections for real-time job notifications.
 
 import json
 import logging
-from typing import Optional
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from cybershield.notifications.websocket import ws_manager
 
@@ -40,12 +39,14 @@ async def websocket_endpoint(
 
     try:
         # Send welcome message
-        await websocket.send_json({
-            "type": "connected",
-            "message": f"Connected to CyberGuide notifications",
-            "user_id": user_id,
-            "connection_id": conn_id,
-        })
+        await websocket.send_json(
+            {
+                "type": "connected",
+                "message": "Connected to CyberGuide notifications",
+                "user_id": user_id,
+                "connection_id": conn_id,
+            }
+        )
 
         # Listen for messages from client
         while True:
@@ -62,38 +63,48 @@ async def websocket_endpoint(
                     room = message.get("room")
                     if room:
                         ws_manager.join_room(user_id, room)
-                        await websocket.send_json({
-                            "type": "subscribed",
-                            "room": room,
-                        })
+                        await websocket.send_json(
+                            {
+                                "type": "subscribed",
+                                "room": room,
+                            }
+                        )
 
                 elif msg_type == "unsubscribe":
                     room = message.get("room")
                     if room:
                         ws_manager.leave_room(user_id, room)
-                        await websocket.send_json({
-                            "type": "unsubscribed",
-                            "room": room,
-                        })
+                        await websocket.send_json(
+                            {
+                                "type": "unsubscribed",
+                                "room": room,
+                            }
+                        )
 
                 elif msg_type == "rooms":
                     rooms = ws_manager.get_user_rooms(user_id)
-                    await websocket.send_json({
-                        "type": "rooms",
-                        "rooms": rooms,
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "rooms",
+                            "rooms": rooms,
+                        }
+                    )
 
                 else:
-                    await websocket.send_json({
-                        "type": "error",
-                        "message": f"Unknown message type: {msg_type}",
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "error",
+                            "message": f"Unknown message type: {msg_type}",
+                        }
+                    )
 
             except json.JSONDecodeError:
-                await websocket.send_json({
-                    "type": "error",
-                    "message": "Invalid JSON",
-                })
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "message": "Invalid JSON",
+                    }
+                )
 
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket, user_id, conn_id)

@@ -4,10 +4,8 @@ Slack Notifier
 Sends notifications via Slack webhooks.
 """
 
-import json
 import logging
 from typing import Any, Dict, Optional
-from datetime import datetime, timezone
 
 import httpx
 
@@ -33,45 +31,34 @@ class SlackNotifier(BaseNotifier):
         blocks = [
             {
                 "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": message.title,
-                    "emoji": True
-                }
+                "text": {"type": "plain_text", "text": message.title, "emoji": True},
             },
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": message.content[:3000]
-                }
-            },
+            {"type": "section", "text": {"type": "mrkdwn", "text": message.content[:3000]}},
             {
                 "type": "context",
                 "elements": [
                     {
                         "type": "mrkdwn",
-                        "text": f"*Type:* {message.notification_type.value.replace('_', ' ').title()} | *Priority:* {message.priority.value.upper()}"
+                        "text": f"*Type:* {message.notification_type.value.replace('_', ' ').title()} | *Priority:* {message.priority.value.upper()}",
                     }
-                ]
-            }
+                ],
+            },
         ]
 
         if message.url:
-            blocks.append({
-                "type": "actions",
-                "elements": [
-                    {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "View Details"
-                        },
-                        "url": message.url,
-                        "style": "primary"
-                    }
-                ]
-            })
+            blocks.append(
+                {
+                    "type": "actions",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "View Details"},
+                            "url": message.url,
+                            "style": "primary",
+                        }
+                    ],
+                }
+            )
 
         return blocks
 
@@ -99,9 +86,7 @@ class SlackNotifier(BaseNotifier):
 
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(
-                self.webhook_url,
-                json=payload,
-                headers={"Content-Type": "application/json"}
+                self.webhook_url, json=payload, headers={"Content-Type": "application/json"}
             )
 
             # Slack returns 200 on success

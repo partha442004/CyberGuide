@@ -11,9 +11,7 @@ Tests the ResumeParser class covering:
 - PDF parsing (integration test)
 """
 
-import pytest
-import asyncio
-from cybershield.services.resume_service import ResumeParser, SECURITY_SKILLS
+from cybershield.services.resume_service import SECURITY_SKILLS, ResumeParser
 
 
 class TestResumeParserSkills:
@@ -24,7 +22,9 @@ class TestResumeParserSkills:
 
     def test_extract_pentesting_skills(self):
         """Should detect penetration testing related skills."""
-        text = "experienced in penetration testing and ethical hacking using metasploit and burp suite"
+        text = (
+            "experienced in penetration testing and ethical hacking using metasploit and burp suite"
+        )
         skills = self.parser._extract_skills(text)
         skill_names = [s["name"].lower() for s in skills]
         assert "penetration testing" in skill_names
@@ -113,11 +113,16 @@ class TestResumeParserEducation:
 
     def test_extract_institution(self):
         """Should extract institution name."""
-        text = "EDUCATION\nB.Tech in IT\nMahendra Engineering College, Salem\nCGPA: 6.75\n2021 - 2025"
+        text = (
+            "EDUCATION\nB.Tech in IT\nMahendra Engineering College, Salem\nCGPA: 6.75\n2021 - 2025"
+        )
         edu = self.parser._extract_education(text)
         assert len(edu) >= 1
         assert edu[0]["institution"] is not None
-        assert "mahendra" in edu[0]["institution"].lower() or "engineering" in edu[0]["institution"].lower()
+        assert (
+            "mahendra" in edu[0]["institution"].lower()
+            or "engineering" in edu[0]["institution"].lower()
+        )
 
     def test_extract_gpa(self):
         """Should extract GPA/CGPA."""

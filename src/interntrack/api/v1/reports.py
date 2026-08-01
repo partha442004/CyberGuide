@@ -2,7 +2,7 @@
 Reports API endpoints.
 """
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.api.schemas.report import ReportResponse

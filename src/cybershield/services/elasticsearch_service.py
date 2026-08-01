@@ -33,7 +33,11 @@ JOB_MAPPING = {
     "mappings": {
         "properties": {
             "id": {"type": "keyword"},
-            "title": {"type": "text", "analyzer": "job_analyzer", "fields": {"keyword": {"type": "keyword"}}},
+            "title": {
+                "type": "text",
+                "analyzer": "job_analyzer",
+                "fields": {"keyword": {"type": "keyword"}},
+            },
             "company_name": {"type": "keyword"},
             "location": {"type": "text", "fields": {"keyword": {"type": "keyword"}}},
             "country": {"type": "keyword"},
@@ -86,7 +90,9 @@ async def init_elasticsearch(host: str = "http://localhost:9200") -> bool:
         logger.info("elasticsearch package not installed - search will use database fallback")
         return False
     except Exception as e:
-        logger.warning(f"Elasticsearch initialization failed: {e} - search will use database fallback")
+        logger.warning(
+            f"Elasticsearch initialization failed: {e} - search will use database fallback"
+        )
         return False
 
 
@@ -140,11 +146,13 @@ async def index_jobs(jobs: List[Dict[str, Any]]) -> int:
         for job in jobs:
             doc_id = job.get("id") or job.get("source_id")
             if doc_id:
-                actions.append({
-                    "_index": INDEX_NAME,
-                    "_id": str(doc_id),
-                    "_source": job,
-                })
+                actions.append(
+                    {
+                        "_index": INDEX_NAME,
+                        "_id": str(doc_id),
+                        "_source": job,
+                    }
+                )
 
         if actions:
             success, _ = await async_bulk(_es_client, actions)
@@ -182,19 +190,21 @@ async def search_jobs(
         return {"results": [], "total": 0, "aggregations": {}, "source": "database"}
 
     try:
-        must_clauses = []
-        filter_clauses = []
+        must_clauses: List[Dict[str, Any]] = []
+        filter_clauses: List[Dict[str, Any]] = []
 
         # Full-text search on title and description
         if query:
-            must_clauses.append({
-                "multi_match": {
-                    "query": query,
-                    "fields": ["title^3", "description^2", "company_name", "required_skills^2"],
-                    "type": "best_fields",
-                    "fuzziness": "AUTO",
+            must_clauses.append(
+                {
+                    "multi_match": {
+                        "query": query,
+                        "fields": ["title^3", "description^2", "company_name", "required_skills^2"],
+                        "type": "best_fields",
+                        "fuzziness": "AUTO",
+                    }
                 }
-            })
+            )
         else:
             must_clauses.append({"match_all": {}})
 
@@ -217,7 +227,7 @@ async def search_jobs(
             filter_clauses.append({"terms": {"required_skills": skills}})
 
         # Salary range filter
-        salary_range = {}
+        salary_range: Dict[str, float] = {}
         if min_salary is not None:
             salary_range["gte"] = min_salary
         if max_salary is not None:
@@ -256,13 +266,12 @@ async def search_jobs(
         hits = response["hits"]
         results = [hit["_source"] for hit in hits["hits"]]
 
-        aggregations = {}
+        aggregations: Dict[str, Any] = {}
         if "aggregations" in response:
             for agg_name, agg_data in response["aggregations"].items():
                 if "buckets" in agg_data:
                     aggregations[agg_name] = [
-                        {"key": b["key"], "count": b["doc_count"]}
-                        for b in agg_data["buckets"]
+                        {"key": b["key"], "count": b["doc_count"]} for b in agg_data["buckets"]
                     ]
                 elif "value" in agg_data:
                     aggregations[agg_name] = agg_data

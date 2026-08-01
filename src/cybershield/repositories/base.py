@@ -7,7 +7,7 @@ Provides generic CRUD operations for all repositories.
 from typing import Any, Dict, Generic, List, Optional, Sequence, Type, TypeVar
 from uuid import uuid4
 
-from sqlalchemy import select, func, desc, asc
+from sqlalchemy import asc, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
@@ -33,7 +33,7 @@ class BaseRepository(Generic[ModelType]):
     async def get(self, id: str) -> Optional[ModelType]:
         """Get a record by ID."""
         result = await self.session.execute(
-            select(self.model).where(self.model.id == id)
+            select(self.model).where(self.model.id == id)  # type: ignore[attr-defined]
         )
         return result.scalar_one_or_none()
 
@@ -41,7 +41,7 @@ class BaseRepository(Generic[ModelType]):
         """Get a record by ID or raise NotFoundError."""
         record = await self.get(id)
         if not record:
-            raise NotFoundError(f"{self.model.__name__} with id {id} not found")
+            raise NotFoundError(self.model.__name__, id)
         return record
 
     async def get_all(
@@ -72,7 +72,7 @@ class BaseRepository(Generic[ModelType]):
         else:
             # Default ordering by created_at descending
             if hasattr(self.model, "created_at"):
-                query = query.order_by(desc(self.model.created_at))
+                query = query.order_by(desc(self.model.created_at))  # type: ignore[attr-defined]
 
         query = query.offset(skip).limit(limit)
         result = await self.session.execute(query)
@@ -92,7 +92,7 @@ class BaseRepository(Generic[ModelType]):
                         query = query.where(column == value)
 
         result = await self.session.execute(query)
-        return result.scalar()
+        return result.scalar() or 0
 
     async def create(self, data: Dict[str, Any]) -> ModelType:
         """Create a new record."""
@@ -141,9 +141,9 @@ class BaseRepository(Generic[ModelType]):
     async def exists(self, id: str) -> bool:
         """Check if a record exists."""
         result = await self.session.execute(
-            select(func.count()).where(self.model.id == id)
+            select(func.count()).where(self.model.id == id)  # type: ignore[attr-defined]
         )
-        return result.scalar() > 0
+        return (result.scalar() or 0) > 0
 
     async def search(
         self, query_text: str, fields: List[str], limit: int = 10
@@ -159,6 +159,7 @@ class BaseRepository(Generic[ModelType]):
 
         if search_conditions:
             from sqlalchemy import or_
+
             query = query.where(or_(*search_conditions))
 
         query = query.limit(limit)

@@ -3,15 +3,17 @@ AI service for job classification and skill matching.
 """
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.config import get_settings
-from interntrack.domain.enums import ExperienceLevel, JobType, SkillCategory
+from interntrack.domain.enums import ExperienceLevel, JobType
 from interntrack.repositories.skill_repository import SkillRepository
+from interntrack.utils.logger import get_logger
 
 settings = get_settings()
+logger = get_logger(__name__)
 
 
 class AIService:
@@ -21,24 +23,23 @@ class AIService:
         self.session = session
         self.skill_repo = SkillRepository(session)
 
-    async def classify_job(self, job_data: dict) -> Dict[str, Any]:
+    async def classify_job(self, job_data: dict) -> dict[str, Any]:
         """Classify a job posting using AI."""
         prompt = self._build_classification_prompt(job_data)
 
         if settings.gemini_api_key:
             return await self._classify_with_gemini(prompt)
-        elif settings.ollama_base_url:
+        if settings.ollama_base_url:
             return await self._classify_with_ollama(prompt)
-        else:
-            return self._classify_with_rules(job_data)
+        return self._classify_with_rules(job_data)
 
     def _build_classification_prompt(self, job_data: dict) -> str:
         """Build prompt for job classification."""
         return f"""Classify this job posting:
 
-Title: {job_data.get('title', 'N/A')}
-Company: {job_data.get('company', 'N/A')}
-Description: {job_data.get('description', 'N/A')[:500]}
+Title: {job_data.get("title", "N/A")}
+Company: {job_data.get("company", "N/A")}
+Description: {job_data.get("description", "N/A")[:500]}
 
 Return JSON with:
 - job_type: internship|full_time|part_time|contract|freelance|remote
@@ -48,7 +49,7 @@ Return JSON with:
 - confidence: 0.0-1.0
 """
 
-    async def _classify_with_gemini(self, prompt: str) -> Dict[str, Any]:
+    async def _classify_with_gemini(self, prompt: str) -> dict[str, Any]:
         """Classify using Google Gemini API."""
         try:
             import google.generativeai as genai
@@ -56,11 +57,11 @@ Return JSON with:
             genai.configure(api_key=settings.gemini_api_key)
             model = genai.GenerativeModel(settings.gemini_model)
             response = model.generate_content(prompt)
-            return json.loads(response.text)
+            return cast("dict[str, Any]", json.loads(response.text))
         except Exception:
             return {"error": "Gemini classification failed"}
 
-    async def _classify_with_ollama(self, prompt: str) -> Dict[str, Any]:
+    async def _classify_with_ollama(self, prompt: str) -> dict[str, Any]:
         """Classify using local Ollama."""
         try:
             import httpx
@@ -76,12 +77,15 @@ Return JSON with:
                     timeout=60,
                 )
                 if response.status_code == 200:
-                    return json.loads(response.json().get("response", "{}"))
-        except Exception:
-            pass
+                    return cast(
+                        "dict[str, Any]",
+                        json.loads(response.json().get("response", "{}")),
+                    )
+        except Exception as e:
+            logger.warning("Ollama classification failed: %s", e)
         return {"error": "Ollama classification failed"}
 
-    def _classify_with_rules(self, job_data: dict) -> Dict[str, Any]:
+    def _classify_with_rules(self, job_data: dict) -> dict[str, Any]:
         """Rule-based classification fallback."""
         title = job_data.get("title", "").lower()
         description = job_data.get("description", "").lower()
@@ -107,15 +111,15 @@ Return JSON with:
         }
 
     async def match_skills(
-        self, job_skills: List[str], user_skills: List[str]
-    ) -> Dict[str, Any]:
+        self,
+        job_skills: list[str],
+        user_skills: list[str],
+    ) -> dict[str, Any]:
         """Match job skills with user skills."""
         matched = set(job_skills) & set(user_skills)
         missing = set(job_skills) - set(user_skills)
 
-        match_percentage = (
-            len(matched) / len(job_skills) * 100 if job_skills else 0
-        )
+        match_percentage = len(matched) / len(job_skills) * 100 if job_skills else 0
 
         return {
             "matched_skills": list(matched),
@@ -124,34 +128,45 @@ Return JSON with:
             "recommendations": await self._get_skill_recommendations(list(missing)),
         }
 
-    async def _get_skill_recommendations(self, skills: List[str]) -> List[dict]:
+    async def _get_skill_recommendations(self, skills: list[str]) -> list[dict]:
         """Get learning recommendations for missing skills."""
         recommendations = []
         for skill_name in skills:
             skill = await self.skill_repo.get_by_name(skill_name)
             if skill and skill.learning_resources:
-                recommendations.append({
-                    "skill": skill_name,
-                    "category": skill.category.value,
-                    "resources": skill.learning_resources[:3],
-                })
+                recommendations.append(
+                    {
+                        "skill": skill_name,
+                        "category": skill.category.value,
+                        "resources": skill.learning_resources[:3],
+                    },
+                )
         return recommendations
 
     async def generate_learning_path(
-        self, current_skills: List[str], target_role: str
-    ) -> Dict[str, Any]:
+        self,
+        current_skills: list[str],
+        target_role: str,
+    ) -> dict[str, Any]:
         """Generate a learning path for career progression."""
-        prompt = f"""Create a learning path for someone with skills: {', '.join(current_skills)}
-Target role: {target_role}
-Include courses from: Google Cloud Skills Boost, OWASP, PortSwigger, TryHackMe, Hack The Box, OverTheWire, PicoCTF
-Return JSON with steps, estimated time, and resources."""
+        courses = (
+            "Include courses from: Google Cloud Skills Boost, OWASP, "
+            "PortSwigger, TryHackMe, Hack The Box, OverTheWire, PicoCTF"
+        )
+        skill_list = ", ".join(current_skills)
+        prompt = (
+            f"Create a learning path for someone with skills: {skill_list}\n"
+            f"Target role: {target_role}\n"
+            f"{courses}\n"
+            "Return JSON with steps, estimated time, and resources."
+        )
 
         try:
             if settings.gemini_api_key:
                 return await self._classify_with_gemini(prompt)
-            elif settings.ollama_base_url:
+            if settings.ollama_base_url:
                 return await self._classify_with_ollama(prompt)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("AI service unavailable: %s", e)
 
         return {"steps": [], "message": "AI service not configured"}

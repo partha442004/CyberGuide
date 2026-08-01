@@ -2,14 +2,10 @@
 Notification service for multi-channel notifications.
 """
 
-from typing import Any, Dict, List, Optional
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from interntrack.domain.enums import NotificationChannel
-from interntrack.domain.exceptions import NotificationError
-from interntrack.domain.models import NotificationConfig
 from interntrack.config import get_settings
+from interntrack.domain.exceptions import NotificationError
 
 settings = get_settings()
 
@@ -17,7 +13,11 @@ settings = get_settings()
 class NotificationChannel:
     """Base notification channel interface."""
 
-    async def send(self, message: str, subject: Optional[str] = None) -> bool:
+    async def send(
+        self,
+        message: str,
+        subject: str | None = None,  # noqa: ARG002 (interface)
+    ) -> bool:
         raise NotImplementedError
 
 
@@ -28,7 +28,11 @@ class TelegramChannel(NotificationChannel):
         self.bot_token = bot_token
         self.chat_id = chat_id
 
-    async def send(self, message: str, subject: Optional[str] = None) -> bool:
+    async def send(
+        self,
+        message: str,
+        subject: str | None = None,  # noqa: ARG002 (interface)
+    ) -> bool:
         """Send Telegram message."""
         try:
             import httpx
@@ -43,14 +47,19 @@ class TelegramChannel(NotificationChannel):
                 response = await client.post(url, json=payload, timeout=10)
                 return response.status_code == 200
         except Exception as e:
-            raise NotificationError("telegram", str(e))
+            raise NotificationError("telegram", str(e)) from e
 
 
 class EmailChannel(NotificationChannel):
     """Email notification channel via SMTP."""
 
     def __init__(
-        self, host: str, port: int, user: str, password: str, from_email: str
+        self,
+        host: str,
+        port: int,
+        user: str,
+        password: str,
+        from_email: str,
     ):
         self.host = host
         self.port = port
@@ -58,12 +67,13 @@ class EmailChannel(NotificationChannel):
         self.password = password
         self.from_email = from_email
 
-    async def send(self, message: str, subject: str = "InternTrack") -> bool:
+    async def send(self, message: str, subject: str | None = None) -> bool:
         """Send email notification."""
+        subject = subject or "InternTrack"
         try:
             import smtplib
-            from email.mime.text import MIMEText
             from email.mime.multipart import MIMEMultipart
+            from email.mime.text import MIMEText
 
             msg = MIMEMultipart()
             msg["From"] = self.from_email
@@ -76,7 +86,7 @@ class EmailChannel(NotificationChannel):
                 server.send_message(msg)
             return True
         except Exception as e:
-            raise NotificationError("email", str(e))
+            raise NotificationError("email", str(e)) from e
 
 
 class DiscordChannel(NotificationChannel):
@@ -85,7 +95,11 @@ class DiscordChannel(NotificationChannel):
     def __init__(self, webhook_url: str):
         self.webhook_url = webhook_url
 
-    async def send(self, message: str, subject: Optional[str] = None) -> bool:
+    async def send(
+        self,
+        message: str,
+        subject: str | None = None,  # noqa: ARG002 (interface)
+    ) -> bool:
         """Send Discord webhook message."""
         try:
             import httpx
@@ -93,11 +107,13 @@ class DiscordChannel(NotificationChannel):
             payload = {"content": message}
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    self.webhook_url, json=payload, timeout=10
+                    self.webhook_url,
+                    json=payload,
+                    timeout=10,
                 )
                 return response.status_code in (200, 204)
         except Exception as e:
-            raise NotificationError("discord", str(e))
+            raise NotificationError("discord", str(e)) from e
 
 
 class SlackChannel(NotificationChannel):
@@ -106,7 +122,11 @@ class SlackChannel(NotificationChannel):
     def __init__(self, webhook_url: str):
         self.webhook_url = webhook_url
 
-    async def send(self, message: str, subject: Optional[str] = None) -> bool:
+    async def send(
+        self,
+        message: str,
+        subject: str | None = None,  # noqa: ARG002 (interface)
+    ) -> bool:
         """Send Slack webhook message."""
         try:
             import httpx
@@ -114,11 +134,13 @@ class SlackChannel(NotificationChannel):
             payload = {"text": message}
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    self.webhook_url, json=payload, timeout=10
+                    self.webhook_url,
+                    json=payload,
+                    timeout=10,
                 )
                 return response.status_code == 200
         except Exception as e:
-            raise NotificationError("slack", str(e))
+            raise NotificationError("slack", str(e)) from e
 
 
 class NotificationManager:
@@ -126,14 +148,15 @@ class NotificationManager:
 
     def __init__(self, session: AsyncSession):
         self.session = session
-        self._channels: Dict[str, NotificationChannel] = {}
+        self._channels: dict[str, NotificationChannel] = {}
         self._setup_channels()
 
     def _setup_channels(self) -> None:
         """Setup configured notification channels."""
         if settings.telegram_bot_token and settings.telegram_chat_id:
             self._channels["telegram"] = TelegramChannel(
-                settings.telegram_bot_token, settings.telegram_chat_id
+                settings.telegram_bot_token,
+                settings.telegram_chat_id,
             )
 
         if settings.smtp_user and settings.smtp_password:
@@ -153,10 +176,10 @@ class NotificationManager:
 
     async def notify(
         self,
-        channels: List[str],
+        channels: list[str],
         message: str,
-        subject: Optional[str] = None,
-    ) -> Dict[str, bool]:
+        subject: str | None = None,
+    ) -> dict[str, bool]:
         """Send notification to multiple channels."""
         results = {}
         for channel_name in channels:
@@ -170,10 +193,14 @@ class NotificationManager:
                 results[channel_name] = False
         return results
 
-    async def notify_all(self, message: str, subject: Optional[str] = None) -> Dict[str, bool]:
+    async def notify_all(
+        self,
+        message: str,
+        subject: str | None = None,
+    ) -> dict[str, bool]:
         """Send notification to all configured channels."""
         return await self.notify(list(self._channels.keys()), message, subject)
 
-    def get_configured_channels(self) -> List[str]:
+    def get_configured_channels(self) -> list[str]:
         """Get list of configured channels."""
         return list(self._channels.keys())

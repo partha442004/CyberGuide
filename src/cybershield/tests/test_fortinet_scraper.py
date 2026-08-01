@@ -9,9 +9,8 @@ Tests the FortinetScraper class covering:
 - Location detection
 """
 
-import pytest
-from cybershield.scrapers.companies.fortinet import FortinetScraper
 from cybershield.scrapers.base import ScrapedJob, ScraperConfig
+from cybershield.scrapers.companies.fortinet import FortinetScraper
 
 
 class TestFortinetScraper:
@@ -73,7 +72,7 @@ class TestFortinetScraper:
         assert job.location == "Sunnyvale, CA (US)"
         assert job.country == "USA"
         assert job.job_type == "full_time"
-        assert "fortinet" in job.url.lower()
+        assert "fortinet" in (job.url or "").lower()
 
     def test_parse_job_data_remote(self):
         """Should detect remote jobs."""

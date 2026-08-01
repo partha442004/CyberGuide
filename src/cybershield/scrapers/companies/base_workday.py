@@ -6,12 +6,11 @@ Workday uses a POST JSON API endpoint for job search.
 """
 
 import logging
-from abc import abstractmethod
 from typing import Any, Dict, List, Optional
 
 import httpx
 
-from cybershield.scrapers.base import ScrapedJob, ScraperConfig
+from cybershield.scrapers.base import ScrapedJob
 from cybershield.scrapers.companies.base_company import BaseCompanyScraper
 
 logger = logging.getLogger(__name__)
@@ -51,7 +50,9 @@ class BaseWorkdayScraper(BaseCompanyScraper):
 
         # Workday uses externalPath for job ID
         external_path = job_data.get("externalPath", "")
-        job.source_id = external_path.split("/")[-1] if external_path else str(job_data.get("postedOn", ""))
+        job.source_id = (
+            external_path.split("/")[-1] if external_path else str(job_data.get("postedOn", ""))
+        )
 
         # URL
         if external_path:
@@ -93,7 +94,12 @@ class BaseWorkdayScraper(BaseCompanyScraper):
     def _detect_country(self, job: ScrapedJob, locations_text: str) -> None:
         """Detect country from location text. Override for company-specific locations."""
         loc_lower = locations_text.lower()
-        if "united states" in loc_lower or "usa" in loc_lower or "(us)" in loc_lower or "us)" in loc_lower:
+        if (
+            "united states" in loc_lower
+            or "usa" in loc_lower
+            or "(us)" in loc_lower
+            or "us)" in loc_lower
+        ):
             job.country = "USA"
         elif "india" in loc_lower or "bangalore" in loc_lower or "hyderabad" in loc_lower:
             job.country = "India"
@@ -115,7 +121,9 @@ class BaseWorkdayScraper(BaseCompanyScraper):
         else:
             job.country = "Global"
 
-    async def _fetch_workday(self, keyword: str, page: int = 0, limit: int = 20) -> List[Dict[str, Any]]:
+    async def _fetch_workday(
+        self, keyword: str, page: int = 0, limit: int = 20
+    ) -> List[Dict[str, Any]]:
         """Fetch jobs from Workday API for a single keyword and page."""
         payload = self._build_search_payload(keyword, page, limit)
         await self._rate_limit_wait()
@@ -136,7 +144,8 @@ class BaseWorkdayScraper(BaseCompanyScraper):
             response.raise_for_status()
             self._request_count += 1
         data = response.json()
-        return data.get("jobPostings", [])
+        postings = data.get("jobPostings", [])
+        return [p for p in postings if isinstance(p, dict)]
 
     async def scrape(
         self,

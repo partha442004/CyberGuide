@@ -5,12 +5,12 @@ Provides configurable rate limiting using an in-memory sliding window algorithm.
 Supports per-IP and per-API-key rate limiting with configurable limits.
 """
 
-import time
 import logging
+import time
 from collections import defaultdict
 from typing import Dict, Optional, Tuple
 
-from fastapi import Request, HTTPException, status
+from fastapi import Request, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -21,7 +21,7 @@ class RateLimitStore:
     """In-memory sliding window rate limit store with automatic cleanup."""
 
     CLEANUP_INTERVAL = 300  # Run cleanup every 5 minutes
-    CLEANUP_WINDOW = 3600   # Remove entries older than 1 hour
+    CLEANUP_WINDOW = 3600  # Remove entries older than 1 hour
 
     def __init__(self):
         self._requests: Dict[str, list[float]] = defaultdict(list)
@@ -29,7 +29,7 @@ class RateLimitStore:
 
     def is_allowed(
         self, key: str, max_requests: int, window_seconds: int
-    ) -> Tuple[bool, Dict[str, int]]:
+    ) -> Tuple[bool, Dict[str, str]]:
         """
         Check if a request is allowed under the rate limit.
 
@@ -43,9 +43,7 @@ class RateLimitStore:
         cutoff = now - window_seconds
 
         # Clean old entries for this key
-        self._requests[key] = [
-            t for t in self._requests[key] if t > cutoff
-        ]
+        self._requests[key] = [t for t in self._requests[key] if t > cutoff]
 
         current_count = len(self._requests[key])
 
@@ -152,9 +150,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             limit = self.default_limit
 
         # Check rate limit
-        allowed, headers = rate_limit_store.is_allowed(
-            key, limit, self.default_window
-        )
+        allowed, headers = rate_limit_store.is_allowed(key, limit, self.default_window)
 
         if not allowed:
             logger.warning(f"Rate limit exceeded for {key}")

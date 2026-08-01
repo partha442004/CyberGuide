@@ -2,8 +2,7 @@
 RemoteOK job scraper.
 """
 
-from datetime import datetime
-from typing import List, Optional
+from datetime import UTC, datetime
 
 from interntrack.domain.enums import JobSource
 from interntrack.scrapers.base import BaseScraper, RawJob
@@ -25,9 +24,9 @@ class RemoteOKScraper(BaseScraper):
     async def fetch(
         self,
         query: str,
-        location: Optional[str] = None,
+        location: str | None = None,  # noqa: ARG002 (interface contract)
         limit: int = 100,
-    ) -> List[RawJob]:
+    ) -> list[RawJob]:
         """Fetch remote jobs from RemoteOK."""
         jobs = []
 
@@ -48,7 +47,7 @@ class RemoteOKScraper(BaseScraper):
 
         return jobs
 
-    def _parse_job(self, item: dict, query: str) -> Optional[RawJob]:
+    def _parse_job(self, item: dict, query: str) -> RawJob | None:
         """Parse job item from RemoteOK."""
         title = item.get("position", "")
         company = item.get("company", "")
@@ -86,19 +85,19 @@ class RemoteOKScraper(BaseScraper):
         """Parse salary from text."""
         import re
 
-        numbers = re.findall(r'[\d,]+', salary_text)
+        numbers = re.findall(r"[\d,]+", salary_text)
         if len(numbers) >= 2:
             return (
                 int(numbers[0].replace(",", "")),
                 int(numbers[1].replace(",", "")),
             )
-        elif len(numbers) == 1:
+        if len(numbers) == 1:
             val = int(numbers[0].replace(",", ""))
             return (val, val)
         return (None, None)
 
-    def _parse_date(self, epoch: Optional[int]) -> Optional[datetime]:
+    def _parse_date(self, epoch: int | None) -> datetime | None:
         """Parse epoch timestamp."""
         if epoch:
-            return datetime.fromtimestamp(epoch)
+            return datetime.fromtimestamp(epoch, tz=UTC)
         return None

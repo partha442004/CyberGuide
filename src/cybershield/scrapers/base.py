@@ -17,11 +17,11 @@ import random
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import httpx
 
-from cybershield.cache import cache_manager, CacheManager
+from cybershield.cache import cache_manager
 
 logger = logging.getLogger(__name__)
 
@@ -253,8 +253,17 @@ class BaseScraper(ABC):
 
         # Remove common tracking parameters
         tracking_params = {
-            "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
-            "ref", "source", "from", "track", "click", "spm",
+            "utm_source",
+            "utm_medium",
+            "utm_campaign",
+            "utm_content",
+            "utm_term",
+            "ref",
+            "source",
+            "from",
+            "track",
+            "click",
+            "spm",
         }
         cleaned_params = {k: v for k, v in params.items() if k.lower() not in tracking_params}
 
@@ -299,21 +308,59 @@ class BaseScraper(ABC):
         # Common cybersecurity skills
         skills = [
             # Programming
-            "Python", "JavaScript", "Go", "Rust", "C", "C++", "Java", "PowerShell", "Bash",
+            "Python",
+            "JavaScript",
+            "Go",
+            "Rust",
+            "C",
+            "C++",
+            "Java",
+            "PowerShell",
+            "Bash",
             # Security Tools
-            "Nmap", "Burp Suite", "Wireshark", "Metasploit", "Nessus", "OpenVAS",
-            "Snort", "Suricata", "Zeek", "OSSEC", "Wazuh",
+            "Nmap",
+            "Burp Suite",
+            "Wireshark",
+            "Metasploit",
+            "Nessus",
+            "OpenVAS",
+            "Snort",
+            "Suricata",
+            "Zeek",
+            "OSSEC",
+            "Wazuh",
             # SIEM
-            "Splunk", "Microsoft Sentinel", "Elastic SIEM", "QRadar", "ArcSight",
+            "Splunk",
+            "Microsoft Sentinel",
+            "Elastic SIEM",
+            "QRadar",
+            "ArcSight",
             # Cloud Security
-            "AWS", "Azure", "GCP", "Kubernetes", "Docker",
+            "AWS",
+            "Azure",
+            "GCP",
+            "Kubernetes",
+            "Docker",
             # Security Concepts
-            "OWASP", "MITRE ATT&CK", "NIST", "ISO 27001", "SOC 2",
-            "Penetration Testing", "Vulnerability Assessment", "Incident Response",
-            "Threat Intelligence", "Malware Analysis", "Reverse Engineering",
-            "Digital Forensics", "GRC", "Compliance",
+            "OWASP",
+            "MITRE ATT&CK",
+            "NIST",
+            "ISO 27001",
+            "SOC 2",
+            "Penetration Testing",
+            "Vulnerability Assessment",
+            "Incident Response",
+            "Threat Intelligence",
+            "Malware Analysis",
+            "Reverse Engineering",
+            "Digital Forensics",
+            "GRC",
+            "Compliance",
             # Frameworks
-            "React", "Django", "FastAPI", "Node.js",
+            "React",
+            "Django",
+            "FastAPI",
+            "Node.js",
         ]
 
         found_skills = []
@@ -338,9 +385,7 @@ class BaseScraper(ABC):
         try:
             results = await self.scrape(**kwargs)
             elapsed = asyncio.get_event_loop().time() - start_time
-            logger.info(
-                f"Scraper {self.name} completed: {len(results)} jobs in {elapsed:.1f}s"
-            )
+            logger.info(f"Scraper {self.name} completed: {len(results)} jobs in {elapsed:.1f}s")
             return results
         except Exception as e:
             logger.error(f"Scraper {self.name} failed: {e}")

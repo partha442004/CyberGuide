@@ -2,10 +2,8 @@
 Domain exceptions for the application.
 """
 
-from typing import Optional
 
-
-class AppException(Exception):
+class AppException(Exception):  # noqa: N818 (deliberate base name)
     """Base application exception."""
 
     def __init__(
@@ -13,7 +11,7 @@ class AppException(Exception):
         message: str,
         code: str = "APP_ERROR",
         status: int = 500,
-        details: Optional[dict] = None,
+        details: dict | None = None,
     ):
         self.message = message
         self.code = code
@@ -28,7 +26,7 @@ class AppException(Exception):
                 "code": self.code,
                 "message": self.message,
                 "details": self.details,
-            }
+            },
         }
 
 

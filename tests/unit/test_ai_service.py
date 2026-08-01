@@ -1,8 +1,8 @@
 """Unit tests for services/ai_service.py."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class TestAIService:
@@ -46,8 +46,8 @@ class TestAIService:
         assert "N/A" in prompt
 
     def test_classify_with_rules_internship(self):
-        from interntrack.services.ai_service import AIService
         from interntrack.domain.enums import JobType
+        from interntrack.services.ai_service import AIService
 
         session = AsyncMock()
         service = AIService(session)
@@ -63,8 +63,8 @@ class TestAIService:
         assert result["confidence"] == 0.5
 
     def test_classify_with_rules_remote(self):
-        from interntrack.services.ai_service import AIService
         from interntrack.domain.enums import JobType
+        from interntrack.services.ai_service import AIService
 
         session = AsyncMock()
         service = AIService(session)
@@ -80,8 +80,8 @@ class TestAIService:
         assert result["is_remote"] is True
 
     def test_classify_with_rules_senior(self):
-        from interntrack.services.ai_service import AIService
         from interntrack.domain.enums import ExperienceLevel
+        from interntrack.services.ai_service import AIService
 
         session = AsyncMock()
         service = AIService(session)
@@ -96,8 +96,8 @@ class TestAIService:
         assert result["experience_level"] == ExperienceLevel.SENIOR.value
 
     def test_classify_with_rules_junior(self):
-        from interntrack.services.ai_service import AIService
         from interntrack.domain.enums import ExperienceLevel
+        from interntrack.services.ai_service import AIService
 
         session = AsyncMock()
         service = AIService(session)
@@ -112,8 +112,8 @@ class TestAIService:
         assert result["experience_level"] == ExperienceLevel.JUNIOR.value
 
     def test_classify_with_rules_unknown(self):
+        from interntrack.domain.enums import ExperienceLevel, JobType
         from interntrack.services.ai_service import AIService
-        from interntrack.domain.enums import JobType, ExperienceLevel
 
         session = AsyncMock()
         service = AIService(session)

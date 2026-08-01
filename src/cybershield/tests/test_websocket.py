@@ -9,8 +9,10 @@ Tests the ConnectionManager and WebSocketNotifier classes covering:
 - Statistics
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
 from cybershield.notifications.websocket import ConnectionManager, WebSocketNotifier, ws_manager
 
 
@@ -150,11 +152,13 @@ class TestWebSocketNotifier:
         """Should broadcast to all connections."""
         mock_ws = AsyncMock()
         ws_manager._connections["user1"] = [mock_ws]
-        result = await self.notifier.send({
-            "title": "Test Alert",
-            "content": "Hello",
-            "priority": "high",
-        })
+        result = await self.notifier.send(
+            {
+                "title": "Test Alert",
+                "content": "Hello",
+                "priority": "high",
+            }
+        )
         assert result is True
         assert self.notifier._stats["sent"] == 1
         # Clean up
@@ -163,10 +167,12 @@ class TestWebSocketNotifier:
     @pytest.mark.asyncio
     async def test_send_safe_with_dict(self):
         """Should handle dict messages via send_safe."""
-        result = await self.notifier.send_safe({
-            "title": "Test",
-            "content": "Content",
-        })
+        result = await self.notifier.send_safe(
+            {
+                "title": "Test",
+                "content": "Content",
+            }
+        )
         # May be False if no connections, but should not raise
         assert isinstance(result, bool)
 

@@ -3,25 +3,25 @@ Database seed script for populating sample data.
 """
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from typing import cast
 from uuid import uuid4
 
 from interntrack.database.session import get_db_session, init_db
 from interntrack.domain.enums import (
     ApplicationStatus,
+    ExperienceLevel,
     JobSource,
     JobType,
-    ExperienceLevel,
     SkillCategory,
 )
 from interntrack.domain.models import (
-    Job,
     Application,
-    Skill,
+    Job,
     JobSkill,
+    Skill,
     UserSkill,
 )
-
 
 # Sample jobs
 SAMPLE_JOBS = [
@@ -29,7 +29,10 @@ SAMPLE_JOBS = [
         "title": "Senior Python Developer",
         "company": "TechCorp Inc.",
         "location": "San Francisco, CA",
-        "description": "We are looking for a senior Python developer to join our team. Experience with FastAPI, SQLAlchemy, and PostgreSQL required.",
+        "description": (
+            "We are looking for a senior Python developer to join our team. "
+            "Experience with FastAPI, SQLAlchemy, and PostgreSQL required."
+        ),
         "url": "https://example.com/jobs/senior-python-dev",
         "source": JobSource.LINKEDIN,
         "job_type": JobType.FULL_TIME,
@@ -43,7 +46,10 @@ SAMPLE_JOBS = [
         "title": "Frontend React Developer",
         "company": "StartupXYZ",
         "location": "Remote",
-        "description": "Join our remote team as a React developer. Build beautiful user interfaces with modern React patterns.",
+        "description": (
+            "Join our remote team as a React developer. Build beautiful "
+            "user interfaces with modern React patterns."
+        ),
         "url": "https://example.com/jobs/react-dev",
         "source": JobSource.REMOTE_OK,
         "job_type": JobType.REMOTE,
@@ -57,7 +63,10 @@ SAMPLE_JOBS = [
         "title": "Junior Backend Engineer",
         "company": "DataFlow Systems",
         "location": "New York, NY",
-        "description": "Entry-level position for aspiring backend developers. Python and SQL knowledge preferred.",
+        "description": (
+            "Entry-level position for aspiring backend developers. "
+            "Python and SQL knowledge preferred."
+        ),
         "url": "https://example.com/jobs/junior-backend",
         "source": JobSource.INDEED,
         "job_type": JobType.FULL_TIME,
@@ -71,7 +80,10 @@ SAMPLE_JOBS = [
         "title": "DevOps Engineer",
         "company": "CloudNine Technologies",
         "location": "Austin, TX",
-        "description": "Manage and optimize our cloud infrastructure. Experience with AWS, Docker, and Kubernetes required.",
+        "description": (
+            "Manage and optimize our cloud infrastructure. Experience with "
+            "AWS, Docker, and Kubernetes required."
+        ),
         "url": "https://example.com/jobs/devops-engineer",
         "source": JobSource.HACKER_NEWS,
         "job_type": JobType.FULL_TIME,
@@ -85,7 +97,10 @@ SAMPLE_JOBS = [
         "title": "Full Stack Developer Intern",
         "company": "InnovateTech",
         "location": "Seattle, WA",
-        "description": "Summer internship opportunity for full stack development. Learn React, Node.js, and PostgreSQL.",
+        "description": (
+            "Summer internship opportunity for full stack development. "
+            "Learn React, Node.js, and PostgreSQL."
+        ),
         "url": "https://example.com/jobs/fullstack-intern",
         "source": JobSource.RSS_FEED,
         "job_type": JobType.INTERNSHIP,
@@ -99,7 +114,10 @@ SAMPLE_JOBS = [
         "title": "Machine Learning Engineer",
         "company": "AI Solutions Corp",
         "location": "Boston, MA",
-        "description": "Build and deploy ML models. Python, TensorFlow, and PyTorch experience required.",
+        "description": (
+            "Build and deploy ML models. Python, TensorFlow, and "
+            "PyTorch experience required."
+        ),
         "url": "https://example.com/jobs/ml-engineer",
         "source": JobSource.LINKEDIN,
         "job_type": JobType.FULL_TIME,
@@ -113,7 +131,9 @@ SAMPLE_JOBS = [
         "title": "Remote UI/UX Designer",
         "company": "DesignHub",
         "location": "Remote",
-        "description": "Create beautiful and intuitive user experiences for our SaaS product.",
+        "description": (
+            "Create beautiful and intuitive user experiences for our SaaS product."
+        ),
         "url": "https://example.com/jobs/uiux-designer",
         "source": JobSource.REMOTE_OK,
         "job_type": JobType.REMOTE,
@@ -127,7 +147,9 @@ SAMPLE_JOBS = [
         "title": "Data Analyst",
         "company": "Analytics Pro",
         "location": "Chicago, IL",
-        "description": "Analyze data and create reports. SQL, Python, and Excel skills required.",
+        "description": (
+            "Analyze data and create reports. SQL, Python, and Excel skills required."
+        ),
         "url": "https://example.com/jobs/data-analyst",
         "source": JobSource.INDEED,
         "job_type": JobType.FULL_TIME,
@@ -142,8 +164,16 @@ SAMPLE_JOBS = [
 # Sample skills
 SAMPLE_SKILLS = [
     {"name": "python", "category": SkillCategory.PROGRAMMING, "difficulty_level": 2},
-    {"name": "javascript", "category": SkillCategory.PROGRAMMING, "difficulty_level": 2},
-    {"name": "typescript", "category": SkillCategory.PROGRAMMING, "difficulty_level": 2},
+    {
+        "name": "javascript",
+        "category": SkillCategory.PROGRAMMING,
+        "difficulty_level": 2,
+    },
+    {
+        "name": "typescript",
+        "category": SkillCategory.PROGRAMMING,
+        "difficulty_level": 2,
+    },
     {"name": "react", "category": SkillCategory.FRAMEWORK, "difficulty_level": 3},
     {"name": "fastapi", "category": SkillCategory.FRAMEWORK, "difficulty_level": 2},
     {"name": "django", "category": SkillCategory.FRAMEWORK, "difficulty_level": 3},
@@ -155,7 +185,11 @@ SAMPLE_SKILLS = [
     {"name": "git", "category": SkillCategory.TOOL, "difficulty_level": 1},
     {"name": "linux", "category": SkillCategory.TOOL, "difficulty_level": 2},
     {"name": "rest api", "category": SkillCategory.FRAMEWORK, "difficulty_level": 2},
-    {"name": "machine learning", "category": SkillCategory.PROGRAMMING, "difficulty_level": 4},
+    {
+        "name": "machine learning",
+        "category": SkillCategory.PROGRAMMING,
+        "difficulty_level": 4,
+    },
     {"name": "tensorflow", "category": SkillCategory.FRAMEWORK, "difficulty_level": 4},
     {"name": "pytorch", "category": SkillCategory.FRAMEWORK, "difficulty_level": 4},
     {"name": "figma", "category": SkillCategory.TOOL, "difficulty_level": 2},
@@ -173,7 +207,7 @@ async def seed_database():
     async with get_db_session() as session:
         # Create skills
         print("  Creating skills...")
-        skill_map = {}
+        skill_map: dict[str, Skill] = {}
         for skill_data in SAMPLE_SKILLS:
             skill = Skill(
                 id=str(uuid4()),
@@ -183,7 +217,7 @@ async def seed_database():
                 is_active=True,
             )
             session.add(skill)
-            skill_map[skill.name] = skill
+            skill_map[str(skill.name)] = skill
         await session.flush()
 
         # Create jobs
@@ -204,14 +238,14 @@ async def seed_database():
                 is_remote=job_data["is_remote"],
                 tags=job_data["tags"],
                 is_active=True,
-                posted_at=datetime.now(timezone.utc) - timedelta(days=3),
+                posted_at=datetime.now(UTC) - timedelta(days=3),
             )
             session.add(job)
             await session.flush()
 
             # Add job skills
-            for tag in job_data.get("tags", []):
-                tag_lower = tag.lower()
+            for tag in cast("list", job_data.get("tags") or []):
+                tag_lower = str(tag).lower()
                 if tag_lower in skill_map:
                     job_skill = JobSkill(
                         job_id=job.id,
@@ -240,19 +274,27 @@ async def seed_database():
 
         # Get first 3 jobs for applications
         result = await session.execute(
-            select(Job).limit(3)
+            select(Job).limit(3),
         )
         jobs = list(result.scalars().all())
 
         for i, job in enumerate(jobs):
-            status = [ApplicationStatus.SAVED, ApplicationStatus.APPLIED, ApplicationStatus.INTERVIEW][i]
+            status = [
+                ApplicationStatus.SAVED,
+                ApplicationStatus.APPLIED,
+                ApplicationStatus.INTERVIEW,
+            ][i]
             application = Application(
                 id=str(uuid4()),
                 job_id=job.id,
                 status=status,
                 notes=f"Sample application for {job.title}",
-                applied_at=datetime.now(timezone.utc) - timedelta(days=i) if status != ApplicationStatus.SAVED else None,
-                interview_at=datetime.now(timezone.utc) + timedelta(days=5) if status == ApplicationStatus.INTERVIEW else None,
+                applied_at=datetime.now(UTC) - timedelta(days=i)
+                if status != ApplicationStatus.SAVED
+                else None,
+                interview_at=datetime.now(UTC) + timedelta(days=5)
+                if status == ApplicationStatus.INTERVIEW
+                else None,
             )
             session.add(application)
 
@@ -261,8 +303,8 @@ async def seed_database():
     print("✅ Database seeded successfully!")
     print(f"   - {len(SAMPLE_SKILLS)} skills created")
     print(f"   - {len(SAMPLE_JOBS)} jobs created")
-    print(f"   - 3 applications created")
-    print(f"   - User skills for demo user created")
+    print("   - 3 applications created")
+    print("   - User skills for demo user created")
 
 
 if __name__ == "__main__":

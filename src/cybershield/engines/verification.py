@@ -55,9 +55,9 @@ class VerificationEngine(BaseEngine):
                 follow_redirects=True,
             ) as client:
                 # Try HEAD first, fallback to GET if 405
-                response = await client.head(url, allow_redirects=True)
+                response = await client.head(url)
                 if response.status_code == 405:
-                    response = await client.get(url, allow_redirects=True)
+                    response = await client.get(url)
                 result["status_code"] = response.status_code
                 result["valid"] = response.status_code < 400
                 result["redirect_url"] = str(response.url) if str(response.url) != url else None
@@ -120,7 +120,7 @@ class VerificationEngine(BaseEngine):
         for check in checks:
             check_type = check.get("type")
             passed = check.get("passed", False)
-            weight = weights.get(check_type, 0.1)
+            weight = weights.get(str(check_type), 0.1)
 
             if passed:
                 score += weight
@@ -128,7 +128,7 @@ class VerificationEngine(BaseEngine):
 
         return round(score / total_weight if total_weight > 0 else 0.0, 2)
 
-    async def process(
+    async def process(  # type: ignore[override]
         self,
         job: Dict[str, Any],
         **kwargs,
@@ -147,27 +147,33 @@ class VerificationEngine(BaseEngine):
         # Check main job URL
         job_url = job.get("url", "")
         url_check = await self._check_url(job_url)
-        checks.append({
-            "type": "url_valid",
-            "passed": url_check["valid"],
-            "details": url_check,
-        })
+        checks.append(
+            {
+                "type": "url_valid",
+                "passed": url_check["valid"],
+                "details": url_check,
+            }
+        )
 
         # Check application URL if different from job URL
         apply_url = job.get("apply_url", "")
         if apply_url and apply_url != job_url:
             apply_check = await self._check_url(apply_url)
-            checks.append({
-                "type": "apply_url_valid",
-                "passed": apply_check["valid"],
-                "details": apply_check,
-            })
+            checks.append(
+                {
+                    "type": "apply_url_valid",
+                    "passed": apply_check["valid"],
+                    "details": apply_check,
+                }
+            )
         else:
-            checks.append({
-                "type": "apply_url_valid",
-                "passed": True,  # No separate apply URL to check
-                "details": {"note": "No separate application URL"},
-            })
+            checks.append(
+                {
+                    "type": "apply_url_valid",
+                    "passed": True,  # No separate apply URL to check
+                    "details": {"note": "No separate application URL"},
+                }
+            )
 
         # Check deadline
         deadline = job.get("deadline")
@@ -178,31 +184,36 @@ class VerificationEngine(BaseEngine):
                 deadline = None
 
         deadline_check = self._check_deadline(deadline)
-        checks.append({
-            "type": "deadline_active",
-            "passed": deadline_check.get("active", True),
-            "details": deadline_check,
-        })
+        checks.append(
+            {
+                "type": "deadline_active",
+                "passed": deadline_check.get("active", True),
+                "details": deadline_check,
+            }
+        )
 
         # Company verification (basic check)
         company = job.get("company_name", "")
         company_verified = bool(company and len(company) > 1)
-        checks.append({
-            "type": "company_verified",
-            "passed": company_verified,
-            "details": {"company": company, "verified": company_verified},
-        })
+        checks.append(
+            {
+                "type": "company_verified",
+                "passed": company_verified,
+                "details": {"company": company, "verified": company_verified},
+            }
+        )
 
         # Check for redirect loops
         has_redirect_loop = (
-            url_check.get("redirect_url") and
-            url_check.get("redirect_url") != job_url
+            url_check.get("redirect_url") and url_check.get("redirect_url") != job_url
         )
-        checks.append({
-            "type": "no_redirect_loops",
-            "passed": not has_redirect_loop,
-            "details": {"redirect_url": url_check.get("redirect_url")},
-        })
+        checks.append(
+            {
+                "type": "no_redirect_loops",
+                "passed": not has_redirect_loop,
+                "details": {"redirect_url": url_check.get("redirect_url")},
+            }
+        )
 
         # Calculate verification score
         score = self._calculate_verification_score(checks)
@@ -255,5 +266,5 @@ class VerificationEngine(BaseEngine):
                 "verified": [r["job_id"] for r in verified],
                 "failed": [r["job_id"] for r in failed],
                 "errors": errors,
-            }
+            },
         )

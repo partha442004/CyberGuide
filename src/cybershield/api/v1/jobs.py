@@ -5,12 +5,12 @@ Endpoints for job operations: search, list, get, create, update, delete.
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from cybershield.dependencies import get_session, get_job_repository
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from cybershield.dependencies import get_job_repository
 from cybershield.repositories.job_repository import JobRepository
-from cybershield.schemas.job import JobCreate, JobUpdate, JobResponse, JobListResponse
+from cybershield.schemas.job import JobCreate, JobListResponse, JobResponse, JobUpdate
 
 router = APIRouter()
 
