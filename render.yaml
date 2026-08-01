@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: cyberguide-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn src.cybershield.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cyberguide-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "false"
+      - key: APP_NAME
+        value: "CyberGuide"
+      - key: APP_VERSION
+        value: "1.0.0"
+
+databases:
+  - name: cyberguide-db
+    plan: free
+    databaseName: cyberguide
+    ipAllowList: []
