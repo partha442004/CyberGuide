@@ -130,11 +130,11 @@ async def send_notification(
     # Map priority string to enum
     priority_map = {
         "low": NotificationPriority.LOW,
-        "normal": NotificationPriority.NORMAL,
+        "normal": NotificationPriority.MEDIUM,
         "high": NotificationPriority.HIGH,
         "urgent": NotificationPriority.URGENT,
     }
-    priority = priority_map.get(notification.priority or "normal", NotificationPriority.NORMAL)
+    priority = priority_map.get(notification.priority or "normal", NotificationPriority.MEDIUM)
 
     message = NotificationMessage(
         title=notification.title,

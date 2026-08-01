@@ -55,8 +55,8 @@ class NotificationSendRequest(BaseModel):
     title: str = Field(default="CyberGuide Notification", max_length=200)
     content: str = Field(..., min_length=1, max_length=4096)
     priority: Optional[str] = Field(
-        default="normal",
-        pattern="^(low|normal|high|urgent)$",
+        default="medium",
+        pattern="^(low|medium|high|urgent)$",
     )
     url: Optional[str] = None
     data: Optional[Dict[str, Any]] = None
