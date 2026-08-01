@@ -2,6 +2,7 @@
 Scraper registry for managing multiple job sources.
 """
 
+from interntrack.metrics import business_metrics_store
 from interntrack.scrapers.base import BaseScraper
 
 
@@ -51,7 +52,15 @@ class ScraperRegistry:
             try:
                 jobs = await scraper.fetch(query, location, limit)
                 all_jobs.extend([job.to_dict() for job in jobs])
+                business_metrics_store.record_scraper_run(
+                    scraper.source_name,
+                    success=True,
+                )
             except Exception as e:
+                business_metrics_store.record_scraper_run(
+                    scraper.source_name,
+                    success=False,
+                )
                 print(f"Error fetching from {scraper.source_name}: {e}")
                 continue
 

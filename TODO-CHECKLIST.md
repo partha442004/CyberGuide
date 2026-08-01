@@ -461,9 +461,15 @@ sqlite3 data/interntrack.db "PRAGMA integrity_check;"
 - [x] Error rates — `interntrack_http_errors_total` + `interntrack_http_error_rate`
 - [x] Visualization — Grafana dashboard (request rate, error rate, latency,
       status codes, top paths) via `docker compose --profile monitoring up -d grafana`
-- [ ] Database query times
-- [ ] Scraper success rates
-- [ ] Notification delivery rates
+- [x] Database query times — `interntrack_db_queries_total` +
+      `interntrack_db_query_duration_ms` (SQLAlchemy cursor event listener,
+      `conn.info` timing) + DB Query Latency panel
+- [x] Scraper success rates — `interntrack_scraper_runs_total{source}` +
+      `interntrack_scraper_failures_total{source}` (registry `fetch_all`) +
+      Scraper Runs vs Failures panel
+- [x] Notification delivery rates — `interntrack_notifications_total{channel}`
+      + `interntrack_notification_failures_total{channel}` (manager `notify`)
+      + Notification Delivery vs Failures panel
 
 ### System Metrics
 - [x] CPU usage — node-exporter `node_cpu_seconds_total` (host CPU panel + `CpuHigh` alert)
@@ -911,5 +917,28 @@ docker-compose up -d
 
 ---
 
+## ✅ HARDENING PASS 17 (2026-08-01) — COMPLETED
+
+### Business Metrics Instrumentation + v1.19.0
+- [x] `BusinessMetricsStore` in `src/interntrack/metrics.py` — DB query times,
+      scraper success rates, notification delivery rates (dependency-free
+      Prometheus renderer, global `business_metrics_store`) — completes the
+      Application Metrics checklist (Database query times / Scraper success
+      rates / Notification delivery rates)
+- [x] Instrumentation: `database/session.py` SQLAlchemy cursor-event listener
+      (positional signature, `conn.info` timing → `interntrack_db_*`),
+      `scrapers/registry.py` `fetch_all` (→ `interntrack_scraper_*{source}`),
+      `services/notification_service.py` `notify` (→
+      `interntrack_notification_*{channel}`)
+- [x] `main.py` `/metrics` business key + `/metrics/prometheus` concatenation
+- [x] `deploy/grafana/dashboards/business.json` — InternTrack Business
+      dashboard (uid `interntrack-business`, 3 panels)
+- [x] `tests/unit/test_business_metrics.py` (13 tests) incl. DB-listener
+      wiring regression guard (caught the SQLAlchemy event-signature bug)
+- [x] Both packages + `.env`/`.env.example` + `pyproject.toml` + deployment
+      artifacts synced to **1.19.0**; `make version-check` exit 0
+
+---
+
 **Last Updated:** 2026-08-01
-**Version:** 1.18.0
+**Version:** 1.19.0

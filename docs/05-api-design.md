@@ -666,6 +666,30 @@ Every config is pinned by `tests/unit/test_log_monitoring.py` (clients point
 at Loki, docker-socket discovery is wired, and the dashboard's LogQL
 references the emitted labels).
 
+#### Business metrics (DB / scrapers / notifications)
+
+Beyond the HTTP signals, the API emits **business metrics** from a
+`BusinessMetricsStore` (`src/interntrack/metrics.py`) so operational health
+can be monitored end to end:
+
+| Metric | Type | Emitted by |
+|--------|------|------------|
+| `interntrack_db_queries_total` | counter | SQLAlchemy `before/after_cursor_execute` listener (`database/session.py`, timing on `conn.info`) |
+| `interntrack_db_query_duration_ms` | gauge (avg) | same listener |
+| `interntrack_scraper_runs_total{source}` | counter | `ScraperRegistry.fetch_all` |
+| `interntrack_scraper_failures_total{source}` | counter | `ScraperRegistry.fetch_all` (per-source) |
+| `interntrack_notifications_total{channel}` | counter | `NotificationManager.notify` |
+| `interntrack_notification_failures_total{channel}` | counter | `NotificationManager.notify` (per-channel) |
+
+- `/metrics` includes them under the `business` key; `/metrics/prometheus`
+  concatenates them after the HTTP metrics
+- `deploy/grafana/dashboards/business.json` — **InternTrack Business**
+  dashboard (uid `interntrack-business`): DB query latency, scraper runs vs
+  failures per source, notification delivery vs failures per channel
+- Every expression is pinned to an emitted metric by
+  `tests/unit/test_business_metrics.py` (which also regression-guards the DB
+  listener wiring against a live in-memory engine)
+
 For Kubernetes, the API `Service` (`k8s/raw/06-api.yaml`) carries
 `prometheus.io/scrape: "true"` (+ `path`/`port`) annotations for
 `kubernetes_sd_configs`-based scraping.
