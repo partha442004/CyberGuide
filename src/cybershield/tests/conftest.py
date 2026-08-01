@@ -5,7 +5,7 @@ Shared fixtures for all tests.
 """
 
 import asyncio
-from typing import AsyncGenerator, Generator
+from typing import Any, AsyncGenerator, Generator, cast
 
 import pytest
 import pytest_asyncio
@@ -61,7 +61,7 @@ async def client(db_session) -> AsyncGenerator[AsyncClient, None]:
     # Override the database dependency
     app.dependency_overrides[get_session] = override_get_session
 
-    transport = ASGITransport(app=app)  # type: ignore[arg-type]
+    transport = ASGITransport(app=cast(Any, app))
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 

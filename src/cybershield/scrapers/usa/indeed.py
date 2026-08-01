@@ -8,7 +8,7 @@ import logging
 from typing import Any, List, Optional
 from urllib.parse import urlencode
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from cybershield.scrapers.base import BaseScraper, ScrapedJob, ScraperConfig
 
@@ -54,7 +54,7 @@ class IndeedScraper(BaseScraper):
         }
         return f"{self.BASE_URL}/jobs?{urlencode(params)}"
 
-    def _parse_job_card(self, card: BeautifulSoup) -> Optional[ScrapedJob]:
+    def _parse_job_card(self, card: Tag) -> Optional[ScrapedJob]:
         """Parse individual job card HTML."""
         try:
             job = ScrapedJob()
@@ -64,7 +64,8 @@ class IndeedScraper(BaseScraper):
             if not title_elem:
                 return None
             job.title = title_elem.get_text(strip=True)
-            job.url = self._normalize_url(title_elem.get("href", ""))
+            href = title_elem.get("href", "")
+            job.url = self._normalize_url(str(href) if href else "")
             if job.url and not job.url.startswith("http"):
                 job.url = self.BASE_URL + job.url
 

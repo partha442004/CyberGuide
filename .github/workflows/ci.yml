@@ -73,7 +73,7 @@ jobs:
         run: safety check -r requirements.txt -r requirements-dev.txt --full-report
 
       - name: Trivy filesystem scan (HIGH/CRITICAL)
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@v0.30.0
         with:
           scan-type: fs
           scan-ref: src/

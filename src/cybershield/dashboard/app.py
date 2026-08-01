@@ -7,7 +7,7 @@ Streamlit application with multi-page navigation and theme support.
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
-import pandas as pd  # type: ignore[import-untyped]
+import pandas as pd
 import streamlit as st
 
 # Page configuration
@@ -174,7 +174,7 @@ def show_overview():
 
     with col1:
         st.subheader("📈 Job Trends (Last 30 Days)")
-        import plotly.graph_objects as go  # type: ignore[import-untyped]
+        import plotly.graph_objects as go
 
         fig = go.Figure()
         fig.add_trace(
@@ -349,7 +349,7 @@ def show_analytics():
 
     with tab1:
         st.subheader("🎯 Skill Distribution")
-        import plotly.express as px  # type: ignore[import-untyped]
+        import plotly.express as px
 
         skills_df = pd.DataFrame(
             {
