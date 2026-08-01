@@ -79,6 +79,7 @@ def _build_app(limit: int = 2, api_key_limit: int = 10):
         routes=[
             Route("/api/v1/test", ok, methods=["GET"]),
             Route("/health", ok, methods=["GET"]),
+            Route("/metrics", ok, methods=["GET"]),
         ],
     )
     app.add_middleware(
@@ -125,6 +126,11 @@ class TestRateLimitMiddleware:
             # Exempt paths should always succeed even past the limit
             for _ in range(5):
                 response = await client.get("/health")
+            assert response.status_code == 200
+            # /metrics (monitoring) must also bypass the rate limit so
+            # scrapers stay reliable.
+            for _ in range(5):
+                response = await client.get("/metrics")
             assert response.status_code == 200
             # Exempt requests never count: the first limited-route request is
             # allowed and only the second is blocked (limit=1).

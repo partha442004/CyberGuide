@@ -761,7 +761,21 @@ docker-compose up -d
 - [x] Root `pyproject.toml` `version` 1.0.0 → **1.10.0** (was stale since the
       first release); both packages + `.env`/`.env.example` synced to 1.10.0
 
+## ✅ HARDENING PASS 9 (2026-08-01) — COMPLETED
+
+### Dashboard Lint Cleanup + v1.11.0
+- [x] Fixed all 24 pre-existing `dashboard/` ruff errors (unused imports/locals,
+      S110 → `contextlib.suppress`, C408 dict literals, PIE810, ARG001, E501,
+      COM812); `job_card()` now renders a View Job link from `url`
+- [x] `dashboard/` added to CI ruff scope (`ruff check src/ tests/ dashboard/`)
+      and `make lint/format/format-check`
+- [x] Rate-limit exempt-paths test now covers `GET /metrics`
+- [x] Both packages + `.env`/`.env.example` + `pyproject.toml` + deployment
+      artifacts synced to **1.11.0**; `make version-check` exit 0
+- [x] Live smoke test: `/health` version 1.11.0, `/metrics` snapshot, CORS
+      preflight 200, rate-limit burst `200 200 200 429 429` (limit=3)
+
 ---
 
 **Last Updated:** {{DATE}}
-**Version:** 1.10.0
+**Version:** 1.11.0

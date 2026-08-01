@@ -37,13 +37,13 @@ test-cov: ## Generate HTML coverage report
 
 # Code Quality
 lint: ## Run linter (ruff)
-	ruff check src/ tests/
+	ruff check src/ tests/ dashboard/
 
 format: ## Format code with ruff
-	ruff format src/ tests/
+	ruff format src/ tests/ dashboard/
 
 format-check: ## Check formatting without making changes
-	ruff format --check src/ tests/
+	ruff format --check src/ tests/ dashboard/
 
 typecheck: ## Run type checker (mypy)
 	mypy src/interntrack

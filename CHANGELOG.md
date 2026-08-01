@@ -4,6 +4,34 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.11.0] - 2026-08-01
+
+### Changed
+
+#### Dashboard Lint Cleanup
+- `dashboard/app.py` + `dashboard/components/*`: fixed all 24 pre-existing ruff
+  errors (unused imports, unused widget locals, S110 `try/except/pass` →
+  `contextlib.suppress`, C408 `dict()` → literals, PIE810, ARG001, E501 long
+  lines, COM812) — dashboard now passes `ruff check` and `ruff format` cleanly
+- `job_card()` now renders a **View Job** link when a `url` is provided
+  (previously the argument was unused)
+- `dashboard/` added to the **CI lint/format scope** (`ruff check` +
+  `ruff format --check` now cover `src/ tests/ dashboard/`) and to the
+  `make lint` / `make format` / `make format-check` targets
+
+#### Rate-Limit Exemption Coverage
+- `tests/unit/test_rate_limit.py`: the exempt-paths test now also verifies
+  `GET /metrics` bypasses the rate limit (loop of 5 returns 200); the minimal
+  `_build_app` test app registers a `/metrics` route so the assertion is real
+
+#### Version
+- Both packages, `.env`/`.env.example`, canaries, Helm chart, Oracle
+  deployment files, and docs bumped to `1.11.0`; root `pyproject.toml`
+  version synced — verified by `make version-check` (exit 0)
+- Live smoke test (real uvicorn, temp DB/port): `/health` reports
+  `{"version": "1.11.0"}`, `/metrics` returns the snapshot shape, CORS
+  preflight 200, rate-limit burst `200 200 200 429 429` (limit=3)
+
 ## [1.10.0] - 2026-08-01
 
 ### Added
