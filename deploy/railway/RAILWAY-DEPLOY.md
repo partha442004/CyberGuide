@@ -100,6 +100,24 @@ Service variables on `cyberguide-api`: `DATABASE_URL`, `SECRET_KEY`,
 
 ---
 
+## Redis (wired 2026-08-02)
+
+The project's **Redis** service is connected to the API via
+`REDIS_URL=redis://default:<password>@redis.railway.internal:6379` on the
+`cyberguide-api` service — shared rate limiting (`RedisRateLimitStore`) and
+Redis-backed cache. The app falls back to in-memory stores if Redis is ever
+unreachable (never fails closed). To re-wire after a Redis password rotation,
+copy the new `REDIS_URL` from the Redis service's variables
+(`railway variable list -s Redis -k`) onto the API service and redeploy.
+
+## GitHub auto-deploy (dashboard)
+
+The repo is connected to the Railway project, but pushes to `master` do **not**
+auto-deploy (the last GitHub-triggered deploy predates the current setup).
+To enable it in the dashboard: **Project → Settings → GitHub App / Connected
+Repo → set the deploy branch to `master`**. Until then, deploy explicitly with
+`railway up -s cyberguide-api -y -d` (respects `.railwayignore`).
+
 ## How updates flow
 
 - **`railway up`** (CLI) or a **redeploy from the dashboard** deploys the
