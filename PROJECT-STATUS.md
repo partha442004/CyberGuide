@@ -4,6 +4,19 @@
 
 ---
 
+## 🛠️ 2026-08-02 Coverage Push (scrapers / registry / scheduler — round 5)
+
+- ✅ **Tests**: **1675 passing** (was 1627) — 48 new tests in 5 files
+- ✅ **Combined coverage (interntrack + cybershield)**: **93%** (14,285 lines,
+  1,054 missed; was 91% / 13,720 lines)
+- ✅ **New/updated test files**: `test_unstop_scraper.py` (10),
+  `test_workday_scraper.py` (17), `test_registry_extended.py` (11),
+  `test_checkpoint_scraper_extended.py` (8), `test_scheduler_main.py` (+9)
+- ✅ **Coverage gains (round 5)**: `scrapers/india/unstop.py` 19% → **100%**,
+  `scrapers/companies/base_workday.py` 61% → **100%**,
+  `scrapers/registry.py` 68% → **100%**, `companies/checkpoint.py`
+  59% → **95%**, `scheduler/__main__.py` 50% → **95%**
+
 ## 🛠️ 2026-08-02 Coverage Push (scrapers / alembic / analytics — round 4)
 
 - ✅ **Tests**: **1627 passing** (was 1546) — 81 new tests in 6 files

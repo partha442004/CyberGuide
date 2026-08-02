@@ -4,6 +4,27 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.20.2] - 2026-08-02
+
+### Added
+
+#### CyberGuide Coverage Push (scrapers / registry / scheduler — round 5)
+- `test_unstop_scraper.py` (10 tests) — `scrapers/india/unstop.py` 19% → **100%**
+- `test_workday_scraper.py` (17 tests) — `scrapers/companies/base_workday.py` 61% → **100%**
+  (first tests for the shared Workday ATS base: payload, externalPath URLs,
+  all country-detection branches, Workday API fetch, scrape loop)
+- `test_registry_extended.py` (11 tests) — `scrapers/registry.py` 68% → **100%**
+  (register/unregister, instance caching, run_scraper/run_region/run_all,
+  error isolation, get_stats)
+- `test_checkpoint_scraper_extended.py` (8 tests) — `companies/checkpoint.py`
+  59% → **95%** (remaining country branches, URL fallback, HTML locations,
+  scrape loop)
+- `test_scheduler_main.py` +9 success-path tests — `scheduler/__main__.py`
+  50% → **95%** (job_discovery stores/skips jobs, link_verification,
+  scam_analysis, daily/weekly/monthly report payloads)
+- Combined coverage (interntrack + cybershield): **91% → 93%**
+  (14,285 lines; 1,054 missed) — **1675 tests passing**
+
 ## [1.20.1] - 2026-08-02
 
 ### Added

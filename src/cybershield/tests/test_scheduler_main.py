@@ -165,3 +165,356 @@ class TestJobFunctions:
 
         source = inspect.getsource(scheduler_main)
         assert "asyncio.run(main())" in source
+
+
+class TestJobSuccessPaths:
+    """The async job coroutines must run end-to-end when everything works."""
+
+    @staticmethod
+    def _mock_session(**overrides) -> MagicMock:
+        """Build a session mock that satisfies the async DB context manager."""
+        session = MagicMock()
+        # execute() must resolve to a plain MagicMock so that sync helpers like
+        # scalar_one_or_none() / scalars().all() work (an AsyncMock child would
+        # return coroutines, which are truthy and break the logic).
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None
+        result.scalars.return_value.all.return_value = []
+        session.execute = AsyncMock(return_value=result)
+        session.scalar = AsyncMock(return_value=None)
+        session.commit = AsyncMock()
+        session.add = MagicMock()
+        for key, value in overrides.items():
+            setattr(session, key, value)
+        return session
+
+    @staticmethod
+    def _session_context(session) -> MagicMock:
+        """Wrap a session in an async context manager mock."""
+        ctx = MagicMock()
+        ctx.__aenter__ = AsyncMock(return_value=session)
+        ctx.__aexit__ = AsyncMock(return_value=None)
+        return ctx
+
+    @pytest.mark.asyncio
+    async def test_job_discovery_stores_new_jobs(self):
+        scraped = MagicMock()
+        scraped.url = "https://example.com/job/1"
+        scraped.title = "Security Engineer"
+        scraped.company_name = "Acme"
+        scraped.location = "Pune"
+        scraped.country = "India"
+        scraped.city = "Pune"
+        scraped.description = "desc"
+        scraped.apply_url = None
+        scraped.source = "naukri"
+        scraped.source_id = "1"
+        scraped.salary_min = None
+        scraped.salary_max = None
+        scraped.salary_currency = None
+        scraped.is_remote = False
+        scraped.job_type = "full_time"
+        scraped.experience_level = "mid"
+        scraped.posting_date = None
+        scraped.deadline = None
+        scraped.required_skills = []
+        scraped.preferred_skills = []
+        scraped.raw_data = {}
+
+        session = self._mock_session()
+        # First execute (existing check) -> no existing job
+        session.execute.return_value.scalar_one_or_none.return_value = None
+
+        with (
+            patch(
+                "cybershield.scrapers.registry.ScraperRegistry.run_all",
+                new_callable=AsyncMock,
+                return_value=[scraped],
+            ),
+            patch(
+                "cybershield.scheduler.__main__.get_db_session",
+                return_value=self._session_context(session),
+            ),
+        ):
+            await scheduler_main.job_discovery()
+
+        session.commit.assert_awaited_once()
+        session.add.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_job_discovery_skips_existing_jobs(self):
+        scraped = MagicMock()
+        scraped.url = "https://example.com/job/dup"
+        scraped.title = "Security Engineer"
+        scraped.company_name = "Acme"
+        scraped.location = None
+        scraped.country = None
+        scraped.city = None
+        scraped.description = None
+        scraped.apply_url = None
+        scraped.source = "naukri"
+        scraped.source_id = "1"
+        scraped.salary_min = None
+        scraped.salary_max = None
+        scraped.salary_currency = None
+        scraped.is_remote = False
+        scraped.job_type = "full_time"
+        scraped.experience_level = None
+        scraped.posting_date = None
+        scraped.deadline = None
+        scraped.required_skills = []
+        scraped.preferred_skills = []
+        scraped.raw_data = {}
+
+        session = self._mock_session()
+        session.execute.return_value.scalar_one_or_none.return_value = MagicMock()  # exists
+
+        with (
+            patch(
+                "cybershield.scrapers.registry.ScraperRegistry.run_all",
+                new_callable=AsyncMock,
+                return_value=[scraped],
+            ),
+            patch(
+                "cybershield.scheduler.__main__.get_db_session",
+                return_value=self._session_context(session),
+            ),
+        ):
+            await scheduler_main.job_discovery()
+
+        session.commit.assert_awaited_once()
+        session.add.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_link_verification_marks_verified(self):
+        job = MagicMock()
+        job.id = "job-1"
+        job.url = "https://example.com/job/1"
+        job.apply_url = None
+        job.company = "Acme"
+        job.expires_at = None
+        job.is_verified = False
+
+        session = self._mock_session()
+        session.execute.return_value.scalars.return_value.all.return_value = [job]
+
+        mock_result = MagicMock()
+        mock_result.success = True
+        mock_result.data = {"is_verified": True}
+
+        with (
+            patch(
+                "cybershield.engines.verification.VerificationEngine",
+            ) as mock_engine_cls,
+            patch(
+                "cybershield.scheduler.__main__.get_db_session",
+                return_value=self._session_context(session),
+            ),
+        ):
+            mock_engine_cls.return_value.process = AsyncMock(return_value=mock_result)
+            await scheduler_main.link_verification()
+
+        session.commit.assert_awaited_once()
+        assert job.is_verified is True
+
+    @pytest.mark.asyncio
+    async def test_scam_analysis_creates_score(self):
+        job = MagicMock()
+        job.id = "job-2"
+        job.title = "Security Engineer"
+        job.company = "Acme"
+        job.description = "desc"
+        job.url = "https://example.com/job/2"
+        job.scam_score = None
+
+        session = self._mock_session()
+        session.execute.return_value.scalars.return_value.all.return_value = [job]
+
+        mock_result = MagicMock()
+        mock_result.success = True
+        mock_result.data = {
+            "scam_score": 10,
+            "confidence": 0.9,
+            "flags": ["urgent"],
+            "reasons": ["pay"],
+            "is_scam": False,
+        }
+
+        with (
+            patch(
+                "cybershield.engines.scam_detection.ScamDetectionEngine",
+            ) as mock_engine_cls,
+            patch(
+                "cybershield.scheduler.__main__.get_db_session",
+                return_value=self._session_context(session),
+            ),
+        ):
+            mock_engine_cls.return_value.process = AsyncMock(return_value=mock_result)
+            await scheduler_main.scam_analysis()
+
+        session.commit.assert_awaited_once()
+        session.add.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_daily_report_sends_digest(self):
+        session = self._mock_session()
+        # 4 scalar calls: total (unused), new_today, expiring, high_match
+        session.scalar.side_effect = [10, 3, 5, 7]
+
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.send_daily_digest = AsyncMock()
+
+        with (
+            patch(
+                "cybershield.notifications.orchestrator.NotificationOrchestrator",
+                return_value=mock_orchestrator,
+            ),
+            patch("cybershield.scheduler.__main__.settings") as mock_settings,
+            patch(
+                "cybershield.scheduler.__main__.get_db_session",
+                return_value=self._session_context(session),
+            ),
+        ):
+            mock_settings.telegram_bot_token = None
+            await scheduler_main.daily_report()
+
+        mock_orchestrator.send_daily_digest.assert_awaited_once()
+        payload = mock_orchestrator.send_daily_digest.await_args.args[0]
+        assert payload["new_jobs"] == 3
+        assert payload["expiring_soon"] == 5
+
+    @pytest.mark.asyncio
+    async def test_weekly_report_sends_report(self):
+        session = self._mock_session()
+        # 5 scalar calls: total, new, total_apps, apps_week, expiring_count
+        session.scalar.side_effect = [100, 20, 15, 3, 2]
+        # top_companies / top_skills execute results
+        companies_result = MagicMock()
+        companies_result.all.return_value = [("Microsoft", 5), ("Google", 3)]
+        skills_result = MagicMock()
+        skills_result.all.return_value = [("skill-1", 50)]
+        session.execute.side_effect = [companies_result, skills_result]
+
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.send_report = AsyncMock()
+
+        with (
+            patch(
+                "cybershield.notifications.orchestrator.NotificationOrchestrator",
+                return_value=mock_orchestrator,
+            ),
+            patch("cybershield.scheduler.__main__.settings") as mock_settings,
+            patch(
+                "cybershield.scheduler.__main__.get_db_session",
+                return_value=self._session_context(session),
+            ),
+        ):
+            mock_settings.telegram_bot_token = None
+            await scheduler_main.weekly_report()
+
+        mock_orchestrator.send_report.assert_awaited_once()
+        report_type, payload = mock_orchestrator.send_report.await_args.args
+        assert report_type == "weekly"
+        assert payload["new_jobs"] == 20
+        assert payload["total_jobs"] == 100
+        assert payload["top_companies"][0] == ("Microsoft", 5)
+
+    @pytest.mark.asyncio
+    async def test_monthly_report_sends_report(self):
+        session = self._mock_session()
+        # 7 scalar calls: total, new, total_apps(unused), apps_month,
+        # success_count, total_with_mode, remote_count
+        session.scalar.side_effect = [
+            1000,  # total_jobs
+            150,  # new_this_month
+            40,  # total_apps (unused)
+            40,  # apps_this_month
+            4,  # success_count
+            10,  # total_with_mode
+            5,  # remote_count
+        ]
+        companies_result = MagicMock()
+        companies_result.all.return_value = [("Amazon", 9)]
+        skills_result = MagicMock()
+        skills_result.all.return_value = [("skill-2", 80)]
+        salary_row = MagicMock()
+        salary_row.avg_min = 50000
+        salary_row.avg_max = 90000
+        salary_result = MagicMock()
+        salary_result.first.return_value = salary_row
+        job_type_result = MagicMock()
+        job_type_result.all.return_value = [("full_time", 8), ("remote", 2)]
+        session.execute.side_effect = [
+            companies_result,
+            skills_result,
+            salary_result,
+            job_type_result,
+        ]
+
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.send_report = AsyncMock()
+
+        with (
+            patch(
+                "cybershield.notifications.orchestrator.NotificationOrchestrator",
+                return_value=mock_orchestrator,
+            ),
+            patch("cybershield.scheduler.__main__.settings") as mock_settings,
+            patch(
+                "cybershield.scheduler.__main__.get_db_session",
+                return_value=self._session_context(session),
+            ),
+        ):
+            mock_settings.telegram_bot_token = None
+            await scheduler_main.monthly_report()
+
+        mock_orchestrator.send_report.assert_awaited_once()
+        report_type, payload = mock_orchestrator.send_report.await_args.args
+        assert report_type == "monthly"
+        assert payload["new_jobs"] == 150
+        assert payload["success_rate"] == 10.0  # 4/40
+        assert payload["avg_salary_range"] == "50000-90000"
+        assert payload["remote_percentage"] == 50.0
+
+    @pytest.mark.asyncio
+    async def test_monthly_report_no_apps_zero_success_rate(self):
+        session = self._mock_session()
+        # 7 scalar calls with apps_this_month=0
+        session.scalar.side_effect = [100, 10, 0, 0, 0, 1, 0]
+        companies_result = MagicMock()
+        companies_result.all.return_value = []
+        skills_result = MagicMock()
+        skills_result.all.return_value = []
+        salary_result = MagicMock()
+        salary_result.first.return_value = None  # no salary data
+        job_type_result = MagicMock()
+        job_type_result.all.return_value = []
+        session.execute.side_effect = [
+            companies_result,
+            skills_result,
+            salary_result,
+            job_type_result,
+        ]
+
+        mock_orchestrator = MagicMock()
+        mock_orchestrator.send_report = AsyncMock()
+
+        with (
+            patch(
+                "cybershield.notifications.orchestrator.NotificationOrchestrator",
+                return_value=mock_orchestrator,
+            ),
+            patch("cybershield.scheduler.__main__.settings") as mock_settings,
+            patch(
+                "cybershield.scheduler.__main__.get_db_session",
+                return_value=self._session_context(session),
+            ),
+        ):
+            mock_settings.telegram_bot_token = None
+            await scheduler_main.monthly_report()
+
+        mock_orchestrator.send_report.assert_awaited_once()
+        report_type, payload = mock_orchestrator.send_report.await_args.args
+        assert payload["success_rate"] == 0.0
+        assert payload["avg_salary_range"] == "N/A"
+        assert payload["remote_percentage"] == 0.0
