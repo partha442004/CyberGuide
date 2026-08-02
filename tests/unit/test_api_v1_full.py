@@ -4,6 +4,8 @@ Covers: jobs, applications, skills, notifications, dashboard endpoints.
 Tests both happy paths and error paths for all endpoints.
 """
 
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -11,10 +13,62 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture
-def client():
+def client(tmp_path):
+    """TestClient wired to a hermetic temp-file SQLite database.
+
+    The app's default ``DATABASE_URL`` points at ``./data/interntrack.db``,
+    but the ``data/`` directory is gitignored and absent on the CI runner,
+    which made SQLite raise ``unable to open database file`` for every
+    endpoint here (26 CI failures). This mirrors the async ``client`` fixture
+    in tests/conftest.py: a throwaway database plus a ``get_db`` dependency
+    override so the endpoint tests are deterministic and CI-safe.
+
+    A temp *file* (not ``:memory:``) is used deliberately: ``TestClient``
+    serves the app on its own event-loop thread while this sync fixture runs
+    on the test thread, and file-backed SQLite stays consistent across both.
+    """
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    import interntrack.database.session as session_module
+    from interntrack.database.session import get_db
+    from interntrack.domain.models import Base
     from interntrack.main import app
 
-    return TestClient(app)
+    db_path = tmp_path / "test_interntrack.db"
+    engine = create_async_engine(
+        f"sqlite+aiosqlite:///{db_path}",
+        echo=False,
+    )
+    test_session_local = async_sessionmaker(engine, expire_on_commit=False)
+
+    async def _init_tables() -> None:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+    # Tables must exist before the first request; file-backed SQLite lets the
+    # fixture loop create them and the app's portal loop read them.
+    asyncio.run(_init_tables())
+
+    async def override_get_db():
+        async with test_session_local() as session:
+            yield session
+
+    app.dependency_overrides.clear()
+    app.dependency_overrides[get_db] = override_get_db
+
+    # The /health endpoint builds its own session via async_session_factory;
+    # point it at the test engine so probes succeed during these tests too.
+    original_factory = session_module.async_session_factory
+    session_module.async_session_factory = test_session_local
+
+    try:
+        yield TestClient(app)
+    finally:
+        session_module.async_session_factory = original_factory
+        app.dependency_overrides.clear()
+        # Release the aiosqlite connection thread (mirrors tests/conftest.py's
+        # db_engine fixture which disposes its engine after each test).
+        asyncio.run(engine.dispose())
 
 
 # ─── Jobs API ─────────────────────────────────────────────────────────────────
