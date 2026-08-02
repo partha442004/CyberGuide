@@ -74,7 +74,8 @@ class SkillRepository(BaseRepository[Skill]):
         self, user_id: str, skill_name: str, proficiency: str = "intermediate"
     ) -> UserSkill:
         """Add a skill to user's profile."""
-        skill = await self.get_or_create_by_name(skill_name)
+        # Skill.category is NOT NULL, so a newly-created skill needs a fallback.
+        skill = await self.get_or_create_by_name(skill_name, category="general")
 
         user_skill = UserSkill(
             user_id=user_id,
