@@ -1,4 +1,6 @@
 # Railway.app deployment configuration for InternTrack
+# Docs: deploy/railway/RAILWAY-DEPLOY.md
+
 [build]
 builder = "nixpacks"
 buildCommand = "pip install -r requirements.txt"
@@ -9,8 +11,25 @@ healthcheckPath = "/health"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
-# Required: Add PostgreSQL plugin in Railway dashboard first
-# DATABASE_URL is auto-injected by Railway
 [variables]
 PYTHONPATH = "src"
+APP_NAME = "InternTrack"
+APP_VERSION = "1.20.0"
+DEBUG = "false"
+
+# SECRET_KEY — generate a strong random value in the Railway dashboard and
+# override this placeholder there (Settings -> Variables):
+#   python -c "import secrets; print(secrets.token_hex(32))"
+# The app still boots with the placeholder but logs a security warning.
 SECRET_KEY = "change-me-in-production"
+
+# ---------------------------------------------------------------------------
+# Railway add-ons to create in the dashboard (railway.app -> your project):
+#   - PostgreSQL plugin  -> DATABASE_URL is auto-injected (required)
+#   - Redis plugin       -> set REDIS_URL for shared rate limiting / cache
+#                           (the app falls back to in-memory stores otherwise)
+#
+# Optional app variables (notifications / AI / scrapers):
+#   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, DISCORD_WEBHOOK_URL,
+#   SLACK_WEBHOOK_URL, SMTP_USERNAME, SMTP_PASSWORD, GEMINI_API_KEY
+# ---------------------------------------------------------------------------
