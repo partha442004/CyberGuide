@@ -4,6 +4,66 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [2026-08-02] — CI test-job fix + entry-point coverage push
+
+### Fixed
+
+#### CI Tests job failure: `unable to open database file` (Linux runner)
+- The Tests (pytest) job failed on the Ubuntu runner with 26 failures in
+  `tests/unit/test_api_v1_full.py`, all `sqlite3.OperationalError: unable to
+  open database file`. Root cause (confirmed from the job log via `gh run
+  view --log`): that file defined its **own** local `client` fixture —
+  `TestClient(app)` against the real app — so requests hit the real
+  `DATABASE_URL` (`sqlite+aiosqlite:///./data/interntrack.db`). The `data/`
+  directory is gitignored and absent on the fresh CI runner, so SQLite could
+  not open the DB file. It passed locally only because `data/` exists on the
+  dev machine. This was unrelated to the previously-fixed pytest-asyncio
+  event-loop flakiness.
+- Fix: the local `client` fixture now builds a **hermetic temp-file SQLite
+  DB** (`tmp_path`), creates tables via `Base.metadata.create_all`, overrides
+  the `get_db` dependency on the app, and swaps
+  `interntrack.database.session.async_session_factory` for the test factory;
+  the fixture restores both in `finally` and disposes the async engine so no
+  connection leaks across loops. The app's real `./data` DB is never touched.
+- Verification: `test_api_v1_full.py` passes (32 tests) in the exact CI
+  environment (Python 3.11.9 + pytest-asyncio 1.4.0), and the full suite
+  passes with the `data/` scenario removed from the equation entirely.
+
+### Added
+
+#### Entry-point module tests (CyberGuide, previously 0% coverage)
+- `src/cybershield/tests/test_start_script.py` — `start.py` launcher
+  (`start_api`/`start_dashboard`/`start_scheduler`/`main`) with mocked
+  `subprocess.Popen`, including Ctrl-C shutdown and process-exit handling;
+  `sys.exit` patched with `side_effect=SystemExit` so tests terminate
+  deterministically (no real subprocesses / infinite loops)
+- `src/cybershield/tests/test_check_routes.py` — route-listing script runs
+  via `runpy` and prints the OpenAPI path summary; asserts non-empty,
+  versioned paths with lowercase HTTP methods
+- `src/cybershield/tests/test_scheduler_main.py` — scheduler entry point
+  `create_scheduler` (job ids, trigger types), `main` argument handling and
+  guard, plus the discovery/job functions with mocked `ScraperRegistry` and
+  error-path coverage; avoids `shutdown()` on a never-started
+  `AsyncIOScheduler` (raises `SchedulerNotRunningError`)
+- `src/cybershield/tests/test_dashboard_app.py` — Streamlit dashboard entry
+  point exercised with injected fake `streamlit`/`plotly` modules (persistent
+  `sys.modules` fakes, no streamlit dependency in the backend suite): page
+  routing to each of the 13 renderers, default-page selection, and one
+  smoke test per `show_*` renderer (renders without raising and calls
+  streamlit)
+- Resulting coverage (previously 0%): `start.py` → **98%**,
+  `check_routes.py` → **100%**, `dashboard/app.py` → **99%**,
+  `scheduler/__main__.py` → **50%**
+
+### Changed
+- Full suite (exact CI command, Python 3.11.9 + pytest-asyncio 1.4.0):
+  **1288 passed, 0 failed** (was 1247); combined coverage (interntrack +
+  cybershield) **77%** (10,944 lines) — up from 72.1% (10,619 lines)
+- Validation clean: ruff check + format (CI scope `src/ tests/ dashboard/`),
+  mypy (186 files, `warn_unused_ignores` clean), `scripts/check_versions.py`
+  exit 0 (all sources 1.19.0)
+- README badges refreshed: tests 1247 → **1288 passed**, coverage 67% → **77%**
+
 ## [Merged] - 2026-08-01 — origin/master reconciled into local master
 
 ### Fixed
