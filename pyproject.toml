@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cybershield"
-version = "1.20.0"
+version = "1.20.4"
 description = "Internship & Job Tracker with AI-powered discovery"
 readme = "README.md"
 license = { text = "MIT" }
@@ -154,7 +154,13 @@ asyncio_default_fixture_loop_scope = "function"
 addopts = "-v --cov=interntrack --cov-report=term-missing"
 
 [tool.coverage.run]
-source = ["interntrack"]
+source = ["interntrack", "cybershield"]
+# SQLAlchemy async engines execute DB work inside greenlets; without this,
+# coverage.py's tracer drops lines after `await` on async handlers, silently
+# under-reporting (e.g. cybershield API endpoints showed ~57-62% while tests
+# exercised them fully). With concurrency=greenlet the true coverage is
+# measured (verified: api/v1/notifications.py 62% -> 100%).
+concurrency = ["greenlet"]
 omit = ["tests/*"]
 
 [tool.coverage.report]

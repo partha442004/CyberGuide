@@ -124,9 +124,11 @@ class HackerNewsScraper(BaseScraper):
 
         job = ScrapedJob()
 
-        # Try to extract company name (usually first line)
+        # Try to extract company name (usually first line). Comments from the
+        # HN API start with "<p>", so split yields an empty first element -
+        # skip blank lines to reach the real content.
         lines = text.split("<p>")
-        first_line = lines[0] if lines else text
+        first_line = next((ln for ln in lines if ln.strip()), text) if lines else text
         # Clean HTML
         first_line = re.sub(r"<[^>]+>", "", first_line).strip()
 

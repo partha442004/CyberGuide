@@ -4,6 +4,40 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.20.4] - 2026-08-02
+
+### Added
+
+- Round 7 coverage push: **1862 tests passing** (was 1751) at **98%** combined
+  coverage (was 93%) — 111 new tests across 8 new files:
+  - `test_usa_scrapers.py` (37) — `scrapers/usa/indeed.py` 11% → **97%**,
+    `scrapers/usa/linkedin.py` 17% → **99%**
+  - `test_worldwide_scrapers.py` (32) — `scrapers/worldwide/hackernews.py`
+    14% → **100%**, `remoteok.py` 16% → **100%**, `rss_feeds.py` 18% → **97%**
+  - `test_dependencies_extended.py` (6) — `dependencies.py` 68% → **100%**
+  - `test_main_extended.py` (3) — `main.py` 80% → **100%** (lifespan,
+    API-key middleware registration, both exception handlers)
+  - `test_cache_extended.py` (12) — `cache.py` 84% → **100%** (Redis paths,
+    JSON decode fallback, `get_cache`)
+  - `test_websocket_extended.py` (8) — `notifications/websocket.py`
+    85% → **100%** (connect, failure cleanup, notifier error paths, send_safe)
+  - `test_elasticsearch_service_extended.py` (7) —
+    `services/elasticsearch_service.py` 82% → **100%** (init success,
+    bulk index, extended filters, error paths)
+  - `test_resume_service_extended.py` (6) —
+    `services/resume_service.py` 84% → **100%** (parse_pdf, parse_upload)
+
+### Fixed
+
+- **Coverage measurement bug**: coverage.py's C tracer silently dropped lines
+  executed after SQLAlchemy async greenlet switches, under-reporting async
+  handler code (e.g. `api/v1/notifications.py` showed 62% while actually
+  covered). Added `concurrency = greenlet` to `pyproject.toml`
+  `[tool.coverage.run]` — total now measured at its true **98%**.
+- **Real bug**: `HackerNewsScraper._parse_comment` lost the company name when
+  a comment's HTML started with `<p>` (empty first element from
+  `text.split("<p>")`). Now uses the first non-empty line.
+
 ## [1.20.3] - 2026-08-02
 
 ### Added
