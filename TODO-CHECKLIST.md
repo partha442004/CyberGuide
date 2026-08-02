@@ -579,6 +579,31 @@ sqlite3 data/interntrack.db "PRAGMA integrity_check;"
 
 ---
 
+## ✅ HARDENING PASS 19 (2026-08-02) — COMPLETED
+
+### Coverage Push + v1.20.0
+- [x] **CyberGuide coverage push** (65 new tests in 4 files):
+      `test_notifications_channels.py` (Discord/Slack/Telegram notifiers with
+      a fake httpx.AsyncClient), `test_api_key_middleware.py` (APIKeyMiddleware
+      exempt paths / missing / invalid / valid keys / custom header / open
+      mode), `test_database_session.py` (engine kwargs, lazy init, init_db
+      side-effect assertion, commit/rollback), `test_repositories.py`
+      (BaseRepository CRUD + CompanyRepository against in-memory SQLite)
+- [x] Coverage gains: `database/session.py` 31%→**100%**, `middleware/auth.py`
+      30%→**97%**, discord 25%→**100%**, slack 31%→**100%**, telegram
+      31%→**100%**, `repositories/base.py` 37%→**97%**,
+      `company_repository.py` 39%→**100%**
+- [x] **1353 tests passing** (924 InternTrack + 429 CyberGuide); combined
+      coverage **80%** (was 77%)
+- [x] Both packages + `.env`/`.env.example` + `pyproject.toml` + Helm chart +
+      Oracle deploy + dashboard + docs synced to **1.20.0**;
+      `make version-check` exit 0
+- [x] Smoke script: Windows-safe temp-file cleanup (retry unlink while the
+      aiosqlite thread releases the DB); all 17 checks pass locally
+- [x] README badges refreshed: 1353 tests, 80% coverage
+
+---
+
 ## ✅ HARDENING PASS 2 (2026-08-01) — COMPLETED
 
 ### API Rate Limiting (InternTrack)
@@ -965,4 +990,4 @@ docker-compose up -d
 ---
 
 **Last Updated:** 2026-08-02
-**Version:** 1.19.0
+**Version:** 1.20.0

@@ -4,6 +4,52 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.20.0] - 2026-08-02
+
+### Added
+
+#### CyberGuide Coverage Push (notifications / auth / session / repositories)
+- `test_notifications_channels.py` (26 tests) — `DiscordNotifier`,
+  `SlackNotifier`, `TelegramNotifier`: embed / Block Kit / message building
+  (priority colors, URL + data fields, truncation limits), send success &
+  failure paths, `test_connection`, and the no-config / exception fallbacks —
+  all against a fake `httpx.AsyncClient` (no network)
+- `test_api_key_middleware.py` (7 tests) — `APIKeyMiddleware`: exempt paths,
+  missing key → 401 `MISSING_API_KEY`, invalid key → 403 `INVALID_API_KEY`,
+  valid key sets `request.state.api_key`, custom header name, and open mode
+  (no keys). An autouse fixture patches `get_settings` so open-mode behavior
+  is deterministic regardless of ambient `API_KEYS` env vars (Starlette
+  instantiates middleware lazily on the first request)
+- `test_database_session.py` (10 tests) — engine kwargs (SQLite vs
+  PostgreSQL pooling), lazy `get_engine`/`get_session_factory` caching,
+  `init_db` side-effect assertion (tables exist in the SQLite file),
+  `close_db`, `get_db_session` commit/rollback, and `get_db` yield; module
+  globals reset per test and engines disposed on teardown
+- `test_repositories.py` (22 tests) — `BaseRepository` CRUD (create with
+  generated/provided ids, get, get_or_raise → `NotFoundError`, get_all with
+  pagination/filters/list-IN, count, update, delete, exists, search) and
+  `CompanyRepository` (get_by_name, get_or_create_by_name, get_with_jobs,
+  search_companies, get_top_hiring_companies, get_trusted_companies,
+  update_trust_status) against the in-memory-SQLite `db_session` fixture
+
+#### Smoke Script Windows Cleanup
+- `scripts/smoke_test.py` finally-block now retries the temp DB/log unlink
+  (5 attempts, 200ms apart) — the aiosqlite worker thread can briefly hold
+  the file after the server exits on Windows; CI (Ubuntu) is unaffected but
+  local `make smoke` on Windows is now reliable
+
+### Changed
+- **Full suite: 1353 passed** (924 InternTrack + 429 CyberGuide; was 1288);
+  combined coverage **80%** (11,461 lines; was 77% / 10,944 lines)
+- Coverage gains: `database/session.py` 31% → **100%**, `middleware/auth.py`
+  30% → **97%**, discord 25% → **100%**, slack 31% → **100%**, telegram
+  31% → **100%**, `repositories/base.py` 37% → **97%**,
+  `company_repository.py` 39% → **100%**
+- Version bumped to **1.20.0** across both packages, `.env`/`.env.example`,
+  root `pyproject.toml`, Helm chart, Oracle deploy files, dashboard
+  `DEFAULT_VERSION`, docs, and version canaries — `make version-check` exit 0
+- README badges refreshed: 1353 tests, 80% coverage
+
 ## [2026-08-02] — CI test-job fix + entry-point coverage push
 
 ### Fixed
