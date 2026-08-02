@@ -2,9 +2,9 @@
 
 ## Project Status: ✅ PRODUCTION-READY
 
-**Last Updated:** July 31, 2026
+**Last Updated:** August 2, 2026
 **Total Files:** 120+
-**Total Tests:** 323 passing, 1 warning
+**Total Tests:** 364 passing (was 323 — +41 entry-point tests: start.py, check_routes.py, scheduler/__main__.py, dashboard/app.py)
 **Total Routes:** 33 (via OpenAPI schema)
 
 ---
@@ -35,12 +35,20 @@
 
 ## 📈 Test Status
 
-**Status: ✅ ALL 323 TESTS PASSING (1 warning)**
+**Status: ✅ ALL 364 TESTS PASSING**
 
 ```bash
 C:/Python311/python.exe -m pytest src/cybershield/tests/ -v
-# 323 passed, 0 failed, 0 errors, 1 warning
+# 364 passed, 0 failed, 0 errors
 ```
+
+### Entry-Point Coverage (2026-08-02, previously 0%)
+| Module | Coverage | Test file |
+|--------|----------|-----------|
+| `start.py` | **98%** | `test_start_script.py` (mocked Popen launcher) |
+| `check_routes.py` | **100%** | `test_check_routes.py` (runpy route listing) |
+| `dashboard/app.py` | **99%** | `test_dashboard_app.py` (fake streamlit/plotly, 13 renderers) |
+| `scheduler/__main__.py` | **50%** | `test_scheduler_main.py` (jobs, main, guards) |
 
 ---
 

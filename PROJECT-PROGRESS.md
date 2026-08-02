@@ -1,6 +1,19 @@
 # 📊 InternTrack - Final Project Progress
 
-> **Last Updated:** 2026-08-01 | **Status:** ✅ Complete (100%)
+> **Last Updated:** 2026-08-02 | **Status:** ✅ Complete (100%)
+
+---
+
+## 🛠️ 2026-08-02 CI Fix + Entry-Point Coverage Push
+
+| Check | Result |
+|-------|--------|
+| **CI Tests job** | ✅ Fixed — `test_api_v1_full.py` fixture was hitting the real `./data/interntrack.db` (26 runner failures); now a hermetic temp-file SQLite DB + `get_db` override |
+| **Full test suite** | ✅ **1288 passing** (924 InternTrack + 364 CyberGuide), CI-exact env (Python 3.11.9 + pytest-asyncio 1.4.0) |
+| **Combined coverage** | ✅ **77%** (10,944 lines; was 72.1% / 10,619 lines) |
+| **Entry-point modules** | ✅ `start.py` 98%, `check_routes.py` 100%, `dashboard/app.py` 99%, `scheduler/__main__.py` 50% (all were 0%) |
+| **ruff / mypy / version-check** | ✅ ruff lint + format clean, mypy clean (186 files), `check_versions.py` exit 0 |
+| **CI pipeline** | ✅ Run 30737407251 fully green — Version, Lint, Typecheck, Security, Tests, Smoke |
 
 ---
 
@@ -81,7 +94,7 @@
 | **Engines** | ✅ Complete | 100% | Dedup, verify, classify |
 | **Notifications** | ✅ Complete | 100% | Telegram, Email, Discord |
 | **Dashboard** | ✅ Complete | 100% | Streamlit with charts |
-| **Tests** | ✅ Complete | 100% | 1247 tests passing |
+| **Tests** | ✅ Complete | 100% | 1288 tests passing |
 | **CI/CD** | ✅ Complete | 100% | GitHub Actions ready |
 | **Documentation** | ✅ Complete | 100% | All docs created |
 | **Docker** | ✅ Complete | 100% | Compose ready |
@@ -92,10 +105,10 @@
 ## 📊 FINAL TEST RESULTS
 
 ```
-======================== 1247 passed ========================
+======================== 1288 passed ========================
 InternTrack: 924 passed
-CyberGuide (cybershield): 323 passed
-Total: 1247 tests passing
+CyberGuide (cybershield): 364 passed
+Total: 1288 tests passing
 ```
 
 ### Coverage Improvement Summary
@@ -118,6 +131,7 @@ Total: 1247 tests passing
 | **CyberGuide** | **323** | — | Full cleanup + engine/ES tests + version test (+2) |
 | **Combined** | **766** | **67%** | interntrack + cybershield measured together |
 | **Merge (2026-08-01)** | **1247** | — | origin/master merged — 20 remote test files adopted (+481 InternTrack) |
+| **Entry-points (2026-08-02)** | **1288** | **77%** | +41 CyberGuide tests; start/check_routes/dashboard/scheduler-__main__ covered (were 0%) |
 
 ---
 
@@ -158,7 +172,7 @@ Total: 1247 tests passing
 - [x] `src/interntrack/utils/` - 4 utility files
 - [x] `src/interntrack/reports/templates/` - 3 report templates
 
-### Tests (1247 total: 924 InternTrack + 323 CyberGuide)
+### Tests (1288 total: 924 InternTrack + 364 CyberGuide)
 - [x] `tests/conftest.py` - Test fixtures
 - [x] `tests/unit/test_job_service.py` - 8 tests
 - [x] `tests/unit/test_application_service.py` - 8 tests
@@ -187,6 +201,12 @@ Total: 1247 tests passing
 - [x] `tests/unit/test_glassdoor_scraper.py` - 12 tests
 - [x] `tests/unit/test_learning_service.py` - 16 tests ✨ **NEW**
 - [x] `tests/integration/test_api.py` - 21 tests
+
+### CyberGuide Entry-Point Tests (2026-08-02, previously 0% coverage)
+- [x] `src/cybershield/tests/test_start_script.py` - `start.py` launcher (mocked Popen, Ctrl-C, process-exit) — 98%
+- [x] `src/cybershield/tests/test_check_routes.py` - route-listing script via runpy — 100%
+- [x] `src/cybershield/tests/test_scheduler_main.py` - scheduler entry point (jobs, main, guards) — 50%
+- [x] `src/cybershield/tests/test_dashboard_app.py` - Streamlit dashboard (fake streamlit/plotly, 13 page renderers) — 99%
 
 ### Documentation
 - [x] `README.md` - Project documentation
@@ -282,8 +302,8 @@ uvicorn interntrack.main:app --reload
 | Unit - Worker | 4 | ✅ (0% → 100% coverage) |
 | Integration - API | 23 | ✅ (incl. CORS middleware + health) |
 | **Total (InternTrack)** | **924** | ✅ **All Passing** |
-| **CyberGuide (cybershield)** | **323** | ✅ **All Passing** |
-| **Grand Total** | **1247** | ✅ **All Passing** |
+| **CyberGuide (cybershield)** | **364** | ✅ **All Passing** (incl. 41 new entry-point tests) |
+| **Grand Total** | **1288** | ✅ **All Passing** |
 
 ---
 
@@ -306,4 +326,4 @@ uvicorn interntrack.main:app --reload
 ---
 
 **Project Completion: 100%**
-**Last Updated:** 2026-08-01
+**Last Updated:** 2026-08-02
