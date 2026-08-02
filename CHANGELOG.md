@@ -64,6 +64,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   the skill name had not been seen before — `Skill.category` is NOT NULL.
   New skills now default to `category="general"`.
 
+#### Continuous Deployment (v1.20.0 tag)
+- `DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN` secrets configured in the repo;
+  CD image namespace corrected to `kira2004/cybershield` (was
+  `cybershield/cybershield`, which could never push)
+- The deploy job's `if` was rewritten: the `secrets` context is not valid in
+  `if` conditionals (`Unrecognized named-value: 'secrets'` — GitHub rejects it
+  at both job and step level), so a tiny shell step reads the server secrets
+  as env vars and emits `configured=true|false`; the SSH deploy step runs only
+  when `steps.check.outputs.configured == 'true'`
+- CD verified end-to-end on the `v1.20.0` tag: **Build & push Docker image ✓**
+  (image live on Docker Hub: `kira2004/cybershield` tags `1.20.0` / `1.20` /
+  `latest` / `sha-aed7427`), **Deploy to server ✓** (skipped gracefully —
+  `SERVER_HOST` / `SERVER_USER` / `SSH_PRIVATE_KEY` not configured yet; add
+  them to GitHub → Settings → Secrets → Actions to enable auto-deploy)
+
 ### Changed
 - **Full suite: 1421 passed** (924 InternTrack + 497 CyberGuide; was 1353);
   combined coverage **83%** (12,037 lines; was 80% / 11,461 lines)

@@ -21,6 +21,12 @@
   unseen skill name (`Skill.category` is NOT NULL) — now defaults to
   `category="general"`
 - ✅ **CI green end-to-end** after push
+- ✅ **CD pipeline live (v1.20.0 tag)**: `DOCKERHUB_USERNAME` +
+  `DOCKERHUB_TOKEN` secrets configured; image `kira2004/cybershield` built and
+  pushed (tags `1.20.0` / `1.20` / `latest` / `sha-aed7427`). The deploy job
+  skips gracefully until `SERVER_HOST` / `SERVER_USER` / `SSH_PRIVATE_KEY`
+  are added (secrets can't be referenced in `if` conditionals, so the gate is
+  a shell check writing `steps.check.outputs.configured`; see CHANGELOG)
 
 ---
 
