@@ -604,6 +604,35 @@ sqlite3 data/interntrack.db "PRAGMA integrity_check;"
 
 ---
 
+## ✅ HARDENING PASS 20 (2026-08-02) — COMPLETED
+
+### Coverage Push (orchestrator / websocket / repositories)
+- [x] **68 new CyberGuide tests in 4 files**: `test_notifications_orchestrator.py`
+      (24 — channel register/unregister/list, single/multi/all sends with
+      enabled + exclusion semantics, job / scam / digest / report builders,
+      formatting fallbacks, send stats, `create_default_orchestrator`),
+      `test_notifications_base.py` (11 — enable/disable, `send_safe` success /
+      failure / disabled / exception, job-alert + daily-digest formatters),
+      `test_websocket_endpoint.py` (8 — welcome / ping→pong / subscribe /
+      unsubscribe / rooms / unknown-type / invalid-JSON / disconnect via
+      `FakeWebSocket` raising `WebSocketDisconnect`), `test_repositories_extended.py`
+      (25 — Job / Skill / User / Application repository queries incl.
+      get_high_scam_risk, metrics, watchlists, status transitions)
+- [x] Coverage gains: `notifications/orchestrator.py` 27%→**98%**,
+      `notifications/base.py` 55%→**99%**, `api/v1/websocket.py` 20%→**92%**,
+      `application_repository.py` 42%→**100%**, `user_repository.py`
+      62%→**100%**, `job_repository.py` 50%→**96%**, `skill_repository.py`
+      50%→**93%**
+- [x] **Latent bug fixed**: `SkillRepository.add_user_skill` now defaults new
+      skills to `category="general"` (`Skill.category` is NOT NULL — the old
+      code would 500 on an unseen skill name)
+- [x] **1421 tests passing** (924 InternTrack + 497 CyberGuide); combined
+      coverage **83%** (12,037 lines; was 80% / 11,461 lines)
+- [x] ruff lint + format clean, mypy clean, `make version-check` exit 0
+- [x] README badges refreshed: 1421 tests, 83% coverage
+
+---
+
 ## ✅ HARDENING PASS 2 (2026-08-01) — COMPLETED
 
 ### API Rate Limiting (InternTrack)

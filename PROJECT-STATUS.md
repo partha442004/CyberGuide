@@ -4,6 +4,26 @@
 
 ---
 
+## 🛠️ 2026-08-02 Coverage Push (orchestrator / websocket / repositories)
+
+- ✅ **Tests**: 924 InternTrack + 497 CyberGuide = **1421 passing** (was 1353)
+- ✅ **Combined coverage (interntrack + cybershield)**: **83%** (12,037 lines,
+  was 80% / 11,461 lines)
+- ✅ **68 new CyberGuide tests in 4 files**: `test_notifications_orchestrator.py`
+  (24), `test_notifications_base.py` (11), `test_websocket_endpoint.py` (8),
+  `test_repositories_extended.py` (25)
+- ✅ **Coverage gains**: `notifications/orchestrator.py` 27% → **98%**,
+  `notifications/base.py` 55% → **99%**, `api/v1/websocket.py` 20% → **92%**,
+  `application_repository.py` 42% → **100%**, `user_repository.py`
+  62% → **100%**, `job_repository.py` 50% → **96%**, `skill_repository.py`
+  50% → **93%**
+- ✅ **Latent bug fixed**: `SkillRepository.add_user_skill` would 500 on an
+  unseen skill name (`Skill.category` is NOT NULL) — now defaults to
+  `category="general"`
+- ✅ **CI green end-to-end** after push
+
+---
+
 ## 🛠️ 2026-08-02 CI Fix + Entry-Point Coverage Push
 
 - ✅ **CI Tests job fixed**: `test_api_v1_full.py` local `client` fixture hit the
@@ -12,7 +32,7 @@
   override + `async_session_factory` swap (mirrors `tests/conftest.py`)
 - ✅ **Tests**: 924 InternTrack + 429 CyberGuide = **1353 passing** (was 1288)
 - ✅ **Combined coverage (interntrack + cybershield)**: **80%** (11,461 lines,
-  was 77% / 10,944 lines)
+  was 77% / 10,944 lines) — later raised to **83%** (see Coverage Push above)
 - ✅ **Entry-point coverage** (was 0%): `start.py` → **98%**,
   `check_routes.py` → **100%**, `dashboard/app.py` → **99%**,
   `scheduler/__main__.py` → **50%** — 41 new tests in 4 new files
@@ -226,8 +246,8 @@ internship-tracker/
 ## 🧪 Test Results
 
 ### Test Summary
-- **Total Tests:** 1353 (924 InternTrack + 429 CyberGuide)
-- **Tests Passing:** ✅ 1353 (100%)
+- **Total Tests:** 1421 (924 InternTrack + 497 CyberGuide)
+- **Tests Passing:** ✅ 1421 (100%)
 - **Test Files:** 36+ test files
 
 ### Test Breakdown
@@ -267,8 +287,8 @@ internship-tracker/
 | Unit - Worker | 4 | ✅ (0% → 100% coverage) |
 | Integration - API | 23 | ✅ (incl. CORS middleware + health) |
 | **Total (InternTrack)** | **924** | ✅ **All Passing** |
-| **CyberGuide (cybershield)** | **364** | ✅ **All Passing** (incl. 41 new entry-point tests) |
-| **Grand Total** | **1353** | ✅ **All Passing** |
+| **CyberGuide (cybershield)** | **497** | ✅ **All Passing** (incl. 41 entry-point + 133 notification/websocket/repository tests) |
+| **Grand Total** | **1421** | ✅ **All Passing** |
 
 ---
 
@@ -326,6 +346,7 @@ uvicorn interntrack.main:app --reload
 | **2026-08-01** | **1247** | — | origin/master merged — 20 remote test files adopted (+481 InternTrack) |
 | **2026-08-02** | **1288** | **77%** | CI fix + entry-point tests (+41 CyberGuide, coverage 72.1% → 77%) |
 | **2026-08-02** | **1353** | **80%** | v1.20.0 — notifications/auth/session/repository tests (+65, coverage 77% → 80%) |
+| **2026-08-02** | **1421** | **83%** | v1.20.0 — orchestrator/websocket/repository tests (+68, coverage 80% → 83%) |
 
 ---
 
@@ -359,7 +380,7 @@ uvicorn interntrack.main:app --reload
 ✅ Dashboard with charts
 ✅ Docker deployment ready
 ✅ Documentation complete
-✅ 1353 tests passing (924 InternTrack + 429 CyberGuide)
+✅ 1421 tests passing (924 InternTrack + 497 CyberGuide)
 ✅ CI/CD pipelines configured
 ✅ Security documentation
 ✅ API rate limiting enabled

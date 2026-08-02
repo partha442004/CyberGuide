@@ -38,17 +38,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   the file after the server exits on Windows; CI (Ubuntu) is unaffected but
   local `make smoke` on Windows is now reliable
 
+#### CyberGuide Coverage Push (orchestrator / websocket / repositories)
+- `test_notifications_orchestrator.py` (24 tests) — channel
+  register/unregister/list, single / multi / all sends with enabled +
+  exclusion semantics, job-alert / scam-alert / daily-digest / weekly-report
+  message builders, formatting fallbacks, send stats, and
+  `create_default_orchestrator` — all against fake channels (no network)
+- `test_notifications_base.py` (11 tests) — `BaseNotifier` enable/disable,
+  `send_safe` success / failure / disabled / exception paths, and the
+  job-alert + daily-digest formatters via a concrete test notifier
+- `test_websocket_endpoint.py` (8 tests) — `api/v1/websocket.py` endpoint
+  through a `FakeWebSocket` that raises `WebSocketDisconnect` on queue
+  exhaustion: welcome message, ping→pong, subscribe/unsubscribe (room
+  membership), rooms listing, unknown message type, invalid JSON, and
+  disconnect cleanup
+- `test_repositories_extended.py` (25 tests) — `JobRepository` (search,
+  get_high_scam_risk, mark_duplicates, pagination), `SkillRepository`
+  (user skills add/list/remove, get_or_create, search), `UserRepository`
+  (create, get_by_email, get_by_username), `ApplicationRepository`
+  (get_application_metrics, status transitions) against the
+  in-memory-SQLite `db_session` fixture
+
+### Fixed
+- `SkillRepository.add_user_skill` could raise an `IntegrityError` (500) when
+  the skill name had not been seen before — `Skill.category` is NOT NULL.
+  New skills now default to `category="general"`.
+
 ### Changed
-- **Full suite: 1353 passed** (924 InternTrack + 429 CyberGuide; was 1288);
-  combined coverage **80%** (11,461 lines; was 77% / 10,944 lines)
-- Coverage gains: `database/session.py` 31% → **100%**, `middleware/auth.py`
-  30% → **97%**, discord 25% → **100%**, slack 31% → **100%**, telegram
-  31% → **100%**, `repositories/base.py` 37% → **97%**,
-  `company_repository.py` 39% → **100%**
+- **Full suite: 1421 passed** (924 InternTrack + 497 CyberGuide; was 1353);
+  combined coverage **83%** (12,037 lines; was 80% / 11,461 lines)
+- Coverage gains (round 2): `notifications/orchestrator.py` 27% → **98%**,
+  `notifications/base.py` 55% → **99%**, `api/v1/websocket.py` 20% → **92%**,
+  `application_repository.py` 42% → **100%**, `user_repository.py`
+  62% → **100%**, `job_repository.py` 50% → **96%**, `skill_repository.py`
+  50% → **93%**
+- Coverage gains (round 1): `database/session.py` 31% → **100%**,
+  `middleware/auth.py` 30% → **97%**, discord 25% → **100%**, slack
+  31% → **100%**, telegram 31% → **100%**, `repositories/base.py`
+  37% → **97%**, `company_repository.py` 39% → **100%**
 - Version bumped to **1.20.0** across both packages, `.env`/`.env.example`,
   root `pyproject.toml`, Helm chart, Oracle deploy files, dashboard
   `DEFAULT_VERSION`, docs, and version canaries — `make version-check` exit 0
-- README badges refreshed: 1353 tests, 80% coverage
+- README badges refreshed: 1421 tests, 83% coverage
 
 ## [2026-08-02] — CI test-job fix + entry-point coverage push
 
