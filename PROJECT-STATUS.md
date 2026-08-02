@@ -4,6 +4,32 @@
 
 ---
 
+## 🛠️ 2026-08-02 Coverage Push (scrapers / core services — round 7) ✅ v1.20.4
+
+- ✅ **Tests**: **1862 passing** (was 1751) — 111 new tests in 8 new files
+- ✅ **Combined coverage (interntrack + cybershield)**: **98%** (15,908 lines,
+  390 missed; was 93% / 14,921 lines at the start of the round)
+- 🛠️ **Measurement fix**: added `concurrency = greenlet` to `pyproject.toml`
+  coverage config — coverage.py's C tracer was silently dropping lines after
+  SQLAlchemy async greenlet switches, under-reporting async handler code
+  (e.g. `api/v1/notifications.py` showed 62% but is really 100%). Total is
+  now measured at its true 98%.
+- ✅ **New test files**: `test_usa_scrapers.py` (37), `test_worldwide_scrapers.py`
+  (32), `test_dependencies_extended.py` (6), `test_main_extended.py` (3),
+  `test_cache_extended.py` (12), `test_websocket_extended.py` (8),
+  `test_elasticsearch_service_extended.py` (7), `test_resume_service_extended.py` (6)
+- ✅ **Coverage gains (round 7)**: `scrapers/usa/indeed.py` 11% → **97%**,
+  `scrapers/usa/linkedin.py` 17% → **99%**, `worldwide/hackernews.py`
+  14% → **100%**, `worldwide/remoteok.py` 16% → **100%**,
+  `worldwide/rss_feeds.py` 18% → **97%**, `dependencies.py` 68% → **100%**,
+  `main.py` 80% → **100%**, `cache.py` 84% → **100%**,
+  `notifications/websocket.py` 85% → **100%**,
+  `services/elasticsearch_service.py` 82% → **100%**,
+  `services/resume_service.py` 84% → **100%**
+- 🐛 **Real bug fixed**: `HackerNewsScraper._parse_comment` dropped the company
+  name when a comment's HTML started with `<p>` (empty first element from
+  `text.split("<p>")`). Now uses the first non-empty line.
+
 ## 🛠️ 2026-08-02 Coverage Push (APIs / engines / middleware — round 6)
 
 - ✅ **Tests**: **1751 passing** (was 1675) — 76 new tests in 7 new files
