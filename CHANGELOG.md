@@ -64,6 +64,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   the skill name had not been seen before — `Skill.category` is NOT NULL.
   New skills now default to `category="general"`.
 
+#### Railway.app hosted deployment (no credit card)
+- Deployment target pivoted to **Railway.app** (`railway.toml` refined): Nixpacks
+  build, `alembic upgrade head && uvicorn ... --port $PORT` start command,
+  `/health` healthcheck, `PYTHONPATH=src`, `APP_VERSION=1.20.0`, `DEBUG=false`
+- The Railway **Postgres plugin** auto-injects `DATABASE_URL` (migrations run
+  automatically on every deploy); Redis is optional (the app falls back to
+  in-memory rate-limit/cache stores); `SECRET_KEY` placeholder documented to be
+  overridden in the Railway dashboard
+- New `deploy/railway/RAILWAY-DEPLOY.md` — signup → connect repo → add
+  Postgres → set variables → troubleshooting; no credit card required (Oracle
+  Cloud asks for a card at signup)
+- Oracle Cloud SSH deploy (`cd.yml` deploy job) remains as the self-hosted
+  option and self-skips until server secrets are added
+
 #### Continuous Deployment (v1.20.0 tag)
 - `DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN` secrets configured in the repo;
   CD image namespace corrected to `kira2004/cybershield` (was
