@@ -87,6 +87,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     (`railway domain update <id> --port 8000`)
 - `deploy/railway/RAILWAY-DEPLOY.md` rewritten with the verified configuration
   + troubleshooting; `.railwayignore` added for `railway up` uploads
+- **Redis wired**: `REDIS_URL` set on `cyberguide-api` (→ project Redis service)
+  — shared rate limiting (`RedisRateLimitStore`) + Redis cache; verified by a
+  clean redeploy (no Redis fallback warnings in logs)
+- **Project cleaned up**: stray empty `CyberGuide` service and the unused
+  `Postgres` database deleted — project now has `cyberguide-api` +
+  `Postgres-NjTs` + `Redis` only
+- **GitHub auto-deploy**: noted as pending a dashboard change (set the
+  connected repo's branch to `master`) — see RAILWAY-DEPLOY.md
 - Oracle Cloud SSH deploy (`cd.yml` deploy job) remains as the self-hosted
   option and self-skips until server secrets are added
 

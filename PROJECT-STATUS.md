@@ -33,8 +33,12 @@
   Postgres connected (asyncpg), `DEBUG=false`. The service builds from the
   repo Dockerfile; `railway.toml` `startCommand` (literal `--port 8000`, no
   shell expansion) overrides the CMD; `healthcheckPath` omitted (Railway's
-  probe failed Dockerfile deploys); domain pinned to port 8000. Full config
-  + troubleshooting in `deploy/railway/RAILWAY-DEPLOY.md`
+  probe failed Dockerfile deploys); domain pinned to port 8000. **Redis
+  wired** (`REDIS_URL` → project Redis; shared rate limiting + cache) and the
+  stray `CyberGuide` / duplicate `Postgres` services deleted (project now:
+  `cyberguide-api` + `Postgres-NjTs` + `Redis`). GitHub auto-deploy pending a
+  dashboard branch change (`master`). Full config + troubleshooting in
+  `deploy/railway/RAILWAY-DEPLOY.md`
 
 ---
 
