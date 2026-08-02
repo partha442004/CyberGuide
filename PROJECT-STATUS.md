@@ -4,6 +4,24 @@
 
 ---
 
+## 🛠️ 2026-08-02 Coverage Push (scrapers / alembic / analytics — round 4)
+
+- ✅ **Tests**: **1627 passing** (was 1546) — 81 new tests in 6 files
+- ✅ **Combined coverage (interntrack + cybershield)**: **91%** (13,720 lines,
+  1,296 missed; was 86% / 13,063 lines)
+- ✅ **New test files**: `test_naukri_scraper.py` (16),
+  `test_internshala_scraper.py` (13), `test_freshersworld_scraper.py` (12),
+  `test_company_scrapers_extended.py` (25), `test_alembic_env.py` (5),
+  `test_analytics_api.py` (6)
+- ✅ **Coverage gains (round 4)**: `scrapers/india/naukri.py` 12% → **98%**,
+  `scrapers/india/internshala.py` 17% → **97%**,
+  `scrapers/india/freshersworld.py` 17% → **97%**, `scrapers/companies/`
+  amazon 17% → **99%**, cisco 17% → **93%**, google 17% → **90%**,
+  microsoft 18% → **92%**, `alembic/env.py` 0% → **94%**,
+  `api/v1/analytics.py` 64% → **100%**
+- ✅ **Bug fix**: `naukri.py::_parse_experience_level` misclassified `"0-2 yrs"`
+  as `fresher`; reordered checks so ranges resolve correctly
+
 ## 🛠️ 2026-08-02 Coverage Push (APIs / notifiers / engines — round 3)
 
 - ✅ **Tests**: **1546 passing** (was 1421) — 125 new tests in 8 files
