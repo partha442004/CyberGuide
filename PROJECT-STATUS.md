@@ -27,12 +27,14 @@
   skips gracefully until `SERVER_HOST` / `SERVER_USER` / `SSH_PRIVATE_KEY`
   are added (secrets can't be referenced in `if` conditionals, so the gate is
   a shell check writing `steps.check.outputs.configured`; see CHANGELOG)
-- ✅ **Hosted deploy target: Railway.app** — chosen because Oracle Cloud
-  requires a credit card at signup. `railway.toml` updated (Nixpacks build,
-  `alembic upgrade head` in start command, `/health` check, `APP_VERSION`
-  1.20.0, `DEBUG=false`); Postgres plugin auto-injects `DATABASE_URL`;
-  Redis optional with in-memory fallbacks. New
-  `deploy/railway/RAILWAY-DEPLOY.md` step-by-step guide
+- ✅ **LIVE on Railway.app** — **https://cyberguide-api-production.up.railway.app**
+  (no credit card needed; Oracle Cloud requires one at signup). Verified:
+  `/health` → `{"status":"healthy","version":"1.20.0","database":"ok"}`,
+  Postgres connected (asyncpg), `DEBUG=false`. The service builds from the
+  repo Dockerfile; `railway.toml` `startCommand` (literal `--port 8000`, no
+  shell expansion) overrides the CMD; `healthcheckPath` omitted (Railway's
+  probe failed Dockerfile deploys); domain pinned to port 8000. Full config
+  + troubleshooting in `deploy/railway/RAILWAY-DEPLOY.md`
 
 ---
 
