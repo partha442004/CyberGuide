@@ -57,6 +57,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Verified locally with trivy 0.72.0 (identical command + skip-dirs as CI):
   `cybershield/requirements.txt` now reports **0 vulnerabilities**, exit 0
 
+#### Tests Job flakiness (pytest-asyncio 1.x event-loop drift)
+- The Tests (pytest) job failed on the Ubuntu runner with 6 `Event loop is
+  closed` errors while the identical command passed locally and in a fresh
+  `python:3.11` Linux Docker container (1247 tests). Root cause:
+  pytest-asyncio 1.4.0 (resolved from `pytest-asyncio>=0.23.0`) removed
+  support for custom `event_loop` fixtures — both `tests/conftest.py` and
+  `src/cybershield/tests/conftest.py` still defined deprecated session-scoped
+  `event_loop` fixtures (creating/closing a loop via
+  `asyncio.get_event_loop_policy().new_event_loop()`), a documented source of
+  `Event loop is closed` flakiness under pytest-asyncio 1.x with coverage
+- Removed the unused `event_loop` fixtures from both conftest files (and the
+  now-unused `asyncio`/`Generator` imports); `pyproject.toml`
+  `[tool.pytest.ini_options]` gained `asyncio_default_fixture_loop_scope =
+  "function"` (explicit function-scoped fixture loops, matching all existing
+  async fixtures)
+- Verified: full suite (with coverage, as CI runs it) passes twice in a row
+  in the Linux Docker reproduction environment
+
+## [Unreleased]
+
+### Changed
+
+#### Ruff Configuration Cleanup
+- `pyproject.toml` `[tool.ruff.lint]` `ignore` now includes `COM812` —
+  ruff itself warns this rule conflicts with the formatter; disabling it
+  silences the warning on every lint run (config-only, no behavior change)
+- `.gitignore` now ignores `coverage.xml` (generated artifact from the CI
+  coverage step / local `make test` runs; should never be committed)
+
 ## [Merged] - 2026-08-01 — origin/master reconciled into local master
 
 ### Merged

@@ -4,8 +4,7 @@ Test Configuration and Fixtures
 Shared fixtures for all tests.
 """
 
-import asyncio
-from typing import Any, AsyncGenerator, Generator, cast
+from typing import Any, AsyncGenerator, cast
 
 import pytest
 import pytest_asyncio
@@ -24,14 +23,6 @@ TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 TestSessionLocal = async_sessionmaker(test_engine, expire_on_commit=False)
-
-
-@pytest.fixture(scope="session")
-def event_loop() -> Generator:
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest_asyncio.fixture(scope="function")
