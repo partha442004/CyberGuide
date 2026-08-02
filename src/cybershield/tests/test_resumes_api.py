@@ -107,7 +107,7 @@ class TestSerializeResumeResponse:
             linkedin_url="https://linkedin.com/in/u",
             parsed_at=None,
         )
-        data = _serialize_resume_response(resume)
+        data = _serialize_resume_response(resume)  # type: ignore[arg-type]
         assert data.id == "r-1"
         assert data.file_name == "resume.pdf"
         assert data.file_hash == "abc123"
@@ -386,14 +386,14 @@ class TestMatchResumeBatch:
 
         response = await client.post(
             "/api/v1/resumes/match-batch",
-            params={"user_id": "u-batch", "job_ids": [job_a.id, job_b.id]},
+            params={"user_id": "u-batch", "job_ids": [str(job_a.id), str(job_b.id)]},
         )
         assert response.status_code == 200
         data = response.json()
         assert data["total_jobs_matched"] == 2
         # Sorted by score descending -> python job (higher score) first
-        assert data["matches"][0]["job_id"] == job_a.id
-        assert data["top_match"]["job_id"] == job_a.id
+        assert data["matches"][0]["job_id"] == str(job_a.id)
+        assert data["top_match"]["job_id"] == str(job_a.id)
         assert data["average_score"] is not None
 
     @pytest.mark.asyncio
@@ -410,7 +410,7 @@ class TestMatchResumeBatch:
 
         response = await client.post(
             "/api/v1/resumes/match-batch",
-            params={"user_id": "ghost", "job_ids": [job.id]},
+            params={"user_id": "ghost", "job_ids": [str(job.id)]},
         )
         assert response.status_code == 404
 
@@ -448,9 +448,9 @@ class TestMatchResumeBatch:
 
         response = await client.post(
             "/api/v1/resumes/match-batch",
-            params={"user_id": "u-batch3", "job_ids": [job.id, "missing-1"]},
+            params={"user_id": "u-batch3", "job_ids": [str(job.id), "missing-1"]},
         )
         assert response.status_code == 200
         data = response.json()
         assert data["total_jobs_matched"] == 1
-        assert data["matches"][0]["job_id"] == job.id
+        assert data["matches"][0]["job_id"] == str(job.id)
