@@ -18,10 +18,15 @@
   `interntrack/engines/matching.py` 57% → **99%**, `api/v1/applications.py`
   54% → **80%**, `api/v1/jobs.py` 60% → **73%**, `scrapers/base.py`
   60% → **86%**, `api/v1/notifications.py` 50% → **62%**
-- ✅ **2 latent bugs fixed** (found by the new tests): applications history
-  endpoint returned ORM objects under `response_model=List[dict]` (500) — now
-  serializes; jobs `/expiring-soon` route was shadowed by `/{job_id}` (404) —
-  route order fixed
+- ✅ **3 latent bugs fixed** (found by the new tests + live-app verification):
+  applications history endpoint returned ORM objects under
+  `response_model=List[dict]` (500) — now serializes; jobs `/expiring-soon`
+  route was shadowed by `/{job_id}` (404) — route order fixed; **Railway
+  Postgres schema drift** (`jobs.tags` missing → 500 on all job endpoints) —
+  `init_db()` now runs an idempotent `_sync_missing_columns` step that adds
+  any nullable/defaulted model columns missing from existing tables
+- ✅ **1550 tests** (was 1546) — `test_schema_sync.py` (4 tests) added for the
+  drift reconciliation; coverage stays **86%** (13,081 lines)
 - ✅ ruff lint + format clean on all new/modified files; full suite green
 
 ---
