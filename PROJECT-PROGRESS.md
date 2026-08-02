@@ -4,13 +4,26 @@
 
 ---
 
+## 🛠️ 2026-08-02 Coverage Push (orchestrator / websocket / repositories)
+
+| Check | Result |
+|-------|--------|
+| **Full test suite** | ✅ **1421 passing** (924 InternTrack + 497 CyberGuide), CI-exact env (Python 3.11.9 + pytest-asyncio 1.4.0) |
+| **Combined coverage** | ✅ **83%** (12,037 lines; was 80% / 11,461 lines) |
+| **New tests** | ✅ 68 new CyberGuide tests in 4 files — orchestrator (24), base notifier (11), websocket endpoint (8), extended repositories (25) |
+| **Coverage gains** | ✅ orchestrator 27%→**98%**, base 55%→**99%**, websocket endpoint 20%→**92%**, application 42%→**100%**, user 62%→**100%**, job 50%→**96%**, skill 50%→**93%** |
+| **Bug fixed** | ✅ `SkillRepository.add_user_skill` defaults new skills to `category="general"` (NOT NULL column → latent 500) |
+| **ruff / mypy / version-check** | ✅ ruff lint + format clean, mypy clean, `check_versions.py` exit 0 |
+
+---
+
 ## 🛠️ 2026-08-02 CI Fix + Entry-Point Coverage Push
 
 | Check | Result |
 |-------|--------|
 | **CI Tests job** | ✅ Fixed — `test_api_v1_full.py` fixture was hitting the real `./data/interntrack.db` (26 runner failures); now a hermetic temp-file SQLite DB + `get_db` override |
 | **Full test suite** | ✅ **1353 passing** (924 InternTrack + 429 CyberGuide), CI-exact env (Python 3.11.9 + pytest-asyncio 1.4.0) |
-| **Combined coverage** | ✅ **80%** (11,461 lines; was 77% / 10,944 lines) |
+| **Combined coverage** | ✅ **83%** (12,037 lines; was 80% / 11,461 lines) |
 | **Entry-point modules** | ✅ `start.py` 98%, `check_routes.py` 100%, `dashboard/app.py` 99%, `scheduler/__main__.py` 50% (all were 0%) |
 | **ruff / mypy / version-check** | ✅ ruff lint + format clean, mypy clean (186 files), `check_versions.py` exit 0 |
 | **CI pipeline** | ✅ Run 30737407251 fully green — Version, Lint, Typecheck, Security, Tests, Smoke |
@@ -94,7 +107,7 @@
 | **Engines** | ✅ Complete | 100% | Dedup, verify, classify |
 | **Notifications** | ✅ Complete | 100% | Telegram, Email, Discord |
 | **Dashboard** | ✅ Complete | 100% | Streamlit with charts |
-| **Tests** | ✅ Complete | 100% | 1353 tests passing |
+| **Tests** | ✅ Complete | 100% | 1421 tests passing |
 | **CI/CD** | ✅ Complete | 100% | GitHub Actions ready |
 | **Documentation** | ✅ Complete | 100% | All docs created |
 | **Docker** | ✅ Complete | 100% | Compose ready |
@@ -105,10 +118,10 @@
 ## 📊 FINAL TEST RESULTS
 
 ```
-======================== 1353 passed ========================
+======================== 1421 passed ========================
 InternTrack: 924 passed
-CyberGuide (cybershield): 429 passed
-Total: 1353 tests passing
+CyberGuide (cybershield): 497 passed
+Total: 1421 tests passing
 ```
 
 ### Coverage Improvement Summary
@@ -133,6 +146,7 @@ Total: 1353 tests passing
 | **Merge (2026-08-01)** | **1247** | — | origin/master merged — 20 remote test files adopted (+481 InternTrack) |
 | **Entry-points (2026-08-02)** | **1288** | **77%** | +41 CyberGuide tests; start/check_routes/dashboard/scheduler-__main__ covered (were 0%) |
 | **v1.20.0 (2026-08-02)** | **1353** | **80%** | +65 tests; notifications/auth/session/repositories covered (77% → 80%) |
+| **v1.20.0 (2026-08-02)** | **1421** | **83%** | +68 tests; orchestrator/websocket/repositories covered (80% → 83%) |
 
 ---
 
@@ -173,7 +187,7 @@ Total: 1353 tests passing
 - [x] `src/interntrack/utils/` - 4 utility files
 - [x] `src/interntrack/reports/templates/` - 3 report templates
 
-### Tests (1353 total: 924 InternTrack + 429 CyberGuide)
+### Tests (1421 total: 924 InternTrack + 497 CyberGuide)
 - [x] `tests/conftest.py` - Test fixtures
 - [x] `tests/unit/test_job_service.py` - 8 tests
 - [x] `tests/unit/test_application_service.py` - 8 tests
@@ -303,8 +317,8 @@ uvicorn interntrack.main:app --reload
 | Unit - Worker | 4 | ✅ (0% → 100% coverage) |
 | Integration - API | 23 | ✅ (incl. CORS middleware + health) |
 | **Total (InternTrack)** | **924** | ✅ **All Passing** |
-| **CyberGuide (cybershield)** | **364** | ✅ **All Passing** (incl. 41 new entry-point tests) |
-| **Grand Total** | **1353** | ✅ **All Passing** |
+| **CyberGuide (cybershield)** | **497** | ✅ **All Passing** (incl. 41 entry-point + 133 notification/websocket/repository tests) |
+| **Grand Total** | **1421** | ✅ **All Passing** |
 
 ---
 
