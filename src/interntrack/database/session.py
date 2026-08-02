@@ -76,11 +76,53 @@ async_session_factory = async_sessionmaker(
 
 
 async def init_db() -> None:
-    """Initialize database tables."""
+    """Initialize database tables and reconcile schema drift."""
     from interntrack.domain.models import Base
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # create_all never alters existing tables; sync drifted columns so a
+        # pre-existing database (e.g. the Railway Postgres created before a
+        # column was added to a model) is brought up to date on startup.
+        await conn.run_sync(_sync_missing_columns)
+
+
+def _sync_missing_columns(sync_conn) -> None:
+    """Idempotently add model columns missing from existing tables.
+
+    ``create_all`` only creates tables that don't exist yet — it never adds
+    new columns to an existing table. A database initialized from an older
+    model (e.g. the Railway Postgres ``jobs`` table created before the
+    ``tags`` column existed) would otherwise fail at runtime with
+    ``UndefinedColumnError`` on every ``SELECT *`` of that table.
+
+    For every model table that already exists, this compares the model's
+    columns against the live table and issues ``ALTER TABLE ... ADD COLUMN``
+    for the missing ones. Only nullable/defaulted columns are added, so an
+    existing row can never violate a NOT NULL constraint (a hard-failing
+    column would surface at startup, inside the surrounding ``begin()``
+    transaction, and be rolled back atomically).
+    """
+    from sqlalchemy import inspect as sa_inspect
+    from sqlalchemy import text
+
+    from interntrack.domain.models import Base
+
+    inspector = sa_inspect(sync_conn)
+    table_names = set(inspector.get_table_names())
+
+    for table in Base.metadata.sorted_tables:
+        if table.name not in table_names:
+            continue
+        existing_columns = {col["name"] for col in inspector.get_columns(table.name)}
+        for column in table.columns:
+            if column.name in existing_columns:
+                continue
+            if not column.nullable and column.default is None:
+                continue
+            col_type = column.type.compile(dialect=sync_conn.dialect)
+            stmt = text(f"ALTER TABLE {table.name} ADD COLUMN {column.name} {col_type}")
+            sync_conn.execute(stmt)
 
 
 async def close_db() -> None:

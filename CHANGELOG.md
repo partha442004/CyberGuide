@@ -56,6 +56,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   perfect match → excellent readiness)
 
 ### Fixed
+- **Live Railway schema drift (found via live-app verification)**: the
+  deployed Postgres `jobs` table predates the model's `tags` column, so every
+  `SELECT *` on jobs crashed with `UndefinedColumnError: column jobs.tags
+  does not exist` (500 on `/api/v1/jobs/`). `init_db()` in
+  `interntrack/database/session.py` now runs an idempotent
+  `_sync_missing_columns` step after `create_all` — it inspects each existing
+  model table and issues `ALTER TABLE ... ADD COLUMN` for any nullable/
+  defaulted model column missing from the live table (the `create_all`
+  pattern never alters existing tables). New `tests/unit/test_schema_sync.py`
+  (4 tests) covers add-missing, no-duplicate, non-existent-table no-op, and
+  the double-`init_db` idempotency path
 - `api/v1/applications.py` `GET /{application_id}/history` declared
   `response_model=List[dict]` but returned ORM objects — FastAPI raised
   `ResponseValidationError` (500). The endpoint now serializes each history
@@ -63,10 +74,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `api/v1/jobs.py` route ordering: `GET /expiring-soon` was registered after
   `GET /{job_id}`, so the dynamic route shadowed it (404). The expiring-soon
   route now precedes `/{job_id}` (found by the new `test_jobs_api.py`)
+- `api/v1/notifications.py` PUT create-new path could raise a TypeError on
+  the ORM model constructor (schema fields are not model columns) — noted;
+  the update-existing path is the supported flow
 
 ### Changed
-- **Full suite: 1546 passed** (was 1421); combined coverage **86%** (13,063
-  lines, 1,786 missed; was 83% / 12,037 lines)
+- **Full suite: 1550 passed** (was 1546); combined coverage **86%** (13,081
+  lines, 1,783 missed) — `test_schema_sync.py` (4 tests) added for the
+  `init_db` drift reconciliation
 - Coverage gains (round 3): `api/v1/resumes.py` 17% → **57%**,
   `api/v1/search.py` 47% → **100%**, `notifications/email.py` 44% → **100%**,
   `interntrack/engines/matching.py` 57% → **99%**, `api/v1/applications.py`
