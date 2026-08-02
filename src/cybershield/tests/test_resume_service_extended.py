@@ -64,7 +64,7 @@ class TestParsePdf:
         )
 
         parser = ResumeParser()
-        result = await parser.parse_pdf("/tmp/fake_resume.pdf")
+        result = await parser.parse_pdf("fake_resume.pdf")
 
         assert "skills" in result
         skill_names = [s["name"].lower() for s in result["skills"]]
