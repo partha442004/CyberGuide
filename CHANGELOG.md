@@ -86,6 +86,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `.gitignore` now ignores `coverage.xml` (generated artifact from the CI
   coverage step / local `make test` runs; should never be committed)
 
+#### Local Full-Stack Verification (CI-equivalent)
+- **Full test suite** (exact CI command): **1247 passed, 0 failed, 0 skipped**;
+  no `Event loop is closed` errors — confirms the pytest-asyncio flakiness
+  fix holds across a full run
+- **ruff** lint + format clean (250 files); **mypy** clean (182 files);
+  **bandit** `-ll` clean; **safety** 0 vulnerabilities; **version-check**
+  exit 0 (all sources 1.19.0); **smoke test** all 17 checks pass
+- **trivy fs** v0.72.0 (CI-equivalent command + skip-dirs) against `src/`:
+  `cybershield/requirements.txt` — **0 vulnerabilities**, exit 0
+- Combined coverage (interntrack + cybershield): **72.1%** (10,619 lines,
+  2,967 misses). Lowest-covered areas are the CyberGuide scrapers
+  (indeed/naukri/hackernews ~11–17%) and entry-point modules
+  (`start.py`, `scheduler/__main__.py`, `dashboard/app.py` at 0%) —
+  candidates for future coverage work
+
 ## [Merged] - 2026-08-01 — origin/master reconciled into local master
 
 ### Merged
