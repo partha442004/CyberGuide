@@ -40,9 +40,7 @@ class TestCheckUrl:
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
 
-        with patch(
-            "cybershield.engines.verification.httpx.AsyncClient", return_value=mock_client
-        ):
+        with patch("cybershield.engines.verification.httpx.AsyncClient", return_value=mock_client):
             result = await engine._check_url("https://example.com/job")
         assert result["valid"] is True
         assert result["status_code"] == 200
@@ -57,9 +55,7 @@ class TestCheckUrl:
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
 
-        with patch(
-            "cybershield.engines.verification.httpx.AsyncClient", return_value=mock_client
-        ):
+        with patch("cybershield.engines.verification.httpx.AsyncClient", return_value=mock_client):
             result = await engine._check_url("https://example.com/job")
         assert result["valid"] is True
         assert result["status_code"] == 200
@@ -72,9 +68,7 @@ class TestCheckUrl:
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
 
-        with patch(
-            "cybershield.engines.verification.httpx.AsyncClient", return_value=mock_client
-        ):
+        with patch("cybershield.engines.verification.httpx.AsyncClient", return_value=mock_client):
             result = await engine._check_url("https://example.com/gone")
         assert result["valid"] is False
         assert result["error"] == "HTTP 404"
@@ -86,9 +80,7 @@ class TestCheckUrl:
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
 
-        with patch(
-            "cybershield.engines.verification.httpx.AsyncClient", return_value=mock_client
-        ):
+        with patch("cybershield.engines.verification.httpx.AsyncClient", return_value=mock_client):
             result = await engine._check_url("https://example.com/old-job")
         assert result["redirect_url"] == "https://example.com/new-job"
 
@@ -101,9 +93,7 @@ class TestCheckUrl:
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
 
-        with patch(
-            "cybershield.engines.verification.httpx.AsyncClient", return_value=mock_client
-        ):
+        with patch("cybershield.engines.verification.httpx.AsyncClient", return_value=mock_client):
             result = await engine._check_url("https://example.com/slow")
         assert result["valid"] is False
         assert result["error"] == "Timeout"
@@ -117,9 +107,7 @@ class TestCheckUrl:
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
 
-        with patch(
-            "cybershield.engines.verification.httpx.AsyncClient", return_value=mock_client
-        ):
+        with patch("cybershield.engines.verification.httpx.AsyncClient", return_value=mock_client):
             result = await engine._check_url("https://example.com")
         assert result["valid"] is False
         assert "dns fail" in (result["error"] or "")
@@ -131,9 +119,7 @@ class TestCheckUrl:
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
 
-        with patch(
-            "cybershield.engines.verification.httpx.AsyncClient", return_value=mock_client
-        ):
+        with patch("cybershield.engines.verification.httpx.AsyncClient", return_value=mock_client):
             result = await engine._check_url("https://example.com")
         assert result["valid"] is False
         assert "Unexpected error" in (result["error"] or "")
@@ -218,9 +204,7 @@ class TestProcess:
 
         monkeypatch.setattr(engine, "_check_url", fake_check_url)
         result = await engine.process(job)
-        deadline_check = next(
-            c for c in result.data["checks"] if c["type"] == "deadline_active"
-        )
+        deadline_check = next(c for c in result.data["checks"] if c["type"] == "deadline_active")
         assert deadline_check["passed"] is True
 
     @pytest.mark.asyncio
@@ -237,9 +221,7 @@ class TestProcess:
 
         monkeypatch.setattr(engine, "_check_url", fake_check_url)
         result = await engine.process(job)
-        redirect_check = next(
-            c for c in result.data["checks"] if c["type"] == "no_redirect_loops"
-        )
+        redirect_check = next(c for c in result.data["checks"] if c["type"] == "no_redirect_loops")
         assert redirect_check["passed"] is False
 
     @pytest.mark.asyncio
