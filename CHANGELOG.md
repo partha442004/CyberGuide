@@ -97,7 +97,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `cybershield/requirements.txt` — **0 vulnerabilities**, exit 0
 - Combined coverage (interntrack + cybershield): **72.1%** (10,619 lines,
   2,967 misses). Lowest-covered areas are the CyberGuide scrapers
-  (indeed/naukri/hackernews ~11–17%) and entry-point modules
+  (indeed/naukri/hackernews ~11–19%) and entry-point modules
   (`start.py`, `scheduler/__main__.py`, `dashboard/app.py` at 0%) —
   candidates for future coverage work
 
