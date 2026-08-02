@@ -15,7 +15,25 @@ from cybershield.schemas.notification import (
     NotificationTest,
 )
 
+DEFAULT_CONFIG = {
+    "telegram_enabled": False,
+    "email_enabled": True,
+    "discord_enabled": False,
+    "slack_enabled": False,
+    "push_enabled": False,
+    "instant_alerts": True,
+    "daily_digest": True,
+    "weekly_report": True,
+    "monthly_report": True,
+}
+
+
 router = APIRouter()
+
+
+def _merged_config(config) -> dict:
+    """Merge stored JSON preferences over the schema defaults."""
+    return {**DEFAULT_CONFIG, **dict(config.config or {})}
 
 
 @router.get("/config/{user_id}", response_model=NotificationConfig)
@@ -32,20 +50,12 @@ async def get_notification_config(
     config = result.scalar_one_or_none()
 
     if not config:
-        # Return default config
-        return {
-            "telegram_enabled": False,
-            "email_enabled": True,
-            "discord_enabled": False,
-            "slack_enabled": False,
-            "push_enabled": False,
-            "instant_alerts": True,
-            "daily_digest": True,
-            "weekly_report": True,
-            "monthly_report": True,
-        }
+        # No row yet: return default config
+        return DEFAULT_CONFIG
 
-    return config
+    # The ORM model stores preferences in a JSON column, so merge the stored
+    # values over the defaults for a complete response.
+    return _merged_config(config)
 
 
 @router.put("/config/{user_id}", response_model=NotificationConfig)
@@ -63,19 +73,24 @@ async def update_notification_config(
     config = result.scalar_one_or_none()
 
     if config:
-        # Update existing
-        for key, value in config_data.model_dump(exclude_unset=True).items():
-            setattr(config, key, value)
+        # Update existing: merge into the JSON config column
+        preferences = dict(config.config or {})
+        preferences.update(config_data.model_dump(exclude_unset=True))
+        config.config = preferences  # type: ignore[assignment]
     else:
-        # Create new
+        # Create new: the ORM model only has channel/is_enabled/config columns,
+        # so store the full preference payload in the JSON config column instead
+        # of passing schema-only fields to the constructor.
+        preferences = config_data.model_dump()
         config = NotificationConfigModel(
             user_id=user_id,
-            **config_data.model_dump(),
+            channel=preferences.pop("channel", "default"),
+            config=preferences,
         )
         session.add(config)
 
     await session.flush()
-    return config
+    return _merged_config(config)
 
 
 @router.post("/test", response_model=NotificationResponse)

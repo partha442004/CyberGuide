@@ -4,6 +4,24 @@
 
 ---
 
+## 🛠️ 2026-08-02 Coverage Push (APIs / engines / middleware — round 6)
+
+- ✅ **Tests**: **1751 passing** (was 1675) — 76 new tests in 7 new files
+- ✅ **Combined coverage (interntrack + cybershield)**: **93%** (14,921 lines,
+  990 missed; was 93% / 14,285 lines at the start of the round)
+- ✅ **New test files**: `test_domain_exceptions.py` (5),
+  `test_engines_base.py` (8), `test_verification_engine_extended.py` (13),
+  `test_rate_limit_cybershield.py` (14), `test_users_api_extended.py` (10),
+  `test_notifications_api_extended.py` (6), `test_resumes_api_extended.py` (5)
+- ✅ **Coverage gains (round 6)**: `domain/exceptions.py` 78% → **100%**,
+  `engines/base.py` 68% → **100%**, `engines/verification.py` 73% → **100%**,
+  `middleware/rate_limit.py` 77% → **100%**, `api/v1/users.py` 69% → **94%**,
+  `api/v1/resumes.py` 57% → **68%**
+- 🐛 **Real bug fixed**: `update_notification_config` create-new path 500'd
+  in production (schema-only fields passed to the ORM constructor, which only
+  has `channel`/`is_enabled`/`config` columns). Now stores preferences in the
+  JSON `config` column via a shared `DEFAULT_CONFIG` + `_merged_config()`.
+
 ## 🛠️ 2026-08-02 Coverage Push (scrapers / registry / scheduler — round 5)
 
 - ✅ **Tests**: **1675 passing** (was 1627) — 48 new tests in 5 files

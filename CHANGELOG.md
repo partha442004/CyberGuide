@@ -4,6 +4,35 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.20.3] - 2026-08-02
+
+### Added
+
+- Round 6 coverage push: **1751 tests passing** (was 1675) at **93%** combined
+  coverage — 76 new tests across 7 new files:
+  - `test_domain_exceptions.py` (5) — `domain/exceptions.py` 78% → **100%**
+  - `test_engines_base.py` (8) — `engines/base.py` 68% → **100%**
+  - `test_verification_engine_extended.py` (13) — `engines/verification.py`
+    73% → **100%** (URL/deadline branches, verify_batch, string deadlines)
+  - `test_rate_limit_cybershield.py` (14) — `middleware/rate_limit.py`
+    77% → **100%** (cleanup_expired, _maybe_cleanup, limits, isolation)
+  - `test_users_api_extended.py` (10) — `api/v1/users.py` 69% → **94%**
+    (get_user 404, update_user, create_user password hashing, watchlist
+    error paths)
+  - `test_notifications_api_extended.py` (6) — create-new config path
+  - `test_resumes_api_extended.py` (5) — "Good match" (50-79) suggestion
+    branch + `_extract_skill_names` edge cases; `api/v1/resumes.py` 57% → **68%**
+
+### Fixed
+
+- **Real bug**: `update_notification_config` create-new path (no existing
+  config row) passed schema-only fields (`telegram_enabled`, etc.) to the
+  ORM `NotificationConfig` constructor, which only has
+  `channel`/`is_enabled`/`config` columns — **500 Internal Server Error**
+  in production. Now stores the full preference payload in the JSON
+  `config` column and returns the merged config via a shared `DEFAULT_CONFIG`
+  + `_merged_config()` helper.
+
 ## [1.20.2] - 2026-08-02
 
 ### Added
