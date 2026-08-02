@@ -155,7 +155,7 @@ class NaukriScraper(BaseScraper):
     def _parse_experience_level(self, exp_text: str) -> str:
         """Parse experience level from text."""
         exp_lower = exp_text.lower()
-        if "fresher" in exp_lower or "0" in exp_lower:
+        if "fresher" in exp_lower:
             return "fresher"
         elif "intern" in exp_lower:
             return "intern"
@@ -165,6 +165,8 @@ class NaukriScraper(BaseScraper):
             return "mid"
         elif "senior" in exp_lower or "5+" in exp_lower:
             return "senior"
+        elif "0" in exp_lower:
+            return "fresher"
         return "entry"
 
     def _parse_job_type(self, job_type: str) -> str:

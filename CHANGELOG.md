@@ -4,6 +4,25 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.20.1] - 2026-08-02
+
+### Added
+
+#### CyberGuide Coverage Push (scrapers / alembic / analytics — round 4)
+- `test_naukri_scraper.py` (16 tests) — `scrapers/india/naukri.py` 12% → **98%**
+- `test_internshala_scraper.py` (13 tests) — `scrapers/india/internshala.py` 17% → **97%**
+- `test_freshersworld_scraper.py` (12 tests) — `scrapers/india/freshersworld.py` 17% → **97%**
+- `test_company_scrapers_extended.py` (25 tests) — `scrapers/companies/`
+  amazon 17% → **99%**, cisco 17% → **93%**, google 17% → **90%**,
+  microsoft 18% → **92%**
+- `test_alembic_env.py` (5 tests) — `alembic/env.py` 0% → **94%**
+- `test_analytics_api.py` (6 tests) — `api/v1/analytics.py` 64% → **100%**
+- **Bug fix**: `naukri.py::_parse_experience_level` returned `fresher` for
+  `"0-2 yrs"` (the bare `"0"` check ran before `"0-2"`); reordered so ranges
+  resolve to the intended level
+- Combined coverage (interntrack + cybershield): **86% → 91%**
+  (13,720 lines; 1,296 missed) — **1627 tests passing**
+
 ## [1.20.0] - 2026-08-02
 
 ### Added
