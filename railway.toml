@@ -10,7 +10,7 @@ buildCommand = "pip install -r requirements.txt"
 # schema is created by init_db() (Base.metadata.create_all) at startup, so
 # no explicit migration step is needed here (alembic upgrade head would fail
 # with DuplicateTableError on the existing Railway Postgres schema).
-startCommand = "uvicorn interntrack.main:app --host 0.0.0.0 --port 8000"
+startCommand = "uvicorn interntrack.main:app --host 0.0.0.0 --port ${PORT:-8000}"
 healthcheckPath = "/health"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
