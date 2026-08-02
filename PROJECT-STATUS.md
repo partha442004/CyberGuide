@@ -4,6 +4,28 @@
 
 ---
 
+## 🛠️ 2026-08-02 Coverage Push (APIs / notifiers / engines — round 3)
+
+- ✅ **Tests**: **1546 passing** (was 1421) — 125 new tests in 8 files
+- ✅ **Combined coverage (interntrack + cybershield)**: **86%** (13,063 lines,
+  1,786 missed; was 83% / 12,037 lines)
+- ✅ **New test files**: `test_resumes_api.py` (30), `test_search_api.py` (8),
+  `test_notifications_api.py` (6), `test_email_notifier.py` (17),
+  `test_applications_api.py` (15), `test_jobs_api.py` (13),
+  `test_scraper_base_extended.py` (26), `test_matching_engine_extended.py` (13)
+- ✅ **Coverage gains (round 3)**: `api/v1/resumes.py` 17% → **57%**,
+  `api/v1/search.py` 47% → **100%**, `notifications/email.py` 44% → **100%**,
+  `interntrack/engines/matching.py` 57% → **99%**, `api/v1/applications.py`
+  54% → **80%**, `api/v1/jobs.py` 60% → **73%**, `scrapers/base.py`
+  60% → **86%**, `api/v1/notifications.py` 50% → **62%**
+- ✅ **2 latent bugs fixed** (found by the new tests): applications history
+  endpoint returned ORM objects under `response_model=List[dict]` (500) — now
+  serializes; jobs `/expiring-soon` route was shadowed by `/{job_id}` (404) —
+  route order fixed
+- ✅ ruff lint + format clean on all new/modified files; full suite green
+
+---
+
 ## 🛠️ 2026-08-02 Coverage Push (orchestrator / websocket / repositories)
 
 - ✅ **Tests**: 924 InternTrack + 497 CyberGuide = **1421 passing** (was 1353)

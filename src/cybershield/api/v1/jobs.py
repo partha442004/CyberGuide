@@ -71,6 +71,16 @@ async def search_jobs(
     }
 
 
+@router.get("/expiring-soon", response_model=List[JobResponse])
+async def get_expiring_jobs(
+    days: int = Query(7, ge=1, le=30),
+    repo: JobRepository = Depends(get_job_repository),
+):
+    """Get jobs expiring within specified days."""
+    jobs = await repo.get_expiring_soon(days=days)
+    return jobs
+
+
 @router.get("/{job_id}", response_model=JobResponse)
 async def get_job(
     job_id: str,
@@ -113,13 +123,3 @@ async def delete_job(
     deleted = await repo.delete(job_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Job not found")
-
-
-@router.get("/expiring-soon", response_model=List[JobResponse])
-async def get_expiring_jobs(
-    days: int = Query(7, ge=1, le=30),
-    repo: JobRepository = Depends(get_job_repository),
-):
-    """Get jobs expiring within specified days."""
-    jobs = await repo.get_expiring_soon(days=days)
-    return jobs
