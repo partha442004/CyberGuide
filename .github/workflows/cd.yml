@@ -76,7 +76,8 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd /opt/cybershield
+            # Path matches deploy/oracle-cloud/setup.sh (clones to /home/opc/cybershield)
+            cd /home/opc/cybershield || cd /opt/cybershield
             docker-compose pull
             docker-compose up -d
             docker-compose exec api alembic upgrade head
