@@ -64,17 +64,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   the skill name had not been seen before — `Skill.category` is NOT NULL.
   New skills now default to `category="general"`.
 
-#### Railway.app hosted deployment (no credit card)
-- Deployment target pivoted to **Railway.app** (`railway.toml` refined): Nixpacks
-  build, `alembic upgrade head && uvicorn ... --port $PORT` start command,
-  `/health` healthcheck, `PYTHONPATH=src`, `APP_VERSION=1.20.0`, `DEBUG=false`
-- The Railway **Postgres plugin** auto-injects `DATABASE_URL` (migrations run
-  automatically on every deploy); Redis is optional (the app falls back to
-  in-memory rate-limit/cache stores); `SECRET_KEY` placeholder documented to be
-  overridden in the Railway dashboard
-- New `deploy/railway/RAILWAY-DEPLOY.md` — signup → connect repo → add
-  Postgres → set variables → troubleshooting; no credit card required (Oracle
-  Cloud asks for a card at signup)
+#### Railway.app hosted deployment — LIVE (no credit card)
+- **Deployed and verified live** at
+  **https://cyberguide-api-production.up.railway.app** — v1.20.0,
+  `/health` → `{"status":"healthy","version":"1.20.0","database":"ok"}`,
+  Postgres connected (asyncpg), `DEBUG=false` (docs disabled in production)
+- Deploy target pivoted to **Railway.app** (no credit card — Oracle Cloud
+  asks for one at signup); the service builds from the repo **Dockerfile**
+  (`RAILWAY_DOCKERFILE_PATH=Dockerfile`) with `railway.toml` overriding the
+  container CMD
+- **Config learnings (documented in `deploy/railway/RAILWAY-DEPLOY.md`):**
+  - `startCommand` runs **without shell expansion** — `--port $PORT` /
+    `${PORT:-8000}` fail with `'$PORT' is not a valid integer`; the command
+    must be literal (`uvicorn interntrack.main:app --host 0.0.0.0 --port 8000`)
+  - `alembic upgrade head` in the start command fails — the app
+    self-initializes the schema via `init_db()` (`create_all`), and the
+    Railway Postgres already had tables (`DuplicateTableError`)
+  - `healthcheckPath: /health` made every Dockerfile deploy FAIL (Railway
+    stopped the healthy container); removing it makes SUCCESS = running, and
+    `/health` is reachable via the public domain
+  - The public 502 was fixed by pinning the domain port to 8000
+    (`railway domain update <id> --port 8000`)
+- `deploy/railway/RAILWAY-DEPLOY.md` rewritten with the verified configuration
+  + troubleshooting; `.railwayignore` added for `railway up` uploads
 - Oracle Cloud SSH deploy (`cd.yml` deploy job) remains as the self-hosted
   option and self-skips until server secrets are added
 

@@ -3,48 +3,85 @@
 Deploy the full API + Postgres on Railway's free trial — **no credit card
 required** (unlike Oracle Cloud, which asks for a card at signup).
 
-Railway reads `railway.toml` at the repo root and auto-deploys on every push
-to the connected branch. No Docker Hub push or SSH server needed.
+> ✅ **Verified live (2026-08-02):** the API runs at
+> **https://cyberguide-api-production.up.railway.app** with v1.20.0 and a
+> healthy Postgres connection (`GET /health` → `{"status":"healthy","version":"1.20.0","database":"ok"}`).
+
+Railway deploys from the repo root; the service builds with the **Dockerfile**
+(`RAILWAY_DOCKERFILE_PATH=Dockerfile` on the service) and overrides the
+container CMD with `railway.toml`'s `startCommand`. No Docker Hub push or SSH
+server needed.
+
+---
+
+## How the service is configured (verified working)
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| Build | `Dockerfile` | `RAILWAY_DOCKERFILE_PATH=Dockerfile` (service variable) |
+| Start command | `uvicorn interntrack.main:app --host 0.0.0.0 --port 8000` | Railway runs it **literally** — no shell expansion |
+| Port | `8000` | Dockerfile `EXPOSE 8000`; public domain pinned to `8000` |
+| Healthcheck | *(omitted)* | Railway's internal probe couldn't reach `/health` on Dockerfile deploys; without it, SUCCESS = container running |
+| Schema | `init_db()` → `create_all` at startup | No `alembic upgrade head` at deploy time (see lessons) |
+| `PYTHONPATH` | `/app/src` | matches the Docker image layout |
+| `DATABASE_URL` | Postgres plugin (service variable) | asyncpg → internal `*.railway.internal:5432` |
+| `SECRET_KEY` | random 64-hex (service variable) | set in the dashboard |
+| `DEBUG` | `false` | production mode; `/docs` disabled |
+
+Service variables on `cyberguide-api`: `DATABASE_URL`, `SECRET_KEY`,
+`PYTHONPATH=/app/src`, `APP_NAME`, `DEBUG=false`.
 
 ---
 
 ## Quick start (5 minutes)
 
 ### 1. Sign up
-1. Go to [railway.app](https://railway.app) and click **Start a New Project**
-2. Sign in with **GitHub** (or email) — free trial credit is included
+1. Go to [railway.app](https://railway.app) → **Start a New Project**
+2. Sign in with **GitHub** (or email) — free trial credit included
 
 ### 2. Deploy from this repo
-1. Click **Deploy from GitHub repo**
-2. Select the **CyberGuide** repository (partha442004/CyberGuide)
-3. Railway detects `railway.toml` automatically and starts building
-   (Nixpacks: `pip install -r requirements.txt`)
+1. **Deploy from GitHub repo** → select **CyberGuide**
+   (partha442004/CyberGuide)
+2. Railway builds with the Dockerfile (auto-detected)
 
-> If Railway asks for a repo or deploys an empty project, click **New → GitHub
-> Repo** and pick CyberGuide.
+### 3. Add PostgreSQL + variables on the API service
+1. **New → Database → Add PostgreSQL**; copy the `DATABASE_URL` into the API
+   service → **Variables** (or reference it as a service variable)
+2. Add `PYTHONPATH=/app/src`, `DEBUG=false`
+3. Set a real `SECRET_KEY`:
+   `python -c "import secrets; print(secrets.token_hex(32))"`
 
-### 3. Add PostgreSQL
-1. In your project, click **New → Database → Add PostgreSQL**
-2. Railway injects `DATABASE_URL` automatically — no config needed
-3. The deploy `startCommand` already runs `alembic upgrade head` before
-   starting the API, so migrations apply automatically on every deploy
+### 4. Add a public domain (pinned to port 8000)
+1. Service → **Settings → Networking → Generate Domain** (or CLI:
+   `railway domain -s <service> -p 8000`)
+2. **Update → Port → 8000** so the proxy targets the app port
+3. Open `https://<your-domain>` → `GET /health` → healthy
 
-### 4. Set the SECRET_KEY (important)
-1. Generate one: `python -c "import secrets; print(secrets.token_hex(32))"`
-2. Open the API service → **Variables** → **New Variable**
-3. Name: `SECRET_KEY`, Value: the generated key (overrides the committed
-   `change-me-in-production` placeholder)
+---
 
-### 5. (Optional) Add Redis for shared rate limiting / cache
-1. **New → Database → Redis**
-2. Copy the Redis URL and add a variable `REDIS_URL` on the API service
-   (the app falls back to in-memory stores when this is unset, so it is
-   optional on the free tier)
+## Lessons learned (2026-08-02) — read before changing config
 
-### 6. Open the app
-- Railway shows a **Deploy URL** on the service (e.g. `https://cyberguide-xxxx.up.railway.app`)
-- Health check: `GET {url}/health` → `{"status":"healthy","version":"1.20.0","debug":false}`
-- API docs: `{url}/api/docs` (when not in production mode) or `{url}/docs`
+1. **`railway.toml` `[deploy].startCommand` OVERRIDES the Dockerfile CMD** for
+   Dockerfile services and is executed **without shell expansion**:
+   - `--port $PORT` and `--port ${PORT:-8000}` both fail with
+     `'$PORT' is not a valid integer` — the command must be fully literal.
+   - No `PORT` env var is even injected for this service (verified via
+     `railway run printenv`), so bind the EXPOSE port explicitly.
+2. **Do not run `alembic upgrade head` in the start command**: the app
+   self-initializes the schema with `init_db()` (`Base.metadata.create_all`),
+   and the Railway Postgres already has tables — `alembic upgrade head` fails
+   with `DuplicateTableError: relation "jobs" already exists`. It also fails
+   with `No 'script_location' key` if `alembic.ini` isn't in the image.
+3. **`healthcheckPath: /health` causes Dockerfile deploys to FAIL**: the
+   container starts fine but Railway's internal probe marks the deployment
+   FAILED and stops the container ("Stopping Container"). Removing the
+   healthcheck makes SUCCESS = container running, and the app's own `/health`
+   is reachable via the pinned public domain.
+4. **Pin the domain port**: `railway domain update <id> --port 8000` fixed the
+   public 502 ("Application failed to respond") while the service was online.
+5. **Deploying from CLI**: `railway up -s <service> -y -d` uploads the local
+   directory (`.railwayignore` excludes `.env`, `data/`, caches) and deploys —
+   handy when Railway's GitHub auto-deploy hasn't picked up `master` pushes.
 
 ---
 
@@ -52,7 +89,7 @@ to the connected branch. No Docker Hub push or SSH server needed.
 
 | Variable | Needed for |
 |----------|-----------|
-| `DATABASE_URL` | ✅ auto-injected by the Postgres plugin (required) |
+| `DATABASE_URL` | ✅ Postgres plugin (required) |
 | `SECRET_KEY` | Recommended — random value; placeholder logs a warning |
 | `REDIS_URL` | Shared rate limiting + cache (optional, in-memory fallback) |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | Telegram notifications |
@@ -65,8 +102,9 @@ to the connected branch. No Docker Hub push or SSH server needed.
 
 ## How updates flow
 
-- **Push to master** → CI (GitHub Actions) validates + tests, and Railway
-  auto-deploys the new commit (migrations run automatically).
+- **`railway up`** (CLI) or a **redeploy from the dashboard** deploys the
+  latest code; `init_db()` re-creates any missing tables automatically.
+- **Push to master** → GitHub Actions CI validates + tests the commit.
 - **Tag `v*`** → GitHub CD publishes the `kira2004/cybershield` Docker image
   on Docker Hub (release artifact; not required for Railway).
 
@@ -76,7 +114,8 @@ to the connected branch. No Docker Hub push or SSH server needed.
 
 | Symptom | Fix |
 |---------|-----|
-| Build fails on `pip install` | Check the deploy logs; Nixpacks uses the root `requirements.txt` |
-| `/health` returns 503 | Postgres not linked yet — add the PostgreSQL plugin and redeploy |
-| Migrations not applied | They run via `alembic upgrade head` in `startCommand`; check deploy logs for `alembic` errors |
-| Restarts in a loop | Inspect `railway logs` (Deployments tab) — most common cause is `DATABASE_URL` missing |
+| `Invalid value for '--port': '$PORT'` | Start command must be fully literal — use `--port 8000` |
+| `DuplicateTableError: relation ... already exists` | Remove `alembic upgrade head` from the start command |
+| Deployment FAILED but app starts fine in logs | Likely the healthcheck — remove `healthcheckPath` |
+| Public URL returns 502 "Application failed to respond" | Pin the domain port to 8000: `railway domain update <id> --port 8000` |
+| `/health` returns 503 degraded | Postgres not linked — set `DATABASE_URL` on the API service and redeploy |
