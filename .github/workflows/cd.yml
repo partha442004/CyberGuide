@@ -50,11 +50,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Skipped until the server secrets (SERVER_HOST / SERVER_USER /
-      # SSH_PRIVATE_KEY) are configured in the repo; build-and-push is the
-      # only required job for a release.
+      # The secrets context cannot be used in `if` conditionals, so detect
+      # whether the server secrets are configured via a shell check (unset
+      # secrets become empty env vars) and gate the deploy step on its output.
+      - name: Check server secrets
+        id: check
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          if [ -n "$SERVER_HOST" ] && [ -n "$SERVER_USER" ] && [ -n "$SSH_KEY" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Deploy target configured"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Deploy skipped: SERVER_HOST/SERVER_USER/SSH_PRIVATE_KEY not configured"
+          fi
+
       - name: Deploy to server
-        if: secrets.SERVER_HOST != '' && secrets.SERVER_USER != '' && secrets.SSH_PRIVATE_KEY != ''
+        if: steps.check.outputs.configured == 'true'
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SERVER_HOST }}
