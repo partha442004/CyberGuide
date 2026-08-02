@@ -657,7 +657,7 @@ def show_settings():
         gemini_key = st.text_input("Gemini API Key", type="password", key="gemini_key")
     
     st.subheader("ℹ️ About")
-    st.write("**CyberShield Career Intelligence Platform** v1.19.0")
+    st.write("**CyberShield Career Intelligence Platform** v1.20.0")
     st.write("AI-powered cybersecurity career intelligence")
 
 

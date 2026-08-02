@@ -10,9 +10,9 @@
   real app's `./data/interntrack.db` (26 failures on the runner — `data/` is
   gitignored/absent). Fixture now uses a hermetic temp-file SQLite DB + `get_db`
   override + `async_session_factory` swap (mirrors `tests/conftest.py`)
-- ✅ **Tests**: 924 InternTrack + 364 CyberGuide = **1288 passing** (was 1247)
-- ✅ **Combined coverage (interntrack + cybershield)**: **77%** (10,944 lines,
-  was 72.1% / 10,619 lines)
+- ✅ **Tests**: 924 InternTrack + 429 CyberGuide = **1353 passing** (was 1288)
+- ✅ **Combined coverage (interntrack + cybershield)**: **80%** (11,461 lines,
+  was 77% / 10,944 lines)
 - ✅ **Entry-point coverage** (was 0%): `start.py` → **98%**,
   `check_routes.py` → **100%**, `dashboard/app.py` → **99%**,
   `scheduler/__main__.py` → **50%** — 41 new tests in 4 new files
@@ -39,7 +39,7 @@
   text exposition format) exposing the same counters; exempt from recording
   + rate limiting; `deploy/prometheus/prometheus.yml` + compose `prometheus`
   service (`monitoring` profile); k8s `prometheus.io` Service annotations
-- ✅ **Version**: both packages single-source-of-truth at **1.19.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate; CONTRIBUTING release-bump checklist
+- ✅ **Version**: both packages single-source-of-truth at **1.20.0** — `app_version` reads package `__version__` (interntrack + cybershield), synced with .env/.env.example and root `pyproject.toml`; canary tests in both suites + `scripts/check_versions.py` CI gate; CONTRIBUTING release-bump checklist
 - ✅ **System monitoring**: node-exporter service (monitoring profile) + scrape
   job + `system` alert group (DiskSpaceLow/MemoryHigh/CpuHigh) + **InternTrack
   System** Grafana dashboard; 7 tests pin every PromQL expr to real node
@@ -226,8 +226,8 @@ internship-tracker/
 ## 🧪 Test Results
 
 ### Test Summary
-- **Total Tests:** 1288 (924 InternTrack + 364 CyberGuide)
-- **Tests Passing:** ✅ 1288 (100%)
+- **Total Tests:** 1353 (924 InternTrack + 429 CyberGuide)
+- **Tests Passing:** ✅ 1353 (100%)
 - **Test Files:** 36+ test files
 
 ### Test Breakdown
@@ -268,7 +268,7 @@ internship-tracker/
 | Integration - API | 23 | ✅ (incl. CORS middleware + health) |
 | **Total (InternTrack)** | **924** | ✅ **All Passing** |
 | **CyberGuide (cybershield)** | **364** | ✅ **All Passing** (incl. 41 new entry-point tests) |
-| **Grand Total** | **1288** | ✅ **All Passing** |
+| **Grand Total** | **1353** | ✅ **All Passing** |
 
 ---
 
@@ -325,6 +325,7 @@ uvicorn interntrack.main:app --reload
 | **2026-08-01** | **766** | **67%** | Combined (interntrack + cybershield) |
 | **2026-08-01** | **1247** | — | origin/master merged — 20 remote test files adopted (+481 InternTrack) |
 | **2026-08-02** | **1288** | **77%** | CI fix + entry-point tests (+41 CyberGuide, coverage 72.1% → 77%) |
+| **2026-08-02** | **1353** | **80%** | v1.20.0 — notifications/auth/session/repository tests (+65, coverage 77% → 80%) |
 
 ---
 
@@ -358,7 +359,7 @@ uvicorn interntrack.main:app --reload
 ✅ Dashboard with charts
 ✅ Docker deployment ready
 ✅ Documentation complete
-✅ 1288 tests passing (924 InternTrack + 364 CyberGuide)
+✅ 1353 tests passing (924 InternTrack + 429 CyberGuide)
 ✅ CI/CD pipelines configured
 ✅ Security documentation
 ✅ API rate limiting enabled

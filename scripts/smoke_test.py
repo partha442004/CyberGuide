@@ -193,8 +193,15 @@ def main() -> int:
             server.wait(timeout=5)
         except subprocess.TimeoutExpired:
             server.kill()
-        Path(db_path).unlink(missing_ok=True)
-        log_path.unlink(missing_ok=True)
+        # On Windows the aiosqlite worker thread may still hold the DB file
+        # briefly after the server exits, so retry the unlink a few times.
+        for _path in (Path(db_path), log_path):
+            for _ in range(5):
+                try:
+                    _path.unlink(missing_ok=True)
+                    break
+                except PermissionError:
+                    time.sleep(0.2)
 
 
 if __name__ == "__main__":

@@ -22,7 +22,7 @@ from cybershield.notifications.telegram import TelegramNotifier
 
 def _message(**overrides: Any) -> NotificationMessage:
     """Build a NotificationMessage with sensible defaults."""
-    defaults = {
+    defaults: dict[str, Any] = {
         "title": "Test Alert",
         "content": "This is a test notification",
         "notification_type": NotificationType.INSTANT_ALERT,
