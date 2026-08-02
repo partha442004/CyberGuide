@@ -4,6 +4,25 @@
 
 ---
 
+## 🛠️ 2026-08-02 CI Fix + Entry-Point Coverage Push
+
+- ✅ **CI Tests job fixed**: `test_api_v1_full.py` local `client` fixture hit the
+  real app's `./data/interntrack.db` (26 failures on the runner — `data/` is
+  gitignored/absent). Fixture now uses a hermetic temp-file SQLite DB + `get_db`
+  override + `async_session_factory` swap (mirrors `tests/conftest.py`)
+- ✅ **Tests**: 924 InternTrack + 364 CyberGuide = **1288 passing** (was 1247)
+- ✅ **Combined coverage (interntrack + cybershield)**: **77%** (10,944 lines,
+  was 72.1% / 10,619 lines)
+- ✅ **Entry-point coverage** (was 0%): `start.py` → **98%**,
+  `check_routes.py` → **100%**, `dashboard/app.py` → **99%**,
+  `scheduler/__main__.py` → **50%** — 41 new tests in 4 new files
+  (`test_start_script.py`, `test_check_routes.py`, `test_scheduler_main.py`,
+  `test_dashboard_app.py`)
+- ✅ **CI green end-to-end**: run 30737407251 — Version ✓, Lint (ruff) ✓,
+  Typecheck (mypy) ✓, Security ✓, Tests ✓, Smoke ✓
+
+---
+
 ## 🛠️ 2026-08-01 Hardening Pass
 
 - ✅ **mypy**: 0 errors across 177 source files (107 cybershield errors fixed)
@@ -207,9 +226,9 @@ internship-tracker/
 ## 🧪 Test Results
 
 ### Test Summary
-- **Total Tests:** 1247 (924 InternTrack + 323 CyberGuide)
-- **Tests Passing:** ✅ 1247 (100%)
-- **Test Files:** 32+ test files
+- **Total Tests:** 1288 (924 InternTrack + 364 CyberGuide)
+- **Tests Passing:** ✅ 1288 (100%)
+- **Test Files:** 36+ test files
 
 ### Test Breakdown
 | Category | Tests | Status |
@@ -248,8 +267,8 @@ internship-tracker/
 | Unit - Worker | 4 | ✅ (0% → 100% coverage) |
 | Integration - API | 23 | ✅ (incl. CORS middleware + health) |
 | **Total (InternTrack)** | **924** | ✅ **All Passing** |
-| **CyberGuide (cybershield)** | **323** | ✅ **All Passing** |
-| **Grand Total** | **1247** | ✅ **All Passing** |
+| **CyberGuide (cybershield)** | **364** | ✅ **All Passing** (incl. 41 new entry-point tests) |
+| **Grand Total** | **1288** | ✅ **All Passing** |
 
 ---
 
@@ -305,6 +324,7 @@ uvicorn interntrack.main:app --reload
 | **2026-08-01** | **453** | — | InternTrack + version consistency gate script tests (+10) |
 | **2026-08-01** | **766** | **67%** | Combined (interntrack + cybershield) |
 | **2026-08-01** | **1247** | — | origin/master merged — 20 remote test files adopted (+481 InternTrack) |
+| **2026-08-02** | **1288** | **77%** | CI fix + entry-point tests (+41 CyberGuide, coverage 72.1% → 77%) |
 
 ---
 
@@ -338,7 +358,7 @@ uvicorn interntrack.main:app --reload
 ✅ Dashboard with charts
 ✅ Docker deployment ready
 ✅ Documentation complete
-✅ 1247 tests passing (924 InternTrack + 323 CyberGuide)
+✅ 1288 tests passing (924 InternTrack + 364 CyberGuide)
 ✅ CI/CD pipelines configured
 ✅ Security documentation
 ✅ API rate limiting enabled
@@ -353,5 +373,5 @@ uvicorn interntrack.main:app --reload
 
 ---
 
-**Last Updated:** 2026-08-01
+**Last Updated:** 2026-08-02
 **Status:** ✅ 100% Complete

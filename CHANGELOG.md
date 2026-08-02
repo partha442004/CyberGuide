@@ -63,6 +63,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   mypy (186 files, `warn_unused_ignores` clean), `scripts/check_versions.py`
   exit 0 (all sources 1.19.0)
 - README badges refreshed: tests 1247 → **1288 passed**, coverage 67% → **77%**
+- Docs re-synced to the new numbers: PROJECT-STATUS.md, PROJECT-PROGRESS.md,
+  TODO-CHECKLIST.md (new HARDENING PASS 18 entry), src/cybershield/PROGRESS.md
+  (323 → 364 tests + entry-point coverage table), docs/cscip/17-cicd.md
+  (1247 → 1288 tests)
 
 ## [Merged] - 2026-08-01 — origin/master reconciled into local master
 

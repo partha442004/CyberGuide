@@ -555,6 +555,30 @@ sqlite3 data/interntrack.db "PRAGMA integrity_check;"
 
 ---
 
+## ✅ HARDENING PASS 18 (2026-08-02) — COMPLETED
+
+### CI Tests job fix + Entry-Point Coverage Push
+- [x] **CI Tests job fixed**: `tests/unit/test_api_v1_full.py` local `client`
+      fixture was hitting the real app's `./data/interntrack.db` — the `data/`
+      dir is gitignored/absent on the runner, so all 26 endpoint tests failed
+      with `sqlite3.OperationalError: unable to open database file`. Fixture
+      now uses a hermetic temp-file SQLite DB (`tmp_path`) + `get_db`
+      dependency override + `async_session_factory` swap, restored in
+      `finally` with engine dispose (mirrors `tests/conftest.py`)
+- [x] **Entry-point tests** (CyberGuide modules previously at 0% coverage):
+      `test_start_script.py` (start.py → **98%**), `test_check_routes.py`
+      (check_routes.py → **100%**), `test_scheduler_main.py`
+      (scheduler/__main__.py → **50%**), `test_dashboard_app.py`
+      (dashboard/app.py → **99%**, fake streamlit/plotly injected)
+- [x] **1288 tests passing** (924 InternTrack + 364 CyberGuide) — verified in
+      the CI-exact env (Python 3.11.9 + pytest-asyncio 1.4.0)
+- [x] **Combined coverage 77%** (10,944 lines; was 72.1% / 10,619 lines)
+- [x] README badges refreshed: 1288 tests, 77% coverage
+- [x] CI fully green: run 30737407251 — Version ✓, Lint ✓, Typecheck ✓,
+      Security ✓, Tests ✓, Smoke ✓
+
+---
+
 ## ✅ HARDENING PASS 2 (2026-08-01) — COMPLETED
 
 ### API Rate Limiting (InternTrack)
@@ -940,5 +964,5 @@ docker-compose up -d
 
 ---
 
-**Last Updated:** 2026-08-01
+**Last Updated:** 2026-08-02
 **Version:** 1.19.0
