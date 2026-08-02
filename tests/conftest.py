@@ -2,9 +2,8 @@
 Pytest configuration and test fixtures.
 """
 
-import asyncio
 import os
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 
 # Disable rate limiting so the shared integration client stays deterministic.
@@ -102,14 +101,6 @@ def make_app_mock(**overrides) -> dict:
 
 # Test database URL (in-memory SQLite)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
-
-
-@pytest.fixture(scope="session")
-def event_loop() -> Generator:
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest_asyncio.fixture(scope="function")
