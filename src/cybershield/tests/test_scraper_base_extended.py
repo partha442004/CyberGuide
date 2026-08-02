@@ -33,6 +33,11 @@ def _make_scraper(**config_overrides):
     return _TestScraper(config)
 
 
+def _response(status_code: int = 200, text: str = "ok") -> httpx.Response:
+    request = httpx.Request("GET", "https://test.com/jobs")
+    return httpx.Response(status_code, text=text, request=request)
+
+
 class TestScraperConfig:
     def test_default_headers(self):
         config = ScraperConfig(name="x", base_url="https://x.com")
@@ -141,10 +146,6 @@ class TestParseDate:
 
 
 class TestFetch:
-    def _response(self, status_code=200, text="ok"):
-        request = httpx.Request("GET", "https://test.com/jobs")
-        return httpx.Response(status_code, text=text, request=request)
-
     @pytest.mark.asyncio
     async def test_do_fetch_success(self):
         scraper = _make_scraper(rate_limit=0)
@@ -160,9 +161,7 @@ class TestFetch:
                 return False
 
             async def get(self, *args, **kwargs):
-                return self._response()
-
-        FakeClient._response = self._response
+                return _response()
 
         with patch("cybershield.scrapers.base.httpx.AsyncClient", FakeClient):
             response = await scraper._do_fetch("https://test.com/jobs")
