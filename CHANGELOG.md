@@ -8,6 +8,71 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+#### CyberGuide Coverage Push (APIs / notifiers / engines — round 3)
+- `test_resumes_api.py` (30 tests) — `api/v1/resumes.py` 17% → **57%**: helper
+  coverage (`_extract_skill_names`, `_calculate_job_match` full/partial/none,
+  `_serialize_resume_response`) plus full endpoint integration — upload
+  (non-PDF 400, empty 400, oversize 413, create, update-existing, parser
+  `ValueError`→400, parser exception→500), get (200/404), match (200/404
+  no-resume/404 no-job), delete (200/404), batch-match (sorted results,
+  average score, 404s, missing-job skipping)
+- `test_search_api.py` (8 tests) — `api/v1/search.py` 47% → **100%**: search
+  passthrough, invalid sort/order fallback to `_score`/`desc`, all filters
+  forwarded, DB-fallback empty result, limit validation (422), status
+  endpoint available/unavailable
+- `test_notifications_api.py` (6 tests) — `api/v1/notifications.py` 50% →
+  **62%**: default config when none exists, existing-config GET, PUT update
+  existing, test-notification send (valid + invalid channel 422), send with
+  unknown channel
+- `test_email_notifier.py` (17 tests) — `notifications/email.py` 44% →
+  **100%**: config defaults/overrides, HTML template (title/content, all four
+  priority colors, URL button present/absent, type title-casing, newline→`<br>`),
+  text version, send without credentials → False, send success via mocked
+  `_send_email_sync`, send exception → False, real `_send_email_sync` through
+  a fake `smtplib.SMTP`, `test_connection` success/failure
+- `test_applications_api.py` (15 tests) — `api/v1/applications.py` 54% →
+  **80%**: list (empty, with data, status filter, pagination), get (200/404),
+  create (201), status update (valid → history entry, invalid → 422), history
+  (empty + after change), user metrics (empty + with data + success rate),
+  upcoming deadlines (empty + with interview)
+- `test_jobs_api.py` (13 tests) — `api/v1/jobs.py` 60% → **73%**: list
+  (empty, with data, country/type filter, pagination), search (by query, 422
+  without query), get (200/404), create (201), update, delete (204 + 404),
+  expiring-soon (empty + with deadline)
+- `test_scraper_base_extended.py` (26 tests) — `scrapers/base.py` 60% →
+  **86%**: `ScraperConfig` defaults/custom, `ScrapedJob` defaults + `to_dict`,
+  cache-key determinism, URL normalization (tracking params, unchanged,
+  empty), `_parse_date` (6 formats + invalid + None), `_do_fetch` success /
+  HTTP-error / request-error (counter checks), `_fetch_with_cache` (hit skips
+  network, miss fetches + stores, `use_cache=False`), `_create_cached_response`,
+  `run` (success + error propagation), `clear_cache`, `get_stats` (empty +
+  populated), `_rate_limit_wait` (zero-limit no wait, wait when needed)
+- `test_matching_engine_extended.py` (13 tests) — `interntrack/engines/
+  matching.py` 57% → **99%**: `match_job_to_user` full/partial/missing paths
+  with percentage math (57.14), all-missing → 0%, recommendations (skill
+  resources capped at 3, fallback defaults, top-5 limit), `find_matching_jobs`
+  (no user skills → [], matching jobs with percentage, below-min filter),
+  `get_skill_gap_analysis` detail (matched/missing with priority ordering,
+  perfect match → excellent readiness)
+
+### Fixed
+- `api/v1/applications.py` `GET /{application_id}/history` declared
+  `response_model=List[dict]` but returned ORM objects — FastAPI raised
+  `ResponseValidationError` (500). The endpoint now serializes each history
+  row to a plain dict (found by the new `test_applications_api.py`)
+- `api/v1/jobs.py` route ordering: `GET /expiring-soon` was registered after
+  `GET /{job_id}`, so the dynamic route shadowed it (404). The expiring-soon
+  route now precedes `/{job_id}` (found by the new `test_jobs_api.py`)
+
+### Changed
+- **Full suite: 1546 passed** (was 1421); combined coverage **86%** (13,063
+  lines, 1,786 missed; was 83% / 12,037 lines)
+- Coverage gains (round 3): `api/v1/resumes.py` 17% → **57%**,
+  `api/v1/search.py` 47% → **100%**, `notifications/email.py` 44% → **100%**,
+  `interntrack/engines/matching.py` 57% → **99%**, `api/v1/applications.py`
+  54% → **80%**, `api/v1/jobs.py` 60% → **73%**, `scrapers/base.py`
+  60% → **86%**, `api/v1/notifications.py` 50% → **62%**
+- README badges refreshed: 1546 tests, 86% coverage
 #### CyberGuide Coverage Push (notifications / auth / session / repositories)
 - `test_notifications_channels.py` (26 tests) — `DiscordNotifier`,
   `SlackNotifier`, `TelegramNotifier`: embed / Block Kit / message building

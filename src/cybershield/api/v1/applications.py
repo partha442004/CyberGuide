@@ -90,7 +90,17 @@ async def get_application_history(
 ):
     """Get status change history for an application."""
     history = await repo.get_status_history(application_id)
-    return history
+    return [
+        {
+            "id": h.id,
+            "application_id": h.application_id,
+            "old_status": h.old_status,
+            "new_status": h.new_status,
+            "changed_at": h.changed_at,
+            "notes": h.notes,
+        }
+        for h in history
+    ]
 
 
 @router.get("/user/{user_id}/metrics", response_model=ApplicationMetrics)
