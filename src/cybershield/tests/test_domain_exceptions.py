@@ -5,8 +5,6 @@ Covers the base AppException (defaults, to_dict, attribute aliases) and
 every concrete exception subclass.
 """
 
-import pytest
-
 from cybershield.domain.exceptions import (
     AppException,
     ConfigurationError,

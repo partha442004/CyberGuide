@@ -5,7 +5,7 @@ Covers EngineResult defaults/serialization, BaseEngine.run success and
 error handling, and the _create_result helper.
 """
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
