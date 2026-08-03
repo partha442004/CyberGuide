@@ -5,6 +5,7 @@ Async database session management.
 import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.pool import NullPool
 
 from interntrack.config import get_settings
 from interntrack.metrics import business_metrics_store
@@ -19,10 +21,21 @@ from interntrack.metrics import business_metrics_store
 settings = get_settings()
 
 # Create async engine
+# Use NullPool when on Postgres (serverless-safe) or when explicitly requested.
+# The default QueuePool holds persistent connections, which is fine for a
+# long-running server (Railway, Docker) but exhausts connection limits under
+# serverless. NullPool opens a fresh connection per request and pairs well
+# with Neon's PgBouncer pooler.
+_pool_kwargs: dict[str, Any] = {}
+if settings.database_url.startswith("postgresql"):
+    _pool_kwargs["poolclass"] = NullPool
+else:
+    _pool_kwargs["pool_pre_ping"] = True
+
 engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,
-    pool_pre_ping=True,
+    **_pool_kwargs,
 )
 
 

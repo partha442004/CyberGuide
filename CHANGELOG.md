@@ -26,6 +26,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   the helpers, model defaults and repository queries.
 - **Tests: 2040 passing** (was 2027). Coverage unchanged (99%, every source
   module at 100%).
+- **Follow-up fix during live verification**: the enum columns
+  (`Job.source`/`job_type`, `Application.status`, `ApplicationStatusHistory`
+  statuses, `Skill.category`) were declared as SQLAlchemy native enums, which
+  bound Postgres enum-typed params against the live **varchar** columns
+  (created by the migrations / initial schema), producing
+  `operator does not exist: character varying = applicationstatus` on
+  `/api/v1/dashboard/overview`. Switched all to
+  `Enum(..., native_enum=False, values_callable=...)` so values are stored
+  and bound as lowercase strings — matching the live schema, the migrations,
+  and SQLite tests. Verified all formerly-500ing endpoints return 200 live.
+  Pushed as `ba633ad`, CI green (30797393379).
 
 ## [1.20.7] - 2026-08-03
 
