@@ -119,21 +119,25 @@ class Job(Base, TimestampMixin):
 
     @validates("source")
     def _coerce_job_source(self, _key: str, value):
-        """Coerce any raw source string to a known JobSource value.
+        """Coerce any raw source string to a JobSource member.
 
         Guards against scrapers/API clients writing source names that are not
         defined in :class:`JobSource` — a stored value outside the enum
         crashes every read on Postgres (SQLAlchemy enum lookup), which is what
-        happened live with ``weworkremotely``.
+        happened live with ``weworkremotely``. Always returns a member so
+        in-memory ``job.source.value`` and DB round-trips behave identically.
         """
         if value is None:
-            return JobSource.UNKNOWN.value
+            return JobSource.UNKNOWN
         if isinstance(value, JobSource):
-            return value.value
+            return value
         raw = str(value)
         if raw in JobSource._value2member_map_:
-            return raw
-        return self._SOURCE_ALIASES.get(raw, JobSource.UNKNOWN.value)
+            return JobSource._value2member_map_[raw]
+        mapped = self._SOURCE_ALIASES.get(raw)
+        if mapped and mapped in JobSource._value2member_map_:
+            return JobSource._value2member_map_[mapped]
+        return JobSource.UNKNOWN
 
     def __repr__(self) -> str:
         return f"<Job {self.title} at {self.company}>"
