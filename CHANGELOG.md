@@ -38,6 +38,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `ScheduledReport` (`last_generated`, `next_generation`). Verified against
   the real Neon Postgres (aware insert round-trips naive) and the live
   endpoint after redeploy.
+- **Production bug #2 (found while verifying #1 live): `GET /api/v1/jobs/`
+  returned `INTERNAL_ERROR` after the first successful discovery save** —
+  `RSSFeedScraper` stored the raw feed dict key (e.g. `"weworkremotely"`) as
+  the job `source` instead of the enum value; the stored value crashed the
+  read path on Postgres (`LookupError: 'weworkremotely' is not among the
+  defined enum values`). Fixed in three layers:
+  - `rss_feeds.py` now always emits `JobSource.RSS_FEED.value` (`rss_feed`)
+    regardless of the feed key
+  - `Job` gained a defensive `@validates("source")` that maps raw aliases
+    (`weworkremotely`→`we_work_remotely`, `remoteok`→`remote_ok`, etc.) and
+    falls back to `unknown` for anything outside the enum — future scrapers
+    can't reintroduce the crash
+  - Existing bad rows fixed in Neon (`UPDATE jobs SET source='rss_feed'`)
+  - `SkillCategory` gained `GENERAL = "general"` (the skill repository
+    already writes `category="general"`, which wasn't a valid enum value and
+    would have crashed skill reads the same way)
 - **CD workflow cleaned up** — `.github/workflows/cd.yml` no longer has a
   dead Oracle Cloud SSH `deploy` job (Vercel auto-deploys every push); it now
   only builds/pushes the Docker image to Docker Hub on `v*` tags.
@@ -46,9 +62,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
-- **Tests: 2051 passing** (was 2040). Version bumped to **1.20.9** across all
+- **Tests: 2060 passing** (was 2040). Version bumped to **1.20.9** across all
   sources (`interntrack`/`cybershield` `__version__`, `.env`/`.env.example`,
   root `pyproject.toml`, canary tests) — `make version-check` exit 0.
+- **Note**: Vercel auto-deploy on git push was NOT active (project linked via
+  CLI; default production branch is `main` while the repo uses `master`).
+  Deploys are currently done via `vercel deploy --prod`; enabling the
+  dashboard Git integration + setting the production branch to `master` is
+  documented in PROJECT-STATUS.md.
 - The stale `C:\internship-tracker` copy was deleted from disk (SSH keys
   preserved in the real project first); only the Freebuff app's own
   `desktop-v2.db` cache remains until the app is closed.

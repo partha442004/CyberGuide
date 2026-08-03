@@ -175,6 +175,35 @@ class TestRSSFeedScraper:
             result = await scraper.fetch("python")
             assert len(result) >= 0  # May be empty due to parsing
 
+    @pytest.mark.asyncio
+    async def test_fetch_emits_enum_source_not_feed_key(self):
+        """Regression: jobs must carry the enum source (rss_feed), not the raw
+        feed dict key (e.g. "weworkremotely"), so stored rows round-trip
+        through the JobSource column on Postgres."""
+        from interntrack.scrapers.rss_feeds import RSSFeedScraper
+
+        scraper = RSSFeedScraper(feeds={"weworkremotely": "https://example.com/feed"})
+
+        mock_response = MagicMock()
+        mock_response.text = "<rss version='2.0'><channel></channel></rss>"
+        scraper._get = AsyncMock(return_value=mock_response)
+
+        with patch("feedparser.parse") as mock_parse:
+            mock_parse.return_value.entries = [
+                {
+                    "title": "Python Developer at TechCorp",
+                    "link": "https://example.com/123",
+                    "summary": "Python and Django experience required",
+                },
+            ]
+            mock_parse.return_value.feed = {"title": "Test Feed"}
+
+            result = await scraper.fetch("python")
+            assert result
+            for job in result:
+                assert job.source == "rss_feed"
+                assert job.source != "weworkremotely"
+
 
 class TestCustomRSSFeedScraper:
     """Tests for CustomRSSFeedScraper class."""

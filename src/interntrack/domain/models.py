@@ -92,6 +92,16 @@ class Job(Base, TimestampMixin):
     tags = Column(JSON, nullable=True, default=list)
     raw_data = Column(JSON, nullable=True)
 
+    # Raw names emitted by some scrapers, mapped to canonical enum values so
+    # stored sources always round-trip through the JobSource column.
+    _SOURCE_ALIASES = {
+        "weworkremotely": "we_work_remotely",
+        "remoteok": "remote_ok",
+        "hackernews_jobs": "hackernews",
+        "rss": "rss_feed",
+        "rss_feeds": "rss_feed",
+    }
+
     # Relationships
     applications = relationship("Application", back_populates="job", lazy="selectin")
     skills = relationship("JobSkill", back_populates="job", lazy="selectin")
@@ -106,6 +116,24 @@ class Job(Base, TimestampMixin):
     def _coerce_naive_utc(self, _key: str, value):
         """Normalize aware datetimes to naive UTC for Postgres binding."""
         return to_naive_utc(value)
+
+    @validates("source")
+    def _coerce_job_source(self, _key: str, value):
+        """Coerce any raw source string to a known JobSource value.
+
+        Guards against scrapers/API clients writing source names that are not
+        defined in :class:`JobSource` — a stored value outside the enum
+        crashes every read on Postgres (SQLAlchemy enum lookup), which is what
+        happened live with ``weworkremotely``.
+        """
+        if value is None:
+            return JobSource.UNKNOWN.value
+        if isinstance(value, JobSource):
+            return value.value
+        raw = str(value)
+        if raw in JobSource._value2member_map_:
+            return raw
+        return self._SOURCE_ALIASES.get(raw, JobSource.UNKNOWN.value)
 
     def __repr__(self) -> str:
         return f"<Job {self.title} at {self.company}>"
