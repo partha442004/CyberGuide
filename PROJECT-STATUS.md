@@ -4,6 +4,23 @@
 
 ---
 
+## 🛠️ 2026-08-03 Coverage Push (interntrack core — round 8) ✅ v1.20.5
+
+- ✅ **Tests**: **1929 passing** (was 1862) — 67 new tests in 7 new files
+- ✅ **Combined coverage (interntrack + cybershield)**: **99%** (15,908 lines,
+  232 missed; was 98% / 390 missed at the start of the round)
+- ✅ **New test files**: `test_interntrack_repositories.py` (23),
+  `test_ai_service_gemini.py` (8), `test_interntrack_session_extended.py` (7),
+  `test_interntrack_main_extended.py` (4), `test_rate_limit_extended.py` (6),
+  `test_glassdoor_scraper_extended.py` (5), `test_skills_api_extended.py` (7)
+- ✅ **Coverage gains (round 8)**: `repositories/user_repository.py` 25% →
+  **100%**, `repositories/skill_repository.py` 37% → **100%**,
+  `repositories/job_repository.py` 51% → **100%**,
+  `repositories/application_repository.py` 65% → **100%**,
+  `repositories/base.py` 38% → **100%**, `scrapers/glassdoor.py` → **100%**,
+  `api/v1/skills.py` 79% → **100%**, `domain/exceptions.py` 89% → **100%**
+- 📉 **No source module below 90% coverage** across the whole combined suite
+
 ## 🛠️ 2026-08-02 Coverage Push (scrapers / core services — round 7) ✅ v1.20.4
 
 - ✅ **Tests**: **1862 passing** (was 1751) — 111 new tests in 8 new files
