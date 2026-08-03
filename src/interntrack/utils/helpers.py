@@ -2,7 +2,18 @@
 General helper functions.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
+
+
+def utcnow() -> datetime:
+    """Return the current UTC time as a *naive* datetime.
+
+    The DB columns are plain ``timestamp without time zone`` on PostgreSQL
+    (``Column(DateTime, ...)``), so asyncpg rejects offset-aware values.
+    Storing naive UTC keeps SQLite (tests) and PostgreSQL (production)
+    consistent without a migration.
+    """
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def format_datetime(dt: datetime | None, fmt: str = "%Y-%m-%d %H:%M") -> str:

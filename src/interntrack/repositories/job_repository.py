@@ -2,7 +2,7 @@
 Job repository with job-specific queries.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from interntrack.domain.enums import JobSource, JobType
 from interntrack.domain.models import Job
 from interntrack.repositories.base import BaseRepository
+from interntrack.utils.helpers import utcnow
 
 
 class JobRepository(BaseRepository[Job]):
@@ -31,7 +32,7 @@ class JobRepository(BaseRepository[Job]):
         tolerance_days: int = 7,
     ) -> Job | None:
         """Find potential duplicate job posting."""
-        cutoff_date = datetime.now(UTC) - timedelta(days=tolerance_days)
+        cutoff_date = utcnow() - timedelta(days=tolerance_days)
         query = select(Job).where(
             and_(
                 func.lower(Job.title) == title.lower(),
@@ -75,7 +76,7 @@ class JobRepository(BaseRepository[Job]):
 
     async def get_recent_jobs(self, days: int = 7) -> list[Job]:
         """Get jobs posted in the last N days."""
-        cutoff_date = datetime.now(UTC) - timedelta(days=days)
+        cutoff_date = utcnow() - timedelta(days=days)
         query = (
             select(Job)
             .where(Job.created_at >= cutoff_date)
@@ -86,7 +87,7 @@ class JobRepository(BaseRepository[Job]):
 
     async def get_closing_soon(self, days: int = 2) -> list[Job]:
         """Get jobs closing within N days."""
-        now = datetime.now(UTC)
+        now = utcnow()
         cutoff = now + timedelta(days=days)
         query = (
             select(Job)
@@ -168,7 +169,7 @@ class JobRepository(BaseRepository[Job]):
 
     async def deactivate_expired(self) -> int:
         """Deactivate expired jobs."""
-        now = datetime.now(UTC)
+        now = utcnow()
         expired_ids = (
             (
                 await self.session.execute(

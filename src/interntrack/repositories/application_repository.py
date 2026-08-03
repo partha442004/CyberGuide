@@ -2,7 +2,7 @@
 Application repository with application-specific queries.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from interntrack.domain.enums import ApplicationStatus
 from interntrack.domain.models import Application
 from interntrack.repositories.base import BaseRepository
+from interntrack.utils.helpers import utcnow
 
 
 class ApplicationRepository(BaseRepository[Application]):
@@ -44,7 +45,7 @@ class ApplicationRepository(BaseRepository[Application]):
 
     async def get_recent_applications(self, days: int = 30) -> list[Application]:
         """Get applications from the last N days."""
-        cutoff_date = datetime.now(UTC) - timedelta(days=days)
+        cutoff_date = utcnow() - timedelta(days=days)
         query = (
             select(Application)
             .where(Application.created_at >= cutoff_date)
@@ -55,7 +56,7 @@ class ApplicationRepository(BaseRepository[Application]):
 
     async def get_application_timeline(self, days: int = 30) -> list[dict]:
         """Get application timeline for charts."""
-        cutoff_date = datetime.now(UTC) - timedelta(days=days)
+        cutoff_date = utcnow() - timedelta(days=days)
         query = (
             select(
                 func.date(Application.created_at).label("date"),
@@ -118,7 +119,7 @@ class ApplicationRepository(BaseRepository[Application]):
         application.status = new_status  # type: ignore[assignment]
 
         if new_status == ApplicationStatus.APPLIED and not application.applied_at:
-            application.applied_at = datetime.now(UTC)  # type: ignore[assignment]
+            application.applied_at = utcnow()  # type: ignore[assignment]
 
         # Add status history entry
         history = ApplicationStatusHistory(

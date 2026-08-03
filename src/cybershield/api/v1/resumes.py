@@ -4,7 +4,6 @@ Resumes API Router
 Endpoints for resume upload, parsing, matching, and skill extraction.
 """
 
-from datetime import datetime, timezone
 from typing import Any, List
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -19,6 +18,7 @@ from cybershield.schemas.resume import (
     ResumeUploadResponse,
 )
 from cybershield.services.resume_service import ResumeParser
+from cybershield.utils import utcnow
 
 router = APIRouter()
 
@@ -145,7 +145,7 @@ async def upload_resume(
         existing_resume.certifications = parsed_data.get("certifications", [])
         existing_resume.github_url = parsed_data.get("links", {}).get("github")
         existing_resume.linkedin_url = parsed_data.get("links", {}).get("linkedin")
-        existing_resume.parsed_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+        existing_resume.parsed_at = utcnow()  # type: ignore[assignment]
         resume = existing_resume
     else:
         resume = ResumeData(
@@ -159,7 +159,7 @@ async def upload_resume(
             certifications=parsed_data.get("certifications", []),
             github_url=parsed_data.get("links", {}).get("github"),
             linkedin_url=parsed_data.get("links", {}).get("linkedin"),
-            parsed_at=datetime.now(timezone.utc),
+            parsed_at=utcnow(),
         )
         session.add(resume)
 

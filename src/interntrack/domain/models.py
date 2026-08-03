@@ -2,7 +2,6 @@
 SQLAlchemy ORM models for the application.
 """
 
-from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy import (
@@ -27,6 +26,7 @@ from interntrack.domain.enums import (
     JobType,
     SkillCategory,
 )
+from interntrack.utils.helpers import utcnow
 
 
 class Base(DeclarativeBase):
@@ -36,11 +36,11 @@ class Base(DeclarativeBase):
 class TimestampMixin:
     """Mixin for timestamp fields."""
 
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(UTC),
-        onupdate=lambda: datetime.now(UTC),
+        default=utcnow,
+        onupdate=utcnow,
         nullable=False,
     )
 
@@ -142,7 +142,7 @@ class ApplicationStatusHistory(Base, TimestampMixin):
     )
     old_status: Column = Column(Enum(ApplicationStatus), nullable=True)
     new_status: Column = Column(Enum(ApplicationStatus), nullable=False)
-    changed_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    changed_at = Column(DateTime, default=utcnow, nullable=False)
     notes = Column(Text, nullable=True)
 
     # Relationships

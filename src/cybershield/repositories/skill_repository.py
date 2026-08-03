@@ -4,7 +4,7 @@ Skill Repository
 Specialized repository for skill operations and market analysis.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from typing import Optional, Sequence
 
 from sqlalchemy import desc, func, select
@@ -13,6 +13,7 @@ from sqlalchemy.orm import selectinload
 
 from cybershield.domain.models import JobSkill, Skill, SkillTrend, UserSkill
 from cybershield.repositories.base import BaseRepository
+from cybershield.utils import utcnow
 
 
 class SkillRepository(BaseRepository[Skill]):
@@ -109,7 +110,7 @@ class SkillRepository(BaseRepository[Skill]):
 
     async def get_skill_trends(self, skill_id: str, months: int = 12) -> Sequence[SkillTrend]:
         """Get historical trend data for a skill."""
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=months * 30)
+        cutoff_date = utcnow() - timedelta(days=months * 30)
 
         result = await self.session.execute(
             select(SkillTrend)

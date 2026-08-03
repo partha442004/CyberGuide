@@ -4,7 +4,7 @@ Job Repository
 Specialized repository for job-related operations.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from typing import List, Optional, Sequence
 
 from sqlalchemy import and_, desc, or_, select
@@ -13,6 +13,7 @@ from sqlalchemy.orm import selectinload
 
 from cybershield.domain.models import DuplicateGroup, Job, ScamScore
 from cybershield.repositories.base import BaseRepository
+from cybershield.utils import utcnow
 
 
 class JobRepository(BaseRepository[Job]):
@@ -85,7 +86,7 @@ class JobRepository(BaseRepository[Job]):
 
     async def get_expiring_soon(self, days: int = 7) -> Sequence[Job]:
         """Get jobs expiring within specified days."""
-        now = datetime.now(timezone.utc)
+        now = utcnow()
         future = now + timedelta(days=days)
 
         result = await self.session.execute(
@@ -136,6 +137,6 @@ class JobRepository(BaseRepository[Job]):
         """Update job verification status."""
         job = await self.get_or_raise(job_id)
         job.is_verified = is_verified  # type: ignore[assignment]
-        job.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+        job.updated_at = utcnow()  # type: ignore[assignment]
         await self.session.flush()
         return job

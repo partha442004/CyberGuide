@@ -4,6 +4,29 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.20.8] - 2026-08-03
+
+### Fixed
+
+- **Production bug: aware/naive datetime mismatch on PostgreSQL.** The live
+  Railway deployment returned `INTERNAL_ERROR` (500) on `/reports/daily`,
+  `/api/v1/dashboard/overview`, `/api/v1/dashboard/recent-activity` and
+  `/api/v1/dashboard/charts/application-timeline`. Root cause: models and
+  repositories used offset-aware `datetime.now(UTC)` while PostgreSQL columns
+  are plain `timestamp without time zone`, so asyncpg rejected the bind
+  params (`can't subtract offset-naive and offset-aware datetimes`). The
+  SQLite test suite masked this because SQLite is lenient about tzinfo.
+- Added `utcnow()` (naive UTC) helpers in `interntrack/utils/helpers.py` and
+  `cybershield/utils.py` and switched **all DB-facing datetime sites** to
+  them — model defaults (`created_at`, `updated_at`, `changed_at`), repository
+  cutoffs/`now` values (jobs, applications, skills), `seed_data.py`, resumes
+  API writes, and `cybershield/scheduler/__main__.py`. No migration needed;
+  SQLite (tests) and PostgreSQL (production) now behave identically.
+- Added 13 regression tests in `tests/unit/test_utcnow_naive_fix.py` covering
+  the helpers, model defaults and repository queries.
+- **Tests: 2040 passing** (was 2027). Coverage unchanged (99%, every source
+  module at 100%).
+
 ## [1.20.7] - 2026-08-03
 
 ### Added

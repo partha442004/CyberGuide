@@ -22,7 +22,7 @@ restartPolicyMaxRetries = 3
 [variables]
 PYTHONPATH = "src"
 APP_NAME = "InternTrack"
-APP_VERSION = "1.20.7"
+APP_VERSION = "1.20.8"
 DEBUG = "false"
 
 # SECRET_KEY — generate a strong random value in the Railway dashboard and

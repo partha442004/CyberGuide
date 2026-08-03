@@ -34,20 +34,20 @@ class TestVersionSources:
         Canary: bump this string whenever a new CHANGELOG release is added.
         """
         assert check_versions.is_consistent(check_versions.sources())
-        assert check_versions.sources()["interntrack.__version__"] == "1.20.7"
+        assert check_versions.sources()["interntrack.__version__"] == "1.20.8"
 
     def test_version_from_init_parses(self):
         """Both package __init__.py files expose a parseable __version__."""
-        assert check_versions.version_from_init("interntrack") == "1.20.7"
-        assert check_versions.version_from_init("cybershield") == "1.20.7"
+        assert check_versions.version_from_init("interntrack") == "1.20.8"
+        assert check_versions.version_from_init("cybershield") == "1.20.8"
 
     def test_version_from_env_example_parses(self):
         """.env.example exposes a parseable APP_VERSION."""
-        assert check_versions.version_from_env_example() == "1.20.7"
+        assert check_versions.version_from_env_example() == "1.20.8"
 
     def test_version_from_pyproject_parses(self):
         """Root pyproject.toml exposes a parseable project.version."""
-        assert check_versions.version_from_pyproject() == "1.20.7"
+        assert check_versions.version_from_pyproject() == "1.20.8"
 
 
 class TestConsistencyDetection:

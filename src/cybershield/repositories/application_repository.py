@@ -4,7 +4,6 @@ Application Repository
 Specialized repository for application tracking operations.
 """
 
-from datetime import datetime, timezone
 from typing import Optional, Sequence
 
 from sqlalchemy import and_, desc, func, select
@@ -14,6 +13,7 @@ from sqlalchemy.orm import selectinload
 from cybershield.domain.enums import ApplicationStatus
 from cybershield.domain.models import Application, ApplicationStatusHistory
 from cybershield.repositories.base import BaseRepository
+from cybershield.utils import utcnow
 
 
 class ApplicationRepository(BaseRepository[Application]):
@@ -139,8 +139,8 @@ class ApplicationRepository(BaseRepository[Application]):
 
     async def get_upcoming_deadlines(self, user_id: str, days: int = 7) -> Sequence[Application]:
         """Get applications with upcoming interview deadlines."""
-        now = datetime.now(timezone.utc)
-        future = datetime.now(timezone.utc).replace(day=now.day + days)
+        now = utcnow()
+        future = now.replace(day=now.day + days)
 
         result = await self.session.execute(
             select(Application)

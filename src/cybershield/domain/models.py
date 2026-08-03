@@ -2,7 +2,6 @@
 SQLAlchemy ORM models for CyberGuide (30+ tables).
 """
 
-from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy import (
@@ -19,6 +18,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.orm import DeclarativeBase, relationship
 
+from cybershield.utils import utcnow
+
 
 class Base(DeclarativeBase):
     """Base model for all database models."""
@@ -29,11 +30,11 @@ class Base(DeclarativeBase):
 class TimestampMixin:
     """Mixin for timestamp fields."""
 
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=utcnow,
+        onupdate=utcnow,
         nullable=False,
     )
 
@@ -499,7 +500,7 @@ class ApplicationStatusHistory(Base, TimestampMixin):
     )
     old_status = Column(String(50), nullable=True)
     new_status = Column(String(50), nullable=False)
-    changed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    changed_at = Column(DateTime, default=utcnow, nullable=False)
     notes = Column(Text, nullable=True)
 
     # Relationships
