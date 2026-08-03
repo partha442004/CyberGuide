@@ -16,6 +16,22 @@ def utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
+def to_naive_utc(dt: datetime | None) -> datetime | None:
+    """Coerce a datetime to naive UTC for Postgres ``timestamp`` columns.
+
+    Scrapers and API clients can hand us offset-aware datetimes (e.g. parsed
+    from ISO-8601 with ``+00:00``); asyncpg rejects those when binding to a
+    ``timestamp without time zone`` column with ``can't subtract
+    offset-naive and offset-aware datetimes``. This normalizes them to naive
+    UTC (the same convention as :func:`utcnow`) without a migration.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        return dt.astimezone(UTC).replace(tzinfo=None)
+    return dt
+
+
 def format_datetime(dt: datetime | None, fmt: str = "%Y-%m-%d %H:%M") -> str:
     """Format datetime to string."""
     if dt:

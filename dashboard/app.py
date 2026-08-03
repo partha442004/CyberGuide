@@ -2,6 +2,7 @@
 InternTrack Dashboard - Streamlit Application
 """
 
+import os
 from contextlib import suppress
 
 import httpx
@@ -41,8 +42,10 @@ st.markdown(
 )
 
 # API base URL
-API_URL = "http://localhost:8000/api/v1"
-HEALTH_URL = "http://localhost:8000/health"
+# Base URLs for the InternTrack API. Override via the API_URL env var
+# (e.g. on Streamlit Community Cloud point it at the live Vercel deployment).
+API_URL = os.environ.get("API_URL", "http://localhost:8000/api/v1")
+HEALTH_URL = os.environ.get("HEALTH_URL", "http://localhost:8000/health")
 DEFAULT_VERSION = "1.20.0"
 
 

@@ -6,7 +6,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![CI](https://github.com/partha442004/CyberGuide/actions/workflows/ci.yml/badge.svg)
-![Tests](https://img.shields.io/badge/tests-2040%20passed-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-2051%20passed-brightgreen.svg)
 ![Coverage](https://img.shields.io/badge/coverage-99%25-green.svg)
 ![Security](https://img.shields.io/badge/security-bandit%20%2B%20safety%20%2B%20trivy%20clean-brightgreen.svg)
 
@@ -176,6 +176,10 @@ Vercel (serverless) with a Neon Postgres database. Both are free forever.
   `DEBUG=false`, `RATE_LIMIT_ENABLED=false`
 - **Auto-deploy**: every push to `master` redeploys automatically
 - Neon free tier: PostgreSQL 18, 0.5 GB storage, scale-to-zero compute
+- **Auto-refresh**: `.github/workflows/daily-refresh.yml` (free GitHub Actions
+  cron) triggers `POST /api/v1/jobs/discovery/run` + `GET /api/v1/reports/daily`
+  on the live API twice a day — replaces the always-on worker that can't run
+  on serverless
 
 Note: serverless cold start is ~1-3s on the first request after idle.
 
@@ -216,13 +220,26 @@ pytest tests/integration
 
 ## 📊 Dashboard
 
-Start the Streamlit dashboard:
+Start the Streamlit dashboard locally:
 
 ```bash
+pip install -r dashboard/requirements.txt
 streamlit run dashboard/app.py
 ```
 
-Open http://localhost:8501 in your browser.
+Open http://localhost:8501 in your browser. The dashboard reads `API_URL`
+and `HEALTH_URL` from the environment (defaults to `http://localhost:8000`).
+
+### Dashboard on Streamlit Community Cloud (free, no credit card)
+
+1. Push the repo to GitHub, then go to https://share.streamlit.io and sign in
+   with GitHub
+2. Click **New app** → select `partha442004/CyberGuide` → branch `master`
+3. Set **Main file path** to `dashboard/app.py`
+4. In **Advanced settings** add the secret:
+   `API_URL = https://cyberguide-api.vercel.app`
+   (`HEALTH_URL = https://cyberguide-api.vercel.app/health`)
+5. Click **Deploy** — the dashboard is live at `your-app.streamlit.app`
 
 ---
 

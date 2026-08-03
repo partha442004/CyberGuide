@@ -8,9 +8,109 @@ datetimes``, which broke /reports/daily, /dashboard/overview,
 live Railway deployment. All DB-facing code must use naive UTC values.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 
-from interntrack.utils.helpers import utcnow
+from interntrack.utils.helpers import to_naive_utc, utcnow
+
+
+class TestToNaiveUtc:
+    """Tests for the to_naive_utc() coercion helper."""
+
+    def test_none_passthrough(self):
+        assert to_naive_utc(None) is None
+
+    def test_naive_passthrough(self):
+        dt = datetime(2026, 8, 3, 12, 0, 0)
+        assert to_naive_utc(dt) is dt
+
+    def test_aware_utc_stripped(self):
+        aware = datetime(2026, 8, 3, 12, 0, 0, tzinfo=UTC)
+        naive = to_naive_utc(aware)
+        assert naive.tzinfo is None
+        assert naive == datetime(2026, 8, 3, 12, 0, 0)
+
+    def test_aware_offset_converted_to_utc(self):
+        # 12:00 IST (+5:30) == 06:30 UTC
+        aware = datetime(
+            2026, 8, 3, 12, 0, 0, tzinfo=timezone(timedelta(hours=5, minutes=30))
+        )
+        naive = to_naive_utc(aware)
+        assert naive.tzinfo is None
+        assert naive == datetime(2026, 8, 3, 6, 30, 0)
+
+    def test_roundtrip_preserves_instant(self):
+        aware = datetime(2026, 8, 3, 12, 0, 0, tzinfo=UTC)
+        naive = to_naive_utc(aware)
+        assert naive.replace(tzinfo=UTC) == aware
+
+
+class TestModelDatetimeCoercion:
+    """Model validators must normalize aware datetimes on assignment."""
+
+    def test_job_posted_at_aware_stripped(self):
+        from interntrack.domain.models import Job
+
+        aware = datetime(2026, 8, 3, 7, 30, 43, tzinfo=UTC)
+        job = Job(
+            title="t",
+            company="c",
+            url="https://example.com/aware-dt",
+            posted_at=aware,
+        )
+        assert job.posted_at.tzinfo is None
+        assert job.posted_at == datetime(2026, 8, 3, 7, 30, 43)
+
+    def test_job_expires_at_aware_stripped(self):
+        from interntrack.domain.models import Job
+
+        job = Job(
+            title="t",
+            company="c",
+            url="https://example.com/aware-dt-2",
+            expires_at=datetime(2026, 9, 1, 0, 0, 0, tzinfo=UTC),
+        )
+        assert job.expires_at.tzinfo is None
+
+    def test_job_naive_dates_left_alone(self):
+        from interntrack.domain.models import Job
+
+        naive = datetime(2026, 8, 3, 7, 30, 43)
+        job = Job(
+            title="t",
+            company="c",
+            url="https://example.com/naive-dt",
+            posted_at=naive,
+        )
+        assert job.posted_at is naive
+
+    def test_application_applied_at_aware_stripped(self):
+        from interntrack.domain.models import Application
+
+        app = Application(
+            job_id="j1",
+            applied_at=datetime(2026, 8, 3, 10, 0, 0, tzinfo=UTC),
+        )
+        assert app.applied_at.tzinfo is None
+
+    def test_user_skill_last_used_aware_stripped(self):
+        from interntrack.domain.models import UserSkill
+
+        us = UserSkill(
+            user_id="u1",
+            skill_id="s1",
+            last_used=datetime(2026, 8, 3, 10, 0, 0, tzinfo=UTC),
+        )
+        assert us.last_used.tzinfo is None
+
+    def test_scheduled_report_dates_aware_stripped(self):
+        from interntrack.domain.models import ScheduledReport
+
+        sr = ScheduledReport(
+            report_type="daily",
+            frequency="daily",
+            next_generation=datetime(2026, 8, 4, 0, 0, 0, tzinfo=UTC),
+        )
+        assert sr.next_generation.tzinfo is None
 
 
 class TestUtcnowHelper:
