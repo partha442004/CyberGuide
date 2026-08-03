@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [1.20.8] - 2026-08-03
 
+### Added
+
+- **Vercel + Neon serverless deployment config** for free hosting (no credit card
+  needed). New files: `api/index.py` (Vercel serverless entrypoint),
+  `vercel.json` (build/routes config). Database session now auto-detects
+  Postgres URLs and uses `NullPool` (serverless-safe with Neon's PgBouncer
+  pooler) instead of the default `QueuePool`. See the section below for the
+  dashboard setup guide.
+- ✅ **Neon database verified live**: connected to the user's Neon project
+  (PostgreSQL 18.4), ran `init_db()` to create all **13 tables**, and verified
+  end-to-end CRUD (insert/query a job + skill, enum + timestamp columns
+  working). Connection string format for asyncpg: `?ssl=require` (NOT
+  `sslmode=require`, which asyncpg rejects). Local `.env` updated to point at
+  Neon; `.env.example` documents the Neon format.
+
+### Fixed
+
 ### Fixed
 
 - **Production bug: aware/naive datetime mismatch on PostgreSQL.** The live
