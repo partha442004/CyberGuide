@@ -46,9 +46,12 @@ st.markdown(
 def _get_setting(name: str, default: str) -> str:
     """Resolve a config value: st.secrets first, then env var, then default.
 
-    Streamlit Community Cloud stores secrets in its TOML editor; reading
-    them via st.secrets (guarded, since plain runs/tests have no secrets)
-    lets the dashboard point at the live API without code changes.
+    Streamlit Community Cloud stores secrets in its TOML editor; reading them
+    via st.secrets (guarded, since plain runs/tests have no secrets) lets
+    anyone override the base URL without touching code. The default points at
+    the live Vercel deployment so the cloud dashboard works out of the box;
+    for local development set API_URL=http://localhost:8000/api/v1 (see
+    README).
     """
     with suppress(Exception):
         secrets = getattr(st, "secrets", {})
@@ -57,10 +60,9 @@ def _get_setting(name: str, default: str) -> str:
     return os.environ.get(name, default)
 
 
-# Base URLs for the InternTrack API. On Streamlit Community Cloud set
-# API_URL=https://cyberguide-api.vercel.app in the app secrets.
-API_URL = _get_setting("API_URL", "http://localhost:8000/api/v1")
-HEALTH_URL = _get_setting("HEALTH_URL", "http://localhost:8000/health")
+# Base URLs for the InternTrack API.
+API_URL = _get_setting("API_URL", "https://cyberguide-api.vercel.app/api/v1")
+HEALTH_URL = _get_setting("HEALTH_URL", "https://cyberguide-api.vercel.app/health")
 DEFAULT_VERSION = "1.20.0"
 
 
