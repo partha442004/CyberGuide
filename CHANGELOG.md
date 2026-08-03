@@ -4,6 +4,48 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.20.6] - 2026-08-03
+
+### Added
+
+- Round 9 coverage push: **2013 tests passing** (was 1929) at **99%** combined
+  coverage — missed lines across the combined suite dropped **232 → 114**;
+  no source module is below **93%** anymore. 84 new tests across 8 new files
+  targeting the last under-covered scheduler, engine, scraper, API, and
+  entry-point branches:
+  - `test_scheduler_main_round9.py` — scheduler telegram-branch notifications,
+    scam-alert payloads, and SIGTERM/SIGINT shutdown paths in
+    `scheduler/__main__.py`
+  - `test_engines_round9.py` — scam-detection false-positive/edge branches and
+    deduplication duplicate-resolution in `engines/`
+  - `test_indeed_scraper_round9.py` — `interntrack/scrapers/indeed.py`
+    fetch/HTTP-error/cache paths
+  - `test_round9_misc.py` — checkpoint company scraper country branches,
+    notification orchestrator digest/report send paths, naukri salary +
+    experience parsing, classification skill-categorization, `scrapers/base.py`
+    fetch helpers, and `repositories/base.py` list/search paths
+  - `test_round9_final.py` — `start.py` process-shutdown handling, internshala
+    parse branches, usa linkedin title/company extraction, `notifications/base.py`
+    message building, interntrack matching `find_matching_jobs`, hackernews
+    comment parsing, deduplication DB scan, notification-service init
+  - `test_round9_scrapers.py` — company scrapers (cisco/microsoft/google/
+    amazon) remaining branches, freshersworld salary parsing,
+    `interntrack/api/v1/jobs.py` query/404 paths, `interntrack/config.py`
+    settings coercion
+  - `test_round9_tail.py` — `rss_feeds.py` include flags, cybershield `config.py`
+    notifier-configured properties, `interntrack/main.py` middleware wiring,
+    interntrack linkedin location parsing, usa indeed job-id regex
+  - `test_round9_last.py` — interntrack `scrapers/base.py` rate-limit/session
+    lifecycle, `api/v1/websocket.py` disconnect cleanup, skill/job repository
+    search paths, `remoteok.py` parse, cybershield `api/v1/jobs.py` list
+
+### Changed
+
+- Combined coverage (interntrack + cybershield): **99%** (16,754 lines,
+  114 missed; was 99% / 232 missed at the start of the round)
+- Version bumped to **1.20.6** across both packages, `.env`/`.env.example`,
+  root `pyproject.toml`, and version canaries — `make version-check` exit 0
+
 ## [1.20.5] - 2026-08-03
 
 ### Added
