@@ -41,11 +41,26 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+
 # API base URL
-# Base URLs for the InternTrack API. Override via the API_URL env var
-# (e.g. on Streamlit Community Cloud point it at the live Vercel deployment).
-API_URL = os.environ.get("API_URL", "http://localhost:8000/api/v1")
-HEALTH_URL = os.environ.get("HEALTH_URL", "http://localhost:8000/health")
+def _get_setting(name: str, default: str) -> str:
+    """Resolve a config value: st.secrets first, then env var, then default.
+
+    Streamlit Community Cloud stores secrets in its TOML editor; reading
+    them via st.secrets (guarded, since plain runs/tests have no secrets)
+    lets the dashboard point at the live API without code changes.
+    """
+    with suppress(Exception):
+        secrets = getattr(st, "secrets", {})
+        if name in secrets:
+            return secrets[name]
+    return os.environ.get(name, default)
+
+
+# Base URLs for the InternTrack API. On Streamlit Community Cloud set
+# API_URL=https://cyberguide-api.vercel.app in the app secrets.
+API_URL = _get_setting("API_URL", "http://localhost:8000/api/v1")
+HEALTH_URL = _get_setting("HEALTH_URL", "http://localhost:8000/health")
 DEFAULT_VERSION = "1.20.0"
 
 
