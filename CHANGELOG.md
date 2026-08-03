@@ -4,6 +4,45 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.20.7] - 2026-08-03
+
+### Added
+
+- Round 10 coverage push: **2027 tests passing** (was 2013) — 14 new tests in
+  `test_round10_migration_and_branches.py`. **Every source module in both
+  packages is now 100% covered** — the only remaining 28 unmeasured lines in
+  the combined suite are internal helper lines inside the test files
+  themselves (fake module plumbing, e.g. context-manager `__exit__` returns).
+  Combined coverage: **99%** (16,919 lines, 28 missed; was 99% / 114 missed).
+- Targets closed this round:
+  - `alembic/versions/001_initial_schema.py` **0% → 100%** (73 statements) —
+    the migration script now runs for real against an in-memory SQLite
+    engine through an alembic `Operations` bound to a `MigrationContext`
+    (upgrade creates all tables, downgrade drops them, cycle is idempotent)
+  - `alembic/env.py` line 27 (`fileConfig` with a config file name) and
+    line 77 (the module-level online-mode dispatch through a mocked async
+    engine)
+  - `dashboard/app.py` lines 591-592 (resume-upload success branch) and
+    674 (Save Settings button)
+  - `scrapers/usa/linkedin.py` line 82 (title with multiple `" in "`
+    location segments — company kept whole)
+  - `interntrack/main.py` line 54 (`RateLimitMiddleware` registered when
+    rate limiting is enabled — tested by reloading the module under
+    `RATE_LIMIT_ENABLED=true` and restoring it)
+  - `middleware/auth.py` line 49 (API keys read from settings)
+  - `engines/base.py` line 57 + `scrapers/companies/base_company.py` line 74
+    (abstract method bodies reached via `super()`)
+  - `interntrack/api/v1/notifications.py` lines 29 & 33 (email + slack
+    channel listing)
+
+### Changed
+
+- Combined coverage (interntrack + cybershield): **99%** (16,919 lines,
+  28 missed; was 99% / 114 missed at the start of the round)
+- Version bumped to **1.20.6** in round 9's commit; this round adds no
+  further version bump — release marker stays **1.20.6** (canaries updated
+  for `APP_VERSION` in `.env.example`)
+
 ## [1.20.6] - 2026-08-03
 
 ### Added
