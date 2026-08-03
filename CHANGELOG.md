@@ -27,6 +27,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   root `requirements.txt` (the `cybershield[all]` extra can't resolve the
   local `interntrack` package). Auto-deploy: every push to `master`
   redeploys.
+- ✅ **Railway retired** — project deleted (permanent after 48h, confirmed by
+  Railway email); `railway.toml` + `deploy/railway/RAILWAY-DEPLOY.md` removed
+  from the repo; `vercel.json` + `.vercelignore` now the deployment config.
 
 ### Fixed
 

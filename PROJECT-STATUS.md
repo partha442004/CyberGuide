@@ -6,6 +6,10 @@
 
 ## 🚀 2026-08-03 Vercel + Neon Free Serverless Deployment Config ✅ v1.20.8
 
+- ✅ **Railway retired** — project deleted (48h permanent-deletion window
+  confirmed by Railway email). The app runs exclusively on Vercel + Neon now
+  (`railway.toml` + `deploy/railway/` removed from the repo)
+
 - ✅ **New files**: `api/index.py` (Vercel serverless entrypoint), `vercel.json`
   (build/routes config)
 - ✅ **Database adaptation**: `session.py` now auto-detects Postgres URLs and

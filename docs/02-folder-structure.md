@@ -192,7 +192,8 @@ internship-tracker/
 ├── 📄 Dockerfile                         # API container
 ├── 📄 Dockerfile.dashboard               # Dashboard container
 ├── 📄 docker-compose.yml                 # Docker Compose
-├── 📄 railway.toml                       # Railway.app deployment
+├── 📄 vercel.json                        # Vercel serverless deployment (api/index.py)
+├── 📄 .vercelignore                      # Vercel upload exclusions
 ├── 📄 render.yaml                        # Render.com deployment
 ├── 📄 Procfile                           # Render build system
 ├── 📄 pyproject.toml                     # Project configuration
