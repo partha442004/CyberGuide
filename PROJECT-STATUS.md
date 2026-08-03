@@ -4,6 +4,23 @@
 
 ---
 
+## 🛠️ 2026-08-03 Coverage Push (scheduler / engines / scrapers — round 9) ✅ v1.20.6
+
+- ✅ **Tests**: **2013 passing** (was 1929) — 84 new tests in 8 new files
+- ✅ **Combined coverage (interntrack + cybershield)**: **99%** (16,754 lines,
+  114 missed; was 99% / 232 missed at the start of the round)
+- ✅ **New test files**: `test_scheduler_main_round9.py` (scheduler telegram
+  branches + shutdown), `test_engines_round9.py` (scam/dedup edge branches),
+  `test_indeed_scraper_round9.py` (interntrack indeed fetch paths),
+  `test_round9_misc.py` (checkpoint/orchestrator/naukri/classification/base
+  scraper/repo), `test_round9_final.py` (start.py/internshala/linkedin/
+  notif-base/IT matching/hackernews/dedup/notif-service),
+  `test_round9_scrapers.py` (company scrapers/freshersworld/IT jobs/config),
+  `test_round9_tail.py` (rss_feeds/config/IT main/linkedin/indeed regex),
+  `test_round9_last.py` (IT base scraper/websocket/repos/remoteok/CS jobs)
+- 📉 **No source module below 93% coverage** across the whole combined suite
+  (lowest: `interntrack/api/v1/notifications.py` at 93%)
+
 ## 🛠️ 2026-08-03 Coverage Push (interntrack core — round 8) ✅ v1.20.5
 
 - ✅ **Tests**: **1929 passing** (was 1862) — 67 new tests in 7 new files

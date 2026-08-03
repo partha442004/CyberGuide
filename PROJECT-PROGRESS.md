@@ -1,6 +1,19 @@
 # 📊 InternTrack - Final Project Progress
 
-> **Last Updated:** 2026-08-02 | **Status:** ✅ Complete (100%)
+> **Last Updated:** 2026-08-03 | **Status:** ✅ Complete (100%)
+
+---
+
+## 🛠️ 2026-08-03 Coverage Push (scheduler / engines / scrapers — round 9) ✅ v1.20.6
+
+| Check | Result |
+|-------|--------|
+| **Full test suite** | ✅ **2013 passing** (was 1929), CI-exact env (Python 3.11.9 + pytest-asyncio 1.4.0) |
+| **Combined coverage** | ✅ **99%** (16,754 lines, 114 missed; was 99% / 232 missed at the start of the round) |
+| **New tests** | ✅ 84 new tests in 8 files — scheduler round9, engines round9, indeed round9, round9_misc, round9_final, round9_scrapers, round9_tail, round9_last |
+| **Areas covered** | ✅ scheduler telegram/shutdown paths, scam + dedup edge branches, interntrack indeed fetch, checkpoint/orchestrator/naukri/classification branches, start.py shutdown, internshala/linkedin parse, company scrapers (cisco/microsoft/google/amazon), freshersworld salary, rss_feeds flags, config properties, IT main middleware, websocket cleanup, skill/job repo search |
+| **Coverage floor** | ✅ No source module below **93%** (lowest: `interntrack/api/v1/notifications.py`) |
+| **ruff / mypy / version-check** | ✅ ruff lint + format clean (311 files), mypy clean (233 files), `check_versions.py` exit 0 (1.20.6) |
 
 ---
 
