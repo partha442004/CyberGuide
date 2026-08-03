@@ -17,8 +17,14 @@
   migration required; tests (SQLite) and production (Postgres) now agree
 - ✅ **13 regression tests** in `tests/unit/test_utcnow_naive_fix.py`
 - ✅ **2040 tests passing** (was 2027); ruff/mypy clean
-- ✅ Redeployed to Railway and verified all 4 formerly-broken endpoints return
-  200 with the new version
+- ✅ **Second live bug found & fixed**: native enum params vs varchar columns
+  (`operator does not exist: character varying = applicationstatus`) —
+  switched interntrack enum columns to
+  `native_enum=False + values_callable` (lowercase values) matching the live
+  schema. Verified live: **all endpoints return 200** (`/dashboard/overview`
+  now returns real data)
+- ✅ Redeployed to Railway (deploys `db5860c9` → `e570640b` → `489577c4`)
+  and verified all formerly-broken endpoints return 200 with v1.20.8
 
 ---
 
