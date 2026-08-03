@@ -21,7 +21,7 @@ services:
       - key: APP_NAME
         value: "InternTrack"
       - key: APP_VERSION
-        value: "1.0.0"
+        value: "1.20.8"
       - key: REQUIRE_API_KEY
         value: "false"
 
