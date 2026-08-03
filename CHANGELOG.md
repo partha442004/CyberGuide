@@ -76,6 +76,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The stale `C:\internship-tracker` copy was deleted from disk (SSH keys
   preserved in the real project first); only the Freebuff app's own
   `desktop-v2.db` cache remains until the app is closed.
+- **Git author identity corrected** — the local git config was set to
+  `PARTHASARATHI B` / `member-redacted@example.com`; now set to
+  ** RAVIB** / `ravi.kumar@example.com` so new commits are
+  credited to the correct owner (old commits keep their original author).
 
 ## [1.20.8] - 2026-08-03
 
