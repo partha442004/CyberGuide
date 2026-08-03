@@ -86,3 +86,6 @@ cyberguide-key
 cyberguide-key.pub
 *.pem
 *.key
+.vercel/
+.env
+.env.local
