@@ -228,7 +228,15 @@ streamlit run dashboard/app.py
 ```
 
 Open http://localhost:8501 in your browser. The dashboard reads `API_URL`
-and `HEALTH_URL` from the environment (defaults to `http://localhost:8000`).
+and `HEALTH_URL` (in order): `st.secrets` → environment variable → default.
+The default points at the **live Vercel deployment**, so the cloud dashboard
+works with zero configuration. For local development against your local API,
+set the env vars (or a local `.streamlit/secrets.toml`):
+
+```bash
+API_URL=http://localhost:8000/api/v1 HEALTH_URL=http://localhost:8000/health \
+  streamlit run dashboard/app.py
+```
 
 ### Dashboard on Streamlit Community Cloud (free, no credit card)
 
@@ -236,10 +244,11 @@ and `HEALTH_URL` from the environment (defaults to `http://localhost:8000`).
    with GitHub
 2. Click **New app** → select `partha442004/CyberGuide` → branch `master`
 3. Set **Main file path** to `dashboard/app.py`
-4. In **Advanced settings** add the secret:
-   `API_URL = https://cyberguide-api.vercel.app`
-   (`HEALTH_URL = https://cyberguide-api.vercel.app/health`)
-5. Click **Deploy** — the dashboard is live at `your-app.streamlit.app`
+4. Click **Deploy** — the dashboard is live at `your-app.streamlit.app` and
+   automatically pulls data from https://cyberguide-api.vercel.app (no
+   secrets required; optionally override via the app's **Settings → Secrets**
+   with `API_URL` / `HEALTH_URL`)
+5. Every push to `master` redeploys the dashboard automatically
 
 ---
 
