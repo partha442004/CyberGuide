@@ -6,7 +6,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![CI](https://github.com/partha442004/CyberGuide/actions/workflows/ci.yml/badge.svg)
-![Tests](https://img.shields.io/badge/tests-2027%20passed-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-2040%20passed-brightgreen.svg)
 ![Coverage](https://img.shields.io/badge/coverage-99%25-green.svg)
 ![Security](https://img.shields.io/badge/security-bandit%20%2B%20safety%20%2B%20trivy%20clean-brightgreen.svg)
 
@@ -160,6 +160,24 @@ SCRAPE_INTERVAL_MINUTES=30
 |--------|----------|-------------|
 | GET | `/health` | Readiness probe (200 healthy / 503 degraded) |
 | GET | `/metrics` | Request metrics (counts, error rate, latency) |
+
+---
+
+## ☁️ Cloud Deployment (Vercel + Neon — free, no credit card)
+
+The app runs live at **https://cyberguide-api.vercel.app** — hosted on
+Vercel (serverless) with a Neon Postgres database. Both are free forever.
+
+- `api/index.py` — Vercel serverless entrypoint (re-exports the FastAPI app)
+- `vercel.json` — build/routes config for the Python runtime
+- `.vercelignore` — excludes `pyproject.toml` (Vercel installs from
+  `requirements.txt`) and other local files
+- Env vars on Vercel: `DATABASE_URL` (Neon, asyncpg + `?ssl=require`),
+  `DEBUG=false`, `RATE_LIMIT_ENABLED=false`
+- **Auto-deploy**: every push to `master` redeploys automatically
+- Neon free tier: PostgreSQL 18, 0.5 GB storage, scale-to-zero compute
+
+Note: serverless cold start is ~1-3s on the first request after idle.
 
 ---
 
