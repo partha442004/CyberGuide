@@ -4,6 +4,55 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.20.9] - 2026-08-03
+
+### Added
+
+- **Daily auto-refresh on Vercel** — new `.github/workflows/daily-refresh.yml`
+  replaces the always-on APScheduler worker (which never runs on serverless):
+  a free GitHub Actions cron hits the live Vercel API twice a day
+  (07:00 / 19:00 UTC) — `POST /api/v1/jobs/discovery/run` (software
+  engineering / python developer queries) + `GET /api/v1/reports/daily` —
+  plus `workflow_dispatch` for manual runs. Every push to `master`
+  auto-deploys via Vercel, so the cron always targets the latest code.
+- **Streamlit dashboard is now deploy-ready for Streamlit Community Cloud**
+  (free, no credit card): `dashboard/app.py` reads `API_URL` / `HEALTH_URL`
+  from the environment (defaults to localhost) and a new
+  `dashboard/requirements.txt` (streamlit, httpx, plotly, pandas). Point
+  `API_URL=https://cyberguide-api.vercel.app` in the Cloud app settings.
+- **11 regression tests** in `tests/unit/test_utcnow_naive_fix.py` for the
+  new `to_naive_utc()` helper and the model datetime validators.
+
+### Fixed
+
+- **Production bug: `POST /api/v1/jobs/discovery/run` returned
+  `INTERNAL_ERROR` (500) on Vercel** — scrapers produced offset-aware
+  `posted_at`/`expires_at` datetimes, which asyncpg rejects when binding to
+  Postgres `timestamp without time zone` columns
+  (`can't subtract offset-naive and offset-aware datetimes`). SQLite masked
+  it (lenient about tzinfo). Fix: new `to_naive_utc()` helper in
+  `interntrack/utils/helpers.py` plus `@validates` coercion on **every
+  nullable DateTime column** that can receive external values — `Job`
+  (`posted_at`, `expires_at`), `Application` (`applied_at`, `interview_at`),
+  `UserSkill.last_used`, `NotificationConfig.last_notified`,
+  `ScheduledReport` (`last_generated`, `next_generation`). Verified against
+  the real Neon Postgres (aware insert round-trips naive) and the live
+  endpoint after redeploy.
+- **CD workflow cleaned up** — `.github/workflows/cd.yml` no longer has a
+  dead Oracle Cloud SSH `deploy` job (Vercel auto-deploys every push); it now
+  only builds/pushes the Docker image to Docker Hub on `v*` tags.
+- **Stale docs fixed** — PROJECT-STATUS.md verdict refreshed (2040+ tests,
+  17+ scrapers, Vercel+Neon live, Railway retired, auto-refresh cron).
+
+### Changed
+
+- **Tests: 2051 passing** (was 2040). Version bumped to **1.20.9** across all
+  sources (`interntrack`/`cybershield` `__version__`, `.env`/`.env.example`,
+  root `pyproject.toml`, canary tests) — `make version-check` exit 0.
+- The stale `C:\internship-tracker` copy was deleted from disk (SSH keys
+  preserved in the real project first); only the Freebuff app's own
+  `desktop-v2.db` cache remains until the app is closed.
+
 ## [1.20.8] - 2026-08-03
 
 ### Added

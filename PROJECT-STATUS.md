@@ -614,30 +614,39 @@ uvicorn interntrack.main:app --reload
 
 ## 🎯 Verdict
 
-**The project is 100% production-ready.**
+**The project is 100% production-ready and deployed free on Vercel + Neon.**
 
 ### What Works:
 ✅ Complete API with all endpoints
 ✅ Database models and repositories
 ✅ Service layer with business logic
-✅ All 6 scrapers implemented (HackerNews, RemoteOK, RSS, LinkedIn, Indeed, Glassdoor)
-✅ Dashboard with charts
-✅ Docker deployment ready
+✅ **17+ scrapers implemented** (HackerNews, RemoteOK, RSS, LinkedIn, Indeed,
+  Glassdoor, Naukri, Internshala, Freshersworld, Unstop, Workday + company
+  scrapers, and more)
+✅ Dashboard with charts (Streamlit — deployable free on Streamlit Community
+  Cloud; `API_URL` env var points it at the live API)
+✅ Docker image published to Docker Hub on version tags
 ✅ Documentation complete
-✅ 1421 tests passing (924 InternTrack + 497 CyberGuide)
-✅ CI/CD pipelines configured
+✅ **2040 tests passing** (combined InternTrack + CyberGuide, ~99% coverage)
+✅ CI/CD pipelines configured (CI green; CD builds Docker image on tags)
+✅ **Auto-refresh cron** — GitHub Actions triggers discovery + daily report on
+  the live Vercel API twice a day (replaces the old always-on worker)
 ✅ Security documentation
 ✅ API rate limiting enabled
 ✅ Security scan (bandit) clean at medium+
 
-### Ready for Production:
-1. ✅ All tests passing
-2. ✅ CI/CD configured
-3. ✅ Docker deployment ready
-4. ✅ Security documentation
-5. ✅ Comprehensive documentation
+### Deployment (current):
+1. ✅ **API live on Vercel** — https://cyberguide-api.vercel.app (free, no
+  credit card; cold start ~1-3s after idle)
+2. ✅ **Database on Neon Postgres** — free tier, 13 tables, CRUD verified
+3. ✅ **Auto-deploy** — every push to `master` redeploys via Vercel Git
+  integration
+4. ✅ **Railway retired** — project deleted (48h permanent-deletion window
+  confirmed)
+5. ⏳ **Dashboard** — ready to deploy on Streamlit Community Cloud (free);
+  set `API_URL=https://cyberguide-api.vercel.app`
 
 ---
 
-**Last Updated:** 2026-08-02
+**Last Updated:** 2026-08-03
 **Status:** ✅ 100% Complete

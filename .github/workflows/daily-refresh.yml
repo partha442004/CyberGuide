@@ -1,0 +1,38 @@
+name: Daily refresh (Vercel auto-refresh)
+
+# Replaces the always-on APScheduler worker that used to run on Railway.
+# Vercel is serverless, so nothing runs in the background there. This free
+# GitHub Actions cron keeps the live app's data fresh by hitting the public
+# discovery + report endpoints twice a day. Vercel auto-deploys every push,
+# so this always targets the latest code.
+on:
+  schedule:
+    - cron: '0 7 * * *'   # 07:00 UTC — discovery: software engineering
+    - cron: '0 19 * * *'  # 19:00 UTC — discovery: python developer
+  workflow_dispatch:      # allow manual "Run workflow" from the Actions tab
+
+jobs:
+  refresh:
+    name: Trigger discovery + daily report
+    runs-on: ubuntu-latest
+    env:
+      API_BASE: https://cyberguide-api.vercel.app
+    steps:
+      - name: Run job discovery (software engineering)
+        run: |
+          curl -sSf --max-time 290 -X POST \
+            "$API_BASE/api/v1/jobs/discovery/run?query=software%20engineering" \
+            || echo "discovery (query 1) failed or timed out"
+
+      - name: Run job discovery (python developer)
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 19 * * *'
+        run: |
+          curl -sSf --max-time 290 -X POST \
+            "$API_BASE/api/v1/jobs/discovery/run?query=python%20developer" \
+            || echo "discovery (query 2) failed or timed out"
+
+      - name: Generate daily report
+        run: |
+          curl -sSf --max-time 290 "$API_BASE/api/v1/reports/daily" > /dev/null \
+            && echo "daily report generated OK" \
+            || echo "report generation failed or timed out"

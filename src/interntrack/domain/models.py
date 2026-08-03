@@ -17,7 +17,7 @@ from sqlalchemy import (
     Text,
 )
 from sqlalchemy.dialects.sqlite import JSON
-from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy.orm import DeclarativeBase, relationship, validates
 
 from interntrack.domain.enums import (
     ApplicationStatus,
@@ -26,7 +26,7 @@ from interntrack.domain.enums import (
     JobType,
     SkillCategory,
 )
-from interntrack.utils.helpers import utcnow
+from interntrack.utils.helpers import to_naive_utc, utcnow
 
 
 class Base(DeclarativeBase):
@@ -102,6 +102,11 @@ class Job(Base, TimestampMixin):
         Index("idx_job_active", "is_active"),
     )
 
+    @validates("posted_at", "expires_at")
+    def _coerce_naive_utc(self, _key: str, value):
+        """Normalize aware datetimes to naive UTC for Postgres binding."""
+        return to_naive_utc(value)
+
     def __repr__(self) -> str:
         return f"<Job {self.title} at {self.company}>"
 
@@ -129,6 +134,11 @@ class Application(Base, TimestampMixin):
     cover_letter = Column(Text, nullable=True)
     priority = Column(Integer, default=0)
     reminded = Column(Boolean, default=False)
+
+    @validates("applied_at", "interview_at")
+    def _coerce_naive_utc(self, _key: str, value):
+        """Normalize aware datetimes to naive UTC for Postgres binding."""
+        return to_naive_utc(value)
 
     # Relationships
     job = relationship("Job", back_populates="applications")
@@ -241,6 +251,11 @@ class UserSkill(Base, TimestampMixin):
     last_used = Column(DateTime, nullable=True)
     is_learning = Column(Boolean, default=False)
 
+    @validates("last_used")
+    def _coerce_naive_utc(self, _key: str, value):
+        """Normalize aware datetimes to naive UTC for Postgres binding."""
+        return to_naive_utc(value)
+
     # Relationships
     skill = relationship("Skill", back_populates="user_skills")
 
@@ -273,6 +288,11 @@ class NotificationConfig(Base, TimestampMixin):
     config = Column(JSON, nullable=False, default=dict)
     last_notified = Column(DateTime, nullable=True)
 
+    @validates("last_notified")
+    def _coerce_naive_utc(self, _key: str, value):
+        """Normalize aware datetimes to naive UTC for Postgres binding."""
+        return to_naive_utc(value)
+
 
 class ScheduledReport(Base, TimestampMixin):
     """Scheduled report configuration."""
@@ -286,6 +306,11 @@ class ScheduledReport(Base, TimestampMixin):
     last_generated = Column(DateTime, nullable=True)
     next_generation = Column(DateTime, nullable=True)
     recipients = Column(JSON, nullable=False, default=list)
+
+    @validates("last_generated", "next_generation")
+    def _coerce_naive_utc(self, _key: str, value):
+        """Normalize aware datetimes to naive UTC for Postgres binding."""
+        return to_naive_utc(value)
 
 
 class Company(Base, TimestampMixin):
