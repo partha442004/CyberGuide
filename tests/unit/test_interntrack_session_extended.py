@@ -78,12 +78,19 @@ class TestDbQueryMetrics:
         record_mock = MagicMock()
         monkeypatch.setattr(business_metrics_store, "record_db_query", record_mock)
 
-        # The engine already has install_db_query_metrics wired at import time;
-        # execute a trivial query so the before/after handlers fire.
+        # Use a hermetic in-memory engine (the module-level engine points at a
+        # file DB that does not exist on CI), wire the metrics listeners, then
+        # run a trivial query so the before/after handlers fire.
         from sqlalchemy import text
+        from sqlalchemy.ext.asyncio import create_async_engine
 
-        async with session_module.engine.connect() as conn:
-            await conn.execute(text("SELECT 1"))
+        engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+        session_module.install_db_query_metrics(engine.sync_engine)
+        try:
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+        finally:
+            await engine.dispose()
 
         record_mock.assert_called_once()
         (duration_ms,) = record_mock.call_args.args
