@@ -23,6 +23,16 @@
   map + `unknown` fallback, repaired the existing Neon rows, and added
   `SkillCategory.GENERAL` (the skill repo writes `category="general"`)
 - ✅ **Version 1.20.9** across all sources; **2060 tests passing**
+- ✅ **Auto-refresh cron verified end-to-end** (manual `workflow_dispatch`
+  run 30819922254, green): GitHub Actions curled the live Vercel API —
+  discovery returned `{"discovered":6,"saved":0}` (dedup) and the daily
+  report generated OK
+- ✅ **Full live smoke test green**: every OpenAPI route responds correctly —
+  root, health, openapi (32 paths), jobs, jobs/search (POST), applications +
+  metrics/overview, skills, reports daily/weekly, notifications channels/test,
+  dashboard overview/recent-activity + all charts (job-types, salary,
+  top-companies, application-timeline), metrics/prometheus (200s; 422s are
+  proper validation responses for empty POST bodies)
 - ⚠️ **Vercel auto-deploy on git push is NOT active** — the project was
   linked via CLI and Vercel's default production branch is `main` while the
   repo uses `master`. Deploys currently run `vercel deploy --prod` (manual).
