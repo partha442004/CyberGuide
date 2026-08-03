@@ -17,6 +17,13 @@
   via `init_db()`; end-to-end CRUD verified (jobs + skills insert/query,
   enum + naive-UTC timestamp columns working). asyncpg needs `?ssl=require`
   (not `sslmode=require`)
+- ✅ **DEPLOYED LIVE on Vercel**: **https://cyberguide-api.vercel.app** —
+  `/health` → `{"status":"healthy","version":"1.20.8","database":"ok"}`;
+  all endpoints verified (dashboard/overview, recent-activity, reports/daily,
+  skills, metrics, notifications — all 200)
+- ✅ **Build fix**: `pyproject.toml` excluded via `.vercelignore` so Vercel uses
+  root `requirements.txt` (the `cybershield[all]` extra references the local
+  `interntrack` package, unresolvable on Vercel's build)
 - ✅ **Limitation**: serverless cold start ~1-3s on first request after inactivity
 - ✅ **Guide below** — dashboard setup steps to connect the app
 
