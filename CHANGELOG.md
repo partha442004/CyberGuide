@@ -4,6 +4,41 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.20.5] - 2026-08-03
+
+### Added
+
+- Round 8 coverage push: **1929 tests passing** (was 1862) at **99%** combined
+  coverage (was 98%) — 67 new tests across 7 new files, targeting the last
+  under-covered **interntrack** modules:
+  - `test_interntrack_repositories.py` (23) — `repositories/user_repository.py`
+    25% → **100%**, `skill_repository.py` 37% → **100%**,
+    `job_repository.py` 51% → **100%**, `application_repository.py` 65% → **100%**,
+    `repositories/base.py` 38% → **100%** (real SQLite-async DB tests: CRUD,
+    filters, dedup, salary stats, skill search, watchlist/bookmark joins)
+  - `test_ai_service_gemini.py` (8) — Gemini provider path in
+    `services/ai_service.py` (fake `google.generativeai` module, success +
+    failure + invalid-JSON + Ollama error paths)
+  - `test_interntrack_session_extended.py` (7) — `database/session.py`
+    (engine dispose, `install_db_query_metrics` hooks, teardown)
+  - `test_interntrack_main_extended.py` (4) — `main.py` lifespan + CLI
+    entrypoint (worker spawn paths)
+  - `test_rate_limit_extended.py` (6) — `middleware/rate_limit.py` (lazy Redis
+    client, in-memory cleanup/clear)
+  - `test_glassdoor_scraper_extended.py` (5) — `scrapers/glassdoor.py`
+    fetch/parse with location + cards (focused 70% → **100%**)
+  - `test_skills_api_extended.py` (7) — `api/v1/skills.py` 79% → **100%**
+    (real-DB endpoint tests + `domain/exceptions.py` 89% → **100%**)
+
+### Changed
+
+- Missed lines across the combined suite dropped **390 → 232**;
+  no source module is below 90% coverage anymore
+
+### Fixed
+
+- Removed flakiness in `test_deactivate_expired` (order-independent assertion)
+
 ## [1.20.4] - 2026-08-02
 
 ### Added
