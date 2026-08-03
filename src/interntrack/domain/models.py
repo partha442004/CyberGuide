@@ -57,16 +57,31 @@ class Job(Base, TimestampMixin):
     description = Column(Text, nullable=True)
     url = Column(String(2000), nullable=False, unique=True)
     source: Column = Column(
-        Enum(JobSource),
+        Enum(
+            JobSource,
+            native_enum=False,
+            values_callable=lambda e: [m.value for m in e],
+        ),
         nullable=False,
         default=JobSource.UNKNOWN,
     )
     job_type: Column = Column(
-        Enum(JobType),
+        Enum(
+            JobType,
+            native_enum=False,
+            values_callable=lambda e: [m.value for m in e],
+        ),
         nullable=False,
         default=JobType.UNKNOWN,
     )
-    experience_level: Column = Column(Enum(ExperienceLevel), nullable=True)
+    experience_level: Column = Column(
+        Enum(
+            ExperienceLevel,
+            native_enum=False,
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=True,
+    )
     salary_min = Column(Integer, nullable=True)
     salary_max = Column(Integer, nullable=True)
     salary_currency = Column(String(10), nullable=True, default="USD")
@@ -99,7 +114,11 @@ class Application(Base, TimestampMixin):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
     job_id = Column(String(36), ForeignKey("jobs.id"), nullable=False)
     status: Column = Column(
-        Enum(ApplicationStatus),
+        Enum(
+            ApplicationStatus,
+            native_enum=False,
+            values_callable=lambda e: [m.value for m in e],
+        ),
         nullable=False,
         default=ApplicationStatus.SAVED,
     )
@@ -140,8 +159,22 @@ class ApplicationStatusHistory(Base, TimestampMixin):
         ForeignKey("applications.id"),
         nullable=False,
     )
-    old_status: Column = Column(Enum(ApplicationStatus), nullable=True)
-    new_status: Column = Column(Enum(ApplicationStatus), nullable=False)
+    old_status: Column = Column(
+        Enum(
+            ApplicationStatus,
+            native_enum=False,
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=True,
+    )
+    new_status: Column = Column(
+        Enum(
+            ApplicationStatus,
+            native_enum=False,
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=False,
+    )
     changed_at = Column(DateTime, default=utcnow, nullable=False)
     notes = Column(Text, nullable=True)
 
@@ -156,7 +189,14 @@ class Skill(Base, TimestampMixin):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
     name = Column(String(100), nullable=False, unique=True)
-    category: Column = Column(Enum(SkillCategory), nullable=False)
+    category: Column = Column(
+        Enum(
+            SkillCategory,
+            native_enum=False,
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=False,
+    )
     description = Column(Text, nullable=True)
     difficulty_level = Column(Integer, default=1)  # 1-5
     learning_resources = Column(JSON, nullable=True, default=list)
