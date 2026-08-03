@@ -12,7 +12,7 @@ Runs background jobs for:
 import asyncio
 import logging
 import signal
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -21,6 +21,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from cybershield.config import get_settings
 from cybershield.database.session import get_db_session, init_db
 from cybershield.domain.models import Job, ScamScore
+from cybershield.utils import utcnow
 
 logging.basicConfig(
     level=logging.INFO,
@@ -176,7 +177,7 @@ async def scam_analysis():
                         flags=scam_result.data.get("flags", []),
                         reasons=scam_result.data.get("reasons", []),
                         is_scam=scam_result.data.get("is_scam", False),
-                        analyzed_at=datetime.now(timezone.utc),
+                        analyzed_at=utcnow(),
                     )
                     session.add(scam_score)
                     analyzed_count += 1
@@ -201,7 +202,7 @@ async def daily_report():
             await session.scalar(select(func.count(Job.id)))
             new_today = await session.scalar(
                 select(func.count(Job.id)).where(
-                    Job.created_at >= datetime.now(timezone.utc).replace(hour=0, minute=0, second=0)
+                    Job.created_at >= utcnow().replace(hour=0, minute=0, second=0)
                 )
             )
 
@@ -209,8 +210,8 @@ async def daily_report():
             expiring = await session.scalar(
                 select(func.count(Job.id)).where(
                     Job.is_active,
-                    Job.expires_at <= datetime.now(timezone.utc) + timedelta(days=7),
-                    Job.expires_at >= datetime.now(timezone.utc),
+                    Job.expires_at <= utcnow() + timedelta(days=7),
+                    Job.expires_at >= utcnow(),
                 )
             )
 
@@ -262,7 +263,7 @@ async def weekly_report():
         from cybershield.domain.models import Application, SkillTrend
         from cybershield.notifications.orchestrator import NotificationOrchestrator
 
-        week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+        week_ago = utcnow() - timedelta(days=7)
 
         async with get_db_session() as session:
             # Job stats for the week
@@ -300,12 +301,12 @@ async def weekly_report():
             top_skills = [(row[0], row[1]) for row in top_skills_result.all()]
 
             # Expiring jobs next week
-            next_week = datetime.now(timezone.utc) + timedelta(days=7)
+            next_week = utcnow() + timedelta(days=7)
             expiring_count = await session.scalar(
                 select(func.count(Job.id)).where(
                     Job.is_active,
                     Job.expires_at <= next_week,
-                    Job.expires_at >= datetime.now(timezone.utc),
+                    Job.expires_at >= utcnow(),
                 )
             )
 
@@ -328,7 +329,7 @@ async def weekly_report():
                 "weekly",
                 {
                     "title": "📊 Weekly Report",
-                    "period": f"{week_ago.strftime('%b %d')} - {datetime.now(timezone.utc).strftime('%b %d, %Y')}",
+                    "period": f"{week_ago.strftime('%b %d')} - {utcnow().strftime('%b %d, %Y')}",
                     "new_jobs": new_this_week or 0,
                     "total_jobs": total_jobs or 0,
                     "applications_submitted": apps_this_week or 0,
@@ -354,7 +355,7 @@ async def monthly_report():
         from cybershield.domain.models import Application, SkillTrend
         from cybershield.notifications.orchestrator import NotificationOrchestrator
 
-        month_ago = datetime.now(timezone.utc) - timedelta(days=30)
+        month_ago = utcnow() - timedelta(days=30)
 
         async with get_db_session() as session:
             # Job stats for the month
@@ -460,7 +461,7 @@ async def monthly_report():
                 "monthly",
                 {
                     "title": "📈 Monthly Report",
-                    "period": f"{month_ago.strftime('%b %d')} - {datetime.now(timezone.utc).strftime('%b %d, %Y')}",
+                    "period": f"{month_ago.strftime('%b %d')} - {utcnow().strftime('%b %d, %Y')}",
                     "new_jobs": new_this_month or 0,
                     "total_jobs": total_jobs or 0,
                     "applications_submitted": apps_this_month or 0,

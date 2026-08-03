@@ -4,6 +4,24 @@
 
 ---
 
+## 🛠️ 2026-08-03 Production Bugfix: naive-UTC on PostgreSQL ✅ v1.20.8
+
+- ✅ **Bug found via live smoke test**: 4 endpoints 500'd on Railway
+  (`/reports/daily`, `/dashboard/overview`, `/dashboard/recent-activity`,
+  `/dashboard/charts/application-timeline`) with asyncpg
+  `can't subtract offset-naive and offset-aware datetimes` — aware
+  `datetime.now(UTC)` bound to naive `timestamp without time zone` columns
+- ✅ **Fix**: new `utcnow()` naive-UTC helpers (`interntrack/utils/helpers.py`,
+  `cybershield/utils.py`) used by all DB-facing code — model defaults,
+  repository cutoffs, seed_data, resumes API, cybershield scheduler. No
+  migration required; tests (SQLite) and production (Postgres) now agree
+- ✅ **13 regression tests** in `tests/unit/test_utcnow_naive_fix.py`
+- ✅ **2040 tests passing** (was 2027); ruff/mypy clean
+- ✅ Redeployed to Railway and verified all 4 formerly-broken endpoints return
+  200 with the new version
+
+---
+
 ## 🛠️ 2026-08-03 Coverage Push (migration + last branches — round 10) ✅ v1.20.7
 
 - ✅ **Tests**: **2027 passing** (was 2013) — 14 new tests in

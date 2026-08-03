@@ -3,7 +3,7 @@ Database seed script for populating sample data.
 """
 
 import asyncio
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import cast
 from uuid import uuid4
 
@@ -22,6 +22,7 @@ from interntrack.domain.models import (
     Skill,
     UserSkill,
 )
+from interntrack.utils.helpers import utcnow
 
 # Sample jobs
 SAMPLE_JOBS = [
@@ -238,7 +239,7 @@ async def seed_database():
                 is_remote=job_data["is_remote"],
                 tags=job_data["tags"],
                 is_active=True,
-                posted_at=datetime.now(UTC) - timedelta(days=3),
+                posted_at=utcnow() - timedelta(days=3),
             )
             session.add(job)
             await session.flush()
@@ -289,10 +290,10 @@ async def seed_database():
                 job_id=job.id,
                 status=status,
                 notes=f"Sample application for {job.title}",
-                applied_at=datetime.now(UTC) - timedelta(days=i)
+                applied_at=utcnow() - timedelta(days=i)
                 if status != ApplicationStatus.SAVED
                 else None,
-                interview_at=datetime.now(UTC) + timedelta(days=5)
+                interview_at=utcnow() + timedelta(days=5)
                 if status == ApplicationStatus.INTERVIEW
                 else None,
             )
