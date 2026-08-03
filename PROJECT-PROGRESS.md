@@ -4,6 +4,19 @@
 
 ---
 
+## 🛠️ 2026-08-03 Coverage Push (migration + last branches — round 10) ✅ v1.20.7
+
+| Check | Result |
+|-------|--------|
+| **Full test suite** | ✅ **2027 passing** (was 2013), CI-exact env (Python 3.11.9 + pytest-asyncio 1.4.0) |
+| **Combined coverage** | ✅ **99%** (16,919 lines, 28 missed; was 99% / 114 missed at the start of the round) |
+| **Source coverage** | 🏆 **Every source module in both packages is 100%** — remaining 28 missed lines are test-file-internal helper lines only |
+| **Key win** | ✅ `alembic/versions/001_initial_schema.py` **0% → 100%** (real in-memory SQLite run of upgrade/downgrade via alembic Operations + MigrationContext) |
+| **Branches closed** | ✅ env.py fileConfig + online dispatch, dashboard resume-upload/save-settings, linkedin multi-segment location, IT main rate-limit middleware (reload under `RATE_LIMIT_ENABLED=true`), auth settings keys, engine/company abstract bodies, IT notifications email+slack |
+| **ruff / mypy / version-check** | ✅ ruff lint + format clean (312 files), mypy clean (234 files), `check_versions.py` exit 0 (1.20.7) |
+
+---
+
 ## 🛠️ 2026-08-03 Coverage Push (scheduler / engines / scrapers — round 9) ✅ v1.20.6
 
 | Check | Result |

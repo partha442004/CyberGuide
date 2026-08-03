@@ -2,9 +2,9 @@
 
 ## Project Status: ✅ PRODUCTION-READY
 
-**Last Updated:** August 2, 2026
+**Last Updated:** August 3, 2026
 **Total Files:** 120+
-**Total Tests:** 364 passing (was 323 — +41 entry-point tests: start.py, check_routes.py, scheduler/__main__.py, dashboard/app.py)
+**Total Tests:** 364 passing (was 323 — +41 entry-point tests: start.py, check_routes.py, scheduler/__main__.py, dashboard/app.py) — +coverage pushes through v1.20.7 (combined suite 2027 tests, every source module at 100%)
 **Total Routes:** 33 (via OpenAPI schema)
 
 ---

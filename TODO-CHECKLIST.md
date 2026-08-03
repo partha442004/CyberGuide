@@ -995,6 +995,26 @@ docker-compose up -d
 
 ---
 
+## ✅ HARDENING PASS 23 (2026-08-03) — COMPLETED (v1.20.7)
+
+### Round 10 Coverage Push — every source module at 100%
+- [x] **2027 tests passing** (was 2013) — 14 new tests in
+      `test_round10_migration_and_branches.py`
+- [x] **Combined coverage 99%** (16,919 lines, 28 missed; was 114 missed)
+- [x] **Every source module in both packages is 100% covered** — remaining
+      28 missed lines are test-file-internal helper lines only
+- [x] `alembic/versions/001_initial_schema.py` **0% → 100%** — real in-memory
+      SQLite run of upgrade/downgrade via alembic Operations + MigrationContext
+- [x] Closed: env.py fileConfig + online dispatch, dashboard resume-upload +
+      save-settings branches, linkedin multi-` in `-segment titles,
+      interntrack main rate-limit middleware registration (module reload),
+      auth settings API keys, engine/company abstract bodies, IT
+      notifications email + slack channels
+- [x] ruff lint + format clean (312 files), mypy clean (234 files),
+      `make version-check` exit 0 (1.20.7)
+
+---
+
 ## ✅ HARDENING PASS 17 (2026-08-01) — COMPLETED
 
 ### Business Metrics Instrumentation + v1.19.0
@@ -1018,5 +1038,5 @@ docker-compose up -d
 
 ---
 
-**Last Updated:** 2026-08-02
-**Version:** 1.20.0
+**Last Updated:** 2026-08-03
+**Version:** 1.20.7

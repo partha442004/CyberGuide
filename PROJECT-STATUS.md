@@ -4,6 +4,29 @@
 
 ---
 
+## 🛠️ 2026-08-03 Coverage Push (migration + last branches — round 10) ✅ v1.20.7
+
+- ✅ **Tests**: **2027 passing** (was 2013) — 14 new tests in
+  `test_round10_migration_and_branches.py`
+- ✅ **Combined coverage (interntrack + cybershield)**: **99%** (16,919 lines,
+  28 missed; was 99% / 114 missed at the start of the round)
+- 🏆 **Every source module in both packages is now 100% covered** — the only
+  remaining 28 unmeasured lines are internal helper lines inside the test
+  files themselves (fake module plumbing)
+- ✅ **Key win**: `alembic/versions/001_initial_schema.py` **0% → 100%**
+  (73 statements) — the migration runs for real against an in-memory SQLite
+  engine via alembic `Operations` + `MigrationContext` (upgrade creates all
+  tables, downgrade drops them, cycle idempotent)
+- ✅ **Other branches closed**: `alembic/env.py` fileConfig + online dispatch,
+  `dashboard/app.py` resume-upload + save-settings, `usa/linkedin.py`
+  multi-location-segment title, `interntrack/main.py` rate-limit middleware
+  registration (module reload under `RATE_LIMIT_ENABLED=true`),
+  `middleware/auth.py` settings API keys, `engines/base.py` +
+  `base_company.py` abstract bodies, `interntrack/api/v1/notifications.py`
+  email + slack channels
+- ✅ **ruff / mypy / version-check**: ruff lint + format clean (312 files),
+  mypy clean (234 files), `check_versions.py` exit 0 (1.20.7)
+
 ## 🛠️ 2026-08-03 Coverage Push (scheduler / engines / scrapers — round 9) ✅ v1.20.6
 
 - ✅ **Tests**: **2013 passing** (was 1929) — 84 new tests in 8 new files
