@@ -188,7 +188,7 @@
   a shell check writing `steps.check.outputs.configured`; see CHANGELOG)
 - ✅ **LIVE on Railway.app** — **https://cyberguide-api-production.up.railway.app**
   (no credit card needed; Oracle Cloud requires one at signup). Verified:
-  `/health` → `{"status":"healthy","version":"1.20.0","database":"ok"}`,
+  `/health` → `{"status":"healthy","version":"1.20.7","database":"ok"}`,
   Postgres connected (asyncpg), `DEBUG=false`. The service builds from the
   repo Dockerfile; `railway.toml` `startCommand` (literal `--port 8000`, no
   shell expansion) overrides the CMD; `healthcheckPath` omitted (Railway's
@@ -198,6 +198,20 @@
   `cyberguide-api` + `Postgres-NjTs` + `Redis`). GitHub auto-deploy pending a
   dashboard branch change (`master`). Full config + troubleshooting in
   `deploy/railway/RAILWAY-DEPLOY.md`
+
+---
+
+## 🛠️ 2026-08-03 Live Deploy Synced to v1.20.7 (Railway CLI)
+
+- ✅ Redeployed `cyberguide-api` from the local repo via `railway deployment
+  up --service cyberguide-api` (deployment `db5860c9`)
+- ✅ `APP_VERSION` in `railway.toml` bumped `1.20.0` → `1.20.7` (was
+  overriding the package `__version__` on the live service)
+- ✅ Verified live: `/health` → `{"status":"healthy","version":"1.20.7","database":"ok"}`,
+  `/` → `{"name":"CyberGuide","version":"1.20.7"}`, `/openapi.json`
+  `info.version` = `1.20.7`
+- ✅ App runs 24/7 on Railway (free-tier-friendly, no daily start needed;
+  `restartPolicyType = "on_failure"` with 3 retries)
 
 ---
 
