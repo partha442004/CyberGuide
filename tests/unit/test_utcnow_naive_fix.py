@@ -127,6 +127,21 @@ class TestJobSourceCoercion:
         )
         assert job.source == "linkedin"
 
+    def test_source_is_enum_member_with_value(self):
+        """Regression: export_jobs.py calls job.source.value — the attribute
+        must be a JobSource member (in-memory and after DB round-trip)."""
+        from interntrack.domain.enums import JobSource
+        from interntrack.domain.models import Job
+
+        job = Job(
+            title="t",
+            company="c",
+            url="https://example.com/src-6",
+            source="glassdoor",
+        )
+        assert job.source is JobSource.GLASSDOOR
+        assert job.source.value == "glassdoor"
+
     def test_enum_member_value_used(self):
         from interntrack.domain.enums import JobSource
         from interntrack.domain.models import Job
