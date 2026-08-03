@@ -4,6 +4,24 @@
 
 ---
 
+## 🚀 2026-08-03 Vercel + Neon Free Serverless Deployment Config ✅ v1.20.8
+
+- ✅ **New files**: `api/index.py` (Vercel serverless entrypoint), `vercel.json`
+  (build/routes config)
+- ✅ **Database adaptation**: `session.py` now auto-detects Postgres URLs and
+  uses `NullPool` (serverless-safe with Neon's PgBouncer) instead of the
+  default `QueuePool` — prevents connection exhaustion under serverless
+  concurrency
+- ✅ **No credit card required** — Vercel Hobby (free) + Neon (free Postgres)
+- ✅ **Neon verified live**: PostgreSQL 18.4 connected; all **13 tables** created
+  via `init_db()`; end-to-end CRUD verified (jobs + skills insert/query,
+  enum + naive-UTC timestamp columns working). asyncpg needs `?ssl=require`
+  (not `sslmode=require`)
+- ✅ **Limitation**: serverless cold start ~1-3s on first request after inactivity
+- ✅ **Guide below** — dashboard setup steps to connect the app
+
+---
+
 ## 🛠️ 2026-08-03 Production Bugfix: naive-UTC on PostgreSQL ✅ v1.20.8
 
 - ✅ **Bug found via live smoke test**: 4 endpoints 500'd on Railway
