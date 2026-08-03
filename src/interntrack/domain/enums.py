@@ -82,3 +82,4 @@ class SkillCategory(str, Enum):
     SOFT_SKILL = "soft_skill"
     CERTIFICATION = "certification"
     LANGUAGE = "language"
+    GENERAL = "general"

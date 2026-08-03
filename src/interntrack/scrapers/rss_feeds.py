@@ -44,7 +44,10 @@ class RSSFeedScraper(BaseScraper):
 
         for feed_name, feed_url in self.feeds.items():
             try:
-                feed_jobs = await self._fetch_feed(feed_url, query, feed_name)
+                # Always emit the enum source name ("rss_feed") so the stored
+                # value round-trips through the JobSource column; the raw feed
+                # key is only used for logging/tracking below.
+                feed_jobs = await self._fetch_feed(feed_url, query, self.source_name)
                 jobs.extend(feed_jobs)
             except Exception as e:
                 print(f"Error fetching RSS feed {feed_name}: {e}")

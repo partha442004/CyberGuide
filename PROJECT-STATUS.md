@@ -4,6 +4,33 @@
 
 ---
 
+## 🛠️ 2026-08-03 Auto-Refresh + Discovery live-fix round ✅ v1.20.9
+
+- ✅ **Daily auto-refresh cron**: `.github/workflows/daily-refresh.yml` hits
+  the live Vercel API twice a day (07:00 / 19:00 UTC) — `POST
+  /api/v1/jobs/discovery/run` + `GET /api/v1/reports/daily` — replacing the
+  always-on worker that can't run on serverless; `workflow_dispatch` for
+  manual runs
+- ✅ **Bug #1 fixed & verified live**: discovery crashed with asyncpg
+  `can't subtract offset-naive and offset-aware datetimes` (scrapers return
+  aware `posted_at`). Added `to_naive_utc()` helper + `@validates` coercion
+  on every nullable DateTime column. Verified live: `POST
+  /discovery/run` → `{"discovered":6,"saved":6}` ✅
+- ✅ **Bug #2 fixed & verified live**: after saving, `GET /api/v1/jobs/`
+  crashed (`LookupError: 'weworkremotely' is not among the defined enum
+  values`) — the RSS scraper stored raw feed keys as `source`. Fixed scraper
+  (emits `rss_feed`), added a defensive `Job` `@validates("source")` alias
+  map + `unknown` fallback, repaired the existing Neon rows, and added
+  `SkillCategory.GENERAL` (the skill repo writes `category="general"`)
+- ✅ **Version 1.20.9** across all sources; **2060 tests passing**
+- ⚠️ **Vercel auto-deploy on git push is NOT active** — the project was
+  linked via CLI and Vercel's default production branch is `main` while the
+  repo uses `master`. Deploys currently run `vercel deploy --prod` (manual).
+  To enable auto-deploy: Vercel dashboard → project → Settings → Git →
+  connect the repo and set **Production Branch = `master`**
+
+---
+
 ## 🚀 2026-08-03 Vercel + Neon Free Serverless Deployment Config ✅ v1.20.8
 
 - ✅ **Railway retired** — project deleted (48h permanent-deletion window

@@ -113,6 +113,74 @@ class TestModelDatetimeCoercion:
         assert sr.next_generation.tzinfo is None
 
 
+class TestJobSourceCoercion:
+    """Job.source must never store a value outside the JobSource enum."""
+
+    def test_valid_enum_value_passthrough(self):
+        from interntrack.domain.models import Job
+
+        job = Job(
+            title="t",
+            company="c",
+            url="https://example.com/src-1",
+            source="linkedin",
+        )
+        assert job.source == "linkedin"
+
+    def test_enum_member_value_used(self):
+        from interntrack.domain.enums import JobSource
+        from interntrack.domain.models import Job
+
+        job = Job(
+            title="t",
+            company="c",
+            url="https://example.com/src-2",
+            source=JobSource.MANUAL,
+        )
+        assert job.source == "manual"
+
+    def test_raw_alias_mapped(self):
+        from interntrack.domain.models import Job
+
+        # The exact value that crashed reads live (RSS feed key).
+        job = Job(
+            title="t",
+            company="c",
+            url="https://example.com/src-3",
+            source="weworkremotely",
+        )
+        assert job.source == "we_work_remotely"
+
+    def test_unknown_source_falls_back(self):
+        from interntrack.domain.models import Job
+
+        job = Job(
+            title="t",
+            company="c",
+            url="https://example.com/src-4",
+            source="totally_unknown_board",
+        )
+        assert job.source == "unknown"
+
+    def test_none_source_falls_back(self):
+        from interntrack.domain.models import Job
+
+        job = Job(
+            title="t",
+            company="c",
+            url="https://example.com/src-5",
+            source=None,
+        )
+        assert job.source == "unknown"
+
+    def test_skill_category_has_general(self):
+        """The skill repository writes category='general'; it must be a valid
+        enum value or skill reads would crash on Postgres like Job.source did."""
+        from interntrack.domain.enums import SkillCategory
+
+        assert SkillCategory.GENERAL.value == "general"
+
+
 class TestUtcnowHelper:
     """Tests for the interntrack utcnow() helper."""
 
