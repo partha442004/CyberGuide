@@ -62,6 +62,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- **Vercel auto-deploy now active** — GitHub repo connected to the Vercel
+  project; every push to `master` deploys automatically (production branch =
+  `master`). Manual `vercel deploy --prod` no longer needed.
 - **Tests: 2060 passing** (was 2040). Version bumped to **1.20.9** across all
   sources (`interntrack`/`cybershield` `__version__`, `.env`/`.env.example`,
   root `pyproject.toml`, canary tests) — `make version-check` exit 0.
