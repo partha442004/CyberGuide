@@ -20,6 +20,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   working). Connection string format for asyncpg: `?ssl=require` (NOT
   `sslmode=require`, which asyncpg rejects). Local `.env` updated to point at
   Neon; `.env.example` documents the Neon format.
+- ✅ **DEPLOYED LIVE on Vercel**: **https://cyberguide-api.vercel.app**
+  (project `cyberguide-api`, env vars `DATABASE_URL` (Neon), `DEBUG=false`,
+  `RATE_LIMIT_ENABLED=false`). All endpoints verified 200 against Neon.
+  Build fix: `.vercelignore` excludes `pyproject.toml` so Vercel installs from
+  root `requirements.txt` (the `cybershield[all]` extra can't resolve the
+  local `interntrack` package). Auto-deploy: every push to `master`
+  redeploys.
 
 ### Fixed
 
