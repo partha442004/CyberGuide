@@ -49,6 +49,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **CI Security job**: bumped `aiohttp` 3.13.4 → 3.14.3 to fix
   CVE-2026-69244 (HIGH, out-of-bounds heap read in C HTTP response parser).
 
+### Fixed
+
+- **Resume parsing quality on Vercel (validated against the real
+  `Parthasarathi_B_VAPT_Resume_Final` PDF)**: the fallback PDF text extractor
+  (used because pymupdf's native wheels don't build on Vercel) now handles
+  LibreOffice-style **TJ kerning arrays** (`[(P)100(AR)20(THASARA)90(THI)-278(B)]TJ`
+  — fragments joined, with a space inserted at large negative kerning word
+  gaps), PDF **octal/backslash escapes** (`\002`), and CP1252 smart chars
+  (0x95 bullet → `•`). Previously the live upload returned only 11 skills and
+  0 projects from garbled fragments; now it returns **34 skills, 2 projects,
+  precise education, CEH cert, and clean links**.
+- **Parser quality fixes** (all covered by tests):
+  - `_extract_skills` uses **word boundaries** so `go`/`dd`/`ids` never match
+    inside `Google`/`Conducted`/`Identification`
+  - `_extract_experience` only matches standalone role keywords on real job
+    title lines (skips `SOC Analyst Training`, `Engineering College`,
+    `Team leadership`)
+  - `_extract_projects` only reads the `PROJECTS` section (not hands-on
+    labs / key competencies), supports bullet-list AND title+bullets layouts,
+    and skips URL/report/date lines
+  - `_extract_education` degree stops at the year so one-line blocks
+    (`B.Tech in IT 2021-2025 / CGPA`) don't bleed together
+  - `portfolio` link pattern no longer captures bare platform domains
+- **13 new regression tests** in `test_resume_parser.py` (real-resume fixture
+  text, TJ-array joins, PDF escapes, title heuristics, word-boundary skills).
+  Resume suite now 108 tests passing.
+- **Vercel GitHub auto-deploy confirmed working** — the project's Git
+  connection was already linked with `productionBranch: master`; verified that
+  every `git push` to `master` creates a production deployment automatically
+  (no manual `vercel deploy --prod` needed).
+
 ### Changed
 
 - **Git author identity corrected** — local + global git config now set to
