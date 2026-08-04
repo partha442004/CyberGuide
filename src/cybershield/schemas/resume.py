@@ -76,6 +76,7 @@ class ResumeMatchResponse(BaseModel):
     company: str
     match_score: Optional[float] = None
     matched_skills: List[str] = []
+    related_skills: List[str] = []
     missing_skills: List[str] = []
     suggestions: List[str] = []
 

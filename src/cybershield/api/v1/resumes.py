@@ -18,10 +18,84 @@ from cybershield.schemas.resume import (
     ResumeMatchResponse,
     ResumeUploadResponse,
 )
-from cybershield.services.resume_service import ResumeParser
+from cybershield.services.resume_service import SECURITY_SKILLS, ResumeParser
 from cybershield.utils import utcnow
 
 router = APIRouter()
+
+# ---------------------------------------------------------------------------
+# Fair skill matching for domain-transition candidates
+#
+# Exact-name overlap alone scores a resume 0.0 against any job whose skill
+# list uses different wording (e.g. a Data Analyst resume with ``python`` /
+# ``sql`` vs a Software Engineer job asking for ``go`` / ``kubernetes``).
+# To score domain-transition candidates more fairly we add two extra tiers
+# of partial credit on top of exact matches:
+#
+#   1. SYNONYM matches — equivalent names for the same skill
+#      (e.g. ``k8s`` == ``kubernetes``, ``golang`` == ``go``).
+#   2. CATEGORY matches — skills in the same domain family
+#      (e.g. ``python`` (scripting) partially covers a job asking for
+#      ``go`` (scripting) because the transferable skill set overlaps).
+#
+# Tiers are weighted so exact matches still dominate the score:
+#   required  : exact 1.0, synonym 0.6, category 0.35
+#   preferred : exact 1.0, synonym 0.5, category 0.20
+# ---------------------------------------------------------------------------
+
+# Curated synonym groups: any name in a group matches any other name.
+_SYNONYM_GROUPS = (
+    {"k8s", "kubernetes"},
+    {"golang", "go"},
+    {"js", "javascript"},
+    {"ts", "typescript"},
+    {"node", "node.js"},
+    {"aws", "amazon web services"},
+    {"gcp", "google cloud"},
+    {"ml", "machine learning"},
+    {"ai", "artificial intelligence"},
+    {"powerbi", "power bi"},
+    {"ms excel", "excel", "microsoft excel"},
+    {"git", "github"},
+    {"reactjs", "react"},
+    {"vuejs", "vue.js"},
+    {"c", "c/c++"},
+)
+
+# Flatten synonym groups into a name -> frozenset(synonyms) lookup.
+_SYNONYM_LOOKUP: dict = {}
+for _group in _SYNONYM_GROUPS:
+    _syns = frozenset(_group)
+    for _name in _group:
+        _SYNONYM_LOOKUP.setdefault(_name, set()).update(_syns)
+
+# Category map reused from the resume parser's skill vocabulary, so resume
+# skills and job skills are categorized consistently. Additional common
+# job-side terms (not in the security-focused parser vocabulary) are mapped
+# by hand so software/cloud/data roles get fair category credit too.
+_SKILL_CATEGORY_MAP: dict = {}
+for _category, _skills in SECURITY_SKILLS.items():
+    for _skill in _skills:
+        _SKILL_CATEGORY_MAP[_skill] = _category
+# Extra job-side terms missing from the parser vocabulary.
+_SKILL_CATEGORY_MAP.update(
+    {
+        "java": "scripting",
+        "c++": "scripting",
+        "c#": "scripting",
+        "c": "scripting",
+        "go": "scripting",
+        "rust": "scripting",
+        "kubernetes": "cicd_security",
+        "docker": "cicd_security",
+        "aws": "cloud_security",
+        "azure": "cloud_security",
+        "gcp": "cloud_security",
+        "sql": "data_analysis",
+        "python": "scripting",
+        "git": "cicd_security",
+    }
+)
 
 # Max file size: 10MB
 MAX_FILE_SIZE = 10 * 1024 * 1024
@@ -81,8 +155,29 @@ def _extract_skill_names(skills_list) -> set:
     return result
 
 
+def _synonym_hits(skill: str, resume_skills: set) -> set:
+    """Return resume skills that are synonyms of ``skill`` (excluding itself)."""
+    syns = _SYNONYM_LOOKUP.get(skill)
+    if not syns:
+        return set()
+    return {s for s in syns if s != skill} & resume_skills
+
+
+def _skill_category(skill: str) -> Optional[str]:
+    """Map a lowercase skill name to its domain category."""
+    return _SKILL_CATEGORY_MAP.get(skill)
+
+
 def _calculate_job_match(resume_skills: set, job: _JobMatchData) -> ResumeMatchResponse:
     """Calculate match score between resume skills and a job.
+
+    Scores in three tiers so domain-transition candidates are treated
+    fairly instead of flatlining at 0.0:
+
+    * **exact**   — the resume literally lists the job's skill (full credit)
+    * **synonym** — the resume lists an equivalent name (partial credit)
+    * **category**— the resume lists a same-family skill, e.g. ``python``
+      covering ``go`` (both ``scripting``) — transferable-skill credit
 
     Falls back to the job's ``tags`` column (used by the interntrack Job
     model / live Neon table) when the dedicated skill columns are empty.
@@ -95,27 +190,73 @@ def _calculate_job_match(resume_skills: set, job: _JobMatchData) -> ResumeMatchR
         job_required = job_tags
     all_job_skills = job_required | job_preferred
 
+    matched: List[str] = []
+    related: List[str] = []
+    missing: List[str] = []
+
     if not all_job_skills:
         match_score = None
-        matched = []
-        missing = []
     else:
-        matched = list(resume_skills & all_job_skills)
-        missing = list(all_job_skills - resume_skills)
+        # Resume categories are derived from the shared vocabulary so
+        # ``python`` (scripting) can partially cover ``go`` (scripting).
+        resume_categories = {cat for s in resume_skills if (cat := _skill_category(s)) is not None}
+
+        matched = []
+        related = []
+        missing = []
+        required_earned = 0.0
+        preferred_earned = 0.0
+
+        def _tier(skill: str) -> tuple:
+            """Classify a job skill against the resume.
+
+            Returns (earned_weight, bucket) where bucket is one of
+            ``exact``/``synonym``/``category``/``none``.
+            """
+            if skill in resume_skills:
+                return 1.0, "exact"
+            if _synonym_hits(skill, resume_skills):
+                return 0.6, "synonym"
+            cat = _skill_category(skill)
+            if cat is not None and cat in resume_categories:
+                return 0.35, "category"
+            return 0.0, "none"
+
+        for skill in job_required:
+            weight, tier = _tier(skill)
+            required_earned += weight
+            if tier == "exact" or tier == "synonym":
+                matched.append(skill)
+            elif tier == "category":
+                related.append(skill)
+            else:
+                missing.append(skill)
+
+        for skill in job_preferred:
+            weight, tier = _tier(skill)
+            preferred_earned += weight if tier != "category" else 0.2
+            if tier == "exact" or tier == "synonym":
+                matched.append(skill)
+            elif tier == "category":
+                related.append(skill)
+            else:
+                missing.append(skill)
 
         req_total = max(len(job_required), 1)
         pref_total = max(len(job_preferred), 1)
-        required_matched = len(resume_skills & job_required)
-        preferred_matched = len(resume_skills & job_preferred)
-
         match_score = round(
-            (required_matched / req_total * 0.7 + preferred_matched / pref_total * 0.3) * 100,
+            (required_earned / req_total * 0.7 + preferred_earned / pref_total * 0.3) * 100,
             1,
         )
 
     suggestions = []
     if missing:
         suggestions.append(f"Learn missing skills: {', '.join(missing[:5])}")
+    if related:
+        suggestions.append(
+            "Transferable skills: your resume covers "
+            f"{', '.join(sorted(related)[:4])} from the same domains"
+        )
     if match_score is not None:
         if match_score >= 80:
             suggestions.append("Strong match! Apply now")
@@ -130,6 +271,7 @@ def _calculate_job_match(resume_skills: set, job: _JobMatchData) -> ResumeMatchR
         company=job.company,
         match_score=match_score,
         matched_skills=matched,
+        related_skills=related,
         missing_skills=missing,
         suggestions=suggestions,
     )
