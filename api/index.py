@@ -30,27 +30,45 @@ os.environ.setdefault("RATE_LIMIT_ENABLED", "false")  # No Redis on Vercel free
 # ── Import the FastAPI app ────────────────────────────────────────────────
 # This triggers the module-level engine creation in session.py, which uses
 # NullPool automatically for Postgres URLs.
-from interntrack.database.session import init_db as interntrack_init_db
+from interntrack.database.session import async_session_factory, init_db
 from interntrack.main import app
 
-# ── Mount the (cybershield) resume router ─────────────────────────────────
-# The resume upload / match endpoints live in the cybershield package and
-# need the same database URL as the interntrack app.  We set the env var
-# before importing the cybershield module so its config resolves to the
-# shared Postgres database.
-os.environ.setdefault("CYBERSHIELD_DATABASE_URL", os.environ.get("DATABASE_URL", ""))
+# ── Patch cybershield dependencies to use the interntrack DB session ──────
+# The cybershield resume router uses cybershield.dependencies.get_session()
+# which creates its own separate SQLAlchemy engine — that conflicts with the
+# interntrack engine's asyncpg event loop under serverless concurrency.
+# We monkey-patch the dependency to use the interntrack session factory.
+from collections.abc import AsyncGenerator
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+
+async def _interntrack_get_session() -> AsyncGenerator[AsyncSession, None]:
+    """Yield an interntrack DB session (same engine as the main app)."""
+    async with async_session_factory() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+
+import cybershield.dependencies as _cs_deps
+
+_cs_deps.get_session = _interntrack_get_session  # type: ignore[assignment]
+
+# ── Mount the cybershield resume router ────────────────────────────────────
 from cybershield.api.v1.resumes import router as resumes_router
 from cybershield.database.session import init_db as cybershield_init_db
 
 app.include_router(resumes_router, prefix="/api/v1/resumes", tags=["Resumes"])
 
-# ── Initialize both databases on cold start ───────────────────────────────
-# Each init_db() call is idempotent — ``create_all`` only creates tables
-# that don't exist yet.  Running both ensures both the interntrack and
-# cybershield schemas (ResumeData, ResumeMatchResult, …) are present.
+# ── Initialize database on cold start ─────────────────────────────────────
 try:
-    asyncio.get_event_loop().run_until_complete(interntrack_init_db())
+    asyncio.get_event_loop().run_until_complete(init_db())
     asyncio.get_event_loop().run_until_complete(cybershield_init_db())
 except RuntimeError:
     # Already running in an event loop (Vercel's runtime handles this)
