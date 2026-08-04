@@ -1536,3 +1536,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Database layer implementation
 - Basic API endpoints
 - Initial test setup
+
+## [1.20.0] - 2026-08-04
+
+### Fixed
+
+- **Resume parsing for non-security (Data Analyst) resumes** — new
+  `data_analysis` skill category (SQL, Excel, Power BI, DAX, MySQL, Pandas,
+  Jupyter, ...); Symbol-font bullets (\uf0b7) normalized; `www.` prefix
+  accepted in GitHub/LinkedIn URLs; generic "Certificate of X" lines
+  captured; project-section layout detection now handles dot-title + dash-
+  detail + plain-title layouts; education GPA prefers scaled values
+  ("6.75/10") and decimals ("8.65"), and year/institution extraction works
+  whether the school name precedes or follows the degree. Validated on the
+  real Dnyaneshwari vanjari resume (15 skills, 2 projects, clean education,
+  4 certificates, LinkedIn detected).
+
+### Fixed (job → resume matching on the live app)
+
+- **Live resume-match endpoint crashed with INTERNAL_ERROR**: the Neon
+  `jobs` table (created by the interntrack model) had no
+  `required_skills`/`preferred_skills` columns, and cybershield's `Job`
+  model eager-loads relationships that join against the differently-shaped
+  live `applications` table. Fixes:
+  - `cybershield.database.session.init_db` now syncs missing model columns
+    onto existing tables (idempotent ALTER TABLE), auto-healing the live
+    schema on cold start.
+  - Match endpoints use a column-only select (no eager relationship joins)
+    via a lightweight `_JobMatchData` dataclass.
+  - Matching falls back to the job's `tags` column when the dedicated skill
+    columns are empty (live jobs keep skills in `tags`).
+  - `Job` model gained a `tags` column to match the live table.
+- **Skill extraction in scrapers** now uses word-boundary matching (no more
+  "Go" from Google, "C" from Certificate) with a broader canonical keyword
+  list, exposed as `extract_skills_from_text`.
+- **Backfill script** `interntrack.scripts.backfill_job_skills` enriches
+  existing jobs with extracted skills; run against the live Neon DB
+  (6 jobs updated, e.g. ClickHouse → Python/TypeScript/Go/Rust/SQL/Node.js/
+  AWS/Kubernetes).

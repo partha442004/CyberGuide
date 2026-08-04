@@ -788,6 +788,75 @@ PROJECTS
         text = ResumeParser._join_tj_fragments(r"(a\\b)")
         assert text == r"a\b" or text == "ab"
 
+    def test_data_analyst_resume_skills_and_projects(self):
+        """A non-security resume still extracts skills, projects and certs."""
+        text = """DATA ANALYST
+email@x.com
+OBJECTIVES
+Motivated Data Analyst with skills in Python, SQL, Excel, Power BI.
+EDUCATION
+Bachelor of Engineering Computer Science Keystone School of
+Engineering, Pune - 2026 | CGPA 7 th sem : 8.65
+SKILLS
+Technical Skills:
+Advanced Excel: VLOOKUP, Pivot Table
+SQL: Joins, Window Functions
+Power BI: DAX, Power Query
+Tools: Microsoft Excel, MySQL, jupyter Notebook
+PROJECTS
+Pizza Sales Dashboard (Power BI)
+- Built an interactive dashboard using Power BI, DAX
+- Visualized total sales and Purchase Trends
+Employee Salary System (MySQL)
+- Automated salary management using MySQL
+CERTIFICATES
+Certificate of Advanced Excel
+Certificate of SQL Mastery
+"""
+        result = self.parser._parse_text(text)
+        skill_names = {s["name"].lower() for s in result["skills"]}
+        assert "python" in skill_names
+        assert "sql" in skill_names
+        assert "power bi" in skill_names
+        assert "excel" in skill_names
+        assert "mysql" in skill_names
+        assert "dax" in skill_names
+
+        projects = result["projects"]
+        assert len(projects) == 2
+        assert "pizza sales" in projects[0]["name"].lower()
+        assert "employee salary" in projects[1]["name"].lower()
+
+        edu = result["education"]
+        assert edu and "bachelor" in edu[0]["degree"].lower()
+        assert "keystone" in (edu[0]["institution"] or "").lower()
+        assert edu[0]["gpa"] == "8.65"
+
+        cert_names = {c["name"].lower() for c in result["certifications"]}
+        assert "advanced excel" in cert_names
+        assert "sql mastery" in cert_names
+
+    def test_symbol_font_bullets_normalized(self):
+        """\uf0b7 (Symbol font) bullets are normalized to \u2022."""
+        text = "PROJECTS\n\uf0b7 Pizza Dashboard (Power BI)\n- Built it\n\uf0b7 Sales Tracker (Excel)\n- Tracked sales\n"
+        projects = self.parser._extract_projects(text)
+        assert len(projects) == 2
+        assert "pizza dashboard" in projects[0]["name"].lower()
+
+    def test_linkedin_www_prefix(self):
+        """www.linkedin.com URLs are detected."""
+        text = "LinkedIn: https://www.linkedin.com/in/dnyaneshwari-vanjari"
+        links = self.parser._extract_links(text)
+        assert links.get("linkedin") == "https://www.linkedin.com/in/dnyaneshwari-vanjari"
+
+    def test_certificate_of_generic_lines(self):
+        """'Certificate of X' lines are captured for non-security resumes."""
+        text = "CERTIFICATES\nCertificate of Advanced Excel - completed\nCertificate of SQL Mastery - completed\n"
+        certs = self.parser._extract_certifications(text)
+        names = {c["name"].lower() for c in certs}
+        assert "advanced excel" in names
+        assert "sql mastery" in names
+
     def test_education_single_line_year_does_not_bleed(self):
         """Degree stops at the year even when the whole block is one line."""
         text = (

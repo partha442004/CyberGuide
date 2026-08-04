@@ -224,6 +224,35 @@ SECURITY_SKILLS = {
         "trivy",
         "fortify",
     ],
+    "data_analysis": [
+        "sql",
+        "mysql",
+        "postgresql",
+        "excel",
+        "advanced excel",
+        "power bi",
+        "tableau",
+        "dax",
+        "power query",
+        "pandas",
+        "numpy",
+        "matplotlib",
+        "seaborn",
+        "jupyter",
+        "data analysis",
+        "data analytics",
+        "data visualization",
+        "data cleaning",
+        "data transformation",
+        "etl",
+        "statistics",
+        "statistical analysis",
+        "machine learning",
+        "kpi dashboards",
+        "dashboards",
+        "reporting",
+        "business intelligence",
+    ],
 }
 
 # URL patterns
@@ -231,8 +260,8 @@ SECURITY_SKILLS = {
 # generic "portfolio" pattern must not capture bare domains of known platforms
 # (e.g. "https://linkedin.com" when a profile URL was already extracted).
 URL_PATTERNS = {
-    "github": r"https?://github\.com/[\w-]+",
-    "linkedin": r"https?://linkedin\.com/in/[\w-]+",
+    "github": r"https?://(?:www\.)?github\.com/[\w-]+",
+    "linkedin": r"https?://(?:www\.)?linkedin\.com/in/[\w-]+",
     "tryhackme": r"https?://tryhackme\.com/p/[\w-]+",
     "hackthebox": r"https?://app\.hackthebox\.me/users/[\w-]+",
     # Custom portfolio domains only — exclude the dedicated platforms above
@@ -463,6 +492,10 @@ class ResumeParser:
 
     def _parse_text(self, text: str, file_path: str = "") -> Dict[str, Any]:
         """Parse extracted text and return structured resume data."""
+        # Normalize Symbol-font bullets (\uf0b7, produced by e.g. Word/Google
+        # Docs PDF exports) to the standard bullet so section parsers that
+        # rely on \u2022 keep working.
+        text = text.replace("\uf0b7", "\u2022").replace("\ufffd", "\u2022")
         text_lower = text.lower()
 
         return {
@@ -507,46 +540,113 @@ class ResumeParser:
 
         # Isolate the Education section (between EDUCATION header and next section)
         edu_section_match = re.search(
-            r"EDUCATION\s*\n(.*?)(?=\n(?:SKILLS?|EXPERIENCE|CERTIFICATIONS?|PROJECTS?|ACTIVITIES|HANDS|SUMMARY|CONTACT)|$)",
+            r"EDUCATION\s*\n(.*?)(?=\n(?:SKILLS?|EXPERIENCE|CERTIFICATIONS?|CERTIFICATES?|PROJECTS?|ACTIVITIES|HANDS|SUMMARY|CONTACT)|$)",
             text,
             re.IGNORECASE | re.DOTALL,
         )
         edu_text = edu_section_match.group(1) if edu_section_match else text
 
-        # Degree detection within education section - stop at newline, a year
-        # range, or a CGPA marker so "B.Tech in IT 2021-2025 / CGPA" on a
-        # single line (common in extracted PDFs) doesn't bleed together.
+        # Degree detection within education section. Stop at a year range, a
+        # CGPA marker, a newline, OR an institution keyword so a degree line
+        # that wraps ("Bachelor of Engineering Computer Science Keystone School
+        # of Engineering...") doesn't bleed the institution into the degree.
         degree_match = re.search(
-            r"(b\.?tech|bachelor|b\.?e\.?|m\.?tech|master|mba|ph\.?d|diploma|b\.?sc|m\.?sc)([^\n]{0,120}?)(?=\s*(?:20[12]\d|19\d{2})|\s*\\|\s*cgpa|\s*[|/]\s*cgpa|\n|$)",
+            r"(b\.?tech|bachelor|b\.?e\.?|m\.?tech|master|mba|ph\.?d|diploma|b\.?sc|m\.?sc)"
+            r"([^\n]{0,120}?)(?=\s*(?:20[12]\d|19\d{2})|\s*\\|\s*cgpa|\s*[|/]\s*cgpa|"
+            r"\s+(?:[A-Z][a-z]+\s+)?(?:university|college|institute|academy|school)\b|\n|$)",
             edu_text,
             re.IGNORECASE,
         )
         if degree_match:
-            degree = (degree_match.group(0).strip()) or None
+            degree = degree_match.group(0).strip() or None
         else:
             degree = None
 
-        # Institution detection within education section - line-by-line, stop at dash
+        # Institution detection. The school keyword may appear AFTER the degree
+        # ("...Computer Science Keystone School of Engineering, Pune") or
+        # BEFORE it ("Mahendra Engineering College, Salem - B.Tech...").
+        # Strategy: find the keyword, then (a) extend one preceding capitalized
+        # proper-noun run as the school's name prefix — unless that run already
+        # belongs to the degree (starts with a degree keyword) — and (b) take
+        # everything after the keyword up to a dash / pipe / year / CGPA.
         institution = None
-        for line in edu_text.split("\n"):
-            line = line.strip()
-            if re.search(r"(university|college|institute|academy|school)", line, re.IGNORECASE):
-                # Split on dash and take first part
-                parts = re.split(r"\s*[–-]\s*", line)
-                institution = parts[0].strip()
+        degree_end = degree_match.end() if degree_match else -1
+        for m in re.finditer(
+            r"(university|college|institute|academy|school)\b", edu_text, re.IGNORECASE
+        ):
+            rest = edu_text[m.start() :]
+            cut = re.search(r"\s*[–-]\s*|\s*\|\s*|\s*[|/]\s*cgpa|\s*(?:20[12]\d|19\d{2})", rest)
+            if cut:
+                rest = rest[: cut.start()]
+            suffix = re.sub(r"\s+", " ", rest).strip().rstrip(",")
+            if not suffix:
+                continue
+
+            before = edu_text[max(0, m.start() - 80) : m.start()]
+            prefix = ""
+            if m.start() < degree_end:
+                # School keyword BEFORE the degree ("Mahendra Engineering
+                # College, Salem - B.Tech..."): the whole preceding proper-noun
+                # run is the school name.
+                prefix_m = re.search(r"([A-Z][A-Za-z&.'-]*(?:\s+[A-Z][A-Za-z&.'-]*)*)\s*$", before)
+                if prefix_m:
+                    prefix = prefix_m.group(1)
+            else:
+                # School keyword AFTER the degree ("...Computer Science Keystone
+                # School of Engineering"): only the one capitalized token
+                # immediately before the keyword belongs to the school name.
+                prefix_m = re.search(r"([A-Z][A-Za-z&.'-]*)\s*$", before)
+                if prefix_m and len(prefix_m.group(1)) > 2:
+                    prefix = prefix_m.group(1)
+
+            candidate = f"{prefix} {suffix}".strip()
+            if candidate:
+                institution = candidate
                 break
 
-        # GPA/CGPA
-        gpa_match = re.search(
-            r"(cgpa|gpa|percentage|grades?)[\s:]*(\d+\.?\d*(?:/\d+)?)", edu_text, re.IGNORECASE
-        )
-        gpa = gpa_match.group(2) if gpa_match else None
+        # GPA/CGPA. Prefer a value with a scale suffix ("6.75/10"), then a
+        # decimal GPA ("CGPA 7 th sem : 8.65" → 8.65, not 7), then the last
+        # plain number. Only look on the degree line so HSC/SSC percentages
+        # stay out.
+        degree_line = ""
+        if degree:
+            d_idx = edu_text.find(degree)
+            if d_idx != -1:
+                degree_line = edu_text[d_idx : d_idx + 200]
+        gpa = None
+        gpa_region = degree_line or edu_text
+        for m in re.finditer(r"(?:cgpa|gpa|percentage|grades?)\b[^\n]*", gpa_region, re.IGNORECASE):
+            candidates = re.findall(r"\d+(?:\.\d+)?(?:/\d+)?", m.group(0))
+            if not candidates:
+                continue
+            scaled = [c for c in candidates if "/" in c]
+            decimal = [c for c in candidates if "." in c and "/" not in c]
+            gpa = (scaled or decimal or [candidates[-1]])[-1]
+            break
 
-        # Year range - search within education section for B.Tech context
+        # Year range - prefer the degree entry itself (so HSC/SSC ranges on
+        # later bullet lines don't win). The degree region may wrap across
+        # lines ("...School of \nEngineering, Pune - 2026") but ends at the
+        # next bullet; search only up to the next bullet. Accept a single
+        # year when no range is present.
         years = None
-        year_match = re.search(r"(20[12]\d)\s*[-–]\s*(20[12]\d|present)", edu_text, re.IGNORECASE)
+        degree_entry = degree_line.split("\u2022", 1)[0] if degree_line else ""
+        degree_entry = degree_entry or degree_line or edu_text
+        year_match = re.search(
+            r"(20[12]\d)\s*[-–]\s*(20[12]\d|present)", degree_entry, re.IGNORECASE
+        )
         if year_match:
             years = f"{year_match.group(1)} - {year_match.group(2)}"
+        else:
+            single = re.search(r"(?:20[12]\d|19\d{2})", degree_entry)
+            if single:
+                years = single.group(0)
+            elif degree_line:
+                fallback = re.search(
+                    r"(20[12]\d)\s*[-–]\s*(20[12]\d|present)", edu_text, re.IGNORECASE
+                )
+                if fallback:
+                    years = f"{fallback.group(1)} - {fallback.group(2)}"
 
         if degree or institution:
             education.append(
@@ -632,8 +732,14 @@ class ResumeParser:
         return experience
 
     def _extract_certifications(self, text: str) -> List[Dict[str, Any]]:
-        """Extract certifications."""
+        """Extract certifications.
+
+        Two passes: (1) known security-cert keywords (word-boundary matched),
+        (2) generic "Certificate of X" / "Certified X" lines (e.g. "Certificate
+        of Advanced Excel") so non-security resumes are also covered.
+        """
         certs = []
+        seen = set()
         cert_keywords = [
             "ceh",
             "comp security+",
@@ -661,13 +767,38 @@ class ResumeParser:
             if match:
                 idx = match.start()
                 context = text[max(0, idx - 50) : idx + len(cert) + 50]
-                certs.append(
-                    {
-                        "name": cert.upper() if len(cert) <= 5 else cert.title(),
-                        "status": "in progress" if "progress" in context.lower() else "completed",
-                        "context": context.strip(),
-                    }
-                )
+                name = cert.upper() if len(cert) <= 5 else cert.title()
+                if name not in seen:
+                    seen.add(name)
+                    certs.append(
+                        {
+                            "name": name,
+                            "status": "in progress"
+                            if "progress" in context.lower()
+                            else "completed",
+                            "context": context.strip(),
+                        }
+                    )
+
+        # Generic "Certificate of X" / "Certified in X" lines.
+        for m in re.finditer(
+            r"certificate\s+of\s+([A-Za-z][\w &+.-]{2,60}?)(?=\s*(?:–|-|,|\n|$))",
+            text,
+            re.IGNORECASE,
+        ):
+            name = m.group(1).strip()
+            if not name or name.lower() in seen:
+                continue
+            seen.add(name.lower())
+            line_start = text.rfind("\n", 0, m.start()) + 1
+            context = text[line_start : m.start() + len(name) + 60].strip()
+            certs.append(
+                {
+                    "name": name.title(),
+                    "status": "in progress" if "progress" in context.lower() else "completed",
+                    "context": context,
+                }
+            )
 
         return certs
 
@@ -682,11 +813,15 @@ class ResumeParser:
         projects: list[dict[str, Any]] = []
         seen_names = set()
 
+        # Normalize Symbol-font bullets here too (direct calls to this method
+        # skip _parse_text's normalization).
+        text = text.replace("\uf0b7", "\u2022").replace("\ufffd", "\u2022")
+
         # Match only a PROJECTS header (explicitly, not labs / hands-on).
         # MULTILINE so ^ matches the line start mid-string; \Z is the absolute
         # end so the lookahead doesn't stop at every line break.
         project_section = re.search(
-            r"^\s*PROJECTS?\s*\n(.*?)(?=\n(?:certifications?|education|skills?|experience|activities?|additional|key competencies|awards?|contact)|\Z)",
+            r"^\s*PROJECTS?\s*\n(.*?)(?=\n(?:certifications?|certificates?|education|skills?|experience|activities?|additional|key competencies|awards?|contact)|\Z)",
             text,
             re.IGNORECASE | re.DOTALL | re.MULTILINE,
         )
@@ -696,7 +831,6 @@ class ResumeParser:
 
             # Bullet characters — include U+FFFD (the replacement char produced
             # when PDF extraction loses the original "•" glyph).
-            bullet_re = re.compile(r"^[\s\-•*\u2022\ufffd]+\s*")
             date_re = re.compile(
                 r"^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*\d{4}$",
                 re.IGNORECASE,
@@ -705,13 +839,18 @@ class ResumeParser:
             lines = [raw_line.strip() for raw_line in section_text.split("\n")]
             lines = [ln for ln in lines if ln]
 
-            # Determine layout: if every non-empty line is a bullet, treat each
-            # bullet as its own project (classic list style). Otherwise, bullets
-            # are details under the preceding title line (resume style).
-            non_bullet_lines = [ln for ln in lines if not bullet_re.match(ln)]
-            all_bullets = len(non_bullet_lines) == 0
+            # Determine layout from the bullet combination:
+            #   dot + dash → "\u2022 Title" + "- detail" (Pizza Dashboard style)
+            #   dot only + plain → plain title lines + "\u2022 detail" (real
+            #       resume style)
+            #   dot only → each dot is its own project
+            #   dash only → each dash is its own project
+            #   no bullets → title/detail heuristic
+            # Non-bullet lines that follow a bullet without sentence-ending
+            # punctuation are wrapped continuations and attach as details.
+            dot_bullet_re = re.compile(r"^\s*[\u2022\ufffd]+\s*")
+            dash_bullet_re = re.compile(r"^\s*-\s*")
 
-            # Lines that are clearly NOT project titles.
             def _is_metadata(ln: str) -> bool:
                 return bool(
                     ln.lower().startswith("report:")
@@ -720,53 +859,96 @@ class ResumeParser:
                 )
 
             entries: list[list[str]] = []  # each entry: [title, ...details]
-            if all_bullets:
-                for ln in lines:
-                    clean = bullet_re.sub("", ln).strip()
-                    if clean:
-                        entries.append([clean])
-            else:
-                has_any_bullet = any(bullet_re.match(ln) for ln in lines)
-                current: list[str] | None = None
+            has_dot = any(dot_bullet_re.match(ln) for ln in lines)
+            has_dash = any(dash_bullet_re.match(ln) for ln in lines)
+            has_plain = any(
+                not dot_bullet_re.match(ln) and not dash_bullet_re.match(ln) for ln in lines
+            )
+
+            def _strip_dash(ln: str) -> str:
+                return re.sub(r"^\s*-\s*", "", ln).strip()
+
+            def _strip_dot(ln: str) -> str:
+                return dot_bullet_re.sub("", ln).strip()
+
+            current: list[str] | None = None
+
+            def _start(clean: str) -> None:
+                nonlocal current
+                if current is not None:
+                    entries.append(current)
+                current = [clean] if clean else None
+
+            def _detail(clean: str) -> None:
+                if current is not None and clean:
+                    current.append(clean)
+
+            if has_dot and has_dash:
+                # "\u2022 Title" starts a project; "- detail" and wrapped
+                # continuation lines attach to it.
                 for ln in lines:
                     if _is_metadata(ln):
                         continue
-                    is_bullet = bullet_re.match(ln)
-                    if has_any_bullet:
-                        # Explicit bullets: details attach to current project.
-                        if is_bullet:
-                            clean = bullet_re.sub("", ln).strip()
-                            if current is None:
-                                current = [clean]
-                            else:
-                                current.append(clean)
-                        else:
-                            if current is not None:
-                                entries.append(current)
-                            current = [ln]
+                    if dot_bullet_re.match(ln):
+                        _start(_strip_dot(ln))
+                    elif dash_bullet_re.match(ln):
+                        _detail(_strip_dash(ln))
                     else:
-                        # No bullets (common in PDFs): a project title typically
-                        # has a dash separator ("Title - Detail"), or a year in
-                        # parentheses, or is a short line without commas/sentence
-                        # punctuation. Detail lines are longer and comma-heavy.
-                        looks_like_title = (
-                            re.search(r"\s[-\u2013\u2014]\s", ln) is not None
-                            or re.search(r"\((?:19|20)\d{2}", ln) is not None
-                            or (
-                                len(ln) <= 50
-                                and "," not in ln
-                                and not ln.rstrip().endswith((".", ":", ";"))
-                                and re.search(r"[A-Za-z]", ln) is not None
-                            )
+                        _detail(ln.strip())
+            elif (has_dot or has_dash) and has_plain:
+                # Plain lines are titles; bullets (dot or dash) are details;
+                # wrapped continuations attach.
+                for ln in lines:
+                    if _is_metadata(ln):
+                        continue
+                    if dot_bullet_re.match(ln):
+                        _detail(_strip_dot(ln))
+                    elif dash_bullet_re.match(ln):
+                        _detail(_strip_dash(ln))
+                    else:
+                        _start(ln.strip())
+            elif has_dot:
+                # Plain dot bullet list: each bullet is its own project.
+                for ln in lines:
+                    if _is_metadata(ln):
+                        continue
+                    clean = _strip_dot(ln)
+                    if clean:
+                        entries.append([clean])
+            elif has_dash:
+                # Plain dash bullet list: each bullet is its own project.
+                for ln in lines:
+                    if _is_metadata(ln):
+                        continue
+                    clean = _strip_dash(ln)
+                    if clean:
+                        entries.append([clean])
+            else:
+                # No bullets (common in PDFs): a project title typically has a
+                # dash separator ("Title - Detail"), or a year in parentheses,
+                # or is a short line without commas/sentence punctuation.
+                for ln in lines:
+                    if _is_metadata(ln):
+                        continue
+                    looks_like_title = (
+                        re.search(r"\s[-\u2013\u2014]\s", ln) is not None
+                        or re.search(r"\((?:19|20)\d{2}", ln) is not None
+                        or (
+                            len(ln) <= 50
+                            and "," not in ln
+                            and not ln.rstrip().endswith((".", ":", ";"))
+                            and re.search(r"[A-Za-z]", ln) is not None
                         )
-                        if current is None or looks_like_title:
-                            if current is not None and looks_like_title:
-                                entries.append(current)
-                            current = [ln]
-                        else:
-                            current.append(ln)
-                if current is not None:
-                    entries.append(current)
+                    )
+                    if current is None or looks_like_title:
+                        if current is not None and looks_like_title:
+                            entries.append(current)
+                        current = [ln]
+                    else:
+                        current.append(ln)
+
+            if current is not None and current not in entries:
+                entries.append(current)
 
             output = []
             for entry in entries:

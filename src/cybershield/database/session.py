@@ -81,20 +81,22 @@ async def init_db() -> None:
     """Initialize database tables.
 
     Also fixes schema drift on existing tables (e.g. dropping old FK
-    constraints that no longer exist in the model).
+    constraints that no longer exist in the model, and adding columns that
+    a pre-existing table — like the interntrack-created ``jobs`` table on
+    Neon — is missing).
     """
     from cybershield.domain.models import Base
 
     async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-        # Drop FK constraint on resume_data.user_id if it still exists
-        # (the model removed it — user_id is now a plain string column).
         from sqlalchemy import inspect as _inspect
         from sqlalchemy import text as _text
 
         def _fix_schema(sync_conn):
             inspector = _inspect(sync_conn)
+            # Drop FK constraint on resume_data.user_id if it still exists
+            # (the model removed it — user_id is now a plain string column).
             if "resume_data" in inspector.get_table_names():
                 for fk in inspector.get_foreign_keys("resume_data"):
                     if fk["constrained_columns"] == ["user_id"]:
@@ -104,6 +106,27 @@ async def init_db() -> None:
                             )
                         )
                         logger.info("Dropped FK resume_data_user_id_fkey")
+
+            # Add model columns missing from existing tables (idempotent).
+            # create_all never alters existing tables; a database created by
+            # another app's models (e.g. interntrack's ``jobs`` table, which
+            # has ``tags`` but no ``required_skills``/``preferred_skills``)
+            # would otherwise raise UndefinedColumnError on every SELECT.
+            # Only nullable/defaulted columns are added.
+            table_names = set(inspector.get_table_names())
+            for table in Base.metadata.sorted_tables:
+                if table.name not in table_names:
+                    continue
+                existing_columns = {col["name"] for col in inspector.get_columns(table.name)}
+                for column in table.columns:
+                    if column.name in existing_columns:
+                        continue
+                    if column.nullable or column.default is not None:
+                        col_type = column.type.compile(dialect=sync_conn.dialect)
+                        sync_conn.execute(
+                            _text(f"ALTER TABLE {table.name} ADD COLUMN {column.name} {col_type}")
+                        )
+                        logger.info(f"Added missing column {table.name}.{column.name}")
 
         await conn.run_sync(_fix_schema)
 

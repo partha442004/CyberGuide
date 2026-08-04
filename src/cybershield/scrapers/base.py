@@ -14,6 +14,7 @@ import asyncio
 import hashlib
 import logging
 import random
+import re
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -24,6 +25,126 @@ import httpx
 from cybershield.cache import cache_manager
 
 logger = logging.getLogger(__name__)
+
+
+# Canonical skill names extracted from job descriptions (display casing).
+# Short generic terms that appear inside other words are matched with
+# negative-lookaround boundaries; phrase skills are matched verbatim.
+SKILL_KEYWORDS: List[str] = [
+    # Programming
+    "Python",
+    "JavaScript",
+    "TypeScript",
+    "Go",
+    "Rust",
+    "C",
+    "C++",
+    "C#",
+    "Java",
+    "PowerShell",
+    "Bash",
+    "SQL",
+    "Shell Scripting",
+    # Frameworks / Libraries
+    "React",
+    "Node.js",
+    "Django",
+    "Flask",
+    "FastAPI",
+    "Next.js",
+    "Vue.js",
+    "Spring Boot",
+    # Security Tools
+    "Nmap",
+    "Burp Suite",
+    "Wireshark",
+    "Metasploit",
+    "Nessus",
+    "OpenVAS",
+    "Qualys",
+    "Snort",
+    "Suricata",
+    "Zeek",
+    "OSSEC",
+    "Wazuh",
+    "Kali Linux",
+    "Hydra",
+    "Hashcat",
+    "John the Ripper",
+    "Aircrack-ng",
+    "Sqlmap",
+    "Nikto",
+    # SIEM / Monitoring
+    "Splunk",
+    "Microsoft Sentinel",
+    "Elastic SIEM",
+    "QRadar",
+    "ArcSight",
+    "Grafana",
+    "Prometheus",
+    "ELK Stack",
+    # Cloud Security / Cloud
+    "AWS",
+    "Azure",
+    "GCP",
+    "Kubernetes",
+    "Docker",
+    "Terraform",
+    "Cloud Security",
+    # Security Concepts
+    "OWASP",
+    "MITRE ATT&CK",
+    "NIST",
+    "ISO 27001",
+    "SOC 2",
+    "GDPR",
+    "Penetration Testing",
+    "Vulnerability Assessment",
+    "Incident Response",
+    "Threat Intelligence",
+    "Malware Analysis",
+    "Reverse Engineering",
+    "Digital Forensics",
+    "GRC",
+    "Compliance",
+    "Security Operations",
+    "SOC Analysis",
+    "Threat Hunting",
+    "Red Team",
+    "Blue Team",
+    "Identity and Access Management",
+    "DevSecOps",
+    "Zero Trust",
+    "Endpoint Detection",
+]
+
+
+def extract_skills_from_text(text: Optional[str]) -> List[str]:
+    """Extract known skills from text using word-boundary matching.
+
+    Short skills like "Go" or "AWS" only match as standalone words (never
+    inside "Google", "Certificate" or "awesome"); skills with non-word
+    characters like "C++" / "Node.js" still match; multi-word skills are
+    matched as exact phrases. Returns canonical display-cased names.
+    """
+    if not text:
+        return []
+
+    text_lower = text.lower()
+    found_skills: List[str] = []
+
+    for skill in SKILL_KEYWORDS:
+        skill_lower = skill.lower()
+        # A bare "C" must not match the "C" inside "C++" — require it not
+        # be followed by a "+" when it's the standalone letter.
+        if skill_lower == "c":
+            pattern = r"(?<![a-z0-9])c(?![a-z0-9+])"
+        else:
+            pattern = rf"(?<![a-z0-9]){re.escape(skill_lower)}(?![a-z0-9])"
+        if re.search(pattern, text_lower):
+            found_skills.append(skill)
+
+    return found_skills
 
 
 class ScraperConfig:
@@ -304,75 +425,7 @@ class BaseScraper(ABC):
 
     def _extract_skills(self, text: str) -> List[str]:
         """Extract skills from job description text."""
-        if not text:
-            return []
-
-        # Common cybersecurity skills
-        skills = [
-            # Programming
-            "Python",
-            "JavaScript",
-            "Go",
-            "Rust",
-            "C",
-            "C++",
-            "Java",
-            "PowerShell",
-            "Bash",
-            # Security Tools
-            "Nmap",
-            "Burp Suite",
-            "Wireshark",
-            "Metasploit",
-            "Nessus",
-            "OpenVAS",
-            "Snort",
-            "Suricata",
-            "Zeek",
-            "OSSEC",
-            "Wazuh",
-            # SIEM
-            "Splunk",
-            "Microsoft Sentinel",
-            "Elastic SIEM",
-            "QRadar",
-            "ArcSight",
-            # Cloud Security
-            "AWS",
-            "Azure",
-            "GCP",
-            "Kubernetes",
-            "Docker",
-            # Security Concepts
-            "OWASP",
-            "MITRE ATT&CK",
-            "NIST",
-            "ISO 27001",
-            "SOC 2",
-            "Penetration Testing",
-            "Vulnerability Assessment",
-            "Incident Response",
-            "Threat Intelligence",
-            "Malware Analysis",
-            "Reverse Engineering",
-            "Digital Forensics",
-            "GRC",
-            "Compliance",
-            # Frameworks
-            "React",
-            "Django",
-            "FastAPI",
-            "Node.js",
-        ]
-
-        found_skills = []
-        text_lower = text.lower()
-
-        for skill in skills:
-            if skill.lower() in text_lower:
-                found_skills.append(skill)
-
-        return found_skills
+        return extract_skills_from_text(text)
 
     @abstractmethod
     async def scrape(self, **kwargs) -> List[ScrapedJob]:

@@ -84,6 +84,15 @@ class TestCalculateJobMatch:
         assert result.missing_skills == []
         assert result.suggestions == []
 
+    def test_falls_back_to_tags_when_skill_columns_empty(self):
+        """Live interntrack jobs store skills in ``tags`` — matching must
+        fall back to them when the dedicated columns are empty."""
+        job = self._make_job(required_skills=[], preferred_skills=[], tags=["python", "aws"])
+        result = _calculate_job_match({"python", "docker"}, job)
+        assert result.match_score is not None
+        assert "python" in result.matched_skills
+        assert "aws" in result.missing_skills
+
     def test_low_match_suggests_projects(self):
         job = self._make_job(required_skills=["go", "rust", "kubernetes"])
         result = _calculate_job_match({"python"}, job)

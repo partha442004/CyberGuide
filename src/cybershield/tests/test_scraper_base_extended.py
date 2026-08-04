@@ -352,6 +352,55 @@ class TestRunAndStats:
         assert stats["success_rate"] == 80.0
 
 
+class TestExtractSkills:
+    def test_empty_text(self):
+        scraper = _make_scraper()
+        assert scraper._extract_skills("") == []
+        assert scraper._extract_skills(None) == []
+
+    def test_word_boundaries_no_false_positives(self):
+        """Short skills must not match inside larger words."""
+        scraper = _make_scraper()
+        # 'Go' inside 'Google', 'C' inside 'Certificate', 'AWS' inside 'awesome'
+        skills = scraper._extract_skills("Google Certificate program. Awesome workspace, awsome.")
+        assert "Go" not in skills
+        assert "C" not in skills
+        assert "AWS" not in skills
+
+    def test_standalone_skills_detected(self):
+        scraper = _make_scraper()
+        skills = scraper._extract_skills(
+            "We need Python, AWS, Docker, Kubernetes and OWASP experience."
+        )
+        assert "Python" in skills
+        assert "AWS" in skills
+        assert "Docker" in skills
+        assert "Kubernetes" in skills
+        assert "OWASP" in skills
+
+    def test_multiword_phrase_skills(self):
+        scraper = _make_scraper()
+        skills = scraper._extract_skills(
+            "Experience with penetration testing and incident response is key. "
+            "We value vulnerability assessment skills."
+        )
+        assert "Penetration Testing" in skills
+        assert "Incident Response" in skills
+        assert "Vulnerability Assessment" in skills
+
+    def test_case_insensitive(self):
+        scraper = _make_scraper()
+        skills = scraper._extract_skills("python PYTHON Python")
+        assert skills.count("Python") == 1
+
+    def test_cpp_does_not_match_c(self):
+        scraper = _make_scraper()
+        skills = scraper._extract_skills("We use C++ and Java")
+        assert "C++" in skills
+        assert "C" not in skills  # 'C' should not be detected standalone from C++
+        assert "Java" in skills
+
+
 class TestRateLimitWait:
     @pytest.mark.asyncio
     async def test_rate_limit_zero_no_wait(self):

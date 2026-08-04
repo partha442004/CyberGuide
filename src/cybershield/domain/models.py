@@ -125,6 +125,7 @@ class Job(Base, TimestampMixin):
     batch = Column(String(50), nullable=True)
     required_skills = Column(JSON, default=list)
     preferred_skills = Column(JSON, default=list)
+    tags = Column(JSON, default=list)
     benefits = Column(JSON, nullable=True)
     selection_process = Column(Text, nullable=True)
     interview_process = Column(Text, nullable=True)
