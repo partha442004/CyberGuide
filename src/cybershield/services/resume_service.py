@@ -227,12 +227,17 @@ SECURITY_SKILLS = {
 }
 
 # URL patterns
+# NOTE: order matters — specific platform patterns are checked first, and the
+# generic "portfolio" pattern must not capture bare domains of known platforms
+# (e.g. "https://linkedin.com" when a profile URL was already extracted).
 URL_PATTERNS = {
     "github": r"https?://github\.com/[\w-]+",
     "linkedin": r"https?://linkedin\.com/in/[\w-]+",
     "tryhackme": r"https?://tryhackme\.com/p/[\w-]+",
     "hackthebox": r"https?://app\.hackthebox\.me/users/[\w-]+",
-    "portfolio": r"https?://[\w-]+\.(dev|io|com|net|org)",
+    # Custom portfolio domains only — exclude the dedicated platforms above
+    # (and other common link platforms) so we never report a bare platform URL.
+    "portfolio": r"https?://(?![\.\w-]*\.?(?:linkedin|github|tryhackme|hackthebox|mediafire|facebook|twitter|instagram|youtube|whatsapp)\.(?:com|me|org|net|io))[\w-]+\.(?:dev|io|com|net|org)(?:/[\w./-]*)?",
     "email": r"[\w.-]+@[\w.-]+\.\w+",
     "phone": r"\+?\d[\d\s-]{8,13}",
 }
@@ -394,12 +399,19 @@ class ResumeParser:
         }
 
     def _extract_skills(self, text_lower: str) -> List[Dict[str, Any]]:
-        """Extract skills by matching against the cybersecurity skill database."""
+        """Extract skills by matching against the cybersecurity skill database.
+
+        Uses word boundaries so short keywords ("go", "dd", "ids") only match
+        as standalone words and never inside unrelated words (e.g. "Google",
+        "Conducted", "Identification").
+        """
         found = []
         seen = set()
 
         for keyword, category in self._all_skills.items():
-            if keyword in text_lower and keyword not in seen:
+            # Multi-word keywords still get boundaries on both ends.
+            pattern = r"(?<![a-z0-9]){}(?![a-z0-9])".format(re.escape(keyword))
+            if keyword not in seen and re.search(pattern, text_lower):
                 seen.add(keyword)
                 found.append(
                     {
@@ -466,35 +478,75 @@ class ResumeParser:
         return education
 
     def _extract_experience(self, text: str) -> List[Dict[str, Any]]:
-        """Extract work experience information."""
-        experience = []
+        """Extract work experience information.
 
-        # Intern/role detection
-        role_patterns = [
-            r"(intern|internship|trainee|junior|senior|lead|analyst|engineer|associate|cadet)",
+        Only matches role keywords as standalone words (word boundaries) on
+        lines that actually look like job titles — the keyword appears at the
+        start of the line, or the line contains " at <company>" or a date
+        range. This avoids false positives from prose such as "SOC Analyst
+        Training", "Engineering College", "Team leadership".
+        """
+        experience = []
+        seen_roles = set()
+
+        # Role keywords, matched as standalone words only.
+        role_keywords = [
+            "intern",
+            "internship",
+            "trainee",
+            "junior",
+            "senior",
+            "lead",
+            "analyst",
+            "engineer",
+            "associate",
         ]
 
-        for pattern in role_patterns:
-            matches = re.finditer(pattern, text, re.IGNORECASE)
-            for match in matches:
-                context = text[max(0, match.start() - 100) : match.end() + 100]
-                experience.append(
-                    {
-                        "role": match.group(0).strip(),
-                        "context": context.strip()[:200],
-                    }
-                )
+        for line in text.split("\n"):
+            line_stripped = line.strip()
+            if not line_stripped:
+                continue
+            line_lower = line_stripped.lower()
 
-        # Deduplicate by role
-        seen_roles = set()
-        unique_exp = []
-        for exp in experience:
-            role_key = exp["role"].lower()
-            if role_key not in seen_roles:
-                seen_roles.add(role_key)
-                unique_exp.append(exp)
+            for role in role_keywords:
+                role_pattern = r"(?<![a-z0-9]){}(?![a-z0-9])".format(re.escape(role))
+                if not re.search(role_pattern, line_lower):
+                    continue
 
-        return unique_exp
+                # Skip lines that are section headers or clearly not titles.
+                if re.search(r"(skills?|education|certifications?|projects?|summary)", line_lower):
+                    continue
+
+                # Skip "<role> Training" patterns — course names, not roles
+                # (e.g. "SOC Analyst Training").
+                if re.search(r"{}\s+training\b".format(role), line_lower):
+                    continue
+
+                # A line is a plausible job title when the role is at the
+                # start (after bullets/whitespace) OR the line mentions a
+                # company (" at ") OR contains a date range.
+                role_at_start = re.match(r"^[\s\-•*]*{}".format(role), line_lower) is not None
+                has_company = r" at " in line_lower or r" - " in line_lower
+                has_date = re.search(r"\b(19|20)\d{2}\b", line_lower) is not None
+
+                if not (role_at_start or has_company or has_date):
+                    continue
+
+                # Skip education/institution context (e.g. "Engineering" is
+                # already excluded by word boundaries, but guard anyway).
+                if re.search(r"(college|university|academy|school)", line_lower):
+                    continue
+
+                if role not in seen_roles:
+                    seen_roles.add(role)
+                    experience.append(
+                        {
+                            "role": role,
+                            "context": line_stripped[:200],
+                        }
+                    )
+
+        return experience
 
     def _extract_certifications(self, text: str) -> List[Dict[str, Any]]:
         """Extract certifications."""
@@ -519,9 +571,12 @@ class ResumeParser:
 
         text_lower = text.lower()
         for cert in cert_keywords:
-            if cert in text_lower:
-                # Find context around the certification
-                idx = text_lower.find(cert)
+            # Word-boundary match so "comp security+" doesn't hit "CompTIA",
+            # and standalone "ceh"/"oscp" aren't matched inside other words.
+            pattern = r"(?<![a-z0-9]){}(?![a-z0-9])".format(re.escape(cert))
+            match = re.search(pattern, text_lower)
+            if match:
+                idx = match.start()
                 context = text[max(0, idx - 50) : idx + len(cert) + 50]
                 certs.append(
                     {
@@ -534,53 +589,109 @@ class ResumeParser:
         return certs
 
     def _extract_projects(self, text: str) -> List[Dict[str, Any]]:
-        """Extract project information."""
-        projects = []
+        """Extract project information.
 
-        # Look for project sections
+        Only the PROJECTS section is considered (NOT "hands-on labs", "key
+        competencies", etc. — those are lists of skills/activities, not
+        projects). Bullet items and URL/report lines inside the section are
+        skipped so each entry is a real project.
+        """
+        projects = []
+        seen_names = set()
+
+        # Match only a PROJECTS header (explicitly, not labs / hands-on).
+        # MULTILINE so ^ matches the line start mid-string; \Z is the absolute
+        # end so the lookahead doesn't stop at every line break.
         project_section = re.search(
-            r"(projects?|labs?|hands[- ]?on)[\s:]*\n(.*?)(?=\n(?:certifications?|education|skills?|experience|activities?)|$)",
+            r"^\s*PROJECTS?\s*\n(.*?)(?=\n(?:certifications?|education|skills?|experience|activities?|additional|key competencies|awards?|contact)|\Z)",
             text,
-            re.IGNORECASE | re.DOTALL,
+            re.IGNORECASE | re.DOTALL | re.MULTILINE,
         )
 
         if project_section:
-            section_text = project_section.group(2)
-            # Split by common separators
-            items = re.split(r"\n\s*[-•*]\s*|\n\s*\d+\.\s*", section_text)
+            section_text = project_section.group(1)
 
-            for item in items:
-                item = item.strip()
-                if len(item) > 10:  # Skip very short items
-                    # Extract title (first line or first sentence)
-                    title_match = re.match(r"^([^\n.]+)", item)
-                    title = title_match.group(1).strip() if title_match else item[:50]
+            # Bullet characters — include U+FFFD (the replacement char produced
+            # when PDF extraction loses the original "•" glyph).
+            bullet_re = re.compile(r"^[\s\-•*\u2022\ufffd]+\s*")
+            date_re = re.compile(
+                r"^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s*\d{4}$",
+                re.IGNORECASE,
+            )
 
-                    # Extract technologies mentioned
-                    techs = []
-                    tech_keywords = [
-                        "nessus",
-                        "nmap",
-                        "metasploit",
-                        "burp",
-                        "wireshark",
-                        "owasp",
-                        "dvwa",
-                        "portswigger",
-                        "hackthebox",
-                        "tryhackme",
-                    ]
-                    for tech in tech_keywords:
-                        if tech in item.lower():
-                            techs.append(tech.title())
+            lines = [raw_line.strip() for raw_line in section_text.split("\n")]
+            lines = [ln for ln in lines if ln]
 
-                    projects.append(
-                        {
-                            "name": title[:100],
-                            "description": item[:500],
-                            "technologies": techs,
-                        }
-                    )
+            # Determine layout: if every non-empty line is a bullet, treat each
+            # bullet as its own project (classic list style). Otherwise, bullets
+            # are details under the preceding title line (resume style).
+            non_bullet_lines = [ln for ln in lines if not bullet_re.match(ln)]
+            all_bullets = len(non_bullet_lines) == 0
+
+            entries: list[list[str]] = []  # each entry: [title, ...details]
+            if all_bullets:
+                for ln in lines:
+                    clean = bullet_re.sub("", ln).strip()
+                    if clean:
+                        entries.append([clean])
+            else:
+                current: list[str] | None = None
+                for ln in lines:
+                    # URL / report / date lines are metadata, not titles.
+                    if (
+                        ln.lower().startswith("report:")
+                        or re.match(r"^https?://", ln)
+                        or date_re.match(ln)
+                    ):
+                        continue
+                    if bullet_re.match(ln):
+                        clean = bullet_re.sub("", ln).strip()
+                        if current is None:
+                            current = [clean]
+                        else:
+                            current.append(clean)
+                    else:
+                        if current is not None:
+                            entries.append(current)
+                        current = [ln]
+                if current is not None:
+                    entries.append(current)
+
+            output = []
+            for entry in entries:
+                title = entry[0].strip()
+                title_key = title.lower()[:60]
+                if len(title) <= 2 or title_key in seen_names:
+                    continue
+                seen_names.add(title_key)
+                description = (title + "\n" + "\n".join(entry[1:])).strip()[:500]
+
+                # Extract technologies mentioned.
+                techs = []
+                tech_keywords = [
+                    "nessus",
+                    "nmap",
+                    "metasploit",
+                    "burp",
+                    "wireshark",
+                    "owasp",
+                    "dvwa",
+                    "portswigger",
+                    "hackthebox",
+                    "tryhackme",
+                ]
+                for tech in tech_keywords:
+                    if tech in description.lower():
+                        techs.append(tech.title())
+
+                output.append(
+                    {
+                        "name": title[:100],
+                        "description": description,
+                        "technologies": techs,
+                    }
+                )
+            return output
 
         return projects
 

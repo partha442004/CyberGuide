@@ -579,3 +579,193 @@ class TestResumeParserPdfFallback:
         names = [s["name"].lower() for s in result["skills"]]
         assert "python" in names
         assert "nmap" in names
+
+
+# Real resume (VAPT fresher) text — the exact content extracted from the
+# user's "Parthasarathi_B_VAPT_Resume_Final" PDF. Used to lock in detection
+# quality regressions.
+REAL_RESUME_TEXT = """\
+PARTHASARATHI B
+parthasarathi442004@gmail.com
++91 6380319830
+Bangalore, Karnataka
+https://linkedin.com/in/parthasarathi-b-24b986267
+https://tryhackme.com/p/parthasarathi442
+PROFESSIONAL SUMMARY
+Disciplined and motivated IT graduate with NCC background and CEH/CSA training.
+Strong interest in cybersecurity with proficiency in vulnerability assessment,
+OWASP Top 10, and exploitation using Kali Linux, Nmap, Nessus, Metasploit, and
+Burp Suite. Hands-on experience with Metasploitable 2, DVWA, and PortSwigger labs.
+TECHNICAL SKILLS
+Vulnerability Assessment: Nessus, OpenVAS, CVSS Scoring, Risk Rating
+Penetration Testing: Network Pentesting, Web App Testing, OWASP Top 10, Exploitation
+Security Tools: Nmap, Metasploit, Burp Suite, Wireshark, Kali Linux, Hydra, OWASP ZAP
+Reconnaissance: Passive Recon, Active Recon, Google Dorks, Shodan
+Privilege Escalation: Linux Privesc, Windows Privesc, SUID Exploits
+HANDS-ON LABS
+Network Vulnerability Assessment using Nessus and Nmap on Metasploitable 2
+Web Application Security Testing on DVWA using Burp Suite and OWASP ZAP
+SQL Injection labs on PortSwigger Web Security Academy
+PROJECTS
+Vulnerability Assessment - Metasploitable (192.168.1.82)
+February 2026
+• Conducted VA using Nessus Scanner, identified 122 vulnerabilities
+• Documented critical findings: VNC weak password (CVSS 10.0)
+Penetration Testing - Metasploitable 2 (192.168.1.68)
+May 2026
+• Performed reconnaissance using Nmap, identified 7 open ports
+• Exploited bindshell on port 1524 using Netcat
+CERTIFICATION
+CEH v13 with AI & SOC Analyst Training
+In Progress / TechByHeart Academy
+EDUCATION
+Mahendra Engineering College, Salem - B.Tech in Information Technology
+2021 - 2025 / CGPA: 6.75/10
+ADDITIONAL
+NCC Cadet - Team leadership and disciplined execution
+"""
+
+
+class TestResumeParserRealResume:
+    """Quality checks against the user's real VAPT resume."""
+
+    def setup_method(self):
+        self.parser = ResumeParser()
+
+    def test_real_resume_full_parse(self):
+        """Full parse of the real resume returns all sections."""
+        result = self.parser._parse_text(REAL_RESUME_TEXT, "real_resume.pdf")
+        assert "skills" in result
+        assert "education" in result
+        assert "projects" in result
+        assert "certifications" in result
+        assert "links" in result
+
+    def test_real_resume_skills_quality(self):
+        """Skills are extracted with no false positives from word boundaries."""
+        result = self.parser._parse_text(REAL_RESUME_TEXT)
+        names = [s["name"].lower() for s in result["skills"]]
+        # Key skills present.
+        for skill in ("nessus", "nmap", "metasploit", "burp suite", "kali linux"):
+            assert skill in names
+        # Short-keyword false positives must NOT appear ("go" in Google,
+        # "dd" in Conducted, "ids" inside other words, etc.).
+        assert "go" not in names
+        assert "dd" not in names
+
+    def test_real_resume_projects_quality(self):
+        """Only the two real projects are extracted (not labs/competencies)."""
+        result = self.parser._parse_text(REAL_RESUME_TEXT)
+        projects = result["projects"]
+        assert len(projects) == 2
+        names = " ".join(p["name"] for p in projects).lower()
+        assert "vulnerability assessment" in names
+        assert "penetration testing" in names
+
+    def test_real_resume_no_fake_experience(self):
+        """No fake work experience from prose (Analyst/Engineer/Cadet/lead)."""
+        result = self.parser._parse_text(REAL_RESUME_TEXT)
+        # This resume has no professional experience section, so nothing
+        # should be detected — "SOC Analyst Training", "Engineering College",
+        # "Team leadership" are all prose, not roles.
+        assert result["experience"] == []
+
+    def test_real_resume_links_quality(self):
+        """Links are clean — no bare platform URL in 'portfolio'."""
+        result = self.parser._parse_text(REAL_RESUME_TEXT)
+        links = result["links"]
+        assert links["linkedin"].startswith("https://linkedin.com/in/")
+        assert links["tryhackme"].startswith("https://tryhackme.com/p/")
+        assert "email" in links
+        # portfolio must not be a bare linkedin/github/tryhackme domain.
+        if "portfolio" in links:
+            assert "linkedin.com" not in links["portfolio"]
+            assert "tryhackme.com" not in links["portfolio"]
+
+    def test_real_resume_education_quality(self):
+        """Education is parsed precisely from the real resume."""
+        result = self.parser._parse_text(REAL_RESUME_TEXT)
+        assert len(result["education"]) >= 1
+        edu = result["education"][0]
+        assert edu["degree"] is not None
+        assert "b.tech" in edu["degree"].lower()
+        assert edu["institution"] is not None
+        assert "mahendra" in edu["institution"].lower()
+
+    def test_real_resume_certifications(self):
+        """CEH certification detected from the real resume."""
+        result = self.parser._parse_text(REAL_RESUME_TEXT)
+        names = [c["name"].lower() for c in result["certifications"]]
+        assert "ceh" in names
+
+    def test_project_title_plus_bullets_layout(self):
+        """Title+bullets layout (real resume style) groups details correctly."""
+        text = """PROJECTS
+Vulnerability Assessment - Metasploitable (192.168.1.82)
+February 2026
+• Conducted VA using Nessus Scanner
+• Documented critical findings: VNC weak password (CVSS 10.0)
+Penetration Testing - Metasploitable 2 (192.168.1.68)
+May 2026
+• Performed reconnaissance using Nmap
+"""
+        projects = self.parser._extract_projects(text)
+        assert len(projects) == 2
+        p0 = projects[0]
+        assert "vulnerability assessment" in p0["name"].lower()
+        # Details belong to the first project.
+        assert "nessus" in p0["description"].lower()
+
+    def test_bullet_list_layout(self):
+        """Plain bullet list (each bullet = its own project)."""
+        text = """PROJECTS
+- Network Vulnerability Assessment using Nessus and Nmap
+- DVWA Security Testing with Burp Suite
+- PortSwigger SQL Injection Labs
+"""
+        projects = self.parser._extract_projects(text)
+        assert len(projects) == 3
+
+    def test_hands_on_labs_not_projects(self):
+        """HANDS-ON LABS / KEY COMPETENCIES sections must not be projects."""
+        text = """HANDS-ON LABS
+- Network Vulnerability Assessment using Nessus
+- SQL Injection labs on PortSwigger
+KEY COMPETENCIES
+- Port scanning and service enumeration using Nmap
+PROJECTS
+- DVWA Security Testing using Burp Suite
+"""
+        projects = self.parser._extract_projects(text)
+        assert len(projects) == 1
+        assert "dvwa" in projects[0]["name"].lower()
+
+    def test_portfolio_excludes_platform_domains(self):
+        """portfolio never captures a bare known-platform domain."""
+        text = "LinkedIn: https://linkedin.com/in/user\nGitHub: https://github.com/user"
+        links = self.parser._extract_links(text)
+        assert "portfolio" not in links
+        assert "linkedin" in links
+        assert "github" in links
+
+    def test_custom_portfolio_domain_still_detected(self):
+        """A genuine custom domain is still detected as portfolio."""
+        text = "Portfolio: https://parthasarathi.dev"
+        links = self.parser._extract_links(text)
+        assert "portfolio" in links
+        assert "parthasarathi.dev" in links["portfolio"]
+
+    def test_experience_word_boundary_no_false_positives(self):
+        """Role keywords must not match inside other words or 'X Training'."""
+        text = (
+            "SOC Analyst Training at TechByHeart\n"
+            "Mahendra Engineering College, Salem\n"
+            "NCC Cadet - Team leadership\n"
+            "Worked on vulnerability scanning\n"
+        )
+        exp = self.parser._extract_experience(text)
+        # "analyst" inside "Analyst Training" (course name, not a role),
+        # "engineer" inside "Engineering", "lead" inside "leadership" —
+        # none should match.
+        roles = [e["role"].lower() for e in exp]
+        assert roles == []
