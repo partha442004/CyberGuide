@@ -1603,3 +1603,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `remote`/`full-time` are filtered out of job-skill fallback so they no
   longer pollute missing-skills or suggestions, and the tier helper is now
   properly typed. Regression tests added for both behaviors.
+
+- **Fixed dashboard discovery returning nothing** — the Streamlit dashboard
+  sends the search query in the JSON body (`{"query": ...}`) but the
+  `/jobs/discovery/run` endpoint only read it from a query parameter, so the
+  button silently ran the default `python developer` search and found 0 new
+  jobs. The endpoint now accepts the query from the body (body wins) while
+  keeping `?query=` backward compatibility. Regression tests added for both
+  forms.

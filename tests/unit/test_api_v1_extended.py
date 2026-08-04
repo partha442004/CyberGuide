@@ -249,6 +249,65 @@ class TestJobsAPIUnit:
         assert result["discovered"] == 1
         assert result["saved"] == 1
 
+    @pytest.mark.asyncio
+    async def test_run_discovery_body_query_wins(self):
+        """Dashboard sends the query in the JSON body; it must win over the default."""
+        from interntrack.api.v1.jobs import run_discovery
+
+        mock_registry = MagicMock()
+        mock_registry.fetch_all = AsyncMock(return_value=[{"title": "Intern Job"}])
+
+        mock_service = MagicMock()
+        mock_service.save_jobs = AsyncMock(return_value=[{"title": "Intern Job"}])
+
+        with (
+            patch("interntrack.api.v1.jobs.JobService", return_value=mock_service),
+            patch(
+                "interntrack.scrapers.registry.get_default_registry",
+                return_value=mock_registry,
+            ),
+        ):
+            result = await run_discovery(
+                body={"query": "data science internship"},
+                db=AsyncMock(),
+            )
+
+        assert result["discovered"] == 1
+        mock_registry.fetch_all.assert_awaited_once_with(
+            query="data science internship",
+            sources=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_run_discovery_query_param_still_works(self):
+        """Query-param form (curl/API docs) must keep working."""
+        from interntrack.api.v1.jobs import run_discovery
+
+        mock_registry = MagicMock()
+        mock_registry.fetch_all = AsyncMock(return_value=[])
+
+        mock_service = MagicMock()
+        mock_service.save_jobs = AsyncMock(return_value=[])
+
+        with (
+            patch("interntrack.api.v1.jobs.JobService", return_value=mock_service),
+            patch(
+                "interntrack.scrapers.registry.get_default_registry",
+                return_value=mock_registry,
+            ),
+        ):
+            result = await run_discovery(
+                query="python developer",
+                body=None,
+                db=AsyncMock(),
+            )
+
+        assert result["discovered"] == 0
+        mock_registry.fetch_all.assert_awaited_once_with(
+            query="python developer",
+            sources=None,
+        )
+
 
 class TestApplicationsAPIUnit:
     """Unit tests for applications API endpoint functions."""
