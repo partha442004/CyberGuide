@@ -680,10 +680,33 @@ uvicorn interntrack.main:app --reload
   integration
 4. ✅ **Railway retired** — project deleted (48h permanent-deletion window
   confirmed)
-5. ⏳ **Dashboard** — ready to deploy on Streamlit Community Cloud (free);
-  set `API_URL=https://cyberguide-api.vercel.app`
+5. ✅ **Dashboard** — deployed on Streamlit Community Cloud at
+  https://cyberguide2026aug.streamlit.app (free); app was created before the
+  live-API default was committed, so it shows "No data available" —
+  **delete & recreate** from the same repo/branch/file on share.streamlit.io
+  to pick up the latest code (which defaults to the live Vercel API)
+  
+---
+
+#### ✅ 2026-08-04 Git Identity & Streamlit Dashboard
+
+- ✅ **Git author identity corrected** — local config was set to `Dnyaneshwari
+  Vanjari` / `vanjaridnyaneshwari246@gmail.com`; now **PARTHASARATHI B** /
+  `parthasarathi442004@gmail.com` (both local + global). Test commit `02bb826`
+  verified on GitHub: author shows **PARTHASARATHI B**.
+- ✅ **Vercel auto-deploy proven working** — push `5ba427e` triggered an
+  automatic deployment (`cyberguide-b51a0gh6e` via `-git-master-` integration
+  URL) without any manual `vercel deploy` command. Live API returns version
+  `1.20.9`.
+- ✅ **Stale `C:\internship-tracker` deleted** — fully removed from disk.
+- ✅ **Dashboard deployed** on Streamlit Community Cloud (https://cyberguide2026aug.streamlit.app)
+  — app is running but needs to be recreated from the latest commit to pick up
+  the live-API default (currently shows "No data available" because it was
+  created before the fix).
+- ✅ **Full stack verified**: Git clean, CI green, API healthy (`6 jobs`),
+  cron runs successful (latest: 2026-08-03 20:24 UTC, 33s).
 
 ---
 
-**Last Updated:** 2026-08-03
+**Last Updated:** 2026-08-04
 **Status:** ✅ 100% Complete

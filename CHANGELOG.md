@@ -4,6 +4,21 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.20.10] - 2026-08-04
+
+### Changed
+
+- **Git author identity corrected** — local + global git config now set to
+  **PARTHASARATHI B** / `parthasarathi442004@gmail.com` (was
+  `Dnyaneshwari Vanjari`). Verified on GitHub: commit `02bb826` shows the
+  correct author name.
+- **Stale `C:\internship-tracker` deleted** — the empty leftover folder has
+  been fully removed from disk.
+- **Streamlit dashboard deployed** at https://cyberguide2026aug.streamlit.app
+  — note: the app was created before the live-API default was committed, so it
+  currently shows "No data available". Delete & recreate from the same repo
+  on share.streamlit.io to pick up the latest code.
+
 ## [1.20.9] - 2026-08-03
 
 ### Added
