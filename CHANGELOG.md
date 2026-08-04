@@ -1574,3 +1574,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   existing jobs with extracted skills; run against the live Neon DB
   (6 jobs updated, e.g. ClickHouse → Python/TypeScript/Go/Rust/SQL/Node.js/
   AWS/Kubernetes).
+
+- **PDF extraction on Vercel (no pymupdf)** — added `pypdf` (pure-Python,
+  installs in any sandbox) as the second extractor in the chain
+  (`pymupdf` → `pypdf` → regex fallback). Verified: with pymupdf hidden,
+  the Dnyaneshwari resume still parses to 15 skills, 2 projects, clean
+  education (GPA 8.65), 4 certifications and a detected LinkedIn URL —
+  previously the regex fallback garbled this PDF (848 chars extracted vs
+  2692 with pypdf). `pypdf` pinned in `requirements.txt`,
+  `src/cybershield/requirements.txt` and the mypy override list.

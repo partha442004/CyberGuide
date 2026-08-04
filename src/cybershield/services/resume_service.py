@@ -304,7 +304,25 @@ class ResumeParser:
         except ImportError:
             pass
 
-        # Fallback: basic PDF text extraction (no native deps).
+        # Fallback 2: pypdf (pure Python, installs everywhere incl. Vercel).
+        # Handles CID/ToUnicode-mapped fonts and complex PDFs far better than
+        # the regex fallback (e.g. Word/Google Docs exports whose glyphs the
+        # raw-stream parser can't decode).
+        try:
+            import pypdf
+
+            reader = pypdf.PdfReader(file_path)
+            full_text = "\n".join(
+                page.extract_text() or "" for page in reader.pages
+            )
+            if full_text.strip():
+                return full_text
+        except ImportError:
+            pass
+        except Exception:
+            pass
+
+        # Fallback 3: basic PDF text extraction (no external deps).
         # Handles common PDF encodings with pure stdlib:
         #   - ASCII85 (+ FlateDecode) streams (e.g. reportlab output)
         #   - Plain FlateDecode (zlib) streams
