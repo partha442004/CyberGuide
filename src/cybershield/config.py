@@ -47,16 +47,13 @@ class Settings(BaseSettings):
     @classmethod
     def resolve_database_url(cls, v: str) -> str:
         """Resolve the database URL through multiple fallbacks."""
+        import os as _os
+
         if v == "sqlite+aiosqlite:///./data/cybershield.db":
-            # 1. CYBERSHIELD_DATABASE_URL (set by api/index.py)
-            shared = os.environ.get("CYBERSHIELD_DATABASE_URL")
-            if shared:
-                return shared
-            # 2. Shared DATABASE_URL (used by the parent app)
-            shared = os.environ.get("DATABASE_URL")
-            if shared:
-                return shared
-            # 3. In-memory SQLite (safe on Vercel's read-only fs)
+            for var in ("CYBERSHIELD_DATABASE_URL", "DATABASE_URL"):
+                shared = _os.environ.get(var)
+                if shared:
+                    return shared
             return "sqlite+aiosqlite://"
         return v
 
