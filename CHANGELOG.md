@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Resume upload/match endpoints now live on Vercel** — deployed the
+  cybershield resume router on the Vercel entrypoint (`api/index.py`),
+  patched the DB session to use the same engine as the interntrack app
+  (avoids asyncpg "different loop" crash), and removed the FK constraint on
+  `resume_data.user_id` so users can upload without a pre-existing account.
+  Verified live: `POST /api/v1/resumes/upload` returns parsed skills,
+  `GET /api/v1/resumes/{user_id}` returns stored data, and
+  `POST /api/v1/resumes/match-batch` returns proper validation.
 - **Streamlit dashboard now has a fully working Resume Match page** — upload
   your PDF resume, see parsed skills/education/experience/certifications, and
   click "Find Best Matching Jobs" to batch-match your resume against all
