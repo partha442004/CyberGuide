@@ -108,6 +108,32 @@ class TestDomainTransitionMatching:
         assert result.related_skills == ["go"]
         assert result.matched_skills == []
 
+    def test_preferred_synonym_weighs_less_than_required_synonym(self):
+        """Preferred synonyms earn 0.5 (vs 0.6 required) — doc table holds."""
+        resume = {"kubernetes"}
+        required_job = _make_job(required_skills=["k8s"], preferred_skills=[])
+        preferred_job = _make_job(required_skills=[], preferred_skills=["k8s"])
+        req = _calculate_job_match(resume, required_job)
+        pref = _calculate_job_match(resume, preferred_job)
+        # 0.6/1*0.7 = 42.0  vs  0.5/1*0.3 = 15.0
+        assert req.match_score == 42.0
+        assert pref.match_score == 15.0
+
+    def test_non_skill_tags_filtered_from_missing(self):
+        """Tags like ``remote``/``full-time`` never become bogus gaps."""
+        job = _make_job(required_skills=[], preferred_skills=[], tags=["python", "remote"])
+        result = _calculate_job_match({"python"}, job)
+        assert result.match_score == 70.0
+        assert result.missing_skills == []
+        assert "remote" not in result.missing_skills
+
+    def test_noise_only_tags_return_no_score(self):
+        """A job tagged only with non-skills has nothing to match — None."""
+        job = _make_job(required_skills=[], preferred_skills=[], tags=["remote", "full-time"])
+        result = _calculate_job_match({"python"}, job)
+        assert result.match_score is None
+        assert result.missing_skills == []
+
 
 class TestExtractSkillNamesEdgeCases:
     def test_dict_without_name_key_ignored(self):
