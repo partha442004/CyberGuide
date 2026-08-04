@@ -252,17 +252,60 @@ class ResumeParser:
                 mapping[skill.lower()] = category
         return mapping
 
+    def _extract_pdf_text(self, file_path: str) -> str:
+        """Extract text from a PDF using available libraries.
+
+        Tries pymupdf (fast, best quality) first, then falls back to a
+        basic PDF text extraction that works without native dependencies.
+        """
+        try:
+            import pymupdf
+
+            doc = pymupdf.open(file_path)
+            full_text = ""
+            for page in doc:
+                full_text += page.get_text()
+            doc.close()
+            return full_text
+        except ImportError:
+            pass
+
+        # Fallback: basic PDF text extraction (no native deps)
+        try:
+            with open(file_path, "rb") as f:
+                data = f.read()
+        except Exception:
+            return ""
+
+        text_parts: list[str] = []
+        # Try to extract text between parentheses in PDF streams
+        # (simple heuristic — works for text-based PDFs)
+        content = data.decode("latin-1", errors="replace")
+        in_stream = False
+        for line in content.split("\n"):
+            stripped = line.strip()
+            if stripped == "stream":
+                in_stream = True
+                continue
+            if stripped == "endstream":
+                in_stream = False
+                continue
+            if in_stream:
+                # Extract text between parentheses
+                import re as _re
+
+                texts = _re.findall(r"\(([^)]*)", line)
+                for t in texts:
+                    # Filter out gibberish (non-printable chars)
+                    clean = "".join(c for c in t if 32 <= ord(c) < 127 or c in " \n\r")
+                    if len(clean) > 3:
+                        text_parts.append(clean)
+
+        return "\n".join(text_parts)
+
     async def parse_pdf(self, file_path: str) -> Dict[str, Any]:
         """Parse a PDF resume and extract structured data."""
-        import pymupdf
-
-        # Extract text from PDF
-        doc: Any = pymupdf.open(file_path)
-        full_text = ""
-        for page in doc:
-            full_text += page.get_text()
-        doc.close()
-
+        full_text = self._extract_pdf_text(file_path)
         return self._parse_text(full_text, file_path)
 
     async def parse_upload(self, file_content: bytes, filename: str) -> Dict[str, Any]:
