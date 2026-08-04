@@ -271,51 +271,43 @@ class ResumeParser:
             pass
 
         # Fallback: basic PDF text extraction (no native deps)
+        # Uses zlib (stdlib) to decompress FlateDecode streams, then
+        # extracts text from PDF operators (Tj, TJ, ', ").
         try:
             with open(file_path, "rb") as f:
                 data = f.read()
         except Exception:
             return ""
 
+        import zlib
+
         text_parts: list[str] = []
         content = data.decode("latin-1", errors="replace")
 
-        # Strategy 1: text between parentheses in PDF streams
-        in_stream = False
-        for line in content.split("\n"):
-            stripped = line.strip()
-            if stripped == "stream":
-                in_stream = True
-                continue
-            if stripped == "endstream":
-                in_stream = False
-                continue
-            if in_stream:
-                texts = re.findall(r"\(([^)]*)", line)
-                for t in texts:
-                    clean = "".join(c for c in t if 32 <= ord(c) < 127 or c in " \n\r")
-                    if len(clean) > 3:
-                        text_parts.append(clean)
+        # Find and decompress stream sections
+        for m in re.finditer(r"stream\s(.+?)\sendstream", content, re.DOTALL):
+            raw = m.group(1).strip()
+            # Try to decompress (FlateDecode)
+            try:
+                raw_bytes = raw.encode("latin-1")
+                decompressed = zlib.decompress(raw_bytes)
+                stream_content = decompressed.decode("latin-1", errors="replace")
+            except (zlib.error, Exception):
+                stream_content = raw
 
-        # Strategy 2: text before Tj/TJ operators (PDF text-showing operators)
-        for line in content.split("\n"):
-            texts = re.findall(r"\(([^)]*)\)\s*Tj", line)
+            # Extract text from PDF operators: (text) Tj, (text) ', (text) "
+            texts = re.findall(r"\(([^)]*)\)\s*(?:Tj|'|\"|TJ)", stream_content)
             for t in texts:
                 clean = "".join(c for c in t if 32 <= ord(c) < 127 or c in " \n\r")
                 if len(clean) > 1:
                     text_parts.append(clean)
 
-        # Strategy 3: decode PDF hex strings <...> before Tj
-        for line in content.split("\n"):
-            hex_matches = re.findall(r"<([0-9A-Fa-f]+)>\s*Tj", line)
-            for h in hex_matches:
-                try:
-                    decoded = bytes.fromhex(h).decode("latin-1", errors="replace")
-                    clean = "".join(c for c in decoded if 32 <= ord(c) < 127 or c in " \n\r")
-                    if len(clean) > 1:
-                        text_parts.append(clean)
-                except Exception:
-                    pass
+            # Also try parenthesized text not followed by an operator
+            texts = re.findall(r"\(([^)]*)\)", stream_content)
+            for t in texts:
+                clean = "".join(c for c in t if 32 <= ord(c) < 127 or c in " \n\r")
+                if len(clean) > 3 and clean not in text_parts:
+                    text_parts.append(clean)
 
         return "\n".join(text_parts)
 
