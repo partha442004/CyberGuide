@@ -267,9 +267,7 @@ class ResumeData(Base, TimestampMixin):
     __tablename__ = "resume_data"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    user_id = Column(
-        String(36), nullable=True, index=True
-    )
+    user_id = Column(String(36), nullable=True, index=True)
     file_path = Column(String(500), nullable=True)
     file_hash = Column(String(64), nullable=False)
     skills = Column(JSON, default=list)

@@ -100,8 +100,7 @@ async def init_db() -> None:
                     if fk["constrained_columns"] == ["user_id"]:
                         sync_conn.execute(
                             _text(
-                                "ALTER TABLE resume_data "
-                                "DROP CONSTRAINT resume_data_user_id_fkey"
+                                "ALTER TABLE resume_data DROP CONSTRAINT resume_data_user_id_fkey"
                             )
                         )
                         logger.info("Dropped FK resume_data_user_id_fkey")
