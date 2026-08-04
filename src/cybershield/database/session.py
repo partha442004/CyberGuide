@@ -90,8 +90,8 @@ async def init_db() -> None:
 
         # Drop FK constraint on resume_data.user_id if it still exists
         # (the model removed it — user_id is now a plain string column).
-        from sqlalchemy import text as _text
         from sqlalchemy import inspect as _inspect
+        from sqlalchemy import text as _text
 
         def _fix_schema(sync_conn):
             inspector = _inspect(sync_conn)
