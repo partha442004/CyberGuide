@@ -2,6 +2,7 @@
 Application configuration management using Pydantic Settings.
 """
 
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -36,8 +37,19 @@ class Settings(BaseSettings):
     api_port: int = 8000
     api_key_header: str = "X-API-Key"
 
-    # Database
+    # Database — falls back to the shared DATABASE_URL env var so the
+    # cybershield resume endpoints work when mounted on the Vercel app.
     database_url: str = "sqlite+aiosqlite:///./data/cybershield.db"
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def resolve_database_url(cls, v: str) -> str:
+        """Allow the parent app's DATABASE_URL to override the default."""
+        if v == "sqlite+aiosqlite:///./data/cybershield.db":
+            shared = os.environ.get("DATABASE_URL")
+            if shared:
+                return shared
+        return v
 
     # Redis (Optional)
     redis_url: Optional[str] = None

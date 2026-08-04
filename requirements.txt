@@ -21,3 +21,4 @@ redis>=5.0.0
 asyncpg>=0.29.0
 plotly>=5.18.0
 streamlit>=1.29.0
+pymupdf>=1.23.0
