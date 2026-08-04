@@ -78,11 +78,36 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
 
 
 async def init_db() -> None:
-    """Initialize database tables."""
+    """Initialize database tables.
+
+    Also fixes schema drift on existing tables (e.g. dropping old FK
+    constraints that no longer exist in the model).
+    """
     from cybershield.domain.models import Base
 
     async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+        # Drop FK constraint on resume_data.user_id if it still exists
+        # (the model removed it — user_id is now a plain string column).
+        from sqlalchemy import text as _text
+        from sqlalchemy import inspect as _inspect
+
+        def _fix_schema(sync_conn):
+            inspector = _inspect(sync_conn)
+            if "resume_data" in inspector.get_table_names():
+                for fk in inspector.get_foreign_keys("resume_data"):
+                    if fk["constrained_columns"] == ["user_id"]:
+                        sync_conn.execute(
+                            _text(
+                                "ALTER TABLE resume_data "
+                                "DROP CONSTRAINT resume_data_user_id_fkey"
+                            )
+                        )
+                        logger.info("Dropped FK resume_data_user_id_fkey")
+
+        await conn.run_sync(_fix_schema)
+
     logger.info("Database tables initialized")
 
 
