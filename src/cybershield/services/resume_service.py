@@ -679,7 +679,7 @@ class ResumeParser:
         projects). Bullet items and URL/report lines inside the section are
         skipped so each entry is a real project.
         """
-        projects = []
+        projects: list[dict[str, Any]] = []
         seen_names = set()
 
         # Match only a PROJECTS header (explicitly, not labs / hands-on).
@@ -713,10 +713,10 @@ class ResumeParser:
 
             # Lines that are clearly NOT project titles.
             def _is_metadata(ln: str) -> bool:
-                return (
+                return bool(
                     ln.lower().startswith("report:")
                     or re.match(r"^https?://", ln)
-                    or bool(date_re.match(ln))
+                    or date_re.match(ln)
                 )
 
             entries: list[list[str]] = []  # each entry: [title, ...details]
