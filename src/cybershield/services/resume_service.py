@@ -312,9 +312,7 @@ class ResumeParser:
             import pypdf
 
             reader = pypdf.PdfReader(file_path)
-            full_text = "\n".join(
-                page.extract_text() or "" for page in reader.pages
-            )
+            full_text = "\n".join(page.extract_text() or "" for page in reader.pages)
             if full_text.strip():
                 return full_text
         except ImportError:
