@@ -1583,3 +1583,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   previously the regex fallback garbled this PDF (848 chars extracted vs
   2692 with pypdf). `pypdf` pinned in `requirements.txt`,
   `src/cybershield/requirements.txt` and the mypy override list.
+
+- **CI green** — bumped `pypdf` to 6.14.2 (fixes CVE-2026-59935/59936,
+  HIGH DoS in crafted-PDF inline images) and ruff-formatted
+  `resume_service.py` so the Lint + Security jobs pass.
