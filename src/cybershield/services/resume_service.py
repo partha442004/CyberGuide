@@ -278,9 +278,9 @@ class ResumeParser:
             return ""
 
         text_parts: list[str] = []
-        # Try to extract text between parentheses in PDF streams
-        # (simple heuristic — works for text-based PDFs)
         content = data.decode("latin-1", errors="replace")
+
+        # Strategy 1: text between parentheses in PDF streams
         in_stream = False
         for line in content.split("\n"):
             stripped = line.strip()
@@ -291,15 +291,31 @@ class ResumeParser:
                 in_stream = False
                 continue
             if in_stream:
-                # Extract text between parentheses
-                import re as _re
-
-                texts = _re.findall(r"\(([^)]*)", line)
+                texts = re.findall(r"\(([^)]*)", line)
                 for t in texts:
-                    # Filter out gibberish (non-printable chars)
                     clean = "".join(c for c in t if 32 <= ord(c) < 127 or c in " \n\r")
                     if len(clean) > 3:
                         text_parts.append(clean)
+
+        # Strategy 2: text before Tj/TJ operators (PDF text-showing operators)
+        for line in content.split("\n"):
+            texts = re.findall(r"\(([^)]*)\)\s*Tj", line)
+            for t in texts:
+                clean = "".join(c for c in t if 32 <= ord(c) < 127 or c in " \n\r")
+                if len(clean) > 1:
+                    text_parts.append(clean)
+
+        # Strategy 3: decode PDF hex strings <...> before Tj
+        for line in content.split("\n"):
+            hex_matches = re.findall(r"<([0-9A-Fa-f]+)>\s*Tj", line)
+            for h in hex_matches:
+                try:
+                    decoded = bytes.fromhex(h).decode("latin-1", errors="replace")
+                    clean = "".join(c for c in decoded if 32 <= ord(c) < 127 or c in " \n\r")
+                    if len(clean) > 1:
+                        text_parts.append(clean)
+                except Exception:
+                    pass
 
         return "\n".join(text_parts)
 
