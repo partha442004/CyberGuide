@@ -268,7 +268,7 @@ class ResumeData(Base, TimestampMixin):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
     user_id = Column(
-        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
     file_path = Column(String(500), nullable=True)
     file_hash = Column(String(64), nullable=False)
