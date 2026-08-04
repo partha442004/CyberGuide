@@ -38,16 +38,26 @@ class Settings(BaseSettings):
 
     # Database — the parent app (api/index.py) sets CYBERSHIELD_DATABASE_URL
     # so the shared Neon Postgres URL is used when mounted on Vercel.
+    # Falls back to a shared DATABASE_URL env var if CYBERSHIELD_DATABASE_URL
+    # is not set, and finally to an in-memory SQLite (safe for Vercel's
+    # read-only filesystem).
     database_url: str = "sqlite+aiosqlite:///./data/cybershield.db"
 
     @field_validator("database_url", mode="before")
     @classmethod
     def resolve_database_url(cls, v: str) -> str:
-        """Allow the parent app to override via CYBERSHIELD_DATABASE_URL."""
+        """Resolve the database URL through multiple fallbacks."""
         if v == "sqlite+aiosqlite:///./data/cybershield.db":
+            # 1. CYBERSHIELD_DATABASE_URL (set by api/index.py)
             shared = os.environ.get("CYBERSHIELD_DATABASE_URL")
             if shared:
                 return shared
+            # 2. Shared DATABASE_URL (used by the parent app)
+            shared = os.environ.get("DATABASE_URL")
+            if shared:
+                return shared
+            # 3. In-memory SQLite (safe on Vercel's read-only fs)
+            return "sqlite+aiosqlite://"
         return v
 
     # Redis (Optional)
