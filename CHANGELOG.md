@@ -28,6 +28,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **Resume upload returned empty parse results on Vercel** — the PDF text
+  fallback (used because pymupdf's native wheels don't build on Vercel's
+  Python runtime) couldn't extract text from reportlab-style PDFs: (1) its
+  regex required whitespace before `endstream`, but binary payloads end
+  flush against it; (2) it never decoded **ASCII85** streams (`/Filter
+  [/ASCII85Decode /FlateDecode]`), so zlib got the wrong input. The fallback
+  now handles ASCII85 + FlateDecode, plain zlib, raw-deflate (`wbits=-15`),
+  and uncompressed streams, with no whitespace requirement before
+  `endstream`. Verified live: upload now returns 8 skills, 1 education,
+  2 experience, 2 certifications, 1 project.
+- **5 regression tests** added in `test_resume_parser.py`
+  (`TestResumeParserPdfFallback`) building minimal in-memory PDFs —
+  ASCII85+Flate with and without whitespace before `endstream`, plain zlib,
+  garbage-stream no-crash, and `parse_upload` skill extraction without
+  pymupdf. All 50 resume-parser tests pass.
+
+### Changed
+
 - **CI Security job**: bumped `aiohttp` 3.13.4 → 3.14.3 to fix
   CVE-2026-69244 (HIGH, out-of-bounds heap read in C HTTP response parser).
 
