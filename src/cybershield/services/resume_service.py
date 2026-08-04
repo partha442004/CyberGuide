@@ -339,21 +339,99 @@ class ResumeParser:
                     except Exception:
                         stream_content = raw
 
-            # Extract text from PDF operators: (text) Tj, (text) ', (text) "
-            texts = re.findall(r"\(([^)]*)\)\s*(?:Tj|'|\"|TJ)", stream_content)
-            for t in texts:
-                clean = "".join(c for c in t if 32 <= ord(c) < 127 or c in " \n\r")
+            # Extract text from PDF text-showing operators. Real-world PDFs
+            # (e.g. LibreOffice/Canva exports) split words into kerning arrays:
+            #   [(P)100(AR)20(THASARA)90(THI)-278(B)]TJ
+            # so all (..) fragments inside one array must be joined, inserting a
+            # space when a large negative kerning value (a word gap) separates
+            # fragments. Also handle single (text) Tj and hex strings <...> Tj.
+            # All patterns are simple/bounded to avoid catastrophic backtracking.
+            pieces = []
+
+            # 1) TJ arrays: [(frag)num(frag)...] TJ — join fragments, inserting
+            #    spaces at word gaps (large negative kerning numbers).
+            for m in re.finditer(r"\[(.*?)\]\s*TJ", stream_content):
+                joined = self._join_tj_fragments(m.group(1))
+                if joined:
+                    pieces.append(joined)
+
+            # 2) Plain single-string operators: (text) Tj / ' / "
+            for t in re.findall(r"\(([^)]*)\)\s*(?:Tj|'|\")", stream_content):
+                pieces.append(t)
+
+            # 3) Hex strings <...> Tj (common with embedded CID fonts) — only
+            # used when no literal-string text was found above.
+            if not pieces:
+                for m in re.finditer(r"<([0-9A-Fa-f]+)>\s*Tj", stream_content):
+                    hexstr = m.group(1)
+                    try:
+                        pieces.append(bytes.fromhex(hexstr).decode("latin-1", errors="replace"))
+                    except ValueError:
+                        pass
+
+            for piece in pieces:
+                clean = self._clean_pdf_text(piece)
                 if len(clean) > 1:
                     text_parts.append(clean)
 
-            # Also try parenthesized text not followed by an operator
-            texts = re.findall(r"\(([^)]*)\)", stream_content)
-            for t in texts:
-                clean = "".join(c for c in t if 32 <= ord(c) < 127 or c in " \n\r")
-                if len(clean) > 3 and clean not in text_parts:
-                    text_parts.append(clean)
-
         return "\n".join(text_parts)
+
+    @staticmethod
+    def _clean_pdf_text(piece: str) -> str:
+        """Normalize a PDF text fragment to printable ASCII.
+
+        PDFs (esp. LibreOffice exports) use CP1252 control chars for smart
+        punctuation: chr(0x95) is bullet \u2022, smart quotes are 0x91-0x94,
+        dashes 0x96/0x97. Map those to ASCII so downstream section parsers
+        (which rely on \u2022 bullets) keep working.
+        """
+        out = []
+        for c in piece:
+            o = ord(c)
+            if 32 <= o < 127 or c in " \n\r":
+                out.append(c)
+            elif o == 0x95:
+                out.append("\u2022")  # bullet
+            elif o in (0x91, 0x92):
+                out.append("'")
+            elif o in (0x93, 0x94):
+                out.append('"')
+            elif o in (0x96, 0x97):
+                out.append("-")
+            elif c == "\u2019":
+                out.append("'")
+            elif c == "\u201c":
+                out.append('"')
+            elif c == "\u201d":
+                out.append('"')
+            elif c == "\u2013":
+                out.append("-")
+            elif c == "\u2014":
+                out.append("-")
+            # other control chars dropped
+        return "".join(out)
+
+    @staticmethod
+    def _join_tj_fragments(array_body: str) -> str:
+        """Join the (..) fragments of a TJ array body into a text string.
+
+        A large negative kerning number between fragments marks a word gap
+        (PDFs encode spaces this way instead of literal space chars). PDF
+        escape sequences inside strings (\\(, \\), \\\\, octal \\ddd) are
+        unescaped. Returns "" when the body contains no string fragments.
+        """
+        parts: list[str] = []
+        for frag in re.finditer(r"\(([^)]*)\)\s*(-?\d+(?:\.\d+)?)?", array_body):
+            raw = frag.group(1)
+            kerning = frag.group(2)
+            # Unescape PDF string escapes.
+            raw = re.sub(r"\\([()\\])", r"\1", raw)
+            raw = re.sub(r"\\([0-7]{1,3})", lambda mm: chr(int(mm.group(1), 8)), raw)
+            parts.append(raw)
+            # Large negative kerning (~ <-150) indicates a word gap.
+            if kerning and float(kerning) < -150:
+                parts.append(" ")
+        return "".join(parts)
 
     async def parse_pdf(self, file_path: str) -> Dict[str, Any]:
         """Parse a PDF resume and extract structured data."""
@@ -435,13 +513,18 @@ class ResumeParser:
         )
         edu_text = edu_section_match.group(1) if edu_section_match else text
 
-        # Degree detection within education section - stop at newline
+        # Degree detection within education section - stop at newline, a year
+        # range, or a CGPA marker so "B.Tech in IT 2021-2025 / CGPA" on a
+        # single line (common in extracted PDFs) doesn't bleed together.
         degree_match = re.search(
-            r"(b\.?tech|bachelor|b\.?e\.?|m\.?tech|master|mba|ph\.?d|diploma|b\.?sc|m\.?sc)[\s,]*([^\n]+)",
+            r"(b\.?tech|bachelor|b\.?e\.?|m\.?tech|master|mba|ph\.?d|diploma|b\.?sc|m\.?sc)([^\n]{0,120}?)(?=\s*(?:20[12]\d|19\d{2})|\s*\\|\s*cgpa|\s*[|/]\s*cgpa|\n|$)",
             edu_text,
             re.IGNORECASE,
         )
-        degree = degree_match.group(0).strip() if degree_match else None
+        if degree_match:
+            degree = (degree_match.group(0).strip()) or None
+        else:
+            degree = None
 
         # Institution detection within education section - line-by-line, stop at dash
         institution = None
@@ -628,6 +711,14 @@ class ResumeParser:
             non_bullet_lines = [ln for ln in lines if not bullet_re.match(ln)]
             all_bullets = len(non_bullet_lines) == 0
 
+            # Lines that are clearly NOT project titles.
+            def _is_metadata(ln: str) -> bool:
+                return (
+                    ln.lower().startswith("report:")
+                    or re.match(r"^https?://", ln)
+                    or bool(date_re.match(ln))
+                )
+
             entries: list[list[str]] = []  # each entry: [title, ...details]
             if all_bullets:
                 for ln in lines:
@@ -635,25 +726,45 @@ class ResumeParser:
                     if clean:
                         entries.append([clean])
             else:
+                has_any_bullet = any(bullet_re.match(ln) for ln in lines)
                 current: list[str] | None = None
                 for ln in lines:
-                    # URL / report / date lines are metadata, not titles.
-                    if (
-                        ln.lower().startswith("report:")
-                        or re.match(r"^https?://", ln)
-                        or date_re.match(ln)
-                    ):
+                    if _is_metadata(ln):
                         continue
-                    if bullet_re.match(ln):
-                        clean = bullet_re.sub("", ln).strip()
-                        if current is None:
-                            current = [clean]
+                    is_bullet = bullet_re.match(ln)
+                    if has_any_bullet:
+                        # Explicit bullets: details attach to current project.
+                        if is_bullet:
+                            clean = bullet_re.sub("", ln).strip()
+                            if current is None:
+                                current = [clean]
+                            else:
+                                current.append(clean)
                         else:
-                            current.append(clean)
+                            if current is not None:
+                                entries.append(current)
+                            current = [ln]
                     else:
-                        if current is not None:
-                            entries.append(current)
-                        current = [ln]
+                        # No bullets (common in PDFs): a project title typically
+                        # has a dash separator ("Title - Detail"), or a year in
+                        # parentheses, or is a short line without commas/sentence
+                        # punctuation. Detail lines are longer and comma-heavy.
+                        looks_like_title = (
+                            re.search(r"\s[-\u2013\u2014]\s", ln) is not None
+                            or re.search(r"\((?:19|20)\d{2}", ln) is not None
+                            or (
+                                len(ln) <= 50
+                                and "," not in ln
+                                and not ln.rstrip().endswith((".", ":", ";"))
+                                and re.search(r"[A-Za-z]", ln) is not None
+                            )
+                        )
+                        if current is None or looks_like_title:
+                            if current is not None and looks_like_title:
+                                entries.append(current)
+                            current = [ln]
+                        else:
+                            current.append(ln)
                 if current is not None:
                     entries.append(current)
 
