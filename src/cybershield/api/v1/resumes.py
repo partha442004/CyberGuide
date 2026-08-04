@@ -4,7 +4,8 @@ Resumes API Router
 Endpoints for resume upload, parsing, matching, and skill extraction.
 """
 
-from typing import Any, List
+from dataclasses import dataclass
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import select
@@ -24,6 +25,25 @@ router = APIRouter()
 
 # Max file size: 10MB
 MAX_FILE_SIZE = 10 * 1024 * 1024
+
+
+@dataclass
+class _JobMatchData:
+    """Lightweight job payload for matching.
+
+    We deliberately load only the columns matching needs — never the full
+    ORM ``Job`` entity. The cybershield ``Job`` model declares eager
+    relationships (``applications``, ``skills``, ...) that join against
+    tables whose shapes differ in the live interntrack schema, crashing on
+    the deployed app. A column-only select sidesteps that entirely.
+    """
+
+    id: str
+    title: Optional[str]
+    company: Optional[str]
+    required_skills: Any
+    preferred_skills: Any
+    tags: Any
 
 
 def _as_list(value: Any) -> list:
@@ -61,10 +81,18 @@ def _extract_skill_names(skills_list) -> set:
     return result
 
 
-def _calculate_job_match(resume_skills: set, job: Job) -> ResumeMatchResponse:
-    """Calculate match score between resume skills and a job."""
-    job_required = _extract_skill_names(job.required_skills)
-    job_preferred = _extract_skill_names(job.preferred_skills)
+def _calculate_job_match(resume_skills: set, job: _JobMatchData) -> ResumeMatchResponse:
+    """Calculate match score between resume skills and a job.
+
+    Falls back to the job's ``tags`` column (used by the interntrack Job
+    model / live Neon table) when the dedicated skill columns are empty.
+    """
+    job_required = _extract_skill_names(getattr(job, "required_skills", None))
+    job_preferred = _extract_skill_names(getattr(job, "preferred_skills", None))
+    if not job_required and not job_preferred:
+        # Live jobs (interntrack model) keep skills in ``tags``.
+        job_tags = _extract_skill_names(getattr(job, "tags", None))
+        job_required = job_tags
     all_job_skills = job_required | job_preferred
 
     if not all_job_skills:
@@ -190,11 +218,22 @@ async def match_resume_to_job(
     if not resume:
         raise HTTPException(status_code=404, detail="No resume found. Upload a resume first.")
 
-    # Get job
-    job_result = await session.execute(select(Job).where(Job.id == job_id))
-    job = job_result.scalar_one_or_none()
-    if not job:
+    # Get job (column-only select — avoids eager relationship joins that
+    # crash against the live interntrack schema).
+    job_result = await session.execute(
+        select(
+            Job.id,
+            Job.title,
+            Job.company,
+            Job.required_skills,
+            Job.preferred_skills,
+            Job.tags,
+        ).where(Job.id == job_id)
+    )
+    row = job_result.first()
+    if not row:
         raise HTTPException(status_code=404, detail="Job not found.")
+    job = _JobMatchData(*row)
 
     # Extract resume skill names
     resume_skills = _extract_skill_names(resume.skills)
@@ -246,9 +285,19 @@ async def match_resume_batch(
     if not resume:
         raise HTTPException(status_code=404, detail="No resume found. Upload a resume first.")
 
-    # Get all jobs
-    job_result = await session.execute(select(Job).where(Job.id.in_(job_ids)))
-    jobs = {str(job.id): job for job in job_result.scalars().all()}
+    # Get all jobs (column-only select — avoids eager relationship joins
+    # that crash against the live interntrack schema).
+    job_result = await session.execute(
+        select(
+            Job.id,
+            Job.title,
+            Job.company,
+            Job.required_skills,
+            Job.preferred_skills,
+            Job.tags,
+        ).where(Job.id.in_(job_ids))
+    )
+    jobs = {str(row.id): _JobMatchData(*row) for row in job_result.all()}
 
     if not jobs:
         raise HTTPException(status_code=404, detail="No jobs found.")
