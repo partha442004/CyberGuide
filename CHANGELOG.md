@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [1.20.10] - 2026-08-04
 
+### Added
+
+- **Streamlit dashboard now has a fully working Resume Match page** — upload
+  your PDF resume, see parsed skills/education/experience/certifications, and
+  click "Find Best Matching Jobs" to batch-match your resume against all
+  saved jobs (match score %, matched/missing skills, suggestions).
+- **Discovery page now uses POST** (the correct API method) with a proper
+  spinner, success/error messages, and tips.
+- **Jobs page split into two tabs** — "Discovery" (run scrapers) and "Saved
+  Jobs" (browse, view, apply).
+- **Settings page** shows the live API URL and has a "Clear Cache" button.
+
+### Fixed
+
+- **CI Security job**: bumped `aiohttp` 3.13.4 → 3.14.3 to fix
+  CVE-2026-69244 (HIGH, out-of-bounds heap read in C HTTP response parser).
+
 ### Changed
 
 - **Git author identity corrected** — local + global git config now set to

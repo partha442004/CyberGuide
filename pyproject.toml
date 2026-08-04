@@ -111,6 +111,8 @@ extend-immutable-calls = [
 # Tests: private-member access, fixture arg names, and test secrets are idiomatic.
 "tests/**" = ["SLF001", "ARG001", "ARG002", "S105"]
 "tests/unit/test_*.py" = ["DTZ001", "DTZ006"]
+# Dashboard: section-header comments are not ERA (commented-out code).
+"dashboard/app.py" = ["ERA001", "E501"]
 
 [tool.mypy]
 python_version = "3.11"
