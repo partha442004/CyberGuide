@@ -270,30 +270,69 @@ class ResumeParser:
         except ImportError:
             pass
 
-        # Fallback: basic PDF text extraction (no native deps)
-        # Uses zlib (stdlib) to decompress FlateDecode streams, then
-        # extracts text from PDF operators (Tj, TJ, ', ").
+        # Fallback: basic PDF text extraction (no native deps).
+        # Handles common PDF encodings with pure stdlib:
+        #   - ASCII85 (+ FlateDecode) streams (e.g. reportlab output)
+        #   - Plain FlateDecode (zlib) streams
+        #   - Raw/uncompressed streams
+        # Then extracts text from PDF operators (Tj, TJ, ', ").
         try:
             with open(file_path, "rb") as f:
                 data = f.read()
         except Exception:
             return ""
 
+        import base64
         import zlib
 
         text_parts: list[str] = []
         content = data.decode("latin-1", errors="replace")
 
-        # Find and decompress stream sections
-        for m in re.finditer(r"stream\s(.+?)\sendstream", content, re.DOTALL):
+        # Find stream sections. Do NOT require whitespace before "endstream":
+        # binary payloads frequently end flush against the keyword (e.g.
+        # ASCII85 "~>endstream" or raw bytes ending in ">endstream").
+        for m in re.finditer(r"stream\r?\n(.*?)endstream", content, re.DOTALL):
             raw = m.group(1).strip()
-            # Try to decompress (FlateDecode)
-            try:
-                raw_bytes = raw.encode("latin-1")
-                decompressed = zlib.decompress(raw_bytes)
-                stream_content = decompressed.decode("latin-1", errors="replace")
-            except (zlib.error, Exception):
-                stream_content = raw
+            if not raw:
+                continue
+            raw_bytes = raw.encode("latin-1")
+            stream_content = None
+
+            # 1) ASCII85 (Base85) encoded streams
+            if raw_bytes[:1].isalpha() or b"~>" in raw_bytes or b"~" in raw_bytes[-2:]:
+                a85_bytes = raw_bytes
+                # Strip the ASCII85 end-of-data marker if present.
+                for suffix in (b"~>", b"~"):
+                    if a85_bytes.endswith(suffix):
+                        a85_bytes = a85_bytes[: -len(suffix)]
+                        break
+                try:
+                    decoded = base64.a85decode(a85_bytes)
+                    try:
+                        stream_content = zlib.decompress(decoded).decode(
+                            "latin-1", errors="replace"
+                        )
+                    except Exception:
+                        try:
+                            stream_content = zlib.decompress(decoded, -15).decode(
+                                "latin-1", errors="replace"
+                            )
+                        except Exception:
+                            stream_content = decoded.decode("latin-1", errors="replace")
+                except Exception:
+                    pass
+
+            # 2) FlateDecode (zlib) streams
+            if stream_content is None:
+                try:
+                    decompressed = zlib.decompress(raw_bytes)
+                    stream_content = decompressed.decode("latin-1", errors="replace")
+                except Exception:
+                    try:
+                        decompressed = zlib.decompress(raw_bytes, -15)
+                        stream_content = decompressed.decode("latin-1", errors="replace")
+                    except Exception:
+                        stream_content = raw
 
             # Extract text from PDF operators: (text) Tj, (text) ', (text) "
             texts = re.findall(r"\(([^)]*)\)\s*(?:Tj|'|\"|TJ)", stream_content)

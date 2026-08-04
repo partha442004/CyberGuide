@@ -449,3 +449,133 @@ Email: user@test.com
         text = "CERTIFICATIONS\nCEH - Completed\nOSCP - In Progress"
         result = self.parser._parse_text(text)
         assert len(result["certifications"]) >= 1
+
+
+class TestResumeParserPdfFallback:
+    """Test the pure-stdlib PDF fallback extractor (used on Vercel).
+
+    pymupdf is not installed on Vercel's runtime, so the fallback must
+    handle ASCII85 + FlateDecode streams and plain zlib streams using
+    only the standard library. These tests build a minimal PDF in memory
+    and verify text extraction without requiring pymupdf.
+    """
+
+    def setup_method(self):
+        self.parser = ResumeParser()
+
+    def _build_a85_flate_pdf(self, text: str) -> bytes:
+        """Build a minimal PDF whose content stream is ASCII85+Flate encoded."""
+        import base64
+        import zlib
+
+        content = f"BT /F1 12 Tf 14.4 TL ET\nBT 1 0 0 1 50 750 Tm ({text}) Tj T* ET\n"
+        compressed = zlib.compress(content.encode("latin-1"))
+        a85 = base64.a85encode(compressed)
+        stream = a85 + b"~>"
+        length = len(stream)
+        pdf = (
+            b"%PDF-1.4\n"
+            b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+            b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+            b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]\n"
+            b"   /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n"
+            b"4 0 obj\n<< /Filter [ /ASCII85Decode /FlateDecode ] /Length "
+            + str(length).encode()
+            + b" >>\nstream\n"
+            + stream
+            + b"\nendstream\nendobj\n"
+            b"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n"
+            b"trailer\n<< /Size 6 /Root 1 0 R >>\n%%EOF\n"
+        )
+        return pdf
+
+    def test_a85_flate_fallback_extracts_text(self, tmp_path):
+        """Fallback must extract text from ASCII85+Flate encoded streams."""
+        pdf = self._build_a85_flate_pdf("Python penetration testing Nmap Burp Suite")
+        pdf_path = tmp_path / "resume.pdf"
+        pdf_path.write_bytes(pdf)
+
+        text = self.parser._extract_pdf_text(str(pdf_path))
+        assert "Python" in text
+        assert "penetration testing" in text
+
+    def test_a85_flate_fallback_no_endstream_whitespace(self, tmp_path):
+        """Fallback must handle streams where data ends flush at 'endstream'."""
+        import base64
+        import zlib
+
+        content = "BT /F1 12 Tf 14.4 TL ET\nBT 1 0 0 1 50 750 Tm (Nmap) Tj ET\n"
+        stream = base64.a85encode(zlib.compress(content.encode("latin-1"))) + b"~>"
+        pdf = (
+            b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+            b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+            b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]\n"
+            b"   /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n"
+            b"4 0 obj\n<< /Filter [ /ASCII85Decode /FlateDecode ] /Length "
+            + str(len(stream)).encode()
+            + b" >>\nstream\n"
+            + stream
+            + b"endstream\nendobj\n"
+            b"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n"
+            b"trailer\n<< /Size 6 /Root 1 0 R >>\n%%EOF\n"
+        )
+        pdf_path = tmp_path / "resume2.pdf"
+        pdf_path.write_bytes(pdf)
+
+        text = self.parser._extract_pdf_text(str(pdf_path))
+        assert "Nmap" in text
+
+    def test_plain_zlib_fallback(self, tmp_path):
+        """Fallback must handle plain zlib (FlateDecode only) streams."""
+        import zlib
+
+        content = "BT /F1 12 Tf 14.4 TL ET\nBT 1 0 0 1 50 750 Tm (Wireshark) Tj ET\n"
+        stream = zlib.compress(content.encode("latin-1"))
+        pdf = (
+            b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+            b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+            b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]\n"
+            b"   /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n"
+            b"4 0 obj\n<< /Filter /FlateDecode /Length "
+            + str(len(stream)).encode()
+            + b" >>\nstream\n"
+            + stream
+            + b"\nendstream\nendobj\n"
+            b"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n"
+            b"trailer\n<< /Size 6 /Root 1 0 R >>\n%%EOF\n"
+        )
+        pdf_path = tmp_path / "resume3.pdf"
+        pdf_path.write_bytes(pdf)
+
+        text = self.parser._extract_pdf_text(str(pdf_path))
+        assert "Wireshark" in text
+
+    def test_garbage_stream_does_not_crash(self, tmp_path):
+        """Fallback must not raise on malformed stream data."""
+        pdf = (
+            b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+            b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+            b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]\n"
+            b"   /Contents 4 0 R >>\nendobj\n"
+            b"4 0 obj\n<< /Length 20 >>\nstream\nNOT-REAL-DATA-123\nendstream\nendobj\n"
+            b"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n"
+            b"trailer\n<< /Size 6 /Root 1 0 R >>\n%%EOF\n"
+        )
+        pdf_path = tmp_path / "resume4.pdf"
+        pdf_path.write_bytes(pdf)
+
+        text = self.parser._extract_pdf_text(str(pdf_path))
+        assert isinstance(text, str)
+
+    def test_parse_upload_extracts_skills_without_pymupdf(self, tmp_path):
+        """parse_upload should extract skills via fallback when pymupdf missing."""
+        pdf = self._build_a85_flate_pdf("Python Nmap Metasploit SIEM")
+        pdf_path = tmp_path / "resume5.pdf"
+        pdf_path.write_bytes(pdf)
+
+        import asyncio
+
+        result = asyncio.run(self.parser.parse_upload(pdf, "resume5.pdf"))
+        names = [s["name"].lower() for s in result["skills"]]
+        assert "python" in names
+        assert "nmap" in names
