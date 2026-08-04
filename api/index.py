@@ -32,6 +32,15 @@ os.environ.setdefault("RATE_LIMIT_ENABLED", "false")  # No Redis on Vercel free
 from interntrack.database.session import init_db
 from interntrack.main import app
 
+# ── Mount the (cybershield) resume router ─────────────────────────────────
+# The resume upload / match endpoints live in the cybershield package and
+# need a different DB session factory.  We import the router directly and
+# include it under the same prefix so the Vercel API serves it alongside
+# the interntrack routes.
+from cybershield.api.v1.resumes import router as resumes_router
+
+app.include_router(resumes_router, prefix="/api/v1/resumes", tags=["Resumes"])
+
 # ── Initialize database on cold start ─────────────────────────────────────
 # This runs once when the serverless function cold-starts. It's a no-op if
 # all tables and columns already exist.

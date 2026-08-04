@@ -47,6 +47,9 @@ python-dotenv==1.0.1
 python-multipart==0.0.30
 tenacity==8.2.3
 
+# PDF parsing (resume upload)
+pymupdf==1.25.2
+
 # Testing
 pytest==7.4.4
 pytest-asyncio==0.23.4
