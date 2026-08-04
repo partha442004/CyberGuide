@@ -769,3 +769,54 @@ PROJECTS
         # none should match.
         roles = [e["role"].lower() for e in exp]
         assert roles == []
+
+    def test_tj_array_fragments_joined_with_word_gaps(self):
+        """TJ-array fragments are joined, inserting spaces at word gaps."""
+        body = "(P)100(AR)20(THASARA)90(THI)-278(B)"
+        text = ResumeParser._join_tj_fragments(body)
+        assert text == "PARTHASARATHI B"
+
+    def test_tj_array_pdf_escapes_unescaped(self):
+        """PDF octal/backslash escapes inside TJ fragments are unescaped."""
+        text = ResumeParser._join_tj_fragments(r"(pro\002ciency)")
+        # \002 is an octal escape → control char; no literal backslash remains.
+        assert "\\" not in text
+        assert text.replace("\x02", "") == "prociency"
+
+    def test_tj_array_escape_slash(self):
+        """A lone escaped backslash (\\\\ in PDF) unescapes to one slash."""
+        text = ResumeParser._join_tj_fragments(r"(a\\b)")
+        assert text == r"a\b" or text == "ab"
+
+    def test_education_single_line_year_does_not_bleed(self):
+        """Degree stops at the year even when the whole block is one line."""
+        text = (
+            "EDUCATION\n"
+            "Mahendra Engineering College, Salem - B.Tech in Information "
+            "Technology 2021 - 2025 \\ CGPA: 6.75/10\n"
+        )
+        edu = self.parser._extract_education(text)
+        assert len(edu) >= 1
+        assert edu[0]["degree"] == "B.Tech in Information Technology"
+        assert edu[0]["gpa"] == "6.75/10"
+        assert edu[0]["years"] == "2021 - 2025"
+
+    def test_projects_no_bullets_short_title_heuristic(self):
+        """PDF-style projects (no bullets) use short-title heuristic."""
+        text = """PROJECTS
+Vulnerability Assessment - Metasploitable (192.168.1.82)
+February 2026
+Conducted VA using Nessus Scanner, identified 122 vulnerabilities
+Documented critical findings: VNC weak password (CVSS 10.0)
+Report: https://www.mediafire.com/file/abc
+Penetration Testing - Metasploitable 2 (192.168.1.68)
+May 2026
+Performed reconnaissance using Nmap, identified 7 open ports
+"""
+        projects = self.parser._extract_projects(text)
+        assert len(projects) == 2
+        names = " ".join(p["name"] for p in projects).lower()
+        assert "vulnerability assessment" in names
+        assert "penetration testing" in names
+        # Detail lines belong to the first project's description.
+        assert "nessus" in projects[0]["description"].lower()
