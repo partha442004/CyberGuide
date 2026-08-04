@@ -141,9 +141,19 @@ async def get_closing_soon(
 async def run_discovery(
     source: str | None = None,
     query: str = "python developer",
+    body: dict | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """Run job discovery from sources."""
+    """Run job discovery from sources.
+
+    Accepts the query either as a query parameter (?query=...) for
+    backward compatibility or in the JSON body ({"query": ...}) which
+    is what the Streamlit dashboard sends. The body value wins so the
+    dashboard's "Run Discovery" button searches what the user typed
+    instead of silently falling back to the default.
+    """
+    if body and body.get("query"):
+        query = body["query"]
     from interntrack.scrapers.registry import get_default_registry
 
     registry = get_default_registry()
