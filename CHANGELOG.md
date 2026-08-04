@@ -1597,3 +1597,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   with a new `related_skills` response field and a "Transferable skills"
   suggestion. Exact matches still dominate, and truly unrelated roles
   (e.g. a `compliance`-only job) still score 0.0.
+
+- **Matcher polish from code review** — preferred-synonym matches now score
+  at the documented 0.5 weight (was accidentally 0.6), noise tags such as
+  `remote`/`full-time` are filtered out of job-skill fallback so they no
+  longer pollute missing-skills or suggestions, and the tier helper is now
+  properly typed. Regression tests added for both behaviors.

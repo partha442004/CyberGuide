@@ -527,11 +527,17 @@ def show_resume_match() -> None:
                             f"{color} **{m.get('job_title', 'N/A')}** at {m.get('company', 'N/A')} — Match: {score or 0}%"
                         ):
                             matched = m.get("matched_skills", [])
+                            related = m.get("related_skills", [])
                             missing = m.get("missing_skills", [])
                             if matched:
                                 st.write(
                                     "✅ **Your matched skills:**",
                                     ", ".join(matched[:10]),
+                                )
+                            if related:
+                                st.write(
+                                    "🔗 **Transferable skills (same domain):**",
+                                    ", ".join(related[:10]),
                                 )
                             if missing:
                                 st.write(

@@ -5,7 +5,7 @@ Endpoints for resume upload, parsing, matching, and skill extraction.
 """
 
 from dataclasses import dataclass
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import select
@@ -22,6 +22,33 @@ from cybershield.services.resume_service import SECURITY_SKILLS, ResumeParser
 from cybershield.utils import utcnow
 
 router = APIRouter()
+
+# Non-skill tokens that commonly appear in a job's ``tags`` column
+# (e.g. ``remote``, ``hybrid``) — excluded from matching so they never
+# pollute ``missing_skills`` or the "Learn missing skills" suggestion.
+_NON_SKILL_TAGS = frozenset(
+    {
+        "remote",
+        "hybrid",
+        "onsite",
+        "on-site",
+        "full-time",
+        "full time",
+        "part-time",
+        "part time",
+        "contract",
+        "internship",
+        "entry level",
+        "entry-level",
+        "mid level",
+        "senior level",
+        "temporary",
+        "permanent",
+        "relocation",
+        "visa sponsorship",
+        "work from home",
+    }
+)
 
 # ---------------------------------------------------------------------------
 # Fair skill matching for domain-transition candidates
@@ -185,8 +212,10 @@ def _calculate_job_match(resume_skills: set, job: _JobMatchData) -> ResumeMatchR
     job_required = _extract_skill_names(getattr(job, "required_skills", None))
     job_preferred = _extract_skill_names(getattr(job, "preferred_skills", None))
     if not job_required and not job_preferred:
-        # Live jobs (interntrack model) keep skills in ``tags``.
-        job_tags = _extract_skill_names(getattr(job, "tags", None))
+        # Live jobs (interntrack model) keep skills in ``tags`` — filter out
+        # non-skill tokens (``remote``, ``full-time`` ...) so they never
+        # appear as bogus missing skills.
+        job_tags = _extract_skill_names(getattr(job, "tags", None)) - _NON_SKILL_TAGS
         job_required = job_tags
     all_job_skills = job_required | job_preferred
 
@@ -201,31 +230,32 @@ def _calculate_job_match(resume_skills: set, job: _JobMatchData) -> ResumeMatchR
         # ``python`` (scripting) can partially cover ``go`` (scripting).
         resume_categories = {cat for s in resume_skills if (cat := _skill_category(s)) is not None}
 
-        matched = []
-        related = []
-        missing = []
-        required_earned = 0.0
-        preferred_earned = 0.0
-
-        def _tier(skill: str) -> tuple:
+        def _tier(skill: str, is_preferred: bool = False) -> Tuple[float, str]:
             """Classify a job skill against the resume.
 
             Returns (earned_weight, bucket) where bucket is one of
-            ``exact``/``synonym``/``category``/``none``.
+            ``exact``/``synonym``/``category``/``none``. Weights differ for
+            preferred skills so the documented table is honored exactly:
+
+              required  : exact 1.0, synonym 0.6, category 0.35
+              preferred : exact 1.0, synonym 0.5, category 0.20
             """
             if skill in resume_skills:
                 return 1.0, "exact"
             if _synonym_hits(skill, resume_skills):
-                return 0.6, "synonym"
+                return (0.5 if is_preferred else 0.6), "synonym"
             cat = _skill_category(skill)
             if cat is not None and cat in resume_categories:
-                return 0.35, "category"
+                return (0.2 if is_preferred else 0.35), "category"
             return 0.0, "none"
+
+        required_earned = 0.0
+        preferred_earned = 0.0
 
         for skill in job_required:
             weight, tier = _tier(skill)
             required_earned += weight
-            if tier == "exact" or tier == "synonym":
+            if tier in ("exact", "synonym"):
                 matched.append(skill)
             elif tier == "category":
                 related.append(skill)
@@ -233,9 +263,9 @@ def _calculate_job_match(resume_skills: set, job: _JobMatchData) -> ResumeMatchR
                 missing.append(skill)
 
         for skill in job_preferred:
-            weight, tier = _tier(skill)
-            preferred_earned += weight if tier != "category" else 0.2
-            if tier == "exact" or tier == "synonym":
+            weight, tier = _tier(skill, is_preferred=True)
+            preferred_earned += weight
+            if tier in ("exact", "synonym"):
                 matched.append(skill)
             elif tier == "category":
                 related.append(skill)
