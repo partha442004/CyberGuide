@@ -59,6 +59,56 @@ class TestCalculateJobMatchBranches:
         assert result.missing_skills == []
 
 
+class TestDomainTransitionMatching:
+    """Fair scoring for candidates switching domains.
+
+    A resume should not flatline at 0.0 just because it words skills
+    differently (synonyms) or because it has transferable same-family
+    skills (categories) — e.g. a Data Analyst resume vs a Software
+    Engineer job.
+    """
+
+    def test_data_analyst_vs_software_job_gets_nonzero_score(self):
+        """Resume with python/sql partially covers a SWE job asking for
+        go/kubernetes via the shared ``scripting``/``cicd`` families."""
+        job = _make_job(required_skills=["go", "kubernetes", "aws"], preferred_skills=[])
+        result = _calculate_job_match({"python", "sql"}, job)
+        assert result.match_score is not None
+        assert result.match_score > 0
+        # ``go`` is scripting — same family as ``python``.
+        assert "go" in result.related_skills
+        assert "go" not in result.missing_skills
+        # ``kubernetes``/``aws`` are out-of-family for a data analyst.
+        assert "kubernetes" in result.missing_skills
+        assert any("Transferable skills" in s for s in result.suggestions)
+
+    def test_synonym_skills_count_as_partial_match(self):
+        """k8s vs kubernetes / golang vs go are the same skill."""
+        job = _make_job(required_skills=["k8s"], preferred_skills=["golang"])
+        result = _calculate_job_match({"kubernetes", "go"}, job)
+        assert result.match_score is not None
+        assert result.match_score > 0
+        assert "k8s" in result.matched_skills
+        assert "golang" in result.matched_skills
+        assert result.missing_skills == []
+
+    def test_category_match_weights_less_than_exact(self):
+        """Partial credit must not beat a real exact match."""
+        exact_job = _make_job(required_skills=["python"], preferred_skills=[])
+        exact = _calculate_job_match({"python"}, exact_job)
+        category_job = _make_job(required_skills=["go"], preferred_skills=[])
+        category = _calculate_job_match({"python"}, category_job)
+        assert exact.match_score is not None
+        assert category.match_score is not None
+        assert exact.match_score > category.match_score
+
+    def test_related_skills_exposed_in_response(self):
+        job = _make_job(required_skills=["go"], preferred_skills=[])
+        result = _calculate_job_match({"python"}, job)
+        assert result.related_skills == ["go"]
+        assert result.matched_skills == []
+
+
 class TestExtractSkillNamesEdgeCases:
     def test_dict_without_name_key_ignored(self):
         assert _extract_skill_names([{"other": "x"}]) == set()

@@ -312,7 +312,12 @@ class TestMatchResumeToJob:
         assert data["job_id"] == job.id
         assert data["job_title"] == "Backend Dev"
         assert "python" in data["matched_skills"]
-        assert "go" in data["missing_skills"]
+        # ``go`` shares the ``scripting`` category with ``python``, so it is
+        # a transferable/related skill rather than an outright gap.
+        assert "go" in data["related_skills"]
+        assert "go" not in data["missing_skills"]
+        assert data["match_score"] is not None
+        assert data["match_score"] > 0
 
     @pytest.mark.asyncio
     async def test_match_no_resume_returns_404(self, client: AsyncClient, db_session):

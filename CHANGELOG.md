@@ -1587,3 +1587,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **CI green** — bumped `pypdf` to 6.14.2 (fixes CVE-2026-59935/59936,
   HIGH DoS in crafted-PDF inline images) and ruff-formatted
   `resume_service.py` so the Lint + Security jobs pass.
+
+- **Fairer resume-job matching for domain-transition candidates** — the
+  matcher previously scored exact-name overlap only, so a Data Analyst
+  resume (python/sql/excel) vs a Software Engineer job (go/kubernetes)
+  flatlined at 0.0. It now scores in three tiers: exact (1.0/1.0), synonym
+  (0.6/0.5, e.g. k8s==kubernetes, golang==go) and same-category
+  transferable credit (0.35/0.2, e.g. python covering go via `scripting`),
+  with a new `related_skills` response field and a "Transferable skills"
+  suggestion. Exact matches still dominate, and truly unrelated roles
+  (e.g. a `compliance`-only job) still score 0.0.
