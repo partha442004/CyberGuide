@@ -155,74 +155,203 @@ async def _deliver_alert(
     domains: list | None = None,
     subject: str = "InternTrack Daily Alert",
     weekly: bool = False,
+    user=None,
 ) -> dict:
     """Send an alert through the given channels (None = all configured).
 
     Emails get the full single digest message. Telegram gets the digest
     split into small chunks, each with inline **Apply** buttons linking to
-    the job listing. Returns the per-channel delivery results.
+    the job listing. When ``user`` is given, match % is computed from that
+    user's own resume (``user.id``) and delivery is routed to the user's
+    email / Telegram chat instead of the shared defaults. Returns the
+    per-channel delivery results.
     """
     title = "📅 Weekly Digest" if weekly else "📊 Daily Report"
     targets = channels if channels is not None else manager.get_configured_channels()
+    user_id = getattr(user, "id", None)
+    recipient = None
+    if user is not None:
+        recipient = {
+            "email": getattr(user, "email", None),
+            "telegram_chat_id": getattr(user, "telegram_chat_id", None),
+        }
     results: dict = {}
     non_telegram = [c for c in targets if c != "telegram"]
     if non_telegram:
         message = await build_daily_report_message(
-            report, session, domains=domains, title=title
+            report, session, domains=domains, title=title, user_id=user_id
         )
-        results.update(await manager.notify(non_telegram, message, subject=subject))
+        if recipient:
+            results.update(
+                await manager.notify(
+                    non_telegram, message, subject=subject, recipient=recipient
+                )
+            )
+        else:
+            results.update(await manager.notify(non_telegram, message, subject=subject))
     if "telegram" in targets:
         chunks = await build_alert_chunks(
-            report, session, domains=domains, weekly=weekly
+            report, session, domains=domains, weekly=weekly, user_id=user_id
         )
         # Every chunk must deliver for the send to count as delivered.
         telegram_ok = True
         for text, buttons in chunks:
-            chunk_results = await manager.notify(
-                ["telegram"], text, subject=subject, buttons=buttons
-            )
+            if recipient:
+                chunk_results = await manager.notify(
+                    ["telegram"],
+                    text,
+                    subject=subject,
+                    buttons=buttons,
+                    recipient=recipient,
+                )
+            else:
+                chunk_results = await manager.notify(
+                    ["telegram"], text, subject=subject, buttons=buttons
+                )
             telegram_ok = telegram_ok and bool(chunk_results.get("telegram", False))
         results["telegram"] = telegram_ok
     return results
 
 
-async def generate_daily_report():
-    """Generate and send daily report, honoring saved alert preferences.
+async def _enabled_alert_targets(session) -> list[dict]:
+    """Every account with alerts enabled, as ``{user_id, prefs, user}``.
 
-    Only jobs created since the previous alert are included (no duplicates
-    across the three daily sends), and the send window advances afterwards.
+    ``prefs`` is the loaded alert-preferences dict for that user, ``user``
+    is the matching ``User`` profile (``None`` for the legacy ``user1``
+    default before any accounts exist). Never raises: an empty list makes
+    callers fall back to the single-user path (which keeps every existing
+    test and pre-account deployment working unchanged).
+    """
+    try:
+        from sqlalchemy import select
+
+        from interntrack.domain.models import AlertPreferences, User
+
+        result = await session.execute(
+            select(AlertPreferences).where(AlertPreferences.is_enabled.is_(True))
+        )
+        rows = list(result.scalars().all())
+        targets: list[dict] = []
+        for pref in rows:
+            user_id = str(getattr(pref, "user_id", "") or "")
+            if not user_id:
+                continue
+            prefs = await _load_alert_preferences(session, user_id=user_id)
+            user = None
+            if user_id != DEFAULT_ALERT_USER:
+                user_result = await session.execute(
+                    select(User).where(User.id == user_id)
+                )
+                candidate = user_result.scalar_one_or_none()
+                if isinstance(candidate, User):
+                    user = candidate
+            targets.append({"user_id": user_id, "prefs": prefs, "user": user})
+        return targets
+    except Exception:
+        return []
+
+
+async def _user_profile(session, user_id: str):
+    """Load a User profile by id, or None when missing. Never raises.
+
+    Only a genuine :class:`User` row is returned — a mocked/failed session
+    that yields anything else is treated as "no profile" so callers fall
+    back to the shared configured channels instead of routing to junk.
+    """
+    try:
+        from sqlalchemy import select
+
+        from interntrack.domain.models import User
+
+        result = await session.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if isinstance(user, User):
+            return user
+    except Exception:
+        return None
+    return None
+
+
+async def _send_alert_for(session, user_id: str, prefs: dict, user=None) -> None:
+    """Build and deliver one user's daily digest (per-user resume + window).
+
+    Honors the saved domains / channels / min match %, advances that user's
+    no-duplicates window, delivers to the user's own channels and records
+    the send in that user's history.
+    """
+    domains = prefs.get("domains") or None
+    service = ReportService(session)
+    report = await service.generate_daily_report(
+        domains=domains,
+        min_match_score=prefs.get("min_match_score"),
+        since=prefs.get("last_alert_at"),
+    )
+
+    await _mark_alert_sent(session, user_id)
+    if not (report.get("new_jobs") or []):
+        print(
+            f"[{datetime.now(UTC)}] Daily report for {user_id}: "
+            "no new jobs since last alert"
+        )
+        return
+
+    manager = NotificationManager(session)
+    subject = "Daily Report"
+    if domains:
+        subject += f" ({', '.join(domains)})"
+    results = await _deliver_alert(
+        manager,
+        prefs.get("channels") or None,
+        report,
+        session,
+        domains=domains,
+        subject=subject,
+        user=user,
+    )
+    await _record_alert_history(
+        session,
+        user_id=user_id,
+        subject=subject,
+        channels=prefs.get("channels") or list(results.keys()),
+        domains=domains or [],
+        job_count=len(report.get("new_jobs") or []),
+        results=results,
+    )
+
+
+async def generate_daily_report():
+    """Generate and send daily reports for every user with alerts enabled.
+
+    Each registered account gets a personalized digest: their own domains,
+    their own resume match %, their own no-duplicates window, delivered to
+    their own email / Telegram and recorded in their own history. When no
+    accounts exist yet, the legacy single-user path (``user1``) is used so
+    pre-account deployments behave exactly as before.
     """
     async with get_db_session() as session:
-        prefs = await _load_alert_preferences(session)
-        if prefs.get("is_enabled") is False:
-            print(f"[{datetime.now(UTC)}] Daily report skipped — alerts disabled")
-            return
-        domains = prefs.get("domains") or None
-        service = ReportService(session)
-        report = await service.generate_daily_report(
-            domains=domains,
-            min_match_score=prefs.get("min_match_score"),
-            since=prefs.get("last_alert_at"),
-        )
-
-        await _mark_alert_sent(session, DEFAULT_ALERT_USER)
-        if not (report.get("new_jobs") or []):
-            print(f"[{datetime.now(UTC)}] Daily report: no new jobs since last alert")
+        targets = await _enabled_alert_targets(session)
+        if not targets:
+            # Legacy single-user fallback (no registered accounts yet).
+            prefs = await _load_alert_preferences(session)
+            if prefs.get("is_enabled") is False:
+                print(f"[{datetime.now(UTC)}] Daily report skipped — alerts disabled")
+                return
+            await _send_alert_for(session, DEFAULT_ALERT_USER, prefs, None)
             return
 
-        # Send notification via preferred channels (or all configured).
-        manager = NotificationManager(session)
-        subject = "Daily Report"
-        if domains:
-            subject += f" ({', '.join(domains)})"
-        await _deliver_alert(
-            manager,
-            prefs.get("channels") or None,
-            report,
-            session,
-            domains=domains,
-            subject=subject,
-        )
+        for target in targets:
+            if target["prefs"].get("is_enabled") is False:
+                print(
+                    f"[{datetime.now(UTC)}] Daily report skipped for "
+                    f"{target['user_id']} — alerts disabled"
+                )
+                continue
+            await _send_alert_for(
+                session,
+                target["user_id"],
+                target["prefs"],
+                target["user"],
+            )
 
 
 def format_daily_report(report: dict, title: str = "📊 Daily Report") -> str:
@@ -236,16 +365,25 @@ def format_daily_report(report: dict, title: str = "📊 Daily Report") -> str:
     )
 
 
-async def _latest_resume_skill_names(session) -> set | None:
-    """Load the most recently parsed resume's skill names, if any."""
+async def _latest_resume_skill_names(session, user_id: str | None = None) -> set | None:
+    """Load a user's most recently parsed resume's skill names, if any.
+
+    ``user_id`` scopes the lookup to that user's own resume so every user's
+    match % is computed from *their* skills. ``None`` keeps the legacy
+    behavior (most recent resume across all users) used by the default
+    ``user1`` path before any accounts exist.
+    """
     try:
         from sqlalchemy import select
 
         from cybershield.api.v1.resumes import _extract_skill_names
         from cybershield.domain.models import ResumeData
 
+        query = select(ResumeData)
+        if user_id:
+            query = query.where(ResumeData.user_id == user_id)
         result = await session.execute(
-            select(ResumeData).order_by(ResumeData.updated_at.desc()).limit(1)
+            query.order_by(ResumeData.updated_at.desc()).limit(1)
         )
         resume = result.scalar_one_or_none()
         if resume:
@@ -345,6 +483,7 @@ async def _score_and_group_jobs(
     report: dict,
     session,
     domains: list | None = None,
+    user_id: str | None = None,
 ) -> list[tuple[str, list[tuple[float | None, dict]]]]:
     """Score, filter and group the report's jobs into domain sections.
 
@@ -355,7 +494,7 @@ async def _score_and_group_jobs(
     jobs = report.get("new_jobs") or []
     if not jobs:
         return []
-    resume_skills = await _latest_resume_skill_names(session)
+    resume_skills = await _latest_resume_skill_names(session, user_id=user_id)
     scored = [(_job_match_score(resume_skills, job), job) for job in jobs]
     min_score = report.get("min_match_score")
     if min_score:
@@ -394,6 +533,7 @@ async def build_daily_report_message(
     session,
     domains: list | None = None,
     title: str = "📊 Daily Report",
+    user_id: str | None = None,
 ) -> str:
     """Rich daily-report notification: summary counts plus the recent jobs
     grouped by domain (security / coding / data / …), each job carrying its
@@ -404,7 +544,7 @@ async def build_daily_report_message(
     resume match % is below the threshold.
     """
     lines = [format_daily_report(report, title)]
-    sections = await _score_and_group_jobs(report, session, domains)
+    sections = await _score_and_group_jobs(report, session, domains, user_id=user_id)
     for domain, items in sections:
         lines.append("")
         lines.append(f"{_DOMAIN_ICONS.get(domain, domain)} ({len(items)}):")
@@ -428,6 +568,7 @@ async def build_alert_chunks(
     domains: list | None = None,
     weekly: bool = False,
     jobs_per_chunk: int = 4,
+    user_id: str | None = None,
 ) -> list[tuple[str, list[tuple[str, str]]]]:
     """Split the alert digest into Telegram-sized chunks with Apply buttons.
 
@@ -437,7 +578,7 @@ async def build_alert_chunks(
     keyboard on Telegram.
     """
     title = "📅 Weekly Digest" if weekly else "📊 Daily Report"
-    sections = await _score_and_group_jobs(report, session, domains)
+    sections = await _score_and_group_jobs(report, session, domains, user_id=user_id)
     flat: list[tuple[str, float | None, dict]] = []
     for domain, items in sections:
         for score, job in items:

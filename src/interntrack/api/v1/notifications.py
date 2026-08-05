@@ -186,7 +186,7 @@ async def send_alert_now(
     Only jobs created since the previous alert are included (no duplicates);
     a one-off override does NOT advance the window.
     """
-    from interntrack.scheduler.jobs import _deliver_alert
+    from interntrack.scheduler.jobs import _deliver_alert, _user_profile
 
     prefs = await _load_alert_preferences(db, user_id=user_id)
     is_one_off = override is not None
@@ -213,6 +213,9 @@ async def send_alert_now(
     subject = "InternTrack Daily Alert"
     if domains:
         subject += f" ({', '.join(domains)})"
+    # Route the send to the user's own email / Telegram when they have an
+    # account; the legacy path (no account) uses the shared configured channels.
+    user = await _user_profile(db, user_id)
     results = await _deliver_alert(
         manager,
         channels,
@@ -220,6 +223,7 @@ async def send_alert_now(
         db,
         domains=domains,
         subject=subject,
+        user=user,
     )
 
     job_count = len(report.get("new_jobs") or [])
