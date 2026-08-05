@@ -15,6 +15,7 @@ DEFAULT_FEEDS = {
     "remoteok": "https://remoteok.com/remote-jobs.rss",
     "weworkremotely": "https://weworkremotely.com/remote-jobs.rss",
     "hackernews_jobs": "https://hnrss.org/newest?q=hiring",
+    "remotive": "https://remotive.com/remote-jobs/feed",
 }
 
 
