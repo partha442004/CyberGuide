@@ -142,5 +142,5 @@ class TestGetDefaultRegistry:
         sources = registry.list_sources()
 
         assert "hackernews" in sources
-        assert "remote_ok" in sources
+        assert "remote_ok" not in sources  # RemoteOK API returns junk now
         assert "rss_feed" in sources

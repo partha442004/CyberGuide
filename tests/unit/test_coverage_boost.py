@@ -37,12 +37,12 @@ class TestScraperRegistryExtended:
 
         sources = registry.list_sources()
         assert "hackernews" in sources
-        assert "remote_ok" in sources
         assert "rss_feed" in sources
         assert "linkedin" in sources
         assert "indeed" in sources
         assert "glassdoor" in sources
-        assert len(sources) == 6
+        assert "remote_ok" not in sources  # RemoteOK API returns junk now
+        assert len(sources) == 5
 
     @pytest.mark.asyncio
     async def test_fetch_all_no_sources(self):

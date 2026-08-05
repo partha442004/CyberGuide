@@ -2,6 +2,7 @@
 Base scraper class for job discovery.
 """
 
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -53,15 +54,15 @@ class RawJob:
             "tags": self.tags,
             "source": self.source,
             "raw_data": self.raw_data,
-        }
+        }  # Security-family keywords used to expand a security-focused discovery query
 
 
-# Security-family keywords used to expand a security-focused discovery query
 # so that e.g. "cybersecurity" also surfaces SOC / pentest / appsec listings
 # that never use the literal word "cybersecurity".
 SECURITY_KEYWORDS = (
     "security",
     "cybersecurity",
+    "cyber security",
     "infosec",
     "information security",
     "soc",
@@ -90,29 +91,59 @@ _SECURITY_TRIGGERS = frozenset(
     {"cybersecurity", "security", "infosec", "vapt", "pentest", "penetration"},
 )
 
+_WORD_RE = re.compile(r"\w+")
+
+
+def _stem(word: str) -> str:
+    """Light stemmer: engineering -> engineer, analysts -> analyst."""
+    if len(word) > 5 and word.endswith("ing"):
+        word = word[:-3]
+    if len(word) > 4 and word.endswith("ies"):
+        word = f"{word[:-3]}y"
+    if len(word) > 4 and word.endswith("s"):
+        word = word[:-1]
+    return word
+
+
+def _stemmed(text: str) -> str:
+    """Lowercase and lightly stem every word in ``text``."""
+    return _WORD_RE.sub(lambda m: _stem(m.group(0)), text.lower())
+
+
+def _expand_token(token: str) -> tuple[str, ...]:
+    """Return a stemmed query token plus its family alternates."""
+    triggers = frozenset(_stem(t) for t in _SECURITY_TRIGGERS)
+    if token in triggers:
+        return (token, *(_stemmed(k) for k in SECURITY_KEYWORDS))
+    return (token,)
+
 
 def matches_query(text: str, query: str) -> bool:
     """Return True when ``text`` matches the discovery ``query``.
 
-    Matching is deliberately broad for discovery:
-    - multi-word queries match when ANY token appears (a "security analyst"
-      search also surfaces "Security Engineer" listings);
-    - security-family queries are expanded with related security keywords so
-      a "cybersecurity" search also catches SOC, pentest, appsec roles;
+    Matching is tuned for discovery precision:
+    - AND semantics: every query word must be satisfied, so a "security
+      analyst" search finds security-analyst roles, not every Data Analyst;
+    - light stemming so "software engineering" still matches "Software
+      Engineer" and "analysts" matches "analyst";
+    - security-family queries are expanded so "cybersecurity" also matches
+      SOC / pentest / appsec / SIEM / incident-response roles;
+    - word-boundary matching avoids false positives such as "soc" inside
+      "social media";
     - short tokens (< 3 chars) are ignored.
     """
-    text_lower = text.lower()
-    tokens = [
-        token for token in query.lower().replace(",", " ").split() if len(token) >= 3
-    ]
+    text_stemmed = _stemmed(text)
+    tokens = [token for token in _stemmed(query).split() if len(token) >= 3]
     if not tokens:
         return True
 
-    keywords = set(tokens)
-    if keywords & _SECURITY_TRIGGERS:
-        keywords.update(SECURITY_KEYWORDS)
-
-    return any(keyword in text_lower for keyword in keywords)
+    return all(
+        any(
+            re.search(rf"\b{re.escape(alternate)}\b", text_stemmed)
+            for alternate in _expand_token(token)
+        )
+        for token in tokens
+    )
 
 
 class BaseScraper(ABC):

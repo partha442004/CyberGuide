@@ -1628,3 +1628,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   set up; no-op otherwise. Note: `GET /api/v1/notifications/channels` still
   returns `[]` until SMTP / Telegram / Discord credentials are added to the
   Vercel environment variables.
+- **Discovery precision pass** — the first attempt surfaced security jobs but
+  with too much noise: ANY-token substring matching let a "security analyst"
+  run save Data/AML/Financial Analyst roles, and "soc" matched "social media".
+  The matcher now uses AND semantics (every query word must match, so
+  "security analyst" finds only security-analyst roles), word-boundary
+  matching ("soc" no longer hits "Social"), and light stemming
+  ("software engineering" still matches "Software Engineer"). The RemoteOK
+  JSON API source was removed from the default registry because it now
+  returns non-job junk entries ("Menu", "Basic", "Elite", "Cleaning
+  Assistant") — RemoteOK listings still arrive via its RSS feed. The 40 junk
+  rows it had polluted the live DB with were cleaned up.
