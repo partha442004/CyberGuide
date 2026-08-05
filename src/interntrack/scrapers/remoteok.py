@@ -53,8 +53,13 @@ class RemoteOKScraper(BaseScraper):
         company = item.get("company", "")
         description = item.get("description", "")
 
-        # Check if matches query (multi-token + security-family expansion)
-        if not matches_query(f"{title} {company} {description}", query):
+        # Check if matches query (multi-token + security-family expansion;
+        # security queries match against title + company)
+        if not matches_query(
+            f"{title} {company} {description}",
+            query,
+            title=f"{title} {company}",
+        ):
             return None
 
         # Parse salary

@@ -86,8 +86,10 @@ class RSSFeedScraper(BaseScraper):
         summary = entry.get("summary", "")
         published = entry.get("published_parsed")
 
-        # Check if matches query (multi-token + security-family expansion)
-        if not matches_query(f"{title} {summary}", query):
+        # Check if matches query (multi-token + security-family expansion;
+        # security queries match against the title so descriptions mentioning
+        # "security" generically don't flood the results)
+        if not matches_query(f"{title} {summary}", query, title=title):
             return None
 
         # Parse published date

@@ -96,8 +96,9 @@ class HackerNewsScraper(BaseScraper):
         if not title:
             return None
 
-        # Check if matches query (multi-token + security-family expansion)
-        if not matches_query(text, query) and not matches_query(title, query):
+        # Check if matches query (multi-token + security-family expansion;
+        # security queries match against the extracted title)
+        if not matches_query(text, query, title=title):
             return None
 
         return RawJob(

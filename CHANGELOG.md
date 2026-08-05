@@ -1639,3 +1639,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   returns non-job junk entries ("Menu", "Basic", "Elite", "Cleaning
   Assistant") — RemoteOK listings still arrive via its RSS feed. The 40 junk
   rows it had polluted the live DB with were cleaned up.
+- **Security discovery matches the title, not the description** — RSS job
+  descriptions routinely mention "security" in generic contexts ("security
+  and compliance", "data security"), which kept surfacing sales/marketing
+  roles for a "cybersecurity" search. Security-family queries now match
+  against the job title only (word-boundary), so "cybersecurity" surfaces
+  Security/SOC/Pentest/Privacy titles and skips Web Developer / Marketing
+  Manager listings that merely mention "security" in their summary.
+  Non-security queries (e.g. "python developer") still match the full text.
+  The 11 non-security rows my earlier test runs had saved were cleaned from
+  the live DB (30 jobs remain, all cron-discovered).

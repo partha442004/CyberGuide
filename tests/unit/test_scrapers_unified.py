@@ -107,6 +107,32 @@ class TestMatchesQuery:
         assert not matches_query("Social Media Coordinator", "cybersecurity")
         assert not matches_query("Social Media Coordinator", "security")
 
+    def test_security_query_matches_title_only(self):
+        """Security queries match against the job title, because descriptions
+        routinely mention 'security' generically ('security and compliance')."""
+        from interntrack.scrapers.base import matches_query
+
+        assert not matches_query(
+            "Web Developer - own the security and compliance of our platform",
+            "cybersecurity",
+            title="Web Developer",
+        )
+        assert matches_query(
+            "Senior Security Engineer",
+            "cybersecurity",
+            title="Senior Security Engineer",
+        )
+        assert matches_query(
+            "Senior Privacy Engineer",
+            "cybersecurity",
+            title="Senior Privacy Engineer",
+        )
+        assert matches_query(
+            "Full Stack Engineer building Python and AWS services",
+            "python",
+            title="Full Stack Engineer",
+        )
+
     def test_short_tokens_ignored(self):
         from interntrack.scrapers.base import matches_query
 
