@@ -4,6 +4,8 @@ InternTrack Dashboard - Streamlit Application
 
 import os
 from contextlib import suppress
+from datetime import UTC, datetime
+from html import escape
 from typing import Any
 
 import httpx
@@ -18,33 +20,233 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Custom CSS
+# ---------------------------------------------------------------------------
+# Design system (professional theme, adapts to light/dark)
+# ---------------------------------------------------------------------------
+
 st.markdown(
     """
 <style>
+    /* ---------- Base typography ---------- */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    html, body, [data-testid="stAppViewContainer"], .stMarkdown, .stCaption {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    /* ---------- Theme variables ---------- */
+    html[data-theme="light"] {
+        --bg: #f8fafc;
+        --card: #ffffff;
+        --border: #e2e8f0;
+        --text: #0f172a;
+        --muted: #64748b;
+        --soft: rgba(15, 23, 42, 0.045);
+    }
+    html[data-theme="dark"] {
+        --bg: #0b1120;
+        --card: #111a2e;
+        --border: #1e2a44;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --soft: rgba(148, 163, 184, 0.08);
+    }
+
+    /* ---------- App background ---------- */
+    [data-testid="stAppViewContainer"] {
+        background: var(--bg);
+    }
+    [data-testid="stHeader"] {
+        background: transparent;
+    }
+
+    /* ---------- Metric cards ---------- */
     .metric-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 20px;
-        border-radius: 10px;
-        color: white;
-        text-align: center;
+        border-radius: 16px;
+        padding: 20px 22px;
+        color: #ffffff;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-height: 96px;
+        transition: transform .18s ease, box-shadow .18s ease;
+    }
+    .metric-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 14px 32px rgba(0, 0, 0, 0.24);
+    }
+    .metric-icon {
+        font-size: 2.1em;
+        line-height: 1;
+        background: rgba(255, 255, 255, 0.22);
+        border-radius: 12px;
+        padding: 10px 12px;
     }
     .metric-value {
-        font-size: 2.5em;
-        font-weight: bold;
+        font-size: 1.9em;
+        font-weight: 800;
+        line-height: 1.1;
     }
     .metric-label {
-        font-size: 0.9em;
-        opacity: 0.8;
+        font-size: 0.82em;
+        opacity: 0.9;
+        font-weight: 500;
+        letter-spacing: .02em;
     }
-    .stButton > button {
-        width: 100%;
-    }
-    .upload-card {
-        border: 2px dashed #667eea;
-        border-radius: 10px;
-        padding: 20px;
+
+    /* ---------- Stat tiles (Saved Jobs summary) ---------- */
+    .stat-tile {
+        border: 1px solid var(--border);
+        background: var(--card);
+        border-radius: 14px;
+        padding: 14px 18px;
         text-align: center;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    .stat-value {
+        font-size: 1.7em;
+        font-weight: 800;
+        color: var(--text);
+        line-height: 1.2;
+    }
+    .stat-label {
+        font-size: 0.78em;
+        color: var(--muted);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+    }
+
+    /* ---------- Category section headers ---------- */
+    .cat-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 26px 0 4px;
+        padding: 13px 18px;
+        border-radius: 14px;
+        background: var(--soft);
+        border-left: 5px solid #64748b;
+    }
+    .cat-icon {
+        font-size: 1.15em;
+        border-radius: 10px;
+        padding: 7px 9px;
+        color: #fff;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+    }
+    .cat-name {
+        font-size: 1.06em;
+        font-weight: 700;
+        color: var(--text);
+        flex: 1;
+    }
+    .cat-badge {
+        color: #fff;
+        font-weight: 700;
+        font-size: 0.82em;
+        border-radius: 999px;
+        padding: 3px 12px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+    }
+    .cat-pct {
+        font-size: 0.78em;
+        color: var(--muted);
+        font-weight: 600;
+    }
+    .cat-bar {
+        height: 5px;
+        border-radius: 999px;
+        background: var(--soft);
+        margin: 0 18px 10px 18px;
+        overflow: hidden;
+    }
+    .cat-bar-fill {
+        height: 100%;
+        border-radius: 999px;
+        transition: width .6s ease;
+    }
+
+    /* ---------- Job cards ---------- */
+    div[data-testid="stVerticalBlockBorderWrapper"] > div {
+        border-radius: 14px !important;
+        border: 1px solid var(--border) !important;
+        background: var(--card);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+        transition: box-shadow .18s ease, transform .18s ease, border-color .18s ease;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:hover > div {
+        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.14);
+        transform: translateY(-2px);
+        border-color: #667eea !important;
+    }
+
+    /* ---------- Chips ---------- */
+    .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 8px 0 10px;
+    }
+    .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.78em;
+        font-weight: 600;
+        color: var(--text);
+        background: var(--soft);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 4px 11px;
+    }
+    .chip-salary {
+        color: #059669;
+        background: rgba(16, 185, 129, 0.10);
+        border-color: rgba(16, 185, 129, 0.25);
+    }
+    html[data-theme="dark"] .chip-salary { color: #34d399; }
+
+    /* ---------- Job title ---------- */
+    .job-title {
+        font-size: 1.12em;
+        font-weight: 700;
+        color: var(--text);
+        margin: 0;
+    }
+    .job-desc {
+        color: var(--muted);
+        font-size: 0.9em;
+        line-height: 1.55;
+        margin-top: 6px;
+    }
+
+    /* ---------- Pills / buttons polish ---------- */
+    .stButton > button {
+        border-radius: 10px;
+        font-weight: 600;
+    }
+    div[data-testid="stPills"] button {
+        border-radius: 999px !important;
+        font-weight: 600;
+    }
+    div[data-testid="stPills"] button[aria-pressed="true"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        border-color: transparent !important;
+        color: #fff !important;
+    }
+
+    /* ---------- Section subtitles ---------- */
+    .section-title {
+        font-size: 1.25em;
+        font-weight: 800;
+        color: var(--text);
+        margin: 22px 0 8px;
+    }
+    .section-sub {
+        color: var(--muted);
+        font-size: 0.9em;
+        margin-bottom: 14px;
     }
 </style>
 """,
@@ -169,6 +371,20 @@ _DOMAIN_ORDER = [
     "other",
 ]
 
+# Accent styles per category (color = badge/bar accent, grad = icon tile).
+_CATEGORY_STYLE = {
+    "security": {"color": "#e5484d", "grad": "linear-gradient(135deg,#ff6b6b,#c0392b)"},
+    "coding": {"color": "#3b82f6", "grad": "linear-gradient(135deg,#60a5fa,#1d4ed8)"},
+    "data": {"color": "#8b5cf6", "grad": "linear-gradient(135deg,#a78bfa,#6d28d9)"},
+    "design": {"color": "#ec4899", "grad": "linear-gradient(135deg,#f472b6,#be185d)"},
+    "finance": {"color": "#10b981", "grad": "linear-gradient(135deg,#34d399,#047857)"},
+    "marketing": {
+        "color": "#f59e0b",
+        "grad": "linear-gradient(135deg,#fbbf24,#b45309)",
+    },
+    "other": {"color": "#64748b", "grad": "linear-gradient(135deg,#94a3b8,#475569)"},
+}
+
 
 def classify_domain(title: str) -> str:
     """Classify a job title into a domain bucket (mirrors the API)."""
@@ -226,6 +442,174 @@ def fetch_version() -> str:
     return DEFAULT_VERSION
 
 
+def _time_ago(iso_str: Any) -> str:
+    """Human-friendly relative time from an ISO timestamp."""
+    if not iso_str:
+        return "Unknown"
+    try:
+        dt = datetime.fromisoformat(str(iso_str).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        delta = datetime.now(UTC) - dt
+    except (ValueError, TypeError):
+        return "Unknown"
+    secs = delta.total_seconds()
+    if secs < 0:
+        return "Just now"
+    if secs < 3600:
+        return f"{int(secs // 60)}m ago"
+    if secs < 86400:
+        return f"{int(secs // 3600)}h ago"
+    days = int(secs // 86400)
+    if days == 1:
+        return "Yesterday"
+    if days < 30:
+        return f"{days}d ago"
+    return str(iso_str)[:10]
+
+
+def _is_fresh_24h(iso_str: Any) -> bool:
+    """True when the timestamp is within the last 24 hours."""
+    if not iso_str:
+        return False
+    try:
+        dt = datetime.fromisoformat(str(iso_str).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        return (datetime.now(UTC) - dt).total_seconds() < 86400
+    except (ValueError, TypeError):
+        return False
+
+
+# ---------------------------------------------------------------------------
+# UI building blocks
+# ---------------------------------------------------------------------------
+
+
+def _metric_card(icon: str, value: Any, label: str, grad: str) -> None:
+    """Gradient metric tile for the Overview page."""
+    st.markdown(
+        f'<div class="metric-card" style="background:{grad}">'
+        f'<span class="metric-icon">{icon}</span>'
+        f'<div><div class="metric-value">{value}</div>'
+        f'<div class="metric-label">{label}</div></div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _stat_tile(value: Any, label: str) -> None:
+    """Compact stat tile for the Saved Jobs summary row."""
+    st.markdown(
+        f'<div class="stat-tile"><div class="stat-value">{value}</div>'
+        f'<div class="stat-label">{label}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _category_header(domain: str, count: int, total: int) -> None:
+    """Styled category section header with badge + share progress bar."""
+    style = _CATEGORY_STYLE.get(domain, _CATEGORY_STYLE["other"])
+    pct = (count / total * 100) if total else 0
+    st.markdown(
+        f'<div class="cat-header" style="border-left-color:{style["color"]}">'
+        f'<span class="cat-icon" style="background:{style["grad"]}">'
+        f"{style['icon']}</span>"
+        f'<span class="cat-name">{_DOMAIN_LABELS.get(domain, domain)}</span>'
+        f'<span class="cat-badge" style="background:{style["color"]}">{count}</span>'
+        f'<span class="cat-pct">{pct:.0f}% of jobs</span></div>'
+        f'<div class="cat-bar"><div class="cat-bar-fill" '
+        f'style="width:{pct:.1f}%;background:{style["color"]}"></div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _render_job(job: dict) -> None:
+    """One job as a clean, hoverable card with real widgets.
+
+    All scraped fields (title, company, location, description, ...) are
+    untrusted external content, so every value interpolated into HTML is
+    escaped before rendering with ``unsafe_allow_html``.
+    """
+    title = escape(str(job.get("title", "Untitled")))
+    company = escape(str(job.get("company", "Unknown")))
+    posted = job.get("posted_at")
+
+    with st.container(border=True):
+        col_l, col_r = st.columns([4, 1])
+
+        with col_l:
+            st.markdown(f'<div class="job-title">{title}</div>', unsafe_allow_html=True)
+
+            chips = []
+            if job.get("company") and str(job.get("company")) != "Unknown":
+                chips.append(f"🏢 {company}")
+            if job.get("location"):
+                chips.append(f"📍 {escape(str(job.get('location')))}")
+            if job.get("source"):
+                chips.append(f"🗂 {escape(str(job.get('source')))}")
+            if chips:
+                st.markdown(
+                    '<div class="chip-row">'
+                    + "".join(f'<span class="chip">{c}</span>' for c in chips)
+                    + "</div>",
+                    unsafe_allow_html=True,
+                )
+
+            sal_min, sal_max = job.get("salary_min"), job.get("salary_max")
+            if sal_min or sal_max:
+                sal_a = escape(str(sal_min or "N/A"))
+                sal_b = escape(str(sal_max or "N/A"))
+                st.markdown(
+                    f'<div class="chip-row"><span class="chip chip-salary">💰 '
+                    f"{sal_a} – {sal_b}</span></div>",
+                    unsafe_allow_html=True,
+                )
+
+            if job.get("description"):
+                desc = str(job["description"]).strip()
+                if desc:
+                    st.markdown(
+                        f'<div class="job-desc">{escape(desc[:300])}'
+                        f"{'…' if len(desc) > 300 else ''}</div>",
+                        unsafe_allow_html=True,
+                    )
+
+            st.caption(f"🕒 Posted {_time_ago(posted)}")
+
+        with col_r:
+            if job.get("url"):
+                st.link_button("🔗 View", job["url"], use_container_width=True)
+            if st.button(
+                "📋 Apply",
+                key=f"apply_{job.get('id', title)}",
+                use_container_width=True,
+            ):
+                st.toast("Application tracked! Visit Applications to update status.")
+
+
+def _category_picker(options: list[str], labels: dict[str, str]) -> str:
+    """Segmented category filter (pills with a radio fallback)."""
+    picker = getattr(st, "pills", None)
+    if picker is not None:
+        try:
+            selected = picker(
+                "Filter by category",
+                options,
+                selection_mode="single",
+                default="All",
+                format_func=lambda d: labels.get(d, d),
+            )
+            return selected or "All"
+        except TypeError:
+            pass
+    return st.radio(
+        "Filter by category",
+        options,
+        horizontal=True,
+        format_func=lambda d: labels.get(d, d),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Main app
 # ---------------------------------------------------------------------------
@@ -281,14 +665,35 @@ def show_overview() -> None:
 
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("Total Jobs", jobs.get("total_jobs", 0))
+            _metric_card(
+                "💼",
+                jobs.get("total_jobs", 0),
+                "Total Jobs",
+                "linear-gradient(135deg,#667eea 0%,#764ba2 100%)",
+            )
         with col2:
-            st.metric("Applications", apps.get("total_applications", 0))
+            _metric_card(
+                "📝",
+                apps.get("total_applications", 0),
+                "Applications",
+                "linear-gradient(135deg,#f093fb 0%,#f5576c 100%)",
+            )
         with col3:
-            st.metric("Response Rate", f"{apps.get('response_rate', 0)}%")
+            _metric_card(
+                "🎯",
+                f"{apps.get('response_rate', 0)}%",
+                "Response Rate",
+                "linear-gradient(135deg,#4facfe 0%,#00f2fe 100%)",
+            )
         with col4:
-            st.metric("Recent (7d)", apps.get("recent_applications", 0))
+            _metric_card(
+                "🕒",
+                apps.get("recent_applications", 0),
+                "Recent (7d)",
+                "linear-gradient(135deg,#43e97b 0%,#38f9d7 100%)",
+            )
 
+        st.markdown("")
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("Job Types")
@@ -330,8 +735,12 @@ def show_jobs() -> None:
 
     # ------ Tab 1: Discovery ------
     with tab1:
-        st.subheader("Run Job Discovery")
-        st.markdown("Scrapes job boards for new listings matching your query.")
+        st.markdown(
+            '<div class="section-title">Run Job Discovery</div>'
+            '<div class="section-sub">Scrapes job boards for new listings matching '
+            "your query.</div>",
+            unsafe_allow_html=True,
+        )
 
         col1, col2 = st.columns([3, 1])
         with col1:
@@ -381,59 +790,40 @@ def show_jobs() -> None:
             domain = classify_domain(job.get("title", ""))
             grouped.setdefault(domain, []).append(job)
 
-        st.caption(
-            f"📦 **{len(jobs)}** saved jobs across **{len(grouped)}** categories"
-        )
+        fresh_count = sum(1 for j in jobs if _is_fresh_24h(j.get("posted_at")))
+        domains_present = [d for d in _DOMAIN_ORDER if d in grouped]
 
-        # Category filter pills: "All" + one per non-empty category.
-        options = ["All"] + [d for d in _DOMAIN_ORDER if d in grouped]
-        cat_labels = {
-            d: f"{_DOMAIN_LABELS.get(d, d)} ({len(grouped[d])})" for d in options[1:]
-        }
-        selected = st.selectbox(
-            "Filter by category",
-            options,
-            format_func=lambda d: (
-                "All categories" if d == "All" else cat_labels.get(d, d)
-            ),
-        )
+        # Summary stat row.
+        stat_cols = st.columns(4)
+        with stat_cols[0]:
+            _stat_tile(len(jobs), "Saved Jobs")
+        with stat_cols[1]:
+            _stat_tile(len(domains_present), "Categories")
+        with stat_cols[2]:
+            _stat_tile(fresh_count, "New · 24h")
+        with stat_cols[3]:
+            _stat_tile(
+                sum(len(grouped[d]) for d in ("security", "coding", "data")),
+                "Tech Roles",
+            )
+        st.markdown("")
 
-        domains = _DOMAIN_ORDER if selected == "All" else [selected]
+        # Category filter (pills).
+        options = ["All"] + domains_present
+        labels = {"All": "All categories"}
+        for d in domains_present:
+            labels[d] = f"{_DOMAIN_LABELS.get(d, d)} ({len(grouped[d])})"
+        selected = _category_picker(options, labels)
+
+        # Render sections.
+        domains = domains_present if selected == "All" else [selected]
         for domain in domains:
             items = grouped.get(domain)
             if not items:
                 continue
-            st.subheader(f"{_DOMAIN_LABELS.get(domain, domain)} ({len(items)})")
+            _category_header(domain, len(items), len(jobs))
             for job in items:
-                with st.expander(
-                    f"**{job.get('title', 'Untitled')}** — {job.get('company', 'Unknown')}"
-                ):
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.write(f"📍 {job.get('location', 'Remote')}")
-                        sal_min = job.get("salary_min")
-                        sal_max = job.get("salary_max")
-                        if sal_min or sal_max:
-                            st.write(f"💰 {sal_min or 'N/A'} - {sal_max or 'N/A'}")
-                        if job.get("description"):
-                            desc = job["description"]
-                            st.write(desc[:500] + ("..." if len(desc) > 500 else ""))
-                        st.caption(
-                            f"Source: {job.get('source', 'unknown')}  ·  Posted: {job.get('posted_at', 'N/A')}"
-                        )
-                    with col2:
-                        if job.get("url"):
-                            st.link_button(
-                                "🔗 View Job", job["url"], use_container_width=True
-                            )
-                        if st.button(
-                            "📋 Apply",
-                            key=f"apply_{job['id']}",
-                            use_container_width=True,
-                        ):
-                            st.success(
-                                "Application tracked! Visit Applications page to update status."
-                            )
+                _render_job(job)
 
 
 # ---------------------------------------------------------------------------
@@ -551,7 +941,7 @@ def show_analytics() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Page: Resume Match (NEW — actually works!)
+# Page: Resume Match
 # ---------------------------------------------------------------------------
 
 
@@ -730,7 +1120,7 @@ def show_learning() -> None:
 
     cols = st.columns(3)
     for i, platform in enumerate(platforms):
-        with cols[i % 3]:
+        with cols[i % 3], st.container(border=True):
             st.markdown(f"### {platform['icon']} {platform['name']}")
             st.link_button("Visit", platform["url"], use_container_width=True)
 
