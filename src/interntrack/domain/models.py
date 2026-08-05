@@ -100,6 +100,18 @@ class Job(Base, TimestampMixin):
         "hackernews_jobs": "hackernews",
         "rss": "rss_feed",
         "rss_feeds": "rss_feed",
+        # Bridged cybershield sources (internship boards + vendor portals).
+        "internshala": "internshala",
+        "unstop": "unstop",
+        "naukri": "naukri",
+        "freshersworld": "freshersworld",
+        "crowdstrike": "company",
+        "paloalto": "company",
+        "fortinet": "company",
+        "checkpoint": "company",
+        "symantec": "company",
+        "mcafee": "company",
+        "trendmicro": "company",
     }
 
     # Relationships

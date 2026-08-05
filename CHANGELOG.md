@@ -1714,3 +1714,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   from Symantec and TrendMicro (Digital Forensics Analyst, Threat Research
   Editor, Incident Response Coordinator) — sources that blocked earlier
   (Internshala 500, Naukri 400, Workday 422) are skipped and logged.
+- **Bridged sources now keep their real names in the DB** — JobSource gained
+  internshala/unstop/naukri/freshersworld/company values and the Job model's
+  source coercion maps the bridged vendor portals (symantec, trendmicro,
+  crowdstrike, ...) to `company` instead of `unknown`, so discovery runs
+  record which portal each listing came from.
