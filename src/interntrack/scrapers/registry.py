@@ -9,6 +9,10 @@ from interntrack.scrapers.base import BaseScraper
 
 logger = logging.getLogger(__name__)
 
+# Bound concurrent source fetches so dozens of bridged scrapers cannot
+# exhaust connections or exceed the serverless function timeout.
+_MAX_CONCURRENT = 5
+
 
 class ScraperRegistry:
     """Registry for managing scraper instances."""
@@ -44,7 +48,14 @@ class ScraperRegistry:
         sources: list[str] | None = None,
         limit: int = 100,
     ) -> list[dict]:
-        """Fetch jobs from all or specified sources."""
+        """Fetch jobs from all or specified sources, concurrently.
+
+        Sources run in parallel (bounded by :data:`_MAX_CONCURRENT`) so the
+        wall-clock time is roughly the slowest source, not the sum of every
+        source — important since the registry now bridges in many internship
+        and company scrapers and Vercel serverless functions have a hard
+        timeout.
+        """
 
         all_jobs = []
         scrapers = self.get_all()
@@ -52,22 +63,30 @@ class ScraperRegistry:
         if sources:
             scrapers = [s for s in scrapers if s.source_name in sources]
 
-        for scraper in scrapers:
-            try:
-                jobs = await scraper.fetch(query, location, limit)
-                all_jobs.extend([job.to_dict() for job in jobs])
-                business_metrics_store.record_scraper_run(
-                    scraper.source_name,
-                    success=True,
-                )
-            except Exception as e:
-                business_metrics_store.record_scraper_run(
-                    scraper.source_name,
-                    success=False,
-                )
-                print(f"Error fetching from {scraper.source_name}: {e}")
-                continue
+        import asyncio
 
+        semaphore = asyncio.Semaphore(_MAX_CONCURRENT)
+
+        async def fetch_one(scraper: BaseScraper) -> list[dict]:
+            async with semaphore:
+                try:
+                    jobs = await scraper.fetch(query, location, limit)
+                    business_metrics_store.record_scraper_run(
+                        scraper.source_name,
+                        success=True,
+                    )
+                    return [job.to_dict() for job in jobs]
+                except Exception as e:
+                    business_metrics_store.record_scraper_run(
+                        scraper.source_name,
+                        success=False,
+                    )
+                    print(f"Error fetching from {scraper.source_name}: {e}")
+                    return []
+
+        results = await asyncio.gather(*(fetch_one(s) for s in scrapers))
+        for chunk in results:
+            all_jobs.extend(chunk)
         return all_jobs
 
     async def close_all(self) -> None:

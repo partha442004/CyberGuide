@@ -14,9 +14,14 @@ list[RawJob]``) so those sources participate in the same discovery, dedup,
 matching and alerting flow as everything else.
 """
 
+import asyncio
 from typing import Any
 
 from interntrack.scrapers.base import BaseScraper, RawJob, matches_query
+
+# Blocked / slow sources fail fast instead of stalling the whole discovery
+# run (Vercel serverless functions have a hard timeout).
+_SOURCE_TIMEOUT = 8.0
 
 
 class CybershieldScraperAdapter(BaseScraper):
@@ -39,13 +44,21 @@ class CybershieldScraperAdapter(BaseScraper):
     ) -> list[RawJob]:
         """Run the wrapped cybershield scraper and map results to RawJob."""
         try:
-            scraped = await self._cyber.scrape(
-                keywords=[query],
-                max_pages=2,
+            scraped = await asyncio.wait_for(
+                self._cyber.scrape(keywords=[query], max_pages=2),
+                timeout=_SOURCE_TIMEOUT,
             )
+        except TimeoutError:
+            return []
         except TypeError:
             # Some cybershield scrapers accept only **kwargs.
-            scraped = await self._cyber.scrape(keywords=[query])
+            try:
+                scraped = await asyncio.wait_for(
+                    self._cyber.scrape(keywords=[query]),
+                    timeout=_SOURCE_TIMEOUT,
+                )
+            except TimeoutError:
+                return []
 
         jobs: list[RawJob] = []
         for item in scraped or []:
