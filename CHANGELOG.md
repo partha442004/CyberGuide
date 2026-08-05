@@ -1664,3 +1664,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   using the same 3-tier matcher as the dashboard). Triggered by the daily
   cron (07:00 UTC) via /reports/daily and by every discovery run that saves
   new jobs.
+- **Email alerts actually send now (live-bug fix)** — the deployed email
+  channel reported `false` on every send even though the SMTP credentials
+  were valid. Root cause: `EmailChannel.send()` built the MIME message with
+  `From`/`Subject` but never set the `To` recipient, so `smtplib` raised
+  `ValueError: To address must be set` and the manager swallowed it into
+  `email: false`. The channel now always sets `To` (defaults to the SMTP
+  user; overridable via `to_email`), with a regression test asserting the
+  recipient header is present.

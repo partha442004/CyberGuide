@@ -61,12 +61,15 @@ class EmailChannel(NotificationChannel):
         user: str,
         password: str,
         from_email: str,
+        to_email: str | None = None,
     ):
         self.host = host
         self.port = port
         self.user = user
         self.password = password
         self.from_email = from_email
+        # Alerts go to the account owner unless a recipient is given.
+        self.to_email = to_email or user
 
     async def send(self, message: str, subject: str | None = None) -> bool:
         """Send email notification."""
@@ -78,6 +81,7 @@ class EmailChannel(NotificationChannel):
 
             msg = MIMEMultipart()
             msg["From"] = self.from_email
+            msg["To"] = self.to_email
             msg["Subject"] = subject
             msg.attach(MIMEText(message, "html"))
 

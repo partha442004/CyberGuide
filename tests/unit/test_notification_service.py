@@ -61,6 +61,36 @@ class TestEmailChannel:
             assert result is True
             mock_server.starttls.assert_called_once()
             mock_server.login.assert_called_once_with("user", "pass")
+            sent_msg = mock_server.send_message.call_args.args[0]
+            # The recipient must always be set, otherwise smtplib raises
+            # ValueError: To address must be set (regression: was missing).
+            assert sent_msg["To"] == "user"
+            assert sent_msg["From"] == "from@test.com"
+            assert sent_msg["Subject"] == "Test"
+
+    @pytest.mark.asyncio
+    async def test_send_success_custom_recipient(self):
+        from interntrack.services.notification_service import EmailChannel
+
+        channel = EmailChannel(
+            "smtp.gmail.com",
+            587,
+            "user",
+            "pass",
+            "from@test.com",
+            to_email="alerts@test.com",
+        )
+
+        with patch("smtplib.SMTP") as mock_smtp:
+            mock_server = MagicMock()
+            mock_smtp.return_value.__enter__ = MagicMock(return_value=mock_server)
+            mock_smtp.return_value.__exit__ = MagicMock(return_value=False)
+
+            result = await channel.send("<p>Hello</p>")
+
+            assert result is True
+            sent_msg = mock_server.send_message.call_args.args[0]
+            assert sent_msg["To"] == "alerts@test.com"
 
     @pytest.mark.asyncio
     async def test_send_failure(self):
