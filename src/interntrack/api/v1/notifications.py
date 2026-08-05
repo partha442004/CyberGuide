@@ -107,6 +107,7 @@ async def get_alert_preferences(
         channels=prefs.get("channels") or [],
         min_match_score=prefs.get("min_match_score"),
         is_enabled=prefs.get("is_enabled", True),
+        last_alert_at=prefs.get("last_alert_at"),
     )
 
 
@@ -149,6 +150,7 @@ async def update_alert_preferences(
         channels=list(pref.channels or []),
         min_match_score=pref.min_match_score,
         is_enabled=bool(pref.is_enabled),
+        last_alert_at=pref.last_alert_at,
     )
 
 

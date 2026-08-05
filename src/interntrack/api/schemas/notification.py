@@ -72,6 +72,7 @@ class AlertPreferencesResponse(BaseModel):
     channels: list[str] = []
     min_match_score: int | None = None
     is_enabled: bool = True
+    last_alert_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
