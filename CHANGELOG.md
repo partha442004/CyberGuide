@@ -1745,3 +1745,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   and clean hoverable job cards with chip badges (company/location/source/
   salary), human-relative posting times, and escaped HTML (all scraped
   fields are escaped before unsafe_allow_html rendering to prevent XSS).
+- **Daily alert preferences (category picker for email/Telegram)** — the
+  daily digest previously always sent every category. A new
+  `alert_preferences` table (auto-created on deploy) stores per-user
+  domains / channels / min-match-score, exposed via
+  GET+PUT `/api/v1/notifications/preferences/{user_id}` and a
+  `POST .../send-alert` endpoint. `ReportService.generate_daily_report`
+  filters jobs by selected domains (summary counts follow the filter), the
+  alert message drops jobs below the optional resume-match threshold and
+  prints a "filtered to …" footer, and both the GitHub cron
+  (`/reports/daily`) and the APScheduler digest honor the saved
+  preferences — alerts can be fully disabled via `is_enabled`. The
+  dashboard gained a 🔔 Notifications section in Settings: channel
+  multiselect, category pills (e.g. select 🔐 Cybersecurity to receive only
+  security jobs), min-match slider, Save, and a "Send Test Alert Now"
+  button. 18 new tests.

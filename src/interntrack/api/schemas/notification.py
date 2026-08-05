@@ -62,3 +62,24 @@ class NotificationHistoryResponse(BaseModel):
 
     history: list[NotificationHistoryItem]
     total: int
+
+
+class AlertPreferencesResponse(BaseModel):
+    """Saved daily-alert preferences."""
+
+    user_id: str
+    domains: list[str] = []
+    channels: list[str] = []
+    min_match_score: int | None = None
+    is_enabled: bool = True
+
+    model_config = {"from_attributes": True}
+
+
+class AlertPreferencesUpdate(BaseModel):
+    """Update payload for alert preferences (None = keep current value)."""
+
+    domains: list[str] | None = None
+    channels: list[str] | None = None
+    min_match_score: int | None = None
+    is_enabled: bool | None = None

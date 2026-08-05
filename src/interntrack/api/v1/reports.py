@@ -22,19 +22,36 @@ async def get_daily_report(
 
     Vercel is serverless, so the APScheduler worker never runs there; the
     free GitHub Actions cron hits this endpoint to trigger the daily digest.
+    Saved alert preferences (domains / channels / min match %) are applied.
     """
-    service = ReportService(db)
-    report = await service.generate_daily_report()
-
-    # Trigger the daily-digest notification (no-op when no channels configured).
-    from interntrack.scheduler.jobs import build_daily_report_message
+    from interntrack.scheduler.jobs import (
+        _load_alert_preferences,
+        build_daily_report_message,
+    )
     from interntrack.services.notification_service import NotificationManager
 
+    prefs = await _load_alert_preferences(db)
+    domains = prefs.get("domains") or None
+    service = ReportService(db)
+    report = await service.generate_daily_report(
+        domains=domains,
+        min_match_score=prefs.get("min_match_score"),
+    )
+
+    # Trigger the daily-digest notification (no-op when no channels
+    # configured, or when the user has disabled alerts).
     with contextlib.suppress(Exception):
         manager = NotificationManager(db)
-        if manager.get_configured_channels():
-            message = await build_daily_report_message(report, db)
-            await manager.notify_all(message, subject="Daily Report")
+        if manager.get_configured_channels() and prefs.get("is_enabled") is not False:
+            message = await build_daily_report_message(report, db, domains=domains)
+            subject = "Daily Report"
+            if domains:
+                subject += f" ({', '.join(domains)})"
+            channels = prefs.get("channels") or None
+            if channels:
+                await manager.notify(channels, message, subject=subject)
+            else:
+                await manager.notify_all(message, subject=subject)
 
     return report
 
