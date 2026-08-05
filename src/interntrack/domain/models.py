@@ -364,6 +364,30 @@ class AlertPreferences(Base, TimestampMixin):
     is_enabled = Column(Boolean, default=True)
 
 
+class NotificationHistory(Base, TimestampMixin):
+    """Record of a daily-alert digest send, for the dashboard history view.
+
+    One row per send (manual test, one-off, or the scheduled digest) with the
+    channels attempted, the categories covered, and per-channel delivery
+    results. Auto-created on startup by ``create_all``.
+    """
+
+    __tablename__ = "notification_history"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id = Column(
+        String(100),
+        nullable=False,
+        index=True,
+        default="user1",
+    )
+    subject = Column(String(200), nullable=True)
+    channels = Column(JSON, nullable=True)
+    domains = Column(JSON, nullable=True)
+    job_count = Column(Integer, default=0)
+    results = Column(JSON, nullable=True)
+
+
 class ScheduledReport(Base, TimestampMixin):
     """Scheduled report configuration."""
 

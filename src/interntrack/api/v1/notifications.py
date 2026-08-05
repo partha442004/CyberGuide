@@ -13,7 +13,7 @@ from interntrack.api.schemas.notification import (
     NotificationTestResponse,
 )
 from interntrack.database.session import get_db
-from interntrack.scheduler.jobs import _load_alert_preferences
+from interntrack.scheduler.jobs import _load_alert_preferences, _record_alert_history
 from interntrack.services.notification_service import NotificationManager
 from interntrack.services.report_service import ReportService
 
@@ -151,16 +151,30 @@ async def update_alert_preferences(
 @router.post("/preferences/{user_id}/send-alert")
 async def send_alert_now(
     user_id: str,
+    override: AlertPreferencesUpdate | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """Build today's alert filtered by saved preferences and send it now.
+    """Build today's alert and send it now.
 
-    Returns the report summary, per-channel delivery results and how many
-    jobs were included, so the dashboard can confirm the alert went out.
+    Uses the saved preferences, optionally overridden for this one send via
+    the ``override`` body (a one-off test that never touches the saved
+    preferences). Returns the report summary, per-channel delivery results
+    and how many jobs were included; the send is recorded in history.
     """
     from interntrack.scheduler.jobs import build_daily_report_message
 
     prefs = await _load_alert_preferences(db, user_id=user_id)
+    if override is not None:
+        if override.domains is not None:
+            prefs["domains"] = _normalize_domains(override.domains)
+        if override.channels is not None:
+            prefs["channels"] = [c for c in override.channels if c in _ALERT_CHANNELS]
+        if override.min_match_score is not None:
+            prefs["min_match_score"] = max(
+                0,
+                min(100, int(override.min_match_score)),
+            )
+
     domains = prefs.get("domains") or None
     service = ReportService(db)
     report = await service.generate_daily_report(
@@ -177,11 +191,57 @@ async def send_alert_now(
         results = await manager.notify(channels, message, subject=subject)
     else:
         results = await manager.notify_all(message, subject=subject)
+
+    job_count = len(report.get("new_jobs") or [])
+    await _record_alert_history(
+        db,
+        user_id=user_id,
+        subject=subject,
+        channels=channels or list(results.keys()),
+        domains=domains or [],
+        job_count=job_count,
+        results=results,
+    )
     return {
         "summary": report.get("summary") or {},
         "results": results,
-        "job_count": len(report.get("new_jobs") or []),
+        "job_count": job_count,
         "domains": domains or [],
         "channels": list(results.keys()),
         "min_match_score": prefs.get("min_match_score"),
+    }
+
+
+@router.get("/preferences/{user_id}/history")
+async def get_alert_history(
+    user_id: str,
+    limit: int = 20,
+    db: AsyncSession = Depends(get_db),
+):
+    """Recent alert sends for a user, newest first."""
+    from sqlalchemy import select
+
+    from interntrack.domain.models import NotificationHistory
+
+    result = await db.execute(
+        select(NotificationHistory)
+        .where(NotificationHistory.user_id == user_id)
+        .order_by(NotificationHistory.created_at.desc())
+        .limit(min(max(int(limit), 1), 100))
+    )
+    rows = result.scalars().all()
+    return {
+        "history": [
+            {
+                "id": row.id,
+                "sent_at": (row.created_at.isoformat() if row.created_at else None),
+                "subject": row.subject,
+                "channels": row.channels or [],
+                "domains": row.domains or [],
+                "job_count": row.job_count or 0,
+                "results": row.results or {},
+            }
+            for row in rows
+        ],
+        "total": len(rows),
     }

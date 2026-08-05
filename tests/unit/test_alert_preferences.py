@@ -348,6 +348,198 @@ class TestPreferencesAPI:
         mock_manager.notify_all.assert_awaited_once()
         mock_manager.notify.assert_not_called()
 
+    @pytest.mark.asyncio
+    async def test_send_alert_one_off_override_without_saving(self):
+        from interntrack.api.schemas.notification import AlertPreferencesUpdate
+        from interntrack.api.v1.notifications import send_alert_now
+
+        mock_db = AsyncMock()
+        mock_service = MagicMock()
+        mock_service.generate_daily_report = AsyncMock(
+            return_value={
+                "summary": {
+                    "new_jobs": 3,
+                    "new_applications": 0,
+                    "total_applications": 0,
+                },
+                "new_jobs": [{}, {}, {}],
+            }
+        )
+        mock_manager = MagicMock()
+        mock_manager.notify = AsyncMock(return_value={"telegram": True})
+        recorder = AsyncMock()
+
+        with (
+            patch(
+                "interntrack.api.v1.notifications._load_alert_preferences",
+                new=AsyncMock(
+                    return_value={
+                        "domains": ["security"],
+                        "channels": ["email"],
+                        "is_enabled": True,
+                    }
+                ),
+            ),
+            patch(
+                "interntrack.api.v1.notifications.ReportService",
+                return_value=mock_service,
+            ),
+            patch(
+                "interntrack.api.v1.notifications.NotificationManager",
+                return_value=mock_manager,
+            ),
+            patch(
+                "interntrack.scheduler.jobs.build_daily_report_message",
+                new=AsyncMock(return_value="msg"),
+            ),
+            patch(
+                "interntrack.api.v1.notifications._record_alert_history",
+                new=recorder,
+            ),
+        ):
+            result = await send_alert_now(
+                "user1",
+                override=AlertPreferencesUpdate(
+                    domains=["coding"],
+                    channels=["telegram"],
+                ),
+                db=mock_db,
+            )
+
+        # Override used for this one send only.
+        assert result["domains"] == ["coding"]
+        mock_service.generate_daily_report.assert_called_once_with(
+            domains=["coding"],
+            min_match_score=None,
+        )
+        mock_manager.notify.assert_awaited_once_with(
+            ["telegram"], "msg", subject="InternTrack Daily Alert (coding)"
+        )
+        recorder.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_send_alert_overrides_min_match_score(self):
+        from interntrack.api.schemas.notification import AlertPreferencesUpdate
+        from interntrack.api.v1.notifications import send_alert_now
+
+        mock_db = AsyncMock()
+        mock_service = MagicMock()
+        mock_service.generate_daily_report = AsyncMock(
+            return_value={
+                "summary": {
+                    "new_jobs": 0,
+                    "new_applications": 0,
+                    "total_applications": 0,
+                },
+                "new_jobs": [],
+            }
+        )
+        mock_manager = MagicMock()
+        mock_manager.notify_all = AsyncMock(return_value={})
+
+        with (
+            patch(
+                "interntrack.api.v1.notifications._load_alert_preferences",
+                new=AsyncMock(return_value={}),
+            ),
+            patch(
+                "interntrack.api.v1.notifications.ReportService",
+                return_value=mock_service,
+            ),
+            patch(
+                "interntrack.api.v1.notifications.NotificationManager",
+                return_value=mock_manager,
+            ),
+            patch(
+                "interntrack.scheduler.jobs.build_daily_report_message",
+                new=AsyncMock(return_value="msg"),
+            ),
+            patch(
+                "interntrack.api.v1.notifications._record_alert_history",
+                new=AsyncMock(),
+            ),
+        ):
+            await send_alert_now(
+                "user1",
+                override=AlertPreferencesUpdate(min_match_score=85),
+                db=mock_db,
+            )
+
+        mock_service.generate_daily_report.assert_called_once_with(
+            domains=None,
+            min_match_score=85,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Alert history
+# ---------------------------------------------------------------------------
+
+
+class TestAlertHistory:
+    """History endpoint and recording helper."""
+
+    @pytest.mark.asyncio
+    async def test_history_endpoint_returns_rows(self):
+        from datetime import datetime
+
+        from interntrack.api.v1.notifications import get_alert_history
+        from interntrack.domain.models import NotificationHistory
+
+        row = NotificationHistory(
+            user_id="user1",
+            subject="InternTrack Daily Alert (security)",
+            channels=["email"],
+            domains=["security"],
+            job_count=5,
+            results={"email": True},
+            created_at=datetime(2026, 8, 5, 7, 0, 0),
+        )
+        result_mock = MagicMock()
+        result_mock.scalars.return_value.all.return_value = [row]
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=result_mock)
+
+        data = await get_alert_history("user1", db=mock_db)
+
+        assert data["total"] == 1
+        entry = data["history"][0]
+        assert entry["domains"] == ["security"]
+        assert entry["channels"] == ["email"]
+        assert entry["job_count"] == 5
+        assert entry["results"] == {"email": True}
+        assert entry["sent_at"] is not None
+
+    @pytest.mark.asyncio
+    async def test_history_endpoint_empty(self):
+        from interntrack.api.v1.notifications import get_alert_history
+
+        result_mock = MagicMock()
+        result_mock.scalars.return_value.all.return_value = []
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=result_mock)
+
+        data = await get_alert_history("user1", db=mock_db)
+        assert data == {"history": [], "total": 0}
+
+    @pytest.mark.asyncio
+    async def test_record_history_never_raises(self):
+        from interntrack.scheduler.jobs import _record_alert_history
+
+        mock_db = AsyncMock()
+        mock_db.commit.side_effect = RuntimeError("db down")
+
+        # Must not raise even when the commit fails.
+        await _record_alert_history(
+            mock_db,
+            "user1",
+            "InternTrack Daily Alert",
+            ["email"],
+            ["security"],
+            3,
+            {"email": True},
+        )
+
 
 # ---------------------------------------------------------------------------
 # Report service domain filtering

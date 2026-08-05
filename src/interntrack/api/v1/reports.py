@@ -25,7 +25,9 @@ async def get_daily_report(
     Saved alert preferences (domains / channels / min match %) are applied.
     """
     from interntrack.scheduler.jobs import (
+        DEFAULT_ALERT_USER,
         _load_alert_preferences,
+        _record_alert_history,
         build_daily_report_message,
     )
     from interntrack.services.notification_service import NotificationManager
@@ -49,9 +51,18 @@ async def get_daily_report(
                 subject += f" ({', '.join(domains)})"
             channels = prefs.get("channels") or None
             if channels:
-                await manager.notify(channels, message, subject=subject)
+                results = await manager.notify(channels, message, subject=subject)
             else:
-                await manager.notify_all(message, subject=subject)
+                results = await manager.notify_all(message, subject=subject)
+            await _record_alert_history(
+                db,
+                user_id=DEFAULT_ALERT_USER,
+                subject=subject,
+                channels=channels or list(results.keys()),
+                domains=domains or [],
+                job_count=len(report.get("new_jobs") or []),
+                results=results,
+            )
 
     return report
 
