@@ -45,10 +45,18 @@ class ReportService:
             },
             "new_jobs": [
                 {
+                    "id": str(getattr(job, "id", "")),
                     "title": job.title,
                     "company": job.company,
                     "location": job.location,
                     "url": job.url,
+                    "tags": list(getattr(job, "tags", None) or []),
+                    "required_skills": list(
+                        getattr(job, "required_skills", None) or []
+                    ),
+                    "preferred_skills": list(
+                        getattr(job, "preferred_skills", None) or []
+                    ),
                 }
                 for job in new_jobs[:10]
             ],

@@ -27,16 +27,14 @@ async def get_daily_report(
     report = await service.generate_daily_report()
 
     # Trigger the daily-digest notification (no-op when no channels configured).
-    from interntrack.scheduler.jobs import format_daily_report
+    from interntrack.scheduler.jobs import build_daily_report_message
     from interntrack.services.notification_service import NotificationManager
 
     with contextlib.suppress(Exception):
         manager = NotificationManager(db)
         if manager.get_configured_channels():
-            await manager.notify_all(
-                format_daily_report(report),
-                subject="Daily Report",
-            )
+            message = await build_daily_report_message(report, db)
+            await manager.notify_all(message, subject="Daily Report")
 
     return report
 

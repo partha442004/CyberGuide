@@ -36,6 +36,8 @@ SECURITY_SKILLS = {
         "vulnerability management",
     ],
     "penetration_testing": [
+        "cybersecurity",
+        "offensive security",
         "penetration testing",
         "pentest",
         "ethical hacking",
@@ -156,6 +158,7 @@ SECURITY_SKILLS = {
         "xss",
         "csrf",
         "sql injection",
+        "sqli",
         "ssrf",
         "xxe",
         "idor",
