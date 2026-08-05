@@ -371,18 +371,44 @@ _DOMAIN_ORDER = [
     "other",
 ]
 
-# Accent styles per category (color = badge/bar accent, grad = icon tile).
+# Accent styles per category (color = badge/bar accent, grad = icon tile,
+# icon = emoji shown inside the tile). Keys mirror _DOMAIN_LABELS.
 _CATEGORY_STYLE = {
-    "security": {"color": "#e5484d", "grad": "linear-gradient(135deg,#ff6b6b,#c0392b)"},
-    "coding": {"color": "#3b82f6", "grad": "linear-gradient(135deg,#60a5fa,#1d4ed8)"},
-    "data": {"color": "#8b5cf6", "grad": "linear-gradient(135deg,#a78bfa,#6d28d9)"},
-    "design": {"color": "#ec4899", "grad": "linear-gradient(135deg,#f472b6,#be185d)"},
-    "finance": {"color": "#10b981", "grad": "linear-gradient(135deg,#34d399,#047857)"},
+    "security": {
+        "color": "#e5484d",
+        "grad": "linear-gradient(135deg,#ff6b6b,#c0392b)",
+        "icon": "🔐",
+    },
+    "coding": {
+        "color": "#3b82f6",
+        "grad": "linear-gradient(135deg,#60a5fa,#1d4ed8)",
+        "icon": "💻",
+    },
+    "data": {
+        "color": "#8b5cf6",
+        "grad": "linear-gradient(135deg,#a78bfa,#6d28d9)",
+        "icon": "📊",
+    },
+    "design": {
+        "color": "#ec4899",
+        "grad": "linear-gradient(135deg,#f472b6,#be185d)",
+        "icon": "🎨",
+    },
+    "finance": {
+        "color": "#10b981",
+        "grad": "linear-gradient(135deg,#34d399,#047857)",
+        "icon": "💰",
+    },
     "marketing": {
         "color": "#f59e0b",
         "grad": "linear-gradient(135deg,#fbbf24,#b45309)",
+        "icon": "📣",
     },
-    "other": {"color": "#64748b", "grad": "linear-gradient(135deg,#94a3b8,#475569)"},
+    "other": {
+        "color": "#64748b",
+        "grad": "linear-gradient(135deg,#94a3b8,#475569)",
+        "icon": "📦",
+    },
 }
 
 
@@ -551,7 +577,7 @@ def _category_header(domain: str, count: int, total: int) -> None:
     st.markdown(
         f'<div class="cat-header" style="border-left-color:{style["color"]}">'
         f'<span class="cat-icon" style="background:{style["grad"]}">'
-        f"{style['icon']}</span>"
+        f"{style.get('icon', '📌')}</span>"
         f'<span class="cat-name">{_DOMAIN_LABELS.get(domain, domain)}</span>'
         f'<span class="cat-badge" style="background:{style["color"]}">{count}</span>'
         f'<span class="cat-pct">{pct:.0f}% of jobs</span></div>'
