@@ -1736,3 +1736,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   renders each category as its own section. RSS "Company: Role" titles are
   classified by the role part only, so "Keeper Security: Account Manager"
   stays in Marketing.
+- **Dashboard professional redesign** — the Saved Jobs page keeps its
+  category grouping but now presents it in a polished design system:
+  Inter font + theme-aware light/dark variables, gradient metric tiles on
+  Overview, stat tiles (Saved/Categories/New-24h/Tech Roles), a segmented
+  pill category filter (with radio fallback), per-category section headers
+  with colored icon tiles, count badges and share-of-jobs progress bars,
+  and clean hoverable job cards with chip badges (company/location/source/
+  salary), human-relative posting times, and escaped HTML (all scraped
+  fields are escaped before unsafe_allow_html rendering to prevent XSS).
