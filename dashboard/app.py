@@ -73,6 +73,116 @@ DEFAULT_VERSION = "1.20.0"
 
 
 # ---------------------------------------------------------------------------
+# Domain classification (mirrors the API's report classifier)
+# ---------------------------------------------------------------------------
+
+_DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
+    (
+        "security",
+        (
+            "security",
+            "cyber",
+            "soc",
+            "pentest",
+            "vapt",
+            "infosec",
+            "appsec",
+            "devsecops",
+            "siem",
+            "malware",
+            "threat",
+            "vulnerab",
+            "incident response",
+            "red team",
+            "blue team",
+            "ethical hack",
+            "information security",
+        ),
+    ),
+    (
+        "coding",
+        (
+            "software",
+            "developer",
+            "engineer",
+            "programmer",
+            "backend",
+            "frontend",
+            "full stack",
+            "fullstack",
+            "devops",
+            "sre",
+            "python",
+            "javascript",
+            "typescript",
+            "java",
+            "react",
+            "node",
+            "sql",
+            "data engineer",
+            "machine learning",
+            "data scientist",
+            "ai",
+            "architect",
+        ),
+    ),
+    (
+        "data",
+        ("data", "analyst", "analytics", "business intelligence", "database"),
+    ),
+    ("design", ("designer", "ux", "graphic", "visual", "product design")),
+    ("finance", ("finance", "accountant", "accounting", "audit", "tax", "bookkeep")),
+    (
+        "marketing",
+        (
+            "marketing",
+            "sales",
+            "account",
+            "growth",
+            "content",
+            "social media",
+            "brand",
+            "seo",
+            "customer success",
+            "business development",
+        ),
+    ),
+]
+
+_DOMAIN_LABELS = {
+    "security": "🔐 Cybersecurity / VAPT / SOC",
+    "coding": "💻 Coding / Software",
+    "data": "📊 Data & Analytics",
+    "design": "🎨 Design",
+    "finance": "💰 Finance / Admin",
+    "marketing": "📣 Marketing / Sales",
+    "other": "📦 Other",
+}
+
+_DOMAIN_ORDER = [
+    "security",
+    "coding",
+    "data",
+    "design",
+    "finance",
+    "marketing",
+    "other",
+]
+
+
+def classify_domain(title: str) -> str:
+    """Classify a job title into a domain bucket (mirrors the API)."""
+    raw = f"{title or ''}"
+    # RSS titles prefix the company: "Acme Corp: Security Engineer".
+    role = raw.split(": ", 1)[-1] if ": " in raw else raw
+    text = role.lower()
+    for domain, keywords in _DOMAIN_KEYWORDS:
+        if any(k in text for k in keywords):
+            return domain
+    return "other"
+
+
+# ---------------------------------------------------------------------------
 # Data helpers
 # ---------------------------------------------------------------------------
 
@@ -256,11 +366,45 @@ def show_jobs() -> None:
             "💡 Tip: Try queries like *python developer*, *data science intern*, *cybersecurity*"
         )
 
-    # ------ Tab 2: Saved Jobs ------
+    # ------ Tab 2: Saved Jobs (grouped by category) ------
     with tab2:
-        jobs_data = fetch_data("/jobs/?limit=50")
-        if jobs_data and jobs_data.get("jobs"):
-            for job in jobs_data["jobs"]:
+        jobs_data = fetch_data("/jobs/?limit=100")
+        if not jobs_data or not jobs_data.get("jobs"):
+            st.info("No jobs saved yet. Run discovery from the Discovery tab!")
+            return
+
+        jobs = jobs_data["jobs"]
+
+        # Group jobs by domain category.
+        grouped: dict[str, list] = {}
+        for job in jobs:
+            domain = classify_domain(job.get("title", ""))
+            grouped.setdefault(domain, []).append(job)
+
+        st.caption(
+            f"📦 **{len(jobs)}** saved jobs across **{len(grouped)}** categories"
+        )
+
+        # Category filter pills: "All" + one per non-empty category.
+        options = ["All"] + [d for d in _DOMAIN_ORDER if d in grouped]
+        cat_labels = {
+            d: f"{_DOMAIN_LABELS.get(d, d)} ({len(grouped[d])})" for d in options[1:]
+        }
+        selected = st.selectbox(
+            "Filter by category",
+            options,
+            format_func=lambda d: (
+                "All categories" if d == "All" else cat_labels.get(d, d)
+            ),
+        )
+
+        domains = _DOMAIN_ORDER if selected == "All" else [selected]
+        for domain in domains:
+            items = grouped.get(domain)
+            if not items:
+                continue
+            st.subheader(f"{_DOMAIN_LABELS.get(domain, domain)} ({len(items)})")
+            for job in items:
                 with st.expander(
                     f"**{job.get('title', 'Untitled')}** — {job.get('company', 'Unknown')}"
                 ):
@@ -290,8 +434,6 @@ def show_jobs() -> None:
                             st.success(
                                 "Application tracked! Visit Applications page to update status."
                             )
-        else:
-            st.info("No jobs saved yet. Run discovery from the Discovery tab!")
 
 
 # ---------------------------------------------------------------------------

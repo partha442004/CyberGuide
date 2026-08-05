@@ -1727,3 +1727,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   Response Analyst at Cloudflare, Cyber Threat Intelligence Research Analyst
   at ThreatLocker) into the same discovery/dedup/matching flow. Also added
   the Remotive remote-jobs RSS feed. Discovery now spans 17 source entries.
+- **Dashboard Saved Jobs page now groups jobs by category** — the Jobs page
+  previously listed every saved job as one flat expander list. It now
+  classifies each job into the same domains as the alert (🔐 Cybersecurity /
+  VAPT / SOC, 💻 Coding / Software, 📊 Data & Analytics, 🎨 Design, 💰
+  Finance / Admin, 📣 Marketing / Sales, 📦 Other) using the identical
+  role-part classifier, shows a category filter dropdown with counts, and
+  renders each category as its own section. RSS "Company: Role" titles are
+  classified by the role part only, so "Keeper Security: Account Manager"
+  stays in Marketing.
