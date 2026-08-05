@@ -110,6 +110,27 @@ def _expiry_note(job: dict) -> str:
     return f"   ⏳ Expires: {exp:%b %d}"
 
 
+_DOMAIN_ICONS = {
+    "security": "🔐 Cybersecurity / VAPT / SOC",
+    "coding": "💻 Coding / Software",
+    "data": "📊 Data & Analytics",
+    "design": "🎨 Design",
+    "marketing": "📣 Marketing / Sales",
+    "finance": "💰 Finance / Admin",
+    "other": "📦 Other",
+}
+
+
+def _age_badge(age: int) -> str:
+    if age <= 0:
+        return "🟢 today"
+    if age == 1:
+        return "🟡 1d ago"
+    if age <= 3:
+        return f"🟠 {age}d ago"
+    return f"⚪ {age}d ago"
+
+
 def _job_lines(score, job: dict) -> list[str]:
     """One job's notification lines (headline + apply link + expiry note)."""
     title = (job.get("title") or "Untitled")[:90]
@@ -118,6 +139,9 @@ def _job_lines(score, job: dict) -> list[str]:
     head = f"🎯 [{score:.0f}%] {title}" if score is not None else f"💼 {title}"
     if company and company.lower() != "unknown":
         head += f" — {company}"
+    applied = job.get("is_applied", False)
+    head += " ✅ Applied" if applied else " ⬜ Not applied"
+    head += f" · {_age_badge(int(job.get('age_days', 0) or 0))}"
     lines = [head]
     if url:
         lines.append(f"   🔗 Apply: {url}")
@@ -129,8 +153,8 @@ def _job_lines(score, job: dict) -> list[str]:
 
 async def build_daily_report_message(report: dict, session) -> str:
     """Rich daily-report notification: summary counts plus the recent jobs
-    grouped by age (today / 1 day ago / older), each with its apply link,
-    expiry status and the user's match % (best matches first per section).
+    grouped by domain (security / coding / data / …), each job carrying its
+    apply link, expiry status, age badge, applied marker and match %.
     """
     lines = [format_daily_report(report)]
     jobs = report.get("new_jobs") or []
@@ -140,39 +164,34 @@ async def build_daily_report_message(report: dict, session) -> str:
     resume_skills = await _latest_resume_skill_names(session)
     scored = [(_job_match_score(resume_skills, job), job) for job in jobs]
 
-    sections: list[tuple[str, int]] = [
-        ("🟢 New today", 0),
-        ("🟡 1 day ago", 1),
-        ("🟠 2–3 days ago", 2),
-        ("⚪ 4+ days ago", 3),
-    ]
-
-    def bucket(age: int) -> int:
-        if age <= 0:
-            return 0
-        if age == 1:
-            return 1
-        if age <= 3:
-            return 2
-        return 3
-
-    grouped: dict[int, list] = {i: [] for i in range(4)}
+    grouped: dict[str, list] = {}
     for score, job in scored:
-        grouped[bucket(int(job.get("age_days", 0) or 0))].append((score, job))
+        domain = job.get("domain") or "other"
+        grouped.setdefault(domain, []).append((score, job))
 
-    for label, idx in sections:
-        items = grouped[idx]
+    domain_order = [
+        "security",
+        "coding",
+        "data",
+        "design",
+        "marketing",
+        "finance",
+        "other",
+    ]
+    for domain in domain_order:
+        items = grouped.get(domain)
         if not items:
             continue
         items.sort(key=lambda item: (item[0] is None, -(item[0] or 0.0)))
         lines.append("")
-        lines.append(f"{label} ({len(items)}):")
+        lines.append(f"{_DOMAIN_ICONS.get(domain, domain)} ({len(items)}):")
         for score, job in items:
             lines.extend(_job_lines(score, job))
 
     lines.append("")
     lines.append(
-        "Match % = how well your uploaded resume fits each job (best matches first)."
+        "Match % = how well your uploaded resume fits each job · "
+        "✅/⬜ = applied / not applied."
     )
     return "\n".join(lines)
 

@@ -26,6 +26,8 @@ class JobSummary(BaseModel):
     created_at: str | None = None
     expires_at: str | None = None
     is_active: bool = True
+    is_applied: bool = False
+    domain: str = "other"
     age_days: int = 0
 
 
