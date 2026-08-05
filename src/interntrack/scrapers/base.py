@@ -56,6 +56,65 @@ class RawJob:
         }
 
 
+# Security-family keywords used to expand a security-focused discovery query
+# so that e.g. "cybersecurity" also surfaces SOC / pentest / appsec listings
+# that never use the literal word "cybersecurity".
+SECURITY_KEYWORDS = (
+    "security",
+    "cybersecurity",
+    "infosec",
+    "information security",
+    "soc",
+    "penetration",
+    "pentest",
+    "vapt",
+    "ethical hacking",
+    "threat",
+    "vulnerability",
+    "incident response",
+    "forensics",
+    "malware",
+    "cryptography",
+    "zero trust",
+    "firewall",
+    "intrusion",
+    "red team",
+    "blue team",
+    "appsec",
+    "devsecops",
+    "siem",
+)
+
+# Queries containing any of these tokens trigger the security-family expansion.
+_SECURITY_TRIGGERS = frozenset(
+    {"cybersecurity", "security", "infosec", "vapt", "pentest", "penetration"},
+)
+
+
+def matches_query(text: str, query: str) -> bool:
+    """Return True when ``text`` matches the discovery ``query``.
+
+    Matching is deliberately broad for discovery:
+    - multi-word queries match when ANY token appears (a "security analyst"
+      search also surfaces "Security Engineer" listings);
+    - security-family queries are expanded with related security keywords so
+      a "cybersecurity" search also catches SOC, pentest, appsec roles;
+    - short tokens (< 3 chars) are ignored.
+    """
+    text_lower = text.lower()
+    tokens = [
+        token for token in query.lower().replace(",", " ").split() if len(token) >= 3
+    ]
+    if not tokens:
+        return True
+
+    keywords = set(tokens)
+    if keywords & _SECURITY_TRIGGERS:
+        keywords.update(SECURITY_KEYWORDS)
+
+    return any(keyword in text_lower for keyword in keywords)
+
+
 class BaseScraper(ABC):
     """Base class for all job scrapers."""
 

@@ -2,6 +2,8 @@
 Reports API endpoints.
 """
 
+import contextlib
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,9 +18,27 @@ router = APIRouter()
 async def get_daily_report(
     db: AsyncSession = Depends(get_db),
 ):
-    """Get daily report."""
+    """Get daily report and send it to the configured notification channels.
+
+    Vercel is serverless, so the APScheduler worker never runs there; the
+    free GitHub Actions cron hits this endpoint to trigger the daily digest.
+    """
     service = ReportService(db)
-    return await service.generate_daily_report()
+    report = await service.generate_daily_report()
+
+    # Trigger the daily-digest notification (no-op when no channels configured).
+    from interntrack.scheduler.jobs import format_daily_report
+    from interntrack.services.notification_service import NotificationManager
+
+    with contextlib.suppress(Exception):
+        manager = NotificationManager(db)
+        if manager.get_configured_channels():
+            await manager.notify_all(
+                format_daily_report(report),
+                subject="Daily Report",
+            )
+
+    return report
 
 
 @router.get("/weekly", response_model=ReportResponse)

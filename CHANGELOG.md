@@ -1611,3 +1611,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   jobs. The endpoint now accepts the query from the body (body wins) while
   keeping `?query=` backward compatibility. Regression tests added for both
   forms.
+
+- **Cybersecurity discovery now actually finds security jobs** — the scrapers
+  required the exact search phrase to appear verbatim, so a "security analyst"
+  search returned 0 and "cybersecurity" missed SOC / pentest / appsec roles
+  that never use that literal word. Added a shared `matches_query()` matcher
+  (multi-word queries match on ANY token) plus security-family keyword
+  expansion (`cybersecurity`/`security`/`infosec`/`vapt`/`pentest` now also
+  match security, SOC, penetration, appsec, SIEM, incident response, ...).
+  The daily cron now also runs a dedicated cybersecurity discovery at 07:00
+  UTC (previously only software-engineering / python-developer queries).
+- **Notifications now actually fire on Vercel** — the `/reports/daily`
+  endpoint (which the free GitHub cron hits) generated the report but never
+  sent it, and discovery never notified when new jobs were saved. Both now
+  push to the configured channels (email / Telegram / Discord) when any are
+  set up; no-op otherwise. Note: `GET /api/v1/notifications/channels` still
+  returns `[]` until SMTP / Telegram / Discord credentials are added to the
+  Vercel environment variables.

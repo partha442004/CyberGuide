@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 import feedparser
 
 from interntrack.domain.enums import JobSource
-from interntrack.scrapers.base import BaseScraper, RawJob
+from interntrack.scrapers.base import BaseScraper, RawJob, matches_query
 
 # Popular job RSS feeds
 DEFAULT_FEEDS = {
@@ -86,10 +86,8 @@ class RSSFeedScraper(BaseScraper):
         summary = entry.get("summary", "")
         published = entry.get("published_parsed")
 
-        # Check if matches query
-        query_lower = query.lower()
-        search_text = f"{title} {summary}".lower()
-        if query_lower not in search_text:
+        # Check if matches query (multi-token + security-family expansion)
+        if not matches_query(f"{title} {summary}", query):
             return None
 
         # Parse published date

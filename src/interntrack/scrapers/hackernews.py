@@ -6,7 +6,7 @@ import re
 from datetime import UTC, datetime
 
 from interntrack.domain.enums import JobSource
-from interntrack.scrapers.base import BaseScraper, RawJob
+from interntrack.scrapers.base import BaseScraper, RawJob, matches_query
 
 
 class HackerNewsScraper(BaseScraper):
@@ -96,10 +96,8 @@ class HackerNewsScraper(BaseScraper):
         if not title:
             return None
 
-        # Check if matches query
-        query_lower = query.lower()
-        text_lower = text.lower()
-        if query_lower not in text_lower and query_lower not in title.lower():
+        # Check if matches query (multi-token + security-family expansion)
+        if not matches_query(text, query) and not matches_query(title, query):
             return None
 
         return RawJob(

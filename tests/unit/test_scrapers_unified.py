@@ -57,6 +57,50 @@ class TestBaseScraper:
         assert d["raw_data"] == {"key": "val"}
 
 
+# ─── Query Matching ──────────────────────────────────────────────────────────
+
+
+class TestMatchesQuery:
+    """Tests for the shared matches_query() discovery matcher."""
+
+    def test_single_token_substring(self):
+        from interntrack.scrapers.base import matches_query
+
+        assert matches_query("Security Engineer at Acme", "security")
+
+    def test_multi_word_any_token(self):
+        """A 'security analyst' query must also surface 'Security Engineer'."""
+        from interntrack.scrapers.base import matches_query
+
+        assert matches_query("Senior Security Engineer", "security analyst")
+        assert matches_query("Data Analyst internship", "security analyst")
+
+    def test_no_match(self):
+        from interntrack.scrapers.base import matches_query
+
+        assert not matches_query("Java developer role", "python")
+
+    def test_security_family_expansion(self):
+        """A 'cybersecurity' query catches SOC / pentest / appsec roles."""
+        from interntrack.scrapers.base import matches_query
+
+        assert matches_query("SOC Analyst", "cybersecurity")
+        assert matches_query("Penetration Tester", "cybersecurity")
+        assert matches_query("Application Security Engineer", "vapt")
+        assert matches_query("Incident Response Consultant", "infosec")
+
+    def test_short_tokens_ignored(self):
+        from interntrack.scrapers.base import matches_query
+
+        assert matches_query("anything at all", "a")
+
+    def test_empty_query_matches_everything(self):
+        from interntrack.scrapers.base import matches_query
+
+        assert matches_query("Some listing", "")
+        assert matches_query("Some listing", "   ")
+
+
 # ─── HackerNews Scraper ──────────────────────────────────────────────────────
 
 

@@ -5,7 +5,7 @@ RemoteOK job scraper.
 from datetime import UTC, datetime
 
 from interntrack.domain.enums import JobSource
-from interntrack.scrapers.base import BaseScraper, RawJob
+from interntrack.scrapers.base import BaseScraper, RawJob, matches_query
 
 
 class RemoteOKScraper(BaseScraper):
@@ -53,10 +53,8 @@ class RemoteOKScraper(BaseScraper):
         company = item.get("company", "")
         description = item.get("description", "")
 
-        # Check if matches query
-        query_lower = query.lower()
-        search_text = f"{title} {company} {description}".lower()
-        if query_lower not in search_text:
+        # Check if matches query (multi-token + security-family expansion)
+        if not matches_query(f"{title} {company} {description}", query):
             return None
 
         # Parse salary
