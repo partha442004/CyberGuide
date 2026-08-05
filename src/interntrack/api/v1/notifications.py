@@ -13,7 +13,11 @@ from interntrack.api.schemas.notification import (
     NotificationTestResponse,
 )
 from interntrack.database.session import get_db
-from interntrack.scheduler.jobs import _load_alert_preferences, _record_alert_history
+from interntrack.scheduler.jobs import (
+    _load_alert_preferences,
+    _mark_alert_sent,
+    _record_alert_history,
+)
 from interntrack.services.notification_service import NotificationManager
 from interntrack.services.report_service import ReportService
 
@@ -160,10 +164,13 @@ async def send_alert_now(
     the ``override`` body (a one-off test that never touches the saved
     preferences). Returns the report summary, per-channel delivery results
     and how many jobs were included; the send is recorded in history.
+    Only jobs created since the previous alert are included (no duplicates);
+    a one-off override does NOT advance the window.
     """
     from interntrack.scheduler.jobs import build_daily_report_message
 
     prefs = await _load_alert_preferences(db, user_id=user_id)
+    is_one_off = override is not None
     if override is not None:
         if override.domains is not None:
             prefs["domains"] = _normalize_domains(override.domains)
@@ -180,6 +187,7 @@ async def send_alert_now(
     report = await service.generate_daily_report(
         domains=domains,
         min_match_score=prefs.get("min_match_score"),
+        since=prefs.get("last_alert_at"),
     )
     manager = NotificationManager(db)
     message = await build_daily_report_message(report, db, domains=domains)
@@ -193,6 +201,8 @@ async def send_alert_now(
         results = await manager.notify_all(message, subject=subject)
 
     job_count = len(report.get("new_jobs") or [])
+    if not is_one_off:
+        await _mark_alert_sent(db, user_id=user_id)
     await _record_alert_history(
         db,
         user_id=user_id,

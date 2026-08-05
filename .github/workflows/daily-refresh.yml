@@ -3,13 +3,14 @@ name: Daily refresh (Vercel auto-refresh)
 # Replaces the always-on APScheduler worker that used to run on Railway.
 # Vercel is serverless, so nothing runs in the background there. This free
 # GitHub Actions cron keeps the live app's data fresh by hitting the public
-# discovery + report endpoints three times a day. Vercel auto-deploys every
-# push, so this always targets the latest code.
+# discovery + report endpoints three times a day (GitHub cron is UTC, so
+# these are the India/Kolkata IST times converted to UTC, -5h30m).
+# Vercel auto-deploys every push, so this always targets the latest code.
 on:
   schedule:
-    - cron: '0 7 * * *'   # 07:00 UTC — discovery: cybersecurity
-    - cron: '0 13 * * *'  # 13:00 UTC — discovery: software engineering
-    - cron: '0 19 * * *'  # 19:00 UTC — discovery: python developer
+    - cron: '30 2 * * *'   # 08:00 IST — discovery: cybersecurity
+    - cron: '30 7 * * *'   # 13:00 IST — discovery: software engineering
+    - cron: '30 13 * * *'  # 19:00 IST — discovery: python developer
   workflow_dispatch:      # allow manual "Run workflow" from the Actions tab
 
 jobs:
@@ -20,21 +21,21 @@ jobs:
       API_BASE: https://cyberguide-api.vercel.app
     steps:
       - name: Run job discovery (cybersecurity)
-        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 7 * * *'
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *'
         run: |
           curl -sSf --max-time 290 -X POST \
             "$API_BASE/api/v1/jobs/discovery/run?query=cybersecurity" \
             || echo "discovery (cybersecurity) failed or timed out"
 
       - name: Run job discovery (software engineering)
-        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 13 * * *'
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 7 * * *'
         run: |
           curl -sSf --max-time 290 -X POST \
             "$API_BASE/api/v1/jobs/discovery/run?query=software%20engineering" \
             || echo "discovery (software engineering) failed or timed out"
 
       - name: Run job discovery (python developer)
-        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 19 * * *'
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 13 * * *'
         run: |
           curl -sSf --max-time 290 -X POST \
             "$API_BASE/api/v1/jobs/discovery/run?query=python%20developer" \

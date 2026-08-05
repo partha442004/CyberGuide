@@ -292,6 +292,7 @@ class TestGenerateDailyReport:
         mock_report_service = AsyncMock()
         mock_report_service.generate_daily_report.return_value = {
             "summary": {"new_jobs": 5, "new_applications": 3, "total_applications": 10},
+            "new_jobs": [{}],
         }
         mock_report_cls.return_value = mock_report_service
 

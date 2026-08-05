@@ -4,6 +4,7 @@ preferences API endpoints (get / upsert / send-alert), domain filtering in
 the report service, and match-threshold filtering in the alert message.
 """
 
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -41,6 +42,7 @@ class TestLoadAlertPreferences:
         row.domains = ["security"]
         row.channels = []
         row.min_match_score = None
+        row.last_alert_at = None
 
         prefs = await _load_alert_preferences(_db_with_row(row))
         assert prefs == {
@@ -48,6 +50,7 @@ class TestLoadAlertPreferences:
             "channels": [],
             "min_match_score": None,
             "is_enabled": False,
+            "last_alert_at": None,
         }
 
     @pytest.mark.asyncio
@@ -59,6 +62,7 @@ class TestLoadAlertPreferences:
         row.domains = ["security"]
         row.channels = ["email"]
         row.min_match_score = 60
+        row.last_alert_at = None
 
         prefs = await _load_alert_preferences(_db_with_row(row))
         assert prefs == {
@@ -66,6 +70,7 @@ class TestLoadAlertPreferences:
             "channels": ["email"],
             "min_match_score": 60,
             "is_enabled": True,
+            "last_alert_at": None,
         }
 
     @pytest.mark.asyncio
@@ -297,6 +302,7 @@ class TestPreferencesAPI:
         mock_service.generate_daily_report.assert_called_once_with(
             domains=["security"],
             min_match_score=None,
+            since=None,
         )
         # Preferred channels (email) used, not notify_all.
         mock_manager.notify.assert_awaited_once_with(
@@ -411,6 +417,7 @@ class TestPreferencesAPI:
         mock_service.generate_daily_report.assert_called_once_with(
             domains=["coding"],
             min_match_score=None,
+            since=None,
         )
         mock_manager.notify.assert_awaited_once_with(
             ["telegram"], "msg", subject="InternTrack Daily Alert (coding)"
@@ -468,6 +475,7 @@ class TestPreferencesAPI:
         mock_service.generate_daily_report.assert_called_once_with(
             domains=None,
             min_match_score=85,
+            since=None,
         )
 
 
@@ -549,13 +557,19 @@ class TestAlertHistory:
 class _MockJob:
     """Minimal job stand-in matching the repo contract."""
 
-    def __init__(self, title="Job", company="Acme", job_id="j1"):
+    def __init__(
+        self,
+        title="Job",
+        company="Acme",
+        job_id="j1",
+        created_at=None,
+    ):
         self.title = title
         self.company = company
         self.location = "Remote"
         self.url = "https://x"
         self.expires_at = None
-        self.created_at = None
+        self.created_at = created_at
         self.posted_at = None
         self.is_active = True
         self.id = job_id
@@ -607,6 +621,134 @@ class TestReportDomainFilter:
         report = await service.generate_daily_report()
 
         assert len(report["new_jobs"]) == 2
+
+    @pytest.mark.asyncio
+    async def test_filters_jobs_created_since_last_alert(self):
+        """Only jobs created after the previous alert are included (no repeats)."""
+        from datetime import timedelta
+
+        from interntrack.services.report_service import ReportService
+
+        service = ReportService(MagicMock())
+        service.job_repo = AsyncMock()
+        now = datetime.now(UTC)
+        service.job_repo.get_recent_jobs.return_value = [
+            _MockJob(
+                title="Already Sent", job_id="old", created_at=now - timedelta(days=1)
+            ),
+            _MockJob(title="Brand New", job_id="new", created_at=now),
+        ]
+        service.app_repo = AsyncMock()
+        service.app_repo.get_recent_applications.return_value = []
+        service.app_repo.get_status_counts.return_value = {}
+        service.app_repo.get_applied_job_ids.return_value = set()
+        service.job_repo.get_closing_soon.return_value = []
+
+        report = await service.generate_daily_report(
+            since=now - timedelta(hours=2),
+        )
+
+        titles = [j["title"] for j in report["new_jobs"]]
+        assert titles == ["Brand New"]
+        assert report["summary"]["new_jobs"] == 1
+
+
+# ---------------------------------------------------------------------------
+# No-duplicates alert window
+# ---------------------------------------------------------------------------
+
+
+class TestAlertWindow:
+    """last_alert_at window: mark sent + skip empty digests."""
+
+    @pytest.mark.asyncio
+    async def test_mark_alert_sent_creates_row(self):
+        from interntrack.scheduler.jobs import _mark_alert_sent
+
+        mock_db = _db_with_row(None)
+        await _mark_alert_sent(mock_db, "user1")
+
+        # A row was added to the session.
+        added = list(mock_db.add.call_args_list)
+        assert added
+        assert mock_db.commit.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_mark_alert_sent_updates_existing(self):
+        from interntrack.scheduler.jobs import _mark_alert_sent
+
+        existing = MagicMock()
+        existing.is_enabled = True
+        existing.last_alert_at = None
+        mock_db = _db_with_row(existing)
+
+        await _mark_alert_sent(mock_db, "user1")
+
+        assert existing.last_alert_at is not None
+
+    @pytest.mark.asyncio
+    async def test_mark_alert_sent_never_raises(self):
+        from interntrack.scheduler.jobs import _mark_alert_sent
+
+        mock_db = AsyncMock()
+        mock_db.execute.side_effect = RuntimeError("db down")
+
+        await _mark_alert_sent(mock_db, "user1")
+
+    @pytest.mark.asyncio
+    async def test_scheduler_skips_send_when_no_new_jobs(self):
+        from interntrack.scheduler.jobs import generate_daily_report
+
+        mock_session = AsyncMock()
+        mock_report_service = MagicMock()
+        mock_report_service.generate_daily_report = AsyncMock(
+            return_value={
+                "summary": {
+                    "new_jobs": 0,
+                    "new_applications": 0,
+                    "total_applications": 0,
+                },
+                "new_jobs": [],
+            }
+        )
+        mock_manager = MagicMock()
+        mock_manager.notify_all = AsyncMock(return_value={"telegram": True})
+
+        with (
+            patch("interntrack.scheduler.jobs.get_db_session") as mock_db,
+            patch(
+                "interntrack.scheduler.jobs._load_alert_preferences",
+                new=AsyncMock(
+                    return_value={
+                        "domains": ["security"],
+                        "channels": [],
+                        "min_match_score": None,
+                        "is_enabled": True,
+                        "last_alert_at": None,
+                    }
+                ),
+            ),
+            patch(
+                "interntrack.scheduler.jobs.ReportService",
+                return_value=mock_report_service,
+            ),
+            patch(
+                "interntrack.scheduler.jobs.NotificationManager",
+                return_value=mock_manager,
+            ),
+        ):
+            mock_db.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_db.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            await generate_daily_report()
+
+        mock_report_service.generate_daily_report.assert_called_once_with(
+            domains=["security"],
+            min_match_score=None,
+            since=None,
+        )
+        mock_manager.notify_all.assert_not_called()
+        mock_manager.notify.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

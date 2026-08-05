@@ -97,6 +97,7 @@ class TestGenerateDailyReport:
                     "new_applications": 2,
                     "total_applications": 10,
                 },
+                "new_jobs": [{}],
             },
         )
 
