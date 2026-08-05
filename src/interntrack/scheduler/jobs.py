@@ -88,9 +88,49 @@ def _job_match_score(resume_skills: set | None, job: dict) -> float | None:
         return None
 
 
+def _expiry_note(job: dict) -> str:
+    """Expiry/status line for a job, or "" when it never expires."""
+    if not job.get("is_active", True):
+        return "   ❌ Expired / closed"
+    expires_at = job.get("expires_at")
+    if not expires_at:
+        return ""
+    try:
+        exp = datetime.fromisoformat(str(expires_at))
+        if exp.tzinfo is not None:
+            exp = exp.astimezone(UTC).replace(tzinfo=None)
+    except ValueError:
+        return f"   ⏳ Expires: {expires_at}"
+    now = datetime.now(UTC).replace(tzinfo=None)
+    days_left = (exp - now).total_seconds() / 86400
+    if days_left < 0:
+        return "   ❌ Expired"
+    if days_left <= 2:
+        return f"   ⏳ Closing soon ({exp:%b %d})"
+    return f"   ⏳ Expires: {exp:%b %d}"
+
+
+def _job_lines(score, job: dict) -> list[str]:
+    """One job's notification lines (headline + apply link + expiry note)."""
+    title = (job.get("title") or "Untitled")[:90]
+    company = (job.get("company") or "").strip()
+    url = job.get("url") or ""
+    head = f"🎯 [{score:.0f}%] {title}" if score is not None else f"💼 {title}"
+    if company and company.lower() != "unknown":
+        head += f" — {company}"
+    lines = [head]
+    if url:
+        lines.append(f"   🔗 Apply: {url}")
+    note = _expiry_note(job)
+    if note:
+        lines.append(note)
+    return lines
+
+
 async def build_daily_report_message(report: dict, session) -> str:
-    """Rich daily-report notification: summary counts plus the top new jobs
-    with their apply links and the user's match % (best matches first).
+    """Rich daily-report notification: summary counts plus the recent jobs
+    grouped by age (today / 1 day ago / older), each with its apply link,
+    expiry status and the user's match % (best matches first per section).
     """
     lines = [format_daily_report(report)]
     jobs = report.get("new_jobs") or []
@@ -98,22 +138,37 @@ async def build_daily_report_message(report: dict, session) -> str:
         return "\n".join(lines)
 
     resume_skills = await _latest_resume_skill_names(session)
-
-    lines.append("")
-    lines.append("🆕 New jobs found:")
     scored = [(_job_match_score(resume_skills, job), job) for job in jobs]
-    scored.sort(key=lambda item: (item[0] is None, -(item[0] or 0.0)))
 
+    sections: list[tuple[str, int]] = [
+        ("🟢 New today", 0),
+        ("🟡 1 day ago", 1),
+        ("🟠 2–3 days ago", 2),
+        ("⚪ 4+ days ago", 3),
+    ]
+
+    def bucket(age: int) -> int:
+        if age <= 0:
+            return 0
+        if age == 1:
+            return 1
+        if age <= 3:
+            return 2
+        return 3
+
+    grouped: dict[int, list] = {i: [] for i in range(4)}
     for score, job in scored:
-        title = (job.get("title") or "Untitled")[:90]
-        company = job.get("company") or ""
-        url = job.get("url") or ""
-        head = f"🎯 [{score:.0f}%] {title}" if score is not None else f"💼 {title}"
-        if company:
-            head += f" — {company}"
-        lines.append(head)
-        if url:
-            lines.append(f"   🔗 Apply: {url}")
+        grouped[bucket(int(job.get("age_days", 0) or 0))].append((score, job))
+
+    for label, idx in sections:
+        items = grouped[idx]
+        if not items:
+            continue
+        items.sort(key=lambda item: (item[0] is None, -(item[0] or 0.0)))
+        lines.append("")
+        lines.append(f"{label} ({len(items)}):")
+        for score, job in items:
+            lines.extend(_job_lines(score, job))
 
     lines.append("")
     lines.append(

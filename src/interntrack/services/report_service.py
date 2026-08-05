@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.repositories.application_repository import ApplicationRepository
 from interntrack.repositories.job_repository import JobRepository
+from interntrack.utils.helpers import to_naive_utc, utcnow
 
 # Resolve the template directory relative to this module so rendering works
 # regardless of the current working directory.
@@ -29,9 +30,49 @@ class ReportService:
             autoescape=select_autoescape(["html", "xml"]),
         )
 
+    @staticmethod
+    def _as_datetime(value) -> datetime | None:
+        """Narrow an ORM attribute to a datetime (mypy-friendly)."""
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value
+        return None
+
+    @staticmethod
+    def _fmt_dt(value) -> str | None:
+        """Format an ORM datetime attribute to ISO-8601 (mypy-friendly)."""
+        dt = ReportService._as_datetime(value)
+        if dt is None:
+            return None
+        naive = to_naive_utc(dt)
+        if naive is None:
+            return None
+        return naive.isoformat()
+
+    @staticmethod
+    def _job_age_days(job) -> int:
+        """Whole days since the job was posted (0 = today)."""
+        posted = ReportService._as_datetime(
+            getattr(job, "posted_at", None) or getattr(job, "created_at", None)
+        )
+        if posted is None:
+            return 0
+        posted = to_naive_utc(posted)
+        if posted is None:
+            return 0
+        age = (utcnow() - posted).total_seconds() / 86400
+        return max(0, int(age))
+
     async def generate_daily_report(self) -> dict[str, Any]:
-        """Generate daily report."""
-        new_jobs = await self.job_repo.get_recent_jobs(days=1)
+        """Generate daily report.
+
+        Jobs are listed over a 7-day window so the alert can group them by
+        how recently they were posted (today / 1 day ago / older), and each
+        entry carries its expiry info (``expires_at``, ``is_active``) so the
+        message can flag closing-soon and expired listings.
+        """
+        recent_jobs = await self.job_repo.get_recent_jobs(days=7)
         new_apps = await self.app_repo.get_recent_applications(days=1)
         status_counts = await self.app_repo.get_status_counts()
 
@@ -39,7 +80,7 @@ class ReportService:
             "report_type": "daily",
             "generated_at": datetime.now(UTC).isoformat(),
             "summary": {
-                "new_jobs": len(new_jobs),
+                "new_jobs": len(recent_jobs),
                 "new_applications": len(new_apps),
                 "total_applications": sum(status_counts.values()),
             },
@@ -57,16 +98,19 @@ class ReportService:
                     "preferred_skills": list(
                         getattr(job, "preferred_skills", None) or []
                     ),
+                    "posted_at": self._fmt_dt(getattr(job, "posted_at", None)),
+                    "created_at": self._fmt_dt(getattr(job, "created_at", None)),
+                    "expires_at": self._fmt_dt(getattr(job, "expires_at", None)),
+                    "is_active": bool(getattr(job, "is_active", True)),
+                    "age_days": self._job_age_days(job),
                 }
-                for job in new_jobs[:10]
+                for job in recent_jobs[:25]
             ],
             "closing_soon": [
                 {
                     "title": job.title,
                     "company": job.company,
-                    "expires_at": job.expires_at.isoformat()
-                    if job.expires_at
-                    else None,
+                    "expires_at": self._fmt_dt(job.expires_at),
                 }
                 for job in await self.job_repo.get_closing_soon(days=2)
             ],

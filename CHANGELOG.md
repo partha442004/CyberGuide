@@ -1672,3 +1672,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `email: false`. The channel now always sets `To` (defaults to the SMTP
   user; overridable via `to_email`), with a regression test asserting the
   recipient header is present.
+- **Daily alert now groups jobs by age with expiry badges** — the digest is
+  no longer one flat list. Jobs are grouped into sections (🟢 New today,
+  🟡 1 day ago, 🟠 2–3 days ago, ⚪ 4+ days ago) using each listing's
+  `posted_at`/`created_at`, and each job carries its expiry status: ⏳ closing
+  soon (≤2 days), ❌ expired/closed, or a normal expiry date — powered by the
+  existing `expires_at`/`is_active` columns and the `get_closing_soon()`
+  repository query. The report API now also exposes `posted_at`, `created_at`,
+  `expires_at`, `is_active` and `age_days` per job.
