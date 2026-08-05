@@ -90,6 +90,32 @@ class TestRSSFeedScraper:
         result = scraper._extract_tags("Looking for a good communicator")
         assert len(result) == 0
 
+    def test_parse_entry_multi_word_query(self):
+        """Regression: 'security analyst' must match a 'Security Engineer' post."""
+        from interntrack.scrapers.rss_feeds import RSSFeedScraper
+
+        scraper = RSSFeedScraper()
+        entry = {
+            "title": "Senior Security Engineer at TechCorp",
+            "link": "https://example.com/1",
+            "summary": "Build and own the security architecture",
+        }
+        result = scraper._parse_entry(entry, "security analyst", "rss_feed")
+        assert result is not None
+
+    def test_parse_entry_security_expansion(self):
+        """Regression: a 'cybersecurity' query surfaces SOC/pentest roles."""
+        from interntrack.scrapers.rss_feeds import RSSFeedScraper
+
+        scraper = RSSFeedScraper()
+        entry = {
+            "title": "SOC Analyst at SecureCorp",
+            "link": "https://example.com/2",
+            "summary": "Monitor and respond to security events",
+        }
+        result = scraper._parse_entry(entry, "cybersecurity", "rss_feed")
+        assert result is not None
+
     def test_parse_entry_returns_none_for_no_match(self):
         from interntrack.scrapers.rss_feeds import RSSFeedScraper
 

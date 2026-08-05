@@ -2,6 +2,8 @@
 Jobs API endpoints.
 """
 
+import contextlib
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -160,4 +162,21 @@ async def run_discovery(
     jobs = await registry.fetch_all(query=query, sources=[source] if source else None)
     service = JobService(db)
     saved = await service.save_jobs(jobs)
+
+    # Notify configured channels when new jobs were saved (no-op otherwise).
+    if saved:
+        from interntrack.services.notification_service import NotificationManager
+
+        with contextlib.suppress(Exception):
+            message = (
+                f"🚀 Job Discovery\n\n"
+                f"Query: {query}\n"
+                f"Found: {len(jobs)} · Newly saved: {len(saved)}\n\n"
+                f"Check the dashboard or the Jobs page to review them."
+            )
+            await NotificationManager(db).notify_all(
+                message,
+                subject="New Jobs Found",
+            )
+
     return {"discovered": len(jobs), "saved": len(saved)}
