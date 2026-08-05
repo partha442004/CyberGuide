@@ -104,6 +104,87 @@ class TestBuildDailyReportMessage:
         assert "New Jobs: 0" in message
         assert "Apply" not in message
 
+    @pytest.mark.asyncio
+    async def test_groups_jobs_by_age_sections(self):
+        """Jobs are grouped into New today / 1 day ago / older sections."""
+        from interntrack.scheduler.jobs import build_daily_report_message
+
+        report = {
+            "summary": {"new_jobs": 3, "new_applications": 0, "total_applications": 0},
+            "new_jobs": [
+                {
+                    "title": "Today Job",
+                    "company": "A",
+                    "url": "https://a/apply",
+                    "age_days": 0,
+                },
+                {
+                    "title": "Yesterday Job",
+                    "company": "B",
+                    "url": "https://b/apply",
+                    "age_days": 1,
+                },
+                {
+                    "title": "Old Job",
+                    "company": "C",
+                    "url": "https://c/apply",
+                    "age_days": 5,
+                },
+            ],
+        }
+
+        message = await build_daily_report_message(report, None)
+
+        assert "New today (1)" in message
+        assert "1 day ago (1)" in message
+        assert "4+ days ago (1)" in message
+        assert "Today Job" in message
+        assert "Yesterday Job" in message
+        assert "Old Job" in message
+
+    @pytest.mark.asyncio
+    async def test_expiry_badges_in_message(self):
+        """Closing-soon and expired jobs get visible badges."""
+        from interntrack.scheduler.jobs import build_daily_report_message
+
+        report = {
+            "summary": {"new_jobs": 2, "new_applications": 0, "total_applications": 0},
+            "new_jobs": [
+                {
+                    "title": "Closing Job",
+                    "company": "A",
+                    "url": "https://a/apply",
+                    "age_days": 0,
+                    "is_active": True,
+                    "expires_at": "2026-08-07T00:00:00",
+                },
+                {
+                    "title": "Dead Job",
+                    "company": "B",
+                    "url": "https://b/apply",
+                    "age_days": 0,
+                    "is_active": False,
+                },
+            ],
+        }
+
+        message = await build_daily_report_message(report, None)
+
+        assert "Closing soon" in message
+        assert "Expired / closed" in message
+
+    def test_expiry_note(self):
+        from interntrack.scheduler.jobs import _expiry_note
+
+        assert _expiry_note({"is_active": False}) == "   ❌ Expired / closed"
+        assert _expiry_note({"is_active": True}) == ""
+        assert "Closing soon" in _expiry_note(
+            {"is_active": True, "expires_at": "2026-08-07T00:00:00"},
+        )
+        assert "Expired" in _expiry_note(
+            {"is_active": True, "expires_at": "2020-01-01T00:00:00"},
+        )
+
 
 @pytest.mark.asyncio
 class TestRunJobDiscovery:

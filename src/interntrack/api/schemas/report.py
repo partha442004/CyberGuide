@@ -22,7 +22,11 @@ class JobSummary(BaseModel):
     company: str
     location: str | None = None
     url: str | None = None
+    posted_at: str | None = None
+    created_at: str | None = None
     expires_at: str | None = None
+    is_active: bool = True
+    age_days: int = 0
 
 
 class CompanySummary(BaseModel):

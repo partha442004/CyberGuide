@@ -139,12 +139,18 @@ class _MockJob:
         location="Remote",
         url="https://x",
         expires_at=None,
+        created_at=None,
+        posted_at=None,
+        is_active=True,
     ):
         self.title = title
         self.company = company
         self.location = location
         self.url = url
         self.expires_at = expires_at
+        self.created_at = created_at
+        self.posted_at = posted_at
+        self.is_active = is_active
 
 
 class TestGenerateDailyReport:
@@ -173,6 +179,43 @@ class TestGenerateDailyReport:
         assert report["new_jobs"][0]["title"] == "Job"
         assert report["closing_soon"][0]["title"] == "Closing"
         assert report["application_status"] == {"applied": 5}
+
+    @pytest.mark.asyncio
+    async def test_jobs_carry_age_and_expiry_fields(self):
+        """Each new_jobs entry exposes age_days, expiry and activity flags."""
+        service = ReportService(MagicMock())
+        service.job_repo = AsyncMock()
+        from datetime import timedelta
+
+        now = datetime.now(UTC).replace(tzinfo=None)
+        service.job_repo.get_recent_jobs.return_value = [
+            _MockJob(
+                title="Old Job",
+                posted_at=now - timedelta(days=2),
+                expires_at=now + timedelta(days=1),
+                is_active=True,
+            ),
+            _MockJob(
+                title="Closed Job",
+                posted_at=now,
+                expires_at=now - timedelta(days=1),
+                is_active=False,
+            ),
+        ]
+        service.app_repo = AsyncMock()
+        service.app_repo.get_recent_applications.return_value = []
+        service.app_repo.get_status_counts.return_value = {}
+        service.job_repo.get_closing_soon.return_value = []
+
+        report = await service.generate_daily_report()
+
+        old, closed = report["new_jobs"]
+        assert old["age_days"] == 2
+        assert old["is_active"] is True
+        assert old["expires_at"] is not None
+        assert old["posted_at"] is not None
+        assert closed["age_days"] == 0
+        assert closed["is_active"] is False
 
 
 class TestGenerateWeeklyReport:
