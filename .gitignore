@@ -89,3 +89,5 @@ cyberguide-key.pub
 .vercel/
 .env
 .env.local
+.vercel
+.env*

@@ -1704,3 +1704,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   (HTTP 400/404/422 from a dev machine), so real coverage varies — the
   registry logs and skips any source that errors, and the working ones feed
   the daily alert.
+- **Discovery runs sources concurrently with fast-fail timeouts** — bridging
+  in the internship/company scrapers made a full discovery run sequential
+  and slow (51s+), too close to Vercel's serverless function limit. The
+  registry now fetches sources in parallel (bounded at 5 concurrent) so wall
+  time is roughly the slowest source (~19s), and each cybershield adapter
+  caps its source at 8s and returns [] on timeout. Live verification:
+  "cybersecurity" discovery now actually returns real vendor security roles
+  from Symantec and TrendMicro (Digital Forensics Analyst, Threat Research
+  Editor, Incident Response Coordinator) — sources that blocked earlier
+  (Internshala 500, Naukri 400, Workday 422) are skipped and logged.
