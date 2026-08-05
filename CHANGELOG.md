@@ -1691,3 +1691,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   and expiry status. New ApplicationRepository.get_applied_job_ids() backs
   the applied marker; the report API exposes `is_applied` and `domain` per
   job.
+- **Discovery now bridges the cybershield scraper library into the live
+  pipeline** — previously the deployed registry only polled 5 sources
+  (HackerNews, RSS feeds, LinkedIn, Indeed, Glassdoor). A new
+  `CybershieldScraperAdapter` wraps the existing Indian internship-board
+  scrapers (Internshala, Unstop, Naukri, Freshersworld) and security-company
+  career portals (CrowdStrike, Palo Alto, Fortinet, Check Point, Symantec,
+  McAfee, Trend Micro) behind the interntrack `BaseScraper` interface, so
+  they participate in the same discovery/dedup/matching/alert flow.
+  `JobSource` gained `internshala`/`unstop`/`naukri`/`freshersworld`/
+  `company` values. Note: several of those sites block datacenter scraping
+  (HTTP 400/404/422 from a dev machine), so real coverage varies — the
+  registry logs and skips any source that errors, and the working ones feed
+  the daily alert.

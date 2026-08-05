@@ -69,6 +69,11 @@ class JobSource(str, Enum):
     WE_WORK_REMOTELY = "we_work_remotely"
     HACKER_NEWS = "hackernews"
     RSS_FEED = "rss_feed"
+    INTERNSHALA = "internshala"
+    UNSTOP = "unstop"
+    NAUKRI = "naukri"
+    FRESHERWORLD = "freshersworld"
+    COMPANY = "company"
     MANUAL = "manual"
     UNKNOWN = "unknown"
 

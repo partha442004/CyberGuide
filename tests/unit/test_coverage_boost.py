@@ -42,7 +42,15 @@ class TestScraperRegistryExtended:
         assert "indeed" in sources
         assert "glassdoor" in sources
         assert "remote_ok" not in sources  # RemoteOK API returns junk now
-        assert len(sources) == 5
+        # Internship boards and security-company portals are bridged in via
+        # the cybershield adapter (registered when the library is available).
+        assert "internshala" in sources
+        assert "unstop" in sources
+        assert "naukri" in sources
+        assert "freshersworld" in sources
+        assert "crowdstrike" in sources
+        assert "paloalto" in sources
+        assert len(sources) >= 13
 
     @pytest.mark.asyncio
     async def test_fetch_all_no_sources(self):
