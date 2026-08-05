@@ -69,6 +69,20 @@ class TestResumeParserSkills:
         assert "azure security" in skill_names
         assert "iam" in skill_names
 
+    def test_extract_sqli_and_cybersecurity_skills(self):
+        """Regression: 'SQLi' and 'Cybersecurity' must be detected as security
+        skills, and the bare 'sql' data skill must NOT be extracted from
+        'sqli'."""
+        text = "cybersecurity student skilled in sqli, xss and network security"
+        skills = self.parser._extract_skills(text)
+        skill_names = [s["name"].lower() for s in skills]
+        cat_map = {s["name"].lower(): s["category"] for s in skills}
+        assert "sqli" in skill_names
+        assert "cybersecurity" in skill_names
+        assert "sql" not in skill_names
+        assert cat_map["sqli"] == "web_security"
+        assert cat_map["cybersecurity"] == "penetration_testing"
+
     def test_extract_certifications_as_skills(self):
         """Should detect certifications as skills."""
         text = "certified ethical hacker (ceh) and oscp certified"

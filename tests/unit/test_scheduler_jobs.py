@@ -56,6 +56,55 @@ class TestFormatDailyReport:
         assert "Total Applications: 0" in result
 
 
+class TestBuildDailyReportMessage:
+    """Tests for the rich daily-report message (links + match %)."""
+
+    @pytest.mark.asyncio
+    async def test_includes_job_links_and_match_percent(self):
+        from interntrack.scheduler.jobs import build_daily_report_message
+
+        report = {
+            "summary": {"new_jobs": 1, "new_applications": 0, "total_applications": 0},
+            "new_jobs": [
+                {
+                    "id": "job-1",
+                    "title": "Security Engineer",
+                    "company": "Acme Corp",
+                    "url": "https://acme.example/apply",
+                    "tags": ["security", "python"],
+                }
+            ],
+        }
+
+        class FakeResume:
+            skills = [{"name": "Python", "category": "scripting"}]
+
+        class FakeResult:
+            def scalar_one_or_none(self):
+                return FakeResume()
+
+        class FakeSession:
+            async def execute(self, *args, **kwargs):
+                return FakeResult()
+
+        message = await build_daily_report_message(report, FakeSession())
+
+        assert "Security Engineer" in message
+        assert "Acme Corp" in message
+        assert "Apply" in message
+        assert "https://acme.example/apply" in message
+        assert "%" in message
+
+    @pytest.mark.asyncio
+    async def test_no_jobs_keeps_summary_only(self):
+        from interntrack.scheduler.jobs import build_daily_report_message
+
+        report = {"summary": {"new_jobs": 0, "new_applications": 0}}
+        message = await build_daily_report_message(report, None)
+        assert "New Jobs: 0" in message
+        assert "Apply" not in message
+
+
 @pytest.mark.asyncio
 class TestRunJobDiscovery:
     """Tests for run_job_discovery async function."""

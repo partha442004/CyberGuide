@@ -1649,3 +1649,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   Non-security queries (e.g. "python developer") still match the full text.
   The 11 non-security rows my earlier test runs had saved were cleaned from
   the live DB (30 jobs remain, all cron-discovered).
+- **Resume parser now recognizes SQLi + Cybersecurity** — the resume of a
+  VAPT candidate mentions "SQLi" and "Cybersecurity", but the parser only
+  extracted the generic "sql" skill (data_analysis), so matching leaned
+  toward coding/data jobs. Added `sqli` (web_security) and `cybersecurity` /
+  `offensive security` (penetration_testing) to the security skill
+  vocabulary; word boundaries guarantee "sqli" never also extracts "sql".
+  The stored resume for user `parthasarathi` was re-parsed (38 skills, up
+  from 36) so the live matcher uses the fixed skills immediately.
+- **Job alerts now carry apply links + your match %** — the daily-report
+  notification previously sent only counts ("New Jobs: 5"). It now lists
+  each new job with title, company, the registration/apply link, and a
+  🎯 match % computed against your uploaded resume (best matches first,
+  using the same 3-tier matcher as the dashboard). Triggered by the daily
+  cron (07:00 UTC) via /reports/daily and by every discovery run that saves
+  new jobs.

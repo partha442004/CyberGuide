@@ -31,12 +31,12 @@ async def generate_daily_report():
 
         # Send notification
         manager = NotificationManager(session)
-        message = format_daily_report(report)
+        message = await build_daily_report_message(report, session)
         await manager.notify_all(message, subject="Daily Report")
 
 
 def format_daily_report(report: dict) -> str:
-    """Format daily report for notification."""
+    """Format daily report summary counts for notification."""
     summary = report.get("summary", {})
     return (
         f"📊 Daily Report\n\n"
@@ -44,6 +44,82 @@ def format_daily_report(report: dict) -> str:
         f"New Applications: {summary.get('new_applications', 0)}\n"
         f"Total Applications: {summary.get('total_applications', 0)}"
     )
+
+
+async def _latest_resume_skill_names(session) -> set | None:
+    """Load the most recently parsed resume's skill names, if any."""
+    try:
+        from sqlalchemy import select
+
+        from cybershield.api.v1.resumes import _extract_skill_names
+        from cybershield.domain.models import ResumeData
+
+        result = await session.execute(
+            select(ResumeData).order_by(ResumeData.updated_at.desc()).limit(1)
+        )
+        resume = result.scalar_one_or_none()
+        if resume:
+            return _extract_skill_names(resume.skills)
+    except Exception:
+        return None
+    return None
+
+
+def _job_match_score(resume_skills: set | None, job: dict) -> float | None:
+    """Match % for a job against the resume skills, or None when unknown."""
+    if not resume_skills:
+        return None
+    try:
+        from cybershield.api.v1.resumes import _calculate_job_match, _JobMatchData
+
+        job_data = _JobMatchData(
+            id=str(job.get("id") or ""),
+            title=job.get("title"),
+            company=job.get("company"),
+            required_skills=job.get("required_skills") or [],
+            preferred_skills=job.get("preferred_skills") or [],
+            tags=job.get("tags") or [],
+        )
+        result = _calculate_job_match(resume_skills, job_data)
+        if result.match_score is None:
+            return None
+        return float(result.match_score)
+    except Exception:
+        return None
+
+
+async def build_daily_report_message(report: dict, session) -> str:
+    """Rich daily-report notification: summary counts plus the top new jobs
+    with their apply links and the user's match % (best matches first).
+    """
+    lines = [format_daily_report(report)]
+    jobs = report.get("new_jobs") or []
+    if not jobs:
+        return "\n".join(lines)
+
+    resume_skills = await _latest_resume_skill_names(session)
+
+    lines.append("")
+    lines.append("🆕 New jobs found:")
+    scored = [(_job_match_score(resume_skills, job), job) for job in jobs]
+    scored.sort(key=lambda item: (item[0] is None, -(item[0] or 0.0)))
+
+    for score, job in scored:
+        title = (job.get("title") or "Untitled")[:90]
+        company = job.get("company") or ""
+        url = job.get("url") or ""
+        head = f"🎯 [{score:.0f}%] {title}" if score is not None else f"💼 {title}"
+        if company:
+            head += f" — {company}"
+        lines.append(head)
+        if url:
+            lines.append(f"   🔗 Apply: {url}")
+
+    lines.append("")
+    lines.append(
+        "Match % = how well your uploaded resume fits each job (best matches first)."
+    )
+    return "\n".join(lines)
 
 
 async def verify_job_links():
