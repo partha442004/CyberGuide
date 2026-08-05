@@ -4,7 +4,7 @@ InternTrack Dashboard - Streamlit Application
 
 import os
 from contextlib import suppress
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from html import escape
 from typing import Any
 
@@ -481,6 +481,24 @@ def _is_fresh_24h(iso_str: Any) -> bool:
         return (datetime.now(UTC) - dt).total_seconds() < 86400
     except (ValueError, TypeError):
         return False
+
+
+# India / Kolkata is UTC+5:30 with no DST — a fixed offset avoids needing the
+# IANA tz database (tzdata) which is not bundled with Windows Python.
+_IST = timezone(timedelta(hours=5, minutes=30))
+
+
+def _ist_time(iso_str: Any) -> str:
+    """Convert an ISO UTC timestamp to India/Kolkata local time."""
+    if not iso_str:
+        return ""
+    try:
+        dt = datetime.fromisoformat(str(iso_str).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        return dt.astimezone(_IST).strftime("%Y-%m-%d %H:%M")
+    except (ValueError, TypeError):
+        return str(iso_str)[:16]
 
 
 # ---------------------------------------------------------------------------
@@ -1371,14 +1389,13 @@ def show_settings() -> None:
     if not history:
         st.caption(
             "No alerts sent yet — use **Send Test Alert Now** above or wait "
-            "for the daily digest (07:00 / 13:00 / 19:00 UTC)."
+            "for the daily digest (08:00 / 13:00 / 19:00 IST, Kolkata)."
         )
     else:
         import pandas as pd
 
         rows = []
         for h in history:
-            sent = (h.get("sent_at") or "").replace("T", " ")[:16]
             delivered = [
                 _NOTIF_CHANNEL_LABELS.get(c, c)
                 for c, ok in (h.get("results") or {}).items()
@@ -1386,7 +1403,7 @@ def show_settings() -> None:
             ]
             rows.append(
                 {
-                    "Sent (UTC)": sent,
+                    "Sent (IST)": _ist_time(h.get("sent_at")),
                     "Subject": h.get("subject") or "",
                     "Channels": ", ".join(h.get("channels") or []) or "—",
                     "Categories": ", ".join(h.get("domains") or []) or "all",
@@ -1396,7 +1413,8 @@ def show_settings() -> None:
             )
         st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
         st.caption(
-            "Every manual test, one-off alert and scheduled digest is recorded here."
+            "Every manual test, one-off alert and scheduled digest is recorded here. "
+            "Alerts only include **new jobs** since the previous send (no repeats)."
         )
 
     st.divider()

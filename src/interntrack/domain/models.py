@@ -362,6 +362,12 @@ class AlertPreferences(Base, TimestampMixin):
     channels = Column(JSON, nullable=True)
     min_match_score = Column(Integer, nullable=True)
     is_enabled = Column(Boolean, default=True)
+    last_alert_at = Column(DateTime, nullable=True)
+
+    @validates("last_alert_at")
+    def _coerce_naive_utc(self, _key: str, value):
+        """Normalize aware datetimes to naive UTC for Postgres binding."""
+        return to_naive_utc(value)
 
 
 class NotificationHistory(Base, TimestampMixin):

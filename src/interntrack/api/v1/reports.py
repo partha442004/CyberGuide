@@ -27,6 +27,7 @@ async def get_daily_report(
     from interntrack.scheduler.jobs import (
         DEFAULT_ALERT_USER,
         _load_alert_preferences,
+        _mark_alert_sent,
         _record_alert_history,
         build_daily_report_message,
     )
@@ -38,7 +39,14 @@ async def get_daily_report(
     report = await service.generate_daily_report(
         domains=domains,
         min_match_score=prefs.get("min_match_score"),
+        since=prefs.get("last_alert_at"),
     )
+
+    # Advance the no-duplicates window regardless of whether anything new
+    # was found, then skip the send when there are no new jobs.
+    await _mark_alert_sent(db, DEFAULT_ALERT_USER)
+    if not (report.get("new_jobs") or []):
+        return report
 
     # Trigger the daily-digest notification (no-op when no channels
     # configured, or when the user has disabled alerts).

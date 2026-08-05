@@ -54,10 +54,44 @@ async def _load_alert_preferences(
                 "channels": list(pref.channels or []),
                 "min_match_score": pref.min_match_score,
                 "is_enabled": bool(pref.is_enabled),
+                "last_alert_at": pref.last_alert_at,
             }
     except Exception:
         return {}
     return {}
+
+
+async def _mark_alert_sent(
+    session,
+    user_id: str,
+    at: datetime | None = None,
+) -> None:
+    """Record when the last alert was sent.
+
+    This drives the no-duplicates window: the next digest only includes jobs
+    created after this timestamp. Never raises.
+    """
+    import contextlib
+
+    try:
+        from sqlalchemy import select
+
+        from interntrack.domain.models import AlertPreferences
+        from interntrack.utils.helpers import utcnow
+
+        result = await session.execute(
+            select(AlertPreferences).where(AlertPreferences.user_id == user_id)
+        )
+        pref = result.scalar_one_or_none()
+        stamp = at or utcnow()
+        if pref is None:
+            session.add(AlertPreferences(user_id=user_id, last_alert_at=stamp))
+        else:
+            pref.last_alert_at = stamp
+        await session.commit()
+    except Exception:
+        with contextlib.suppress(Exception):
+            await session.rollback()
 
 
 async def _record_alert_history(
@@ -95,7 +129,11 @@ async def _record_alert_history(
 
 
 async def generate_daily_report():
-    """Generate and send daily report, honoring saved alert preferences."""
+    """Generate and send daily report, honoring saved alert preferences.
+
+    Only jobs created since the previous alert are included (no duplicates
+    across the three daily sends), and the send window advances afterwards.
+    """
     async with get_db_session() as session:
         prefs = await _load_alert_preferences(session)
         if prefs.get("is_enabled") is False:
@@ -106,7 +144,13 @@ async def generate_daily_report():
         report = await service.generate_daily_report(
             domains=domains,
             min_match_score=prefs.get("min_match_score"),
+            since=prefs.get("last_alert_at"),
         )
+
+        await _mark_alert_sent(session, DEFAULT_ALERT_USER)
+        if not (report.get("new_jobs") or []):
+            print(f"[{datetime.now(UTC)}] Daily report: no new jobs since last alert")
+            return
 
         # Send notification via preferred channels (or all configured).
         manager = NotificationManager(session)

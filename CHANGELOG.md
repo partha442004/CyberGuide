@@ -1771,3 +1771,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   user can see exactly what was sent and whether it was delivered.
   Refactored the duplicate category-pills fallback into a shared
   `_category_picker_multi` helper. 5 new tests.
+- **No-duplicates daily alerts + India/Kolkata schedule** — the daily
+  refresh cron now runs at 08:00 / 13:00 / 19:00 IST (02:30 / 07:30 / 13:30
+  UTC) so the email/Telegram digests arrive at Indian-friendly times. Each
+  alert only includes jobs created since the previous alert: a new
+  `last_alert_at` window on `alert_preferences` (auto-added on deploy) is
+  advanced after every send, `generate_daily_report` filters by it, the
+  scheduled digest skips empty sends, and one-off test alerts never advance
+  the window. The dashboard history now shows sent times in IST and notes
+  that alerts contain only new jobs. 6 new tests.

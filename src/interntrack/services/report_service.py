@@ -173,6 +173,7 @@ class ReportService:
         self,
         domains: list[str] | None = None,
         min_match_score: int | None = None,
+        since: datetime | None = None,
     ) -> dict[str, Any]:
         """Generate daily report.
 
@@ -185,8 +186,16 @@ class ReportService:
         (security, coding, ...) — the summary counts then reflect the
         filtered set. ``min_match_score`` is carried through so the alert
         message can drop jobs whose resume match % is below the threshold.
+        ``since`` (naive UTC) restricts jobs to those created after the
+        previous alert so the three daily sends never repeat a listing.
         """
         recent_jobs = await self.job_repo.get_recent_jobs(days=7)
+        if since is not None:
+            recent_jobs = [
+                job
+                for job in recent_jobs
+                if (getattr(job, "created_at", None) or utcnow()) > since
+            ]
         new_apps = await self.app_repo.get_recent_applications(days=1)
         status_counts = await self.app_repo.get_status_counts()
         applied_ids = await self.app_repo.get_applied_job_ids()
