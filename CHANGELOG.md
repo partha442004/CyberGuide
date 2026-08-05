@@ -1719,3 +1719,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   source coercion maps the bridged vendor portals (symantec, trendmicro,
   crowdstrike, ...) to `company` instead of `unknown`, so discovery runs
   record which portal each listing came from.
+- **New source: direct security-company Greenhouse boards** — most security
+  vendors run careers through Greenhouse, whose public board API needs no
+  key and never blocks. A new `GreenhouseBoardScraper` polls verified boards
+  (Zscaler, Okta, Cloudflare, KnowBe4, Veracode, BeyondTrust, ThreatLocker)
+  and feeds real vendor roles (Staff Security Analyst at Okta, Incident
+  Response Analyst at Cloudflare, Cyber Threat Intelligence Research Analyst
+  at ThreatLocker) into the same discovery/dedup/matching flow. Also added
+  the Remotive remote-jobs RSS feed. Discovery now spans 17 source entries.

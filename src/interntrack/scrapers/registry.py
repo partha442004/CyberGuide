@@ -116,6 +116,15 @@ def get_default_registry() -> ScraperRegistry:
     registry.register(IndeedScraper())
     registry.register(GlassdoorScraper())
 
+    # Direct security-company Greenhouse career boards (no API key, never
+    # blocks) - the most reliable source of real vendor security roles.
+    try:
+        from interntrack.scrapers.greenhouse import GreenhouseBoardScraper
+
+        registry.register(GreenhouseBoardScraper())
+    except Exception as e:
+        logger.warning("Greenhouse board scraper unavailable: %s", e)
+
     # Indian internship boards and direct security-company career portals live
     # in the cybershield scraper library; adapt them into the same pipeline so
     # the daily discovery also covers internship sites and vendor career pages.
