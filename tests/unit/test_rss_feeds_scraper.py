@@ -127,6 +127,20 @@ class TestRSSFeedScraper:
         result = scraper._parse_entry(entry, "cybersecurity", "rss_feed")
         assert result is not None
 
+    def test_parse_entry_security_matches_title_not_summary(self):
+        """Regression: a 'Web Developer' whose summary mentions 'security'
+        must not match a 'cybersecurity' query."""
+        from interntrack.scrapers.rss_feeds import RSSFeedScraper
+
+        scraper = RSSFeedScraper()
+        entry = {
+            "title": "Web Developer",
+            "link": "https://example.com/3",
+            "summary": "Own the security and compliance of our platform",
+        }
+        result = scraper._parse_entry(entry, "cybersecurity", "rss_feed")
+        assert result is None
+
     def test_parse_entry_returns_none_for_no_match(self):
         from interntrack.scrapers.rss_feeds import RSSFeedScraper
 

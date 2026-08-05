@@ -84,6 +84,7 @@ SECURITY_KEYWORDS = (
     "appsec",
     "devsecops",
     "siem",
+    "privacy",
 )
 
 # Queries containing any of these tokens trigger the security-family expansion.
@@ -118,7 +119,13 @@ def _expand_token(token: str) -> tuple[str, ...]:
     return (token,)
 
 
-def matches_query(text: str, query: str) -> bool:
+def _is_security_query(query: str) -> bool:
+    """True when the query targets the security domain."""
+    triggers = frozenset(_stem(t) for t in _SECURITY_TRIGGERS)
+    return any(token in triggers for token in _stemmed(query).split())
+
+
+def matches_query(text: str, query: str, title: str | None = None) -> bool:
     """Return True when ``text`` matches the discovery ``query``.
 
     Matching is tuned for discovery precision:
@@ -128,10 +135,17 @@ def matches_query(text: str, query: str) -> bool:
       Engineer" and "analysts" matches "analyst";
     - security-family queries are expanded so "cybersecurity" also matches
       SOC / pentest / appsec / SIEM / incident-response roles;
+    - security-family queries match against the job TITLE only, because job
+      descriptions routinely mention "security" in generic contexts
+      ("security and compliance", "data security") that would otherwise
+      flood results with sales/marketing roles;
     - word-boundary matching avoids false positives such as "soc" inside
       "social media";
     - short tokens (< 3 chars) are ignored.
     """
+    if title is not None and _is_security_query(query):
+        text = title
+
     text_stemmed = _stemmed(text)
     tokens = [token for token in _stemmed(query).split() if len(token) >= 3]
     if not tokens:
