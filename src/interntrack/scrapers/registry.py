@@ -76,16 +76,18 @@ def get_default_registry() -> ScraperRegistry:
     """Create default scraper registry with all scrapers."""
     registry = ScraperRegistry()
 
-    # Import and register scrapers
+    # Import and register scrapers. RemoteOK is intentionally NOT registered:
+    # its public JSON API now returns non-job junk entries (site navigation
+    # items and placeholder posts such as "Menu", "Basic", "Elite",
+    # "Cleaning Assistant"), which polluted saved jobs. RemoteOK listings
+    # still arrive via the remoteok RSS feed inside RSSFeedScraper.
     from interntrack.scrapers.glassdoor import GlassdoorScraper
     from interntrack.scrapers.hackernews import HackerNewsScraper
     from interntrack.scrapers.indeed import IndeedScraper
     from interntrack.scrapers.linkedin import LinkedInScraper
-    from interntrack.scrapers.remoteok import RemoteOKScraper
     from interntrack.scrapers.rss_feeds import RSSFeedScraper
 
     registry.register(HackerNewsScraper())
-    registry.register(RemoteOKScraper())
     registry.register(RSSFeedScraper())
     registry.register(LinkedInScraper())
     registry.register(IndeedScraper())

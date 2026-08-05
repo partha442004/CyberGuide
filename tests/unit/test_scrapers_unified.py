@@ -68,17 +68,28 @@ class TestMatchesQuery:
 
         assert matches_query("Security Engineer at Acme", "security")
 
-    def test_multi_word_any_token(self):
-        """A 'security analyst' query must also surface 'Security Engineer'."""
+    def test_multi_word_and_semantics(self):
+        """Every query word must match, so 'security analyst' finds only
+        security-analyst roles (not every Data/Financial Analyst)."""
         from interntrack.scrapers.base import matches_query
 
-        assert matches_query("Senior Security Engineer", "security analyst")
-        assert matches_query("Data Analyst internship", "security analyst")
+        assert matches_query("SOC Analyst", "security analyst")
+        assert matches_query("Cybersecurity Analyst", "security analyst")
+        assert not matches_query("Data Analyst internship", "security analyst")
+        assert not matches_query("Senior Security Engineer", "security analyst")
 
     def test_no_match(self):
         from interntrack.scrapers.base import matches_query
 
         assert not matches_query("Java developer role", "python")
+
+    def test_stemming_plurals(self):
+        """'software engineering' matches 'Software Engineer'; 'analysts'
+        matches 'analyst'."""
+        from interntrack.scrapers.base import matches_query
+
+        assert matches_query("Software Engineer", "software engineering")
+        assert matches_query("Security Analysts", "security analyst")
 
     def test_security_family_expansion(self):
         """A 'cybersecurity' query catches SOC / pentest / appsec roles."""
@@ -88,6 +99,13 @@ class TestMatchesQuery:
         assert matches_query("Penetration Tester", "cybersecurity")
         assert matches_query("Application Security Engineer", "vapt")
         assert matches_query("Incident Response Consultant", "infosec")
+
+    def test_word_boundary_no_social_false_positive(self):
+        """'soc' must not match 'social media'."""
+        from interntrack.scrapers.base import matches_query
+
+        assert not matches_query("Social Media Coordinator", "cybersecurity")
+        assert not matches_query("Social Media Coordinator", "security")
 
     def test_short_tokens_ignored(self):
         from interntrack.scrapers.base import matches_query
