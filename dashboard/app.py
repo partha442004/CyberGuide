@@ -403,6 +403,31 @@ def classify_domain(title: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _api_raw(
+    endpoint: str,
+    method: str = "GET",
+    json_data: dict | None = None,
+    files: Any = None,
+    timeout: int = 30,
+) -> Any:
+    """API caller returning the raw response (to inspect status codes).
+
+    Unlike ``_api`` (which only returns JSON on 200), this returns the full
+    httpx response so callers can distinguish 201, 404 and 409, or None when
+    the API is unreachable.
+    """
+    url = f"{API_URL}{endpoint}"
+    with suppress(Exception):
+        if method == "POST":
+            if files:
+                return httpx.post(url, files=files, timeout=timeout)
+            return httpx.post(url, json=json_data or {}, timeout=timeout)
+        if method == "PUT":
+            return httpx.put(url, json=json_data or {}, timeout=timeout)
+        return httpx.get(url, timeout=timeout)
+    return None
+
+
 def _api(
     endpoint: str,
     method: str = "GET",
@@ -410,19 +435,12 @@ def _api(
     files: Any = None,
     timeout: int = 30,
 ) -> Any:
-    """Generic API caller — returns parsed JSON or None on failure."""
-    url = f"{API_URL}{endpoint}"
-    with suppress(Exception):
-        if method == "POST":
-            if files:
-                resp = httpx.post(url, files=files, timeout=timeout)
-            else:
-                resp = httpx.post(url, json=json_data or {}, timeout=timeout)
-        elif method == "PUT":
-            resp = httpx.put(url, json=json_data or {}, timeout=timeout)
-        else:
-            resp = httpx.get(url, timeout=timeout)
-        if resp.status_code == 200:
+    """Generic API caller — returns parsed JSON on 200, else None."""
+    resp = _api_raw(
+        endpoint, method=method, json_data=json_data, files=files, timeout=timeout
+    )
+    if resp is not None and resp.status_code == 200:
+        with suppress(Exception):
             return resp.json()
     return None
 
@@ -666,6 +684,200 @@ def _category_picker_multi(label: str, default: list[str]) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# User session helpers (multi-user support)
+# ---------------------------------------------------------------------------
+
+
+def _current_user() -> dict | None:
+    """The logged-in user profile from the session, or None."""
+    user = st.session_state.get("user")
+    return user if isinstance(user, dict) and user.get("id") else None
+
+
+def _current_user_id() -> str:
+    """The active user's id — the logged-in account or the legacy default."""
+    user = _current_user()
+    return user["id"] if user else "user1"
+
+
+def _login_user(profile: dict) -> None:
+    """Store a user profile in the Streamlit session."""
+    st.session_state["user"] = profile
+
+
+def _logout_user() -> None:
+    """Clear the logged-in user from the session."""
+    st.session_state.pop("user", None)
+
+
+def show_account() -> None:
+    """Register / login page (email-based accounts, no passwords)."""
+    st.header("👤 My Account")
+    user = _current_user()
+
+    if user:
+        # ── Logged in: profile summary ────────────────────────────────
+        st.success(f"Signed in as **{user.get('name', '')}**")
+        st.markdown(
+            "<div class='metric-card' style='background: linear-gradient("
+            "135deg,#667eea 0%,#764ba2 100%); padding: 20px; border-radius: "
+            "12px; color: white;'>"
+            f"<div style='font-size: 1.4em; font-weight: 700;'>{escape(user.get('name', ''))}</div>"
+            f"<div style='opacity: 0.85;'>{escape(user.get('email', ''))}</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("📍 Location", user.get("location") or "—")
+        with col2:
+            st.metric("🚀 Experience", user.get("experience_level") or "—")
+        with col3:
+            chat = user.get("telegram_chat_id")
+            st.metric("✈️ Telegram", f"✅ {chat}" if chat else "—")
+
+        st.subheader("🏷 Preferred categories")
+        domains = user.get("domains") or []
+        if domains:
+            st.write(" · ".join(_DOMAIN_LABELS.get(d, d) for d in domains))
+        else:
+            st.caption("All categories")
+
+        st.subheader("🧰 Skills")
+        skills = user.get("skills") or []
+        if skills:
+            st.write(", ".join(skills))
+        else:
+            st.caption("No skills saved yet — upload your resume to extract them.")
+
+        if st.button("🚪 Log out", use_container_width=True):
+            _logout_user()
+            st.rerun()
+        return
+
+    # ── Not signed in: register or log in ─────────────────────────────
+    st.markdown(
+        "Create a free account to get **personalized job alerts** — your own "
+        "categories, your own resume match %, and delivery to *your* email / "
+        "Telegram. Login is by email only (no password)."
+    )
+    tab_register, tab_login = st.tabs(["✨ Create account", "🔑 Log in"])
+
+    with tab_register:
+        with st.form("register_form"):
+            name = st.text_input("Full name *")
+            email = st.text_input("Email *")
+            location = st.text_input("Location", placeholder="e.g. Bengaluru, India")
+            experience = st.selectbox(
+                "Experience level",
+                ["", "fresher", "intern", "junior", "senior"],
+                format_func=lambda v: {
+                    "": "Select...",
+                    "fresher": "🎓 Fresher",
+                    "intern": "🧪 Intern",
+                    "junior": "🚀 Junior",
+                    "senior": "💼 Senior",
+                }.get(v, v),
+            )
+            telegram_chat_id = st.text_input(
+                "Telegram chat ID (optional)",
+                help="Message @userinfobot on Telegram to see your chat ID — "
+                "alerts then reach *your* Telegram instead of the shared chat.",
+            )
+            domains = _category_picker_multi("🏷 Preferred categories", ["security"])
+            skills = st.text_input(
+                "Skills (comma-separated)",
+                placeholder="e.g. python, burp suite, nmap, linux",
+            )
+            resume_file = st.file_uploader(
+                "Upload your resume (PDF) — optional at signup",
+                type=["pdf"],
+            )
+            submitted = st.form_submit_button("🚀 Create my account", type="primary")
+
+        if submitted:
+            if not name.strip() or "@" not in email:
+                st.error("Please fill in your name and a valid email.")
+                return
+            payload = {
+                "name": name.strip(),
+                "email": email.strip(),
+                "location": location.strip() or None,
+                "experience_level": experience or None,
+                "telegram_chat_id": telegram_chat_id.strip() or None,
+                "domains": [] if "all" in domains else domains,
+                "skills": [s.strip() for s in skills.split(",") if s.strip()],
+            }
+            resp = _api_raw(
+                "/users/register", method="POST", json_data=payload, timeout=30
+            )
+            if resp is None:
+                st.error("Could not reach the API — is it running?")
+                return
+            if resp.status_code in (200, 201):
+                profile = resp.json()
+                _login_user(profile)
+                if resume_file is not None:
+                    files = {
+                        "file": (
+                            resume_file.name,
+                            resume_file.getvalue(),
+                            "application/pdf",
+                        )
+                    }
+                    upload = _api(
+                        f"/resumes/upload?user_id={profile['id']}",
+                        method="POST",
+                        files=files,
+                        timeout=30,
+                    )
+                    if upload:
+                        st.success(
+                            f"✅ Account created and resume parsed — "
+                            f"{len(upload.get('skills', []))} skills extracted!"
+                        )
+                    else:
+                        st.warning(
+                            "Account created, but resume parsing failed — "
+                            "re-upload it from the Resume Match page."
+                        )
+                else:
+                    st.success(
+                        "✅ Account created! Your personalized daily alerts are on."
+                    )
+                st.rerun()
+            else:
+                try:
+                    detail = resp.json().get("detail", resp.text)
+                except Exception:
+                    detail = resp.text
+                st.error(f"Registration failed: {detail}")
+
+    with tab_login:
+        with st.form("login_form"):
+            email = st.text_input("Your email")
+            submitted = st.form_submit_button("🔑 Log in", type="primary")
+        if submitted:
+            if "@" not in email:
+                st.error("Please enter your email.")
+                return
+            resp = _api_raw(
+                "/users/login",
+                method="POST",
+                json_data={"email": email.strip()},
+                timeout=30,
+            )
+            if resp is None:
+                st.error("Could not reach the API — is it running?")
+            elif resp.status_code == 200:
+                _login_user(resp.json())
+                st.success("Logged in!")
+                st.rerun()
+            else:
+                st.error("No account found with this email — create one first.")
+
+
+# ---------------------------------------------------------------------------
 # Main app
 # ---------------------------------------------------------------------------
 
@@ -688,8 +900,16 @@ def main() -> None:
                 "Resume Match",
                 "Learning",
                 "Settings",
+                "My Account",
             ],
         )
+        st.divider()
+        user = _current_user()
+        if user:
+            st.markdown(f"👤 **{user.get('name', '')}**")
+            st.caption(f"Signed in · {user.get('email', '')}")
+        else:
+            st.caption("Not signed in — browsing as **user1**")
 
     pages = {
         "Overview": show_overview,
@@ -699,6 +919,7 @@ def main() -> None:
         "Resume Match": show_resume_match,
         "Learning": show_learning,
         "Settings": show_settings,
+        "My Account": show_account,
     }
     pages.get(page, show_overview)()
 
@@ -1007,10 +1228,18 @@ def show_resume_match() -> None:
         "Upload your resume (PDF) and we'll match your skills against all saved jobs."
     )
 
-    # User ID
-    user_id = st.text_input(
-        "Your User ID", value="user1", help="A unique identifier for you"
-    )
+    # User ID — the logged-in account (or the legacy user1 default).
+    user_id = _current_user_id()
+    if _current_user():
+        st.caption(
+            f"👤 Matching as **{_current_user().get('name', '')}** — your resume "
+            "is stored separately from other users'."
+        )
+    else:
+        st.caption(
+            "👤 Not signed in — using **user1**. Create an account on the "
+            "*My Account* page to get your own personalized matching."
+        )
 
     # Upload
     uploaded_file = st.file_uploader("Upload your resume (PDF)", type=["pdf"])
@@ -1224,7 +1453,11 @@ def show_settings() -> None:
             )
         )
 
-    user_id = "user1"
+    user_id = _current_user_id()
+    if _current_user():
+        st.caption(f"👤 Alert preferences for **{_current_user().get('name', '')}**.")
+    else:
+        st.caption("👤 Not signed in — editing **user1** preferences.")
     prefs = fetch_data(f"/notifications/preferences/{user_id}") or {}
     saved_chans = prefs.get("channels") or []
     saved_domains = prefs.get("domains") or []

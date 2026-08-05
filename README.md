@@ -128,6 +128,35 @@ SCRAPE_INTERVAL_MINUTES=30
 
 ---
 
+## 👥 Multi-User Accounts
+
+Anyone can create a free account — each user gets **their own personalized
+job alerts and resume matching**:
+
+| What | How it works |
+|---|---|
+| **Sign up** | Dashboard → *My Account* → create account with name + email (+ optional location, experience level, Telegram chat ID, categories, skills, resume). Alerts are **auto-enabled** at signup with your chosen categories. |
+| **Login** | By email only (no password) — the profile is looked up by email. *Known limitation: anyone who knows an email can view that profile; a per-user access token is a planned follow-up.* |
+| **Personalized alerts** | The daily digest (08:00 / 13:00 / 19:00 IST) and Sunday weekly recap are built **per user**: their categories, their `min_match_score`, their own no-duplicates window, and their own send history. |
+| **Resume match %** | Match scores are computed from **your own** uploaded resume (stored per `user_id`), not a shared one. |
+| **Delivery** | Emails go to **your** email address (the app's SMTP account is only the sender) and Telegram messages go to **your** chat ID when you provide one. Users without a chat ID simply don't get Telegram — nothing leaks to other users' chats. |
+
+### Users API
+
+```
+POST   /api/v1/users/register   # name + email + optional profile fields → creates account + auto-enables alerts
+POST   /api/v1/users/login      # { email } → profile
+GET    /api/v1/users            # list profiles
+GET    /api/v1/users/{id}       # one profile
+PUT    /api/v1/users/{id}       # update profile (name, location, experience, telegram_chat_id, domains, skills)
+```
+
+Resumes continue to use the existing endpoint (keyed by `user_id`):
+`POST /api/v1/resumes/upload?user_id=...` and
+`POST /api/v1/resumes/match-batch?user_id=...&job_ids=...`.
+
+---
+
 ## 🚦 API Endpoints
 
 ### Jobs

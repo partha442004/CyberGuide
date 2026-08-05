@@ -45,6 +45,34 @@ class TimestampMixin:
     )
 
 
+class User(Base, TimestampMixin):
+    """Registered user account for personalized job alerts and matching.
+
+    Lives in its own ``user_profiles`` table (not ``users``) to avoid
+    colliding with the cybershield ``users`` table that shares the same
+    database. There is no password: per the product decision, a user is
+    identified by their email (login looks the profile up by email).
+    ``domains`` are the alert categories the user wants (security, coding,
+    data, ...); ``skills`` are the comma-separated skills they typed at
+    signup (used alongside their uploaded resume for match scoring).
+    """
+
+    __tablename__ = "user_profiles"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    name = Column(String(100), nullable=False)
+    email = Column(String(200), nullable=False, unique=True, index=True)
+    telegram_chat_id = Column(String(100), nullable=True)
+    location = Column(String(100), nullable=True)
+    experience_level = Column(String(50), nullable=True)  # fresher/intern/junior/senior
+    domains = Column(JSON, nullable=True, default=list)
+    skills = Column(JSON, nullable=True, default=list)
+    is_active = Column(Boolean, default=True)
+
+    def __repr__(self) -> str:
+        return f"<User {self.name} <{self.email}>>"
+
+
 class Job(Base, TimestampMixin):
     """Job listing model."""
 

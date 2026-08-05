@@ -21,12 +21,15 @@ async def _send_alert_digest(
     report: dict,
     weekly: bool = False,
     domains: list | None = None,
+    user_id: str | None = None,
+    user=None,
 ) -> dict:
     """Deliver a digest through the saved channels and record its history.
 
     Shared by the daily cron trigger and the Sunday weekly digest. Returns
     the per-channel delivery results (possibly empty when nothing was sent).
     ``domains`` overrides the saved preference filter (used by slot sends).
+    ``user`` personalizes delivery (email / Telegram) and match %.
     """
     from interntrack.scheduler.jobs import (
         DEFAULT_ALERT_USER,
@@ -53,10 +56,11 @@ async def _send_alert_digest(
         domains=domains,
         subject=subject,
         weekly=weekly,
+        user=user,
     )
     await _record_alert_history(
         db,
-        user_id=DEFAULT_ALERT_USER,
+        user_id=user_id or DEFAULT_ALERT_USER,
         subject=subject,
         channels=channels or list(results.keys()),
         domains=domains or [],
@@ -64,6 +68,41 @@ async def _send_alert_digest(
         results=results,
     )
     return results
+
+
+async def _load_digest_targets(db) -> list[dict]:
+    """Enabled alert targets, or the legacy single-user target.
+
+    Returns ``[{user_id, prefs, user}]`` — one entry per registered account
+    with alerts enabled, or a single legacy ``user1`` target when no accounts
+    exist yet (pre-account deployments behave exactly as before).
+    """
+    from interntrack.scheduler.jobs import (
+        DEFAULT_ALERT_USER,
+        _enabled_alert_targets,
+        _load_alert_preferences,
+    )
+
+    targets = await _enabled_alert_targets(db)
+    if not targets:
+        targets = [
+            {
+                "user_id": DEFAULT_ALERT_USER,
+                "prefs": await _load_alert_preferences(db),
+                "user": None,
+            }
+        ]
+    return targets
+
+
+async def _empty_report(report_type: str, note: str) -> dict:
+    """A minimal report dict for when nothing could be sent."""
+    return {
+        "report_type": report_type,
+        "generated_at": datetime.now(UTC).isoformat(),
+        "summary": {"new_jobs": 0, "skipped": note},
+        "new_jobs": [],
+    }
 
 
 @router.get("/daily", response_model=ReportResponse)
@@ -79,42 +118,50 @@ async def get_daily_report(
     ``slot`` (morning / afternoon / evening) overrides the category filter
     with that slot's saved ``slot_domains`` when configured.
     """
-    from interntrack.scheduler.jobs import (
-        DEFAULT_ALERT_USER,
-        DEFAULT_SLOT_DOMAINS,
-        _load_alert_preferences,
-        _mark_alert_sent,
-    )
+    from interntrack.scheduler.jobs import DEFAULT_SLOT_DOMAINS, _mark_alert_sent
 
-    prefs = await _load_alert_preferences(db)
-    domains = prefs.get("domains") or None
-    if slot:
-        # A configured slot wins; otherwise fall back to the slot default so
-        # the three cron sends get distinct categories out of the box.
-        slot_domains = prefs.get("slot_domains") or {}
-        if slot in slot_domains and slot_domains[slot]:
-            domains = slot_domains[slot]
-        elif slot in DEFAULT_SLOT_DOMAINS:
-            domains = DEFAULT_SLOT_DOMAINS[slot]
-    service = ReportService(db)
-    report = await service.generate_daily_report(
-        domains=domains,
-        min_match_score=prefs.get("min_match_score"),
-        since=prefs.get("last_alert_at"),
-    )
+    targets = await _load_digest_targets(db)
+    last_report = None
+    for target in targets:
+        prefs = target["prefs"]
+        if prefs.get("is_enabled") is False:
+            continue
+        domains = prefs.get("domains") or None
+        if slot:
+            # A configured slot wins; otherwise fall back to the slot
+            # default so the three cron sends get distinct categories.
+            slot_domains = prefs.get("slot_domains") or {}
+            if slot in slot_domains and slot_domains[slot]:
+                domains = slot_domains[slot]
+            elif slot in DEFAULT_SLOT_DOMAINS:
+                domains = DEFAULT_SLOT_DOMAINS[slot]
+        service = ReportService(db)
+        report = await service.generate_daily_report(
+            domains=domains,
+            min_match_score=prefs.get("min_match_score"),
+            since=prefs.get("last_alert_at"),
+        )
 
-    # Advance the no-duplicates window regardless of whether anything new
-    # was found, then skip the send when there are no new jobs.
-    await _mark_alert_sent(db, DEFAULT_ALERT_USER)
-    if not (report.get("new_jobs") or []):
-        return report
+        # Advance the no-duplicates window regardless of whether anything
+        # new was found, then skip the send when there are no new jobs.
+        await _mark_alert_sent(db, target["user_id"])
+        if report.get("new_jobs") or []:
+            # Trigger the daily-digest notification (no-op when no channels
+            # configured, or when the user has disabled alerts).
+            with contextlib.suppress(Exception):
+                await _send_alert_digest(
+                    db,
+                    prefs,
+                    report,
+                    domains=domains,
+                    user_id=target["user_id"],
+                    user=target["user"],
+                )
+        last_report = report
 
-    # Trigger the daily-digest notification (no-op when no channels
-    # configured, or when the user has disabled alerts).
-    with contextlib.suppress(Exception):
-        await _send_alert_digest(db, prefs, report, domains=domains)
-
-    return report
+    if last_report is None:
+        return await _empty_report("daily", "no alerts enabled")
+    return last_report
 
 
 @router.get("/weekly-alert")
@@ -128,34 +175,43 @@ async def get_weekly_alert(
     recapped in one email/Telegram digest on Sundays. Honors saved domains,
     channels and min match %, and records its send in history.
     """
-    from interntrack.scheduler.jobs import _load_alert_preferences
+    targets = await _load_digest_targets(db)
+    last_report = None
+    sent_any = False
+    for target in targets:
+        prefs = target["prefs"]
+        if prefs.get("weekly_enabled") is False:
+            continue
+        domains = prefs.get("domains") or None
+        service = ReportService(db)
+        report = await service.generate_daily_report(
+            domains=domains,
+            min_match_score=prefs.get("min_match_score"),
+            since=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7),
+        )
+        report["report_type"] = "weekly"
 
-    prefs = await _load_alert_preferences(db)
-    if prefs.get("weekly_enabled") is False:
-        return {
-            "report_type": "weekly",
-            "generated_at": datetime.now(UTC).isoformat(),
-            "summary": {"new_jobs": 0, "skipped": "weekly digest disabled"},
-            "new_jobs": [],
+        if report.get("new_jobs") or []:
+            with contextlib.suppress(Exception):
+                await _send_alert_digest(
+                    db,
+                    prefs,
+                    report,
+                    weekly=True,
+                    user_id=target["user_id"],
+                    user=target["user"],
+                )
+            sent_any = True
+        last_report = report
+
+    if last_report is None:
+        return await _empty_report("weekly", "weekly digest disabled")
+    if not sent_any:
+        last_report["summary"] = {
+            **last_report.get("summary", {}),
+            "skipped": "no new jobs",
         }
-
-    domains = prefs.get("domains") or None
-    service = ReportService(db)
-    report = await service.generate_daily_report(
-        domains=domains,
-        min_match_score=prefs.get("min_match_score"),
-        since=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7),
-    )
-    report["report_type"] = "weekly"
-
-    if not (report.get("new_jobs") or []):
-        report["summary"] = {**report.get("summary", {}), "skipped": "no new jobs"}
-        return report
-
-    with contextlib.suppress(Exception):
-        await _send_alert_digest(db, prefs, report, weekly=True)
-
-    return report
+    return last_report
 
 
 @router.get("/weekly", response_model=ReportResponse)

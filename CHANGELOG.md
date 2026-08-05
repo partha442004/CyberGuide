@@ -793,6 +793,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Multi-user accounts with personalized job alerts** — anyone can now
+  register (name + email, no password per product decision) and every
+  account gets its own daily digest: their chosen categories, their own
+  resume match % (computed from *their* uploaded resume via `user_id`),
+  their own no-duplicates window, and their own send history. Delivery is
+  routed per user — email goes to *their* address (the SMTP account stays
+  the sender) and Telegram goes to *their* chat ID, failing closed when a
+  contact point is missing so alerts never leak to other users' chats.
+  New `user_profiles` table (created automatically by `init_db`), users API
+  (`/api/v1/users/register|login|list|get|put`), auto-enabled
+  `AlertPreferences` at signup, multi-user `generate_daily_report` and
+  `/reports/daily|weekly-alert` loops (legacy `user1` fallback preserved),
+  and a dashboard *My Account* page with register / login / logout wired
+  into Resume Match and Settings. 27 new tests.
+
 ### Changed
 
 #### Ruff Configuration Cleanup

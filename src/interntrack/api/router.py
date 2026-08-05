@@ -11,12 +11,14 @@ from interntrack.api.v1 import (
     notifications,
     reports,
     skills,
+    users,
 )
 
 api_router = APIRouter()
 
 # Include versioned routers
 api_router.include_router(jobs.router, prefix="/v1/jobs", tags=["Jobs"])
+api_router.include_router(users.router, prefix="/v1/users", tags=["Users"])
 api_router.include_router(
     applications.router,
     prefix="/v1/applications",

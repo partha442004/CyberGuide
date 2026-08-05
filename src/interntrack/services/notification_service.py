@@ -202,11 +202,15 @@ class NotificationManager:
         message: str,
         subject: str | None = None,
         buttons: list[tuple[str, str]] | None = None,
+        recipient: dict | None = None,
     ) -> dict[str, bool]:
         """Send notification to multiple channels.
 
         ``buttons`` (optional ``(label, url)`` pairs) is passed to channels
         that support inline buttons (Telegram); other channels ignore it.
+        ``recipient`` (optional) personalizes delivery per user: ``email``
+        overrides the email recipient and ``telegram_chat_id`` overrides the
+        Telegram chat — every registered user gets alerts on *their* devices.
         Records per-channel delivery into the business metrics store.
         ``delivered=False`` covers both a real delivery failure and a channel
         that is not configured (never attempted).
@@ -214,6 +218,11 @@ class NotificationManager:
         results = {}
         for channel_name in channels:
             channel = self._channels.get(channel_name)
+            if recipient:
+                # Per-user delivery: the user's own contact point only. A
+                # missing contact fails the channel (delivered=False) instead
+                # of leaking to the shared/owner channels.
+                channel = self._user_channel(channel_name, recipient)
             if channel:
                 try:
                     results[channel_name] = await channel.send(
@@ -232,6 +241,38 @@ class NotificationManager:
                     delivered=False,
                 )
         return results
+
+    def _user_channel(
+        self,
+        channel_name: str,
+        recipient: dict,
+    ) -> NotificationChannel | None:
+        """A channel instance pointed at a specific user's contact point.
+
+        Email goes to the user's own address (the app's SMTP account stays
+        the sender) and Telegram goes to the user's own chat id. When the
+        user has no contact point for a channel, ``None`` is returned so
+        delivery fails closed — alerts never leak to the shared/owner
+        channels. Discord/Slack webhooks are shared and returned as-is.
+        """
+        if channel_name == "email":
+            email = recipient.get("email")
+            if email and settings.smtp_user and settings.smtp_password:
+                return EmailChannel(
+                    settings.smtp_host,
+                    settings.smtp_port,
+                    settings.smtp_user,
+                    settings.smtp_password,
+                    settings.email_from,
+                    to_email=email,
+                )
+            return None
+        if channel_name == "telegram":
+            chat_id = recipient.get("telegram_chat_id")
+            if settings.telegram_bot_token and chat_id:
+                return TelegramChannel(settings.telegram_bot_token, chat_id)
+            return None
+        return self._channels.get(channel_name)
 
     async def notify_all(
         self,
