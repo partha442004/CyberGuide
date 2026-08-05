@@ -363,6 +363,12 @@ class AlertPreferences(Base, TimestampMixin):
     min_match_score = Column(Integer, nullable=True)
     is_enabled = Column(Boolean, default=True)
     last_alert_at = Column(DateTime, nullable=True)
+    # Per-time-slot categories for the three daily sends: a dict like
+    # {"morning": ["security"], "afternoon": ["coding"], "evening": ["data"]}.
+    # A slot not listed falls back to ``domains``.
+    slot_domains = Column(JSON, nullable=True)
+    # Whether the Sunday weekly digest recap is sent.
+    weekly_enabled = Column(Boolean, default=True)
 
     @validates("last_alert_at")
     def _coerce_naive_utc(self, _key: str, value):

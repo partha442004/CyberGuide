@@ -55,6 +55,29 @@ class TestTelegramChannel:
             assert result is True
 
     @pytest.mark.asyncio
+    async def test_send_with_apply_buttons(self, channel):
+        """Inline keyboard buttons (label + url) ride in reply_markup."""
+        mock_response = AsyncMock()
+        mock_response.status_code = 200
+
+        with patch("httpx.AsyncClient") as mock_httpx:
+            mock_client = AsyncMock()
+            mock_client.post.return_value = mock_response
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_httpx.return_value = mock_client
+
+            buttons = [("✅ Apply — Security Engineer", "https://x/apply")]
+            result = await channel.send("Job digest", buttons=buttons)
+
+            assert result is True
+            _, kwargs = mock_client.post.call_args
+            payload = kwargs["json"]
+            assert payload["reply_markup"]["inline_keyboard"] == [
+                [{"text": "✅ Apply — Security Engineer", "url": "https://x/apply"}]
+            ]
+
+    @pytest.mark.asyncio
     async def test_send_failure(self, channel):
         with patch("httpx.AsyncClient") as mock_httpx:
             mock_client = AsyncMock()
@@ -234,7 +257,25 @@ class TestNotificationManager:
         result = await manager.notify(["telegram"], "Hello", subject="Test")
 
         assert result["telegram"] is True
-        mock_channel.send.assert_called_once_with("Hello", "Test")
+        mock_channel.send.assert_called_once_with("Hello", "Test", None)
+
+    @pytest.mark.asyncio
+    async def test_notify_passes_buttons_to_channel(self, manager):
+        """Inline Apply buttons are forwarded to the channel send call."""
+        mock_channel = AsyncMock()
+        mock_channel.send.return_value = True
+        manager._channels["telegram"] = mock_channel
+
+        buttons = [("Apply", "https://example.com/job")]
+        result = await manager.notify(
+            ["telegram"],
+            "Hello",
+            subject="Test",
+            buttons=buttons,
+        )
+
+        assert result["telegram"] is True
+        mock_channel.send.assert_called_once_with("Hello", "Test", buttons)
 
     @pytest.mark.asyncio
     async def test_notify_channel_exception(self, manager):

@@ -1780,3 +1780,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   scheduled digest skips empty sends, and one-off test alerts never advance
   the window. The dashboard history now shows sent times in IST and notes
   that alerts contain only new jobs. 6 new tests.
+- **Per-slot alert categories + Sunday weekly digest + Telegram Apply
+  buttons** — the three daily sends can now each carry a different category:
+  a `slot_domains` map on `alert_preferences` (morning/afternoon/evening,
+  editable from the dashboard with per-slot pills) plus sensible defaults
+  (morning=security, afternoon=coding, evening=coding+data) so the cron's
+  `/reports/daily?slot=morning|afternoon|evening` calls deliver distinct
+  digests out of the box. A new Sunday cron (09:00 IST) hits the new
+  `/reports/weekly-alert` endpoint which recaps the last 7 days through the
+  saved channels (toggleable via `weekly_enabled`) and records history.
+  Telegram alerts are now chunked into small messages (4 jobs each) with
+  inline **Apply** keyboard buttons linking straight to each listing, while
+  email still gets the full single digest; `_deliver_alert` unifies the
+  path. 14 new tests.

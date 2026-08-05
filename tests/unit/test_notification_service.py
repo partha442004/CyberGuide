@@ -253,7 +253,7 @@ class TestNotificationManager:
         results = await manager.notify(["telegram"], "Test message")
 
         assert results == {"telegram": True}
-        mock_channel.send.assert_called_once_with("Test message", None)
+        mock_channel.send.assert_called_once_with("Test message", None, None)
 
     @pytest.mark.asyncio
     @patch("interntrack.services.notification_service.settings")

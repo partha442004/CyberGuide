@@ -18,6 +18,7 @@ class NotificationChannel:
         self,
         message: str,
         subject: str | None = None,  # noqa: ARG002 (interface)
+        buttons: list[tuple[str, str]] | None = None,  # noqa: ARG002
     ) -> bool:
         raise NotImplementedError
 
@@ -33,17 +34,26 @@ class TelegramChannel(NotificationChannel):
         self,
         message: str,
         subject: str | None = None,  # noqa: ARG002 (interface)
+        buttons: list[tuple[str, str]] | None = None,
     ) -> bool:
-        """Send Telegram message."""
+        """Send Telegram message, optionally with inline Apply buttons.
+
+        ``buttons`` is a list of ``(label, url)`` pairs; each pair becomes an
+        inline keyboard button that opens the URL when tapped.
+        """
         try:
             import httpx
 
             url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
-            payload = {
+            payload: dict = {
                 "chat_id": self.chat_id,
                 "text": message,
                 "parse_mode": "HTML",
             }
+            if buttons:
+                # One button per row, up to Telegram's 100-button limit.
+                inline = [[{"text": label, "url": link}] for label, link in buttons]
+                payload["reply_markup"] = {"inline_keyboard": inline}
             async with httpx.AsyncClient() as client:
                 response = await client.post(url, json=payload, timeout=10)
                 return response.status_code == 200
@@ -71,7 +81,12 @@ class EmailChannel(NotificationChannel):
         # Alerts go to the account owner unless a recipient is given.
         self.to_email = to_email or user
 
-    async def send(self, message: str, subject: str | None = None) -> bool:
+    async def send(
+        self,
+        message: str,
+        subject: str | None = None,
+        buttons: list[tuple[str, str]] | None = None,  # noqa: ARG002
+    ) -> bool:
         """Send email notification."""
         subject = subject or "InternTrack"
         try:
@@ -104,6 +119,7 @@ class DiscordChannel(NotificationChannel):
         self,
         message: str,
         subject: str | None = None,  # noqa: ARG002 (interface)
+        buttons: list[tuple[str, str]] | None = None,  # noqa: ARG002
     ) -> bool:
         """Send Discord webhook message."""
         try:
@@ -131,6 +147,7 @@ class SlackChannel(NotificationChannel):
         self,
         message: str,
         subject: str | None = None,  # noqa: ARG002 (interface)
+        buttons: list[tuple[str, str]] | None = None,  # noqa: ARG002
     ) -> bool:
         """Send Slack webhook message."""
         try:
@@ -184,9 +201,12 @@ class NotificationManager:
         channels: list[str],
         message: str,
         subject: str | None = None,
+        buttons: list[tuple[str, str]] | None = None,
     ) -> dict[str, bool]:
         """Send notification to multiple channels.
 
+        ``buttons`` (optional ``(label, url)`` pairs) is passed to channels
+        that support inline buttons (Telegram); other channels ignore it.
         Records per-channel delivery into the business metrics store.
         ``delivered=False`` covers both a real delivery failure and a channel
         that is not configured (never attempted).
@@ -196,7 +216,9 @@ class NotificationManager:
             channel = self._channels.get(channel_name)
             if channel:
                 try:
-                    results[channel_name] = await channel.send(message, subject)
+                    results[channel_name] = await channel.send(
+                        message, subject, buttons
+                    )
                 except Exception:
                     results[channel_name] = False
                 business_metrics_store.record_notification(
@@ -215,9 +237,15 @@ class NotificationManager:
         self,
         message: str,
         subject: str | None = None,
+        buttons: list[tuple[str, str]] | None = None,
     ) -> dict[str, bool]:
         """Send notification to all configured channels."""
-        return await self.notify(list(self._channels.keys()), message, subject)
+        return await self.notify(
+            list(self._channels.keys()),
+            message,
+            subject,
+            buttons,
+        )
 
     def get_configured_channels(self) -> list[str]:
         """Get list of configured channels."""

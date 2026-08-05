@@ -102,6 +102,8 @@ class TestGenerateDailyReport:
         )
 
         mock_manager = MagicMock()
+        mock_manager.get_configured_channels.return_value = ["telegram"]
+        mock_manager.notify = AsyncMock(return_value={"telegram": True})
         mock_manager.notify_all = AsyncMock(return_value={"telegram": True})
 
         with (
@@ -114,6 +116,24 @@ class TestGenerateDailyReport:
                 "interntrack.scheduler.jobs.NotificationManager",
                 return_value=mock_manager,
             ),
+            patch(
+                "interntrack.scheduler.jobs._load_alert_preferences",
+                new=AsyncMock(
+                    return_value={
+                        "domains": [],
+                        "channels": [],
+                        "min_match_score": None,
+                        "is_enabled": True,
+                        "last_alert_at": None,
+                        "slot_domains": {},
+                        "weekly_enabled": True,
+                    }
+                ),
+            ),
+            patch(
+                "interntrack.scheduler.jobs.build_alert_chunks",
+                new=AsyncMock(return_value=[("chunk", [])]),
+            ),
         ):
             mock_db.return_value.__aenter__ = AsyncMock(return_value=mock_session)
             mock_db.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -121,7 +141,12 @@ class TestGenerateDailyReport:
             await generate_daily_report()
 
             mock_report_service.generate_daily_report.assert_called_once()
-            mock_manager.notify_all.assert_called_once()
+            mock_manager.notify.assert_awaited_once_with(
+                ["telegram"],
+                "chunk",
+                subject="Daily Report",
+                buttons=[],
+            )
 
 
 class TestVerifyJobLinks:
