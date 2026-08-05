@@ -1248,6 +1248,29 @@ def show_settings() -> None:
     # Empty domains = every category.
     domains = [] if "all" in selected_domains else selected_domains
 
+    # Per-time-slot categories: each of the 3 daily sends can carry its own.
+    st.markdown(
+        "**🕐 Per-slot categories (optional)** — your 3 daily sends can each "
+        "focus on a different category. Leave a slot on *All* to use the "
+        "general selection above."
+    )
+    slot_domains = prefs.get("slot_domains") or {}
+    slot_picks = {}
+    for slot_key, slot_label in (
+        ("morning", "🌅 Morning (08:00 IST)"),
+        ("afternoon", "☀️ Afternoon (13:00 IST)"),
+        ("evening", "🌙 Evening (19:00 IST)"),
+    ):
+        saved_slot = slot_domains.get(slot_key) or []
+        default_slot = saved_slot or ["all"]
+        picked = _category_picker_multi(f"{slot_label} — categories", default_slot)
+        slot_picks[slot_key] = [] if "all" in picked else picked
+
+    weekly_enabled = st.checkbox(
+        "📅 Send a Sunday weekly digest (recap of the week's jobs)",
+        value=bool(prefs.get("weekly_enabled", True)),
+    )
+
     # Optional minimum resume-match threshold.
     min_score = st.slider(
         "🎯 Only show jobs matching at least",
@@ -1265,6 +1288,8 @@ def show_settings() -> None:
                 "channels": selected_chans or chan_options or ["email", "telegram"],
                 "min_match_score": min_score or None,
                 "is_enabled": True,
+                "slot_domains": slot_picks,
+                "weekly_enabled": weekly_enabled,
             }
             result = _api(
                 f"/notifications/preferences/{user_id}",
@@ -1278,9 +1303,13 @@ def show_settings() -> None:
                     if len(domains) == 1
                     else (f"{len(domains)} categories" if domains else "all categories")
                 )
+                extra = ""
+                if any(slot_picks.values()):
+                    extra = " + per-slot categories"
                 st.success(
                     f"✅ Preferences saved! Your daily alert now sends **{cats}** "
-                    f"via {', '.join(result.get('channels') or payload['channels'])}."
+                    f"via {', '.join(result.get('channels') or payload['channels'])}"
+                    f"{extra}. Weekly digest: {'on' if weekly_enabled else 'off'}."
                 )
             else:
                 st.error("Failed to save preferences — is the API reachable?")
@@ -1317,6 +1346,24 @@ def show_settings() -> None:
         st.caption(
             "🔔 Your daily alert is filtered to: "
             + ", ".join(_DOMAIN_LABELS.get(d, d) for d in domains)
+        )
+
+    if any(slot_picks.values()):
+        st.caption(
+            "🕐 Per-slot: "
+            + " · ".join(
+                f"{label.split(' (')[0]}: "
+                + (
+                    ", ".join(_DOMAIN_LABELS.get(d, d) for d in slot_picks[k])
+                    if slot_picks[k]
+                    else "general selection"
+                )
+                for k, label in (
+                    ("morning", "🌅 Morning (08:00 IST)"),
+                    ("afternoon", "☀️ Afternoon (13:00 IST)"),
+                    ("evening", "🌙 Evening (19:00 IST)"),
+                )
+            )
         )
 
     # --------------------------------------------------------------
@@ -1414,7 +1461,9 @@ def show_settings() -> None:
         st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
         st.caption(
             "Every manual test, one-off alert and scheduled digest is recorded here. "
-            "Alerts only include **new jobs** since the previous send (no repeats)."
+            "Alerts only include **new jobs** since the previous send (no repeats). "
+            "Sends run at 08:00 / 13:00 / 19:00 IST (+ a Sunday weekly recap), and "
+            "Telegram alerts now carry tap-to-apply buttons."
         )
 
     st.divider()

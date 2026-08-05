@@ -1,6 +1,6 @@
 """Unit tests for scheduler/jobs.py."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -296,14 +296,40 @@ class TestGenerateDailyReport:
         }
         mock_report_cls.return_value = mock_report_service
 
-        mock_manager = AsyncMock()
-        mock_manager.notify_all.return_value = True
+        mock_manager = MagicMock()
+        mock_manager.get_configured_channels.return_value = ["telegram"]
+        mock_manager.notify = AsyncMock(return_value={"telegram": True})
         mock_notif_cls.return_value = mock_manager
 
-        await generate_daily_report()
+        with (
+            patch(
+                "interntrack.scheduler.jobs._load_alert_preferences",
+                new=AsyncMock(
+                    return_value={
+                        "domains": [],
+                        "channels": [],
+                        "min_match_score": None,
+                        "is_enabled": True,
+                        "last_alert_at": None,
+                        "slot_domains": {},
+                        "weekly_enabled": True,
+                    }
+                ),
+            ),
+            patch(
+                "interntrack.scheduler.jobs.build_alert_chunks",
+                new=AsyncMock(return_value=[("chunk", [("Apply", "https://x")])]),
+            ),
+        ):
+            await generate_daily_report()
 
         mock_report_service.generate_daily_report.assert_called_once()
-        mock_manager.notify_all.assert_called_once()
+        mock_manager.notify.assert_awaited_once_with(
+            ["telegram"],
+            "chunk",
+            subject="Daily Report",
+            buttons=[("Apply", "https://x")],
+        )
 
     @patch("interntrack.engines.verification.VerificationEngine")
     @patch("interntrack.scheduler.jobs.get_db_session")

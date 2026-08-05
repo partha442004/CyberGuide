@@ -177,7 +177,7 @@ class TestNotificationInstrumentation:
                 pass
 
         class FakeChannel:
-            async def send(self, _message, _subject=None):
+            async def send(self, _message, _subject=None, _buttons=None):
                 return True
 
         manager = DummyManager()

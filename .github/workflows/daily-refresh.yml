@@ -4,13 +4,17 @@ name: Daily refresh (Vercel auto-refresh)
 # Vercel is serverless, so nothing runs in the background there. This free
 # GitHub Actions cron keeps the live app's data fresh by hitting the public
 # discovery + report endpoints three times a day (GitHub cron is UTC, so
-# these are the India/Kolkata IST times converted to UTC, -5h30m).
+# these are the India/Kolkata IST times converted to UTC, -5h30m). Each slot
+# discovers a different category and the digest is filtered to that slot's
+# saved slot_domains (falling back to the general preference filter).
+# A Sunday cron also sends the weekly digest recap.
 # Vercel auto-deploys every push, so this always targets the latest code.
 on:
   schedule:
-    - cron: '30 2 * * *'   # 08:00 IST — discovery: cybersecurity
-    - cron: '30 7 * * *'   # 13:00 IST — discovery: software engineering
-    - cron: '30 13 * * *'  # 19:00 IST — discovery: python developer
+    - cron: '30 2 * * *'   # 08:00 IST — morning slot: cybersecurity
+    - cron: '30 7 * * *'   # 13:00 IST — afternoon slot: software engineering
+    - cron: '30 13 * * *'  # 19:00 IST — evening slot: python developer
+    - cron: '30 3 * * 0'   # Sunday 09:00 IST — weekly digest recap
   workflow_dispatch:      # allow manual "Run workflow" from the Actions tab
 
 jobs:
@@ -41,8 +45,30 @@ jobs:
             "$API_BASE/api/v1/jobs/discovery/run?query=python%20developer" \
             || echo "discovery (python developer) failed or timed out"
 
-      - name: Generate daily report (sends email/Telegram digest)
+      - name: Generate daily report (morning slot — security)
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *'
         run: |
-          curl -sSf --max-time 290 "$API_BASE/api/v1/reports/daily" > /dev/null \
-            && echo "daily report generated OK" \
-            || echo "report generation failed or timed out"
+          curl -sSf --max-time 290 "$API_BASE/api/v1/reports/daily?slot=morning" > /dev/null \
+            && echo "morning digest generated OK" \
+            || echo "morning digest failed or timed out"
+
+      - name: Generate daily report (afternoon slot — coding)
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 7 * * *'
+        run: |
+          curl -sSf --max-time 290 "$API_BASE/api/v1/reports/daily?slot=afternoon" > /dev/null \
+            && echo "afternoon digest generated OK" \
+            || echo "afternoon digest failed or timed out"
+
+      - name: Generate daily report (evening slot — python/data)
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 13 * * *'
+        run: |
+          curl -sSf --max-time 290 "$API_BASE/api/v1/reports/daily?slot=evening" > /dev/null \
+            && echo "evening digest generated OK" \
+            || echo "evening digest failed or timed out"
+
+      - name: Generate weekly digest (Sunday recap)
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 3 * * 0'
+        run: |
+          curl -sSf --max-time 290 "$API_BASE/api/v1/reports/weekly-alert" > /dev/null \
+            && echo "weekly digest generated OK" \
+            || echo "weekly digest failed or timed out"

@@ -43,6 +43,8 @@ class TestLoadAlertPreferences:
         row.channels = []
         row.min_match_score = None
         row.last_alert_at = None
+        row.slot_domains = None
+        row.weekly_enabled = True
 
         prefs = await _load_alert_preferences(_db_with_row(row))
         assert prefs == {
@@ -51,6 +53,8 @@ class TestLoadAlertPreferences:
             "min_match_score": None,
             "is_enabled": False,
             "last_alert_at": None,
+            "slot_domains": {},
+            "weekly_enabled": True,
         }
 
     @pytest.mark.asyncio
@@ -63,6 +67,8 @@ class TestLoadAlertPreferences:
         row.channels = ["email"]
         row.min_match_score = 60
         row.last_alert_at = None
+        row.slot_domains = {"morning": ["security"]}
+        row.weekly_enabled = False
 
         prefs = await _load_alert_preferences(_db_with_row(row))
         assert prefs == {
@@ -71,6 +77,8 @@ class TestLoadAlertPreferences:
             "min_match_score": 60,
             "is_enabled": True,
             "last_alert_at": None,
+            "slot_domains": {"morning": ["security"]},
+            "weekly_enabled": False,
         }
 
     @pytest.mark.asyncio
@@ -82,9 +90,13 @@ class TestLoadAlertPreferences:
         row.domains = ["coding"]
         row.channels = []
         row.min_match_score = None
+        row.slot_domains = None
+        row.weekly_enabled = True
 
         prefs = await _load_alert_preferences(_db_with_row(row), user_id="user2")
         assert prefs["domains"] == ["coding"]
+        assert prefs["slot_domains"] == {}
+        assert prefs["weekly_enabled"] is True
 
     @pytest.mark.asyncio
     async def test_never_raises_on_db_error(self):
@@ -255,6 +267,54 @@ class TestPreferencesAPI:
         assert result.min_match_score == 100
 
     @pytest.mark.asyncio
+    async def test_update_saves_slot_domains_and_weekly_enabled(self):
+        """Per-slot categories + weekly toggle persist through the API."""
+        from interntrack.api.schemas.notification import AlertPreferencesUpdate
+        from interntrack.api.v1.notifications import update_alert_preferences
+
+        mock_db = _db_with_row(None)
+        result = await update_alert_preferences(
+            "user1",
+            AlertPreferencesUpdate(
+                slot_domains={
+                    "morning": ["security"],
+                    "afternoon": ["coding", "bogus"],
+                    "midnight": ["data"],  # unknown slot dropped
+                },
+                weekly_enabled=False,
+            ),
+            db=mock_db,
+        )
+
+        assert result.slot_domains == {
+            "morning": ["security"],
+            "afternoon": ["coding"],
+        }
+        assert result.weekly_enabled is False
+
+    @pytest.mark.asyncio
+    async def test_get_preferences_includes_slot_fields(self):
+        from interntrack.api.v1.notifications import get_alert_preferences
+
+        with patch(
+            "interntrack.api.v1.notifications._load_alert_preferences",
+            new=AsyncMock(
+                return_value={
+                    "domains": ["security"],
+                    "channels": ["email"],
+                    "min_match_score": None,
+                    "is_enabled": True,
+                    "slot_domains": {"morning": ["security"]},
+                    "weekly_enabled": True,
+                }
+            ),
+        ):
+            result = await get_alert_preferences("user1", db=AsyncMock())
+
+        assert result.slot_domains == {"morning": ["security"]}
+        assert result.weekly_enabled is True
+
+    @pytest.mark.asyncio
     async def test_send_alert_filters_and_notifies_preferred_channels(self):
         from interntrack.api.v1.notifications import send_alert_now
 
@@ -273,6 +333,7 @@ class TestPreferencesAPI:
         mock_manager = MagicMock()
         mock_manager.notify = AsyncMock(return_value={"email": True})
         mock_manager.notify_all = AsyncMock(return_value={"telegram": True})
+        mock_manager.get_configured_channels.return_value = ["email"]
 
         with (
             patch(
@@ -327,7 +388,9 @@ class TestPreferencesAPI:
             }
         )
         mock_manager = MagicMock()
+        mock_manager.notify = AsyncMock(return_value={"telegram": True})
         mock_manager.notify_all = AsyncMock(return_value={"telegram": True})
+        mock_manager.get_configured_channels.return_value = ["telegram"]
 
         with (
             patch(
@@ -346,13 +409,19 @@ class TestPreferencesAPI:
                 "interntrack.scheduler.jobs.build_daily_report_message",
                 new=AsyncMock(return_value="msg"),
             ),
+            patch(
+                "interntrack.scheduler.jobs.build_alert_chunks",
+                new=AsyncMock(return_value=[("chunk", [])]),
+            ),
         ):
             result = await send_alert_now("user1", db=mock_db)
 
         assert result["results"] == {"telegram": True}
         assert result["domains"] == []
-        mock_manager.notify_all.assert_awaited_once()
-        mock_manager.notify.assert_not_called()
+        mock_manager.notify.assert_awaited_once_with(
+            ["telegram"], "chunk", subject="InternTrack Daily Alert", buttons=[]
+        )
+        mock_manager.notify_all.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_send_alert_one_off_override_without_saving(self):
@@ -373,6 +442,7 @@ class TestPreferencesAPI:
         )
         mock_manager = MagicMock()
         mock_manager.notify = AsyncMock(return_value={"telegram": True})
+        mock_manager.get_configured_channels.return_value = ["telegram"]
         recorder = AsyncMock()
 
         with (
@@ -399,6 +469,10 @@ class TestPreferencesAPI:
                 new=AsyncMock(return_value="msg"),
             ),
             patch(
+                "interntrack.scheduler.jobs.build_alert_chunks",
+                new=AsyncMock(return_value=[("chunk", [("Apply", "https://x")])]),
+            ),
+            patch(
                 "interntrack.api.v1.notifications._record_alert_history",
                 new=recorder,
             ),
@@ -420,7 +494,10 @@ class TestPreferencesAPI:
             since=None,
         )
         mock_manager.notify.assert_awaited_once_with(
-            ["telegram"], "msg", subject="InternTrack Daily Alert (coding)"
+            ["telegram"],
+            "chunk",
+            subject="InternTrack Daily Alert (coding)",
+            buttons=[("Apply", "https://x")],
         )
         recorder.assert_awaited_once()
 
@@ -827,3 +904,117 @@ class TestAlertMessageFilter:
 
         assert "🔔 Filtered to: security only" in msg
         assert "Security Analyst" in msg
+
+
+class TestAlertChunks:
+    """Telegram digest chunks carry inline Apply buttons per job."""
+
+    def _report(self, n: int = 5) -> dict:
+        return {
+            "summary": {"new_jobs": n, "new_applications": 0, "total_applications": 0},
+            "new_jobs": [
+                {
+                    "id": f"j{i}",
+                    "title": f"Security Job {i}",
+                    "company": "Acme",
+                    "url": f"https://apply/{i}",
+                    "domain": "security",
+                    "is_applied": False,
+                    "age_days": 0,
+                }
+                for i in range(n)
+            ],
+            "min_match_score": None,
+        }
+
+    @pytest.mark.asyncio
+    async def test_chunks_split_by_job_count(self):
+        from interntrack.scheduler.jobs import build_alert_chunks
+
+        with (
+            patch(
+                "interntrack.scheduler.jobs._latest_resume_skill_names",
+                new=AsyncMock(return_value=None),
+            ),
+            patch(
+                "interntrack.scheduler.jobs._job_match_score",
+                side_effect=[None] * 5,
+            ),
+        ):
+            chunks = await build_alert_chunks(self._report(5), AsyncMock())
+
+        # 5 jobs at 4 per chunk -> 2 chunks.
+        assert len(chunks) == 2
+        assert len(chunks[0][1]) == 4  # 4 Apply buttons
+        assert len(chunks[1][1]) == 1
+        assert "Security Job 0" in chunks[0][0]
+        assert "✅ Apply — Security Job 4" in chunks[1][1][0][0]
+        assert chunks[1][1][0][1] == "https://apply/4"
+
+    @pytest.mark.asyncio
+    async def test_empty_report_single_chunk_no_buttons(self):
+        from interntrack.scheduler.jobs import build_alert_chunks
+
+        chunks = await build_alert_chunks({"summary": {}, "new_jobs": []}, AsyncMock())
+        assert len(chunks) == 1
+        assert chunks[0][1] == []
+        assert "📊 Daily Report" in chunks[0][0]
+
+    @pytest.mark.asyncio
+    async def test_weekly_chunks_use_weekly_title(self):
+        from interntrack.scheduler.jobs import build_alert_chunks
+
+        with (
+            patch(
+                "interntrack.scheduler.jobs._latest_resume_skill_names",
+                new=AsyncMock(return_value=None),
+            ),
+            patch(
+                "interntrack.scheduler.jobs._job_match_score",
+                side_effect=[None],
+            ),
+        ):
+            chunks = await build_alert_chunks(self._report(1), AsyncMock(), weekly=True)
+
+        assert "📅 Weekly Digest" in chunks[0][0]
+
+    @pytest.mark.asyncio
+    async def test_deliver_alert_splits_email_and_telegram(self):
+        """Email gets the full message; Telegram gets chunked Apply buttons."""
+        from interntrack.scheduler.jobs import _deliver_alert
+
+        mock_manager = MagicMock()
+        mock_manager.notify = AsyncMock(
+            side_effect=lambda channels, *_args, **_kwargs: {channels[0]: True}
+        )
+        report = self._report(2)
+
+        with (
+            patch(
+                "interntrack.scheduler.jobs.build_daily_report_message",
+                new=AsyncMock(return_value="full email text"),
+            ),
+            patch(
+                "interntrack.scheduler.jobs.build_alert_chunks",
+                new=AsyncMock(return_value=[("chunk1", [("Apply", "https://x")])]),
+            ),
+        ):
+            results = await _deliver_alert(
+                mock_manager,
+                ["email", "telegram"],
+                report,
+                AsyncMock(),
+                domains=["security"],
+                subject="Daily Report (security)",
+            )
+
+        assert results == {"email": True, "telegram": True}
+        mock_manager.notify.assert_any_await(
+            ["email"], "full email text", subject="Daily Report (security)"
+        )
+        mock_manager.notify.assert_any_await(
+            ["telegram"],
+            "chunk1",
+            subject="Daily Report (security)",
+            buttons=[("Apply", "https://x")],
+        )

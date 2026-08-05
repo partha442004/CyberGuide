@@ -26,6 +26,17 @@ async def run_job_discovery():
 # Default user whose alert preferences apply to the scheduled digest.
 DEFAULT_ALERT_USER = "user1"
 
+# The three daily send slots (see .github/workflows/daily-refresh.yml).
+# Default categories per slot, used when the user hasn't customized
+# ``slot_domains``. The workflow discovers cybersecurity / software
+# engineering / python developer jobs respectively at these times.
+ALERT_SLOTS = ("morning", "afternoon", "evening")
+DEFAULT_SLOT_DOMAINS = {
+    "morning": ["security"],
+    "afternoon": ["coding"],
+    "evening": ["coding", "data"],
+}
+
 
 async def _load_alert_preferences(
     session,
@@ -49,12 +60,20 @@ async def _load_alert_preferences(
         )
         pref = result.scalar_one_or_none()
         if pref is not None:
+            slot_domains = (
+                dict(pref.slot_domains)
+                if isinstance(getattr(pref, "slot_domains", None), dict)
+                else {}
+            )
+            weekly = getattr(pref, "weekly_enabled", None)
             return {
                 "domains": list(pref.domains or []),
                 "channels": list(pref.channels or []),
                 "min_match_score": pref.min_match_score,
                 "is_enabled": bool(pref.is_enabled),
                 "last_alert_at": pref.last_alert_at,
+                "slot_domains": slot_domains,
+                "weekly_enabled": weekly if isinstance(weekly, bool) else True,
             }
     except Exception:
         return {}
@@ -128,6 +147,45 @@ async def _record_alert_history(
             await session.rollback()
 
 
+async def _deliver_alert(
+    manager,
+    channels: list | None,
+    report: dict,
+    session,
+    domains: list | None = None,
+    subject: str = "InternTrack Daily Alert",
+    weekly: bool = False,
+) -> dict:
+    """Send an alert through the given channels (None = all configured).
+
+    Emails get the full single digest message. Telegram gets the digest
+    split into small chunks, each with inline **Apply** buttons linking to
+    the job listing. Returns the per-channel delivery results.
+    """
+    title = "📅 Weekly Digest" if weekly else "📊 Daily Report"
+    targets = channels if channels is not None else manager.get_configured_channels()
+    results: dict = {}
+    non_telegram = [c for c in targets if c != "telegram"]
+    if non_telegram:
+        message = await build_daily_report_message(
+            report, session, domains=domains, title=title
+        )
+        results.update(await manager.notify(non_telegram, message, subject=subject))
+    if "telegram" in targets:
+        chunks = await build_alert_chunks(
+            report, session, domains=domains, weekly=weekly
+        )
+        # Every chunk must deliver for the send to count as delivered.
+        telegram_ok = True
+        for text, buttons in chunks:
+            chunk_results = await manager.notify(
+                ["telegram"], text, subject=subject, buttons=buttons
+            )
+            telegram_ok = telegram_ok and bool(chunk_results.get("telegram", False))
+        results["telegram"] = telegram_ok
+    return results
+
+
 async def generate_daily_report():
     """Generate and send daily report, honoring saved alert preferences.
 
@@ -154,22 +212,24 @@ async def generate_daily_report():
 
         # Send notification via preferred channels (or all configured).
         manager = NotificationManager(session)
-        message = await build_daily_report_message(report, session, domains=domains)
         subject = "Daily Report"
         if domains:
             subject += f" ({', '.join(domains)})"
-        channels = prefs.get("channels") or None
-        if channels:
-            await manager.notify(channels, message, subject=subject)
-        else:
-            await manager.notify_all(message, subject=subject)
+        await _deliver_alert(
+            manager,
+            prefs.get("channels") or None,
+            report,
+            session,
+            domains=domains,
+            subject=subject,
+        )
 
 
-def format_daily_report(report: dict) -> str:
+def format_daily_report(report: dict, title: str = "📊 Daily Report") -> str:
     """Format daily report summary counts for notification."""
     summary = report.get("summary", {})
     return (
-        f"📊 Daily Report\n\n"
+        f"{title}\n\n"
         f"New Jobs: {summary.get('new_jobs', 0)}\n"
         f"New Applications: {summary.get('new_applications', 0)}\n"
         f"Total Applications: {summary.get('total_applications', 0)}"
@@ -281,31 +341,27 @@ def _job_lines(score, job: dict) -> list[str]:
     return lines
 
 
-async def build_daily_report_message(
+async def _score_and_group_jobs(
     report: dict,
     session,
     domains: list | None = None,
-) -> str:
-    """Rich daily-report notification: summary counts plus the recent jobs
-    grouped by domain (security / coding / data / …), each job carrying its
-    apply link, expiry status, age badge, applied marker and match %.
+) -> list[tuple[str, list[tuple[float | None, dict]]]]:
+    """Score, filter and group the report's jobs into domain sections.
 
-    ``domains`` (when given) only includes those sections and adds a
-    "filtered to …" footer; ``report['min_match_score']`` drops jobs whose
-    resume match % is below the threshold.
+    Returns a list of ``(domain, [(score, job), ...])`` ordered by the
+    canonical domain order, jobs within each section sorted by match score.
+    ``report['min_match_score']`` drops jobs below the threshold.
     """
-    lines = [format_daily_report(report)]
     jobs = report.get("new_jobs") or []
     if not jobs:
-        return "\n".join(lines)
-
+        return []
     resume_skills = await _latest_resume_skill_names(session)
     scored = [(_job_match_score(resume_skills, job), job) for job in jobs]
     min_score = report.get("min_match_score")
     if min_score:
         scored = [(s, job) for s, job in scored if s is None or (s or 0) >= min_score]
     if not scored:
-        return "\n".join(lines)
+        return []
 
     grouped: dict[str, list] = {}
     for score, job in scored:
@@ -323,24 +379,90 @@ async def build_daily_report_message(
         "finance",
         "other",
     ]
+    sections: list[tuple[str, list[tuple[float | None, dict]]]] = []
     for domain in domain_order:
         items = grouped.get(domain)
         if not items:
             continue
         items.sort(key=lambda item: (item[0] is None, -(item[0] or 0.0)))
+        sections.append((domain, items))
+    return sections
+
+
+async def build_daily_report_message(
+    report: dict,
+    session,
+    domains: list | None = None,
+    title: str = "📊 Daily Report",
+) -> str:
+    """Rich daily-report notification: summary counts plus the recent jobs
+    grouped by domain (security / coding / data / …), each job carrying its
+    apply link, expiry status, age badge, applied marker and match %.
+
+    ``domains`` (when given) only includes those sections and adds a
+    "filtered to …" footer; ``report['min_match_score']`` drops jobs whose
+    resume match % is below the threshold.
+    """
+    lines = [format_daily_report(report, title)]
+    sections = await _score_and_group_jobs(report, session, domains)
+    for domain, items in sections:
         lines.append("")
         lines.append(f"{_DOMAIN_ICONS.get(domain, domain)} ({len(items)}):")
         for score, job in items:
             lines.extend(_job_lines(score, job))
 
-    lines.append("")
-    lines.append(
-        "Match % = how well your uploaded resume fits each job · "
-        "✅/⬜ = applied / not applied."
-    )
-    if domains:
-        lines.append(f"🔔 Filtered to: {', '.join(domains)} only")
+    if sections:
+        lines.append("")
+        lines.append(
+            "Match % = how well your uploaded resume fits each job · "
+            "✅/⬜ = applied / not applied."
+        )
+        if domains:
+            lines.append(f"🔔 Filtered to: {', '.join(domains)} only")
     return "\n".join(lines)
+
+
+async def build_alert_chunks(
+    report: dict,
+    session,
+    domains: list | None = None,
+    weekly: bool = False,
+    jobs_per_chunk: int = 4,
+) -> list[tuple[str, list[tuple[str, str]]]]:
+    """Split the alert digest into Telegram-sized chunks with Apply buttons.
+
+    Telegram truncates messages at 4096 chars, so a 15-job digest is sent
+    as several messages. Each chunk returns ``(text, buttons)`` where
+    ``buttons`` is a list of ``(label, url)`` pairs rendered as an inline
+    keyboard on Telegram.
+    """
+    title = "📅 Weekly Digest" if weekly else "📊 Daily Report"
+    sections = await _score_and_group_jobs(report, session, domains)
+    flat: list[tuple[str, float | None, dict]] = []
+    for domain, items in sections:
+        for score, job in items:
+            flat.append((domain, score, job))
+    if not flat:
+        return [(format_daily_report(report, title), [])]
+
+    chunks: list[tuple[str, list[tuple[str, str]]]] = []
+    for start in range(0, len(flat), jobs_per_chunk):
+        part = flat[start : start + jobs_per_chunk]
+        lines = [format_daily_report(report, title)]
+        buttons: list[tuple[str, str]] = []
+        for domain, score, job in part:
+            domain_label = _DOMAIN_ICONS.get(domain, domain)
+            if not lines or lines[-1] != domain_label:
+                lines.append("")
+                lines.append(domain_label)
+            lines.extend(_job_lines(score, job))
+            url = job.get("url")
+            if url:
+                # Telegram caps button text at 64 chars.
+                job_title = (job.get("title") or "Job").strip()[:60]
+                buttons.append((f"✅ Apply — {job_title}", url))
+        chunks.append(("\n".join(lines), buttons))
+    return chunks
 
 
 async def verify_job_links():

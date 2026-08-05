@@ -609,6 +609,255 @@ class TestReportsAPIUnit:
         assert result["report_type"] == "weekly"
 
     @pytest.mark.asyncio
+    async def test_daily_report_uses_slot_domains(self):
+        """?slot=morning filters the digest to that slot's saved categories."""
+        from interntrack.api.v1.reports import get_daily_report
+
+        mock_service = MagicMock()
+        mock_service.generate_daily_report = AsyncMock(
+            return_value={
+                "report_type": "daily",
+                "generated_at": "2026-01-01",
+                "summary": {"new_jobs": 2},
+                "new_jobs": [{}, {}],
+            },
+        )
+        mock_manager = MagicMock()
+        mock_manager.get_configured_channels.return_value = []
+
+        with (
+            patch(
+                "interntrack.api.v1.reports.ReportService",
+                return_value=mock_service,
+            ),
+            patch(
+                "interntrack.scheduler.jobs._load_alert_preferences",
+                new=AsyncMock(
+                    return_value={
+                        "domains": ["coding"],
+                        "channels": [],
+                        "min_match_score": None,
+                        "is_enabled": True,
+                        "slot_domains": {"morning": ["security"]},
+                        "weekly_enabled": True,
+                        "last_alert_at": None,
+                    }
+                ),
+            ),
+            patch(
+                "interntrack.scheduler.jobs._mark_alert_sent",
+                new=AsyncMock(),
+            ),
+            patch(
+                "interntrack.services.notification_service.NotificationManager",
+                return_value=mock_manager,
+            ),
+        ):
+            result = await get_daily_report(db=AsyncMock(), slot="morning")
+
+        # Slot domains override the general preference for this send.
+        mock_service.generate_daily_report.assert_called_once_with(
+            domains=["security"],
+            min_match_score=None,
+            since=None,
+        )
+        assert result["report_type"] == "daily"
+
+    @pytest.mark.asyncio
+    async def test_daily_report_unconfigured_slot_uses_default(self):
+        """A slot with no saved categories falls back to its default bucket."""
+        from interntrack.api.v1.reports import get_daily_report
+
+        mock_service = MagicMock()
+        mock_service.generate_daily_report = AsyncMock(
+            return_value={
+                "report_type": "daily",
+                "generated_at": "2026-01-01",
+                "summary": {"new_jobs": 1},
+                "new_jobs": [{}],
+            },
+        )
+        mock_manager = MagicMock()
+        mock_manager.get_configured_channels.return_value = []
+
+        with (
+            patch(
+                "interntrack.api.v1.reports.ReportService",
+                return_value=mock_service,
+            ),
+            patch(
+                "interntrack.scheduler.jobs._load_alert_preferences",
+                new=AsyncMock(
+                    return_value={
+                        "domains": ["coding"],
+                        "channels": [],
+                        "min_match_score": None,
+                        "is_enabled": True,
+                        "slot_domains": {},
+                        "weekly_enabled": True,
+                        "last_alert_at": None,
+                    }
+                ),
+            ),
+            patch(
+                "interntrack.scheduler.jobs._mark_alert_sent",
+                new=AsyncMock(),
+            ),
+            patch(
+                "interntrack.services.notification_service.NotificationManager",
+                return_value=mock_manager,
+            ),
+        ):
+            result = await get_daily_report(db=AsyncMock(), slot="morning")
+
+        # No slot_domains saved -> DEFAULT_SLOT_DOMAINS["morning"] = security.
+        mock_service.generate_daily_report.assert_called_once_with(
+            domains=["security"],
+            min_match_score=None,
+            since=None,
+        )
+        assert result["report_type"] == "daily"
+
+    @pytest.mark.asyncio
+    async def test_daily_report_unknown_slot_falls_back(self):
+        """An unknown slot keeps the general preference filter."""
+        from interntrack.api.v1.reports import get_daily_report
+
+        mock_service = MagicMock()
+        mock_service.generate_daily_report = AsyncMock(
+            return_value={
+                "report_type": "daily",
+                "generated_at": "2026-01-01",
+                "summary": {"new_jobs": 1},
+                "new_jobs": [{}],
+            },
+        )
+        mock_manager = MagicMock()
+        mock_manager.get_configured_channels.return_value = []
+
+        with (
+            patch(
+                "interntrack.api.v1.reports.ReportService",
+                return_value=mock_service,
+            ),
+            patch(
+                "interntrack.scheduler.jobs._load_alert_preferences",
+                new=AsyncMock(
+                    return_value={
+                        "domains": ["coding"],
+                        "channels": [],
+                        "min_match_score": None,
+                        "is_enabled": True,
+                        "slot_domains": {"morning": ["security"]},
+                        "weekly_enabled": True,
+                        "last_alert_at": None,
+                    }
+                ),
+            ),
+            patch(
+                "interntrack.scheduler.jobs._mark_alert_sent",
+                new=AsyncMock(),
+            ),
+            patch(
+                "interntrack.services.notification_service.NotificationManager",
+                return_value=mock_manager,
+            ),
+        ):
+            result = await get_daily_report(db=AsyncMock(), slot="midnight")
+
+        mock_service.generate_daily_report.assert_called_once_with(
+            domains=["coding"],
+            min_match_score=None,
+            since=None,
+        )
+        assert result["report_type"] == "daily"
+
+    @pytest.mark.asyncio
+    async def test_weekly_alert_sends_digest(self):
+        """Sunday weekly-alert endpoint recaps the week and records history."""
+        from interntrack.api.v1.reports import get_weekly_alert
+
+        mock_service = MagicMock()
+        mock_service.generate_daily_report = AsyncMock(
+            return_value={
+                "report_type": "daily",
+                "generated_at": "2026-01-01",
+                "summary": {"new_jobs": 3},
+                "new_jobs": [{}, {}, {}],
+            },
+        )
+        mock_manager = MagicMock()
+        mock_manager.get_configured_channels.return_value = ["email"]
+        mock_manager.notify = AsyncMock(return_value={"email": True})
+        recorder = AsyncMock()
+
+        with (
+            patch(
+                "interntrack.api.v1.reports.ReportService",
+                return_value=mock_service,
+            ),
+            patch(
+                "interntrack.scheduler.jobs._load_alert_preferences",
+                new=AsyncMock(
+                    return_value={
+                        "domains": ["security"],
+                        "channels": ["email"],
+                        "min_match_score": None,
+                        "is_enabled": True,
+                        "slot_domains": {},
+                        "weekly_enabled": True,
+                    }
+                ),
+            ),
+            patch(
+                "interntrack.services.notification_service.NotificationManager",
+                return_value=mock_manager,
+            ),
+            patch(
+                "interntrack.scheduler.jobs._record_alert_history",
+                new=recorder,
+            ),
+            patch(
+                "interntrack.scheduler.jobs.build_daily_report_message",
+                new=AsyncMock(return_value="weekly text"),
+            ),
+        ):
+            result = await get_weekly_alert(db=AsyncMock())
+
+        assert result["report_type"] == "weekly"
+        assert result["summary"]["new_jobs"] == 3
+        mock_manager.notify.assert_awaited_once_with(
+            ["email"], "weekly text", subject="Weekly Digest (security)"
+        )
+        recorder.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_weekly_alert_disabled_skips_send(self):
+        """weekly_enabled=False short-circuits the Sunday recap."""
+        from interntrack.api.v1.reports import get_weekly_alert
+
+        with (
+            patch(
+                "interntrack.scheduler.jobs._load_alert_preferences",
+                new=AsyncMock(
+                    return_value={
+                        "domains": [],
+                        "channels": [],
+                        "is_enabled": True,
+                        "weekly_enabled": False,
+                    }
+                ),
+            ),
+            patch(
+                "interntrack.api.v1.reports.ReportService",
+                return_value=MagicMock(),
+            ),
+        ):
+            result = await get_weekly_alert(db=AsyncMock())
+
+        assert result["summary"]["skipped"] == "weekly digest disabled"
+
+    @pytest.mark.asyncio
     async def test_monthly_report(self):
         from interntrack.api.v1.reports import get_monthly_report
 

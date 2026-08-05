@@ -14,6 +14,9 @@ from interntrack.api.schemas.notification import (
 )
 from interntrack.database.session import get_db
 from interntrack.scheduler.jobs import (
+    ALERT_SLOTS as _ALERT_SLOTS,
+)
+from interntrack.scheduler.jobs import (
     _load_alert_preferences,
     _mark_alert_sent,
     _record_alert_history,
@@ -108,6 +111,8 @@ async def get_alert_preferences(
         min_match_score=prefs.get("min_match_score"),
         is_enabled=prefs.get("is_enabled", True),
         last_alert_at=prefs.get("last_alert_at"),
+        slot_domains=prefs.get("slot_domains") or {},
+        weekly_enabled=prefs.get("weekly_enabled", True),
     )
 
 
@@ -141,6 +146,14 @@ async def update_alert_preferences(
         pref.min_match_score = clamped  # type: ignore[assignment]
     if update.is_enabled is not None:
         pref.is_enabled = update.is_enabled  # type: ignore[assignment]
+    if update.slot_domains is not None:
+        cleaned = {}
+        for slot_key, slot_domains in update.slot_domains.items():
+            if slot_key in _ALERT_SLOTS:
+                cleaned[slot_key] = _normalize_domains(slot_domains)
+        pref.slot_domains = cleaned  # type: ignore[assignment]
+    if update.weekly_enabled is not None:
+        pref.weekly_enabled = update.weekly_enabled  # type: ignore[assignment]
 
     await db.commit()
     await db.refresh(pref)
@@ -151,6 +164,10 @@ async def update_alert_preferences(
         min_match_score=pref.min_match_score,
         is_enabled=bool(pref.is_enabled),
         last_alert_at=pref.last_alert_at,
+        slot_domains=dict(pref.slot_domains or {}),
+        weekly_enabled=(
+            bool(pref.weekly_enabled) if pref.weekly_enabled is not None else True
+        ),
     )
 
 
@@ -169,7 +186,7 @@ async def send_alert_now(
     Only jobs created since the previous alert are included (no duplicates);
     a one-off override does NOT advance the window.
     """
-    from interntrack.scheduler.jobs import build_daily_report_message
+    from interntrack.scheduler.jobs import _deliver_alert
 
     prefs = await _load_alert_preferences(db, user_id=user_id)
     is_one_off = override is not None
@@ -192,15 +209,18 @@ async def send_alert_now(
         since=prefs.get("last_alert_at"),
     )
     manager = NotificationManager(db)
-    message = await build_daily_report_message(report, db, domains=domains)
     channels = prefs.get("channels") or None
     subject = "InternTrack Daily Alert"
     if domains:
         subject += f" ({', '.join(domains)})"
-    if channels:
-        results = await manager.notify(channels, message, subject=subject)
-    else:
-        results = await manager.notify_all(message, subject=subject)
+    results = await _deliver_alert(
+        manager,
+        channels,
+        report,
+        db,
+        domains=domains,
+        subject=subject,
+    )
 
     job_count = len(report.get("new_jobs") or [])
     if not is_one_off:

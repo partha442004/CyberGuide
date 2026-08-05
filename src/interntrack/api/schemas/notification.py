@@ -73,6 +73,8 @@ class AlertPreferencesResponse(BaseModel):
     min_match_score: int | None = None
     is_enabled: bool = True
     last_alert_at: datetime | None = None
+    slot_domains: dict | None = None
+    weekly_enabled: bool = True
 
     model_config = {"from_attributes": True}
 
@@ -84,3 +86,5 @@ class AlertPreferencesUpdate(BaseModel):
     channels: list[str] | None = None
     min_match_score: int | None = None
     is_enabled: bool | None = None
+    slot_domains: dict | None = None
+    weekly_enabled: bool | None = None
