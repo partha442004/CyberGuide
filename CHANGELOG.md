@@ -1760,3 +1760,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   multiselect, category pills (e.g. select 🔐 Cybersecurity to receive only
   security jobs), min-match slider, Save, and a "Send Test Alert Now"
   button. 18 new tests.
+- **One-off alert tester + send history** — the dashboard Notifications
+  section gained (a) a one-off alert expander that sends a single alert with
+  any categories/channels WITHOUT touching saved preferences (the
+  send-alert API accepts an optional override body), and (b) a Recent
+  Alerts history table powered by a new `notification_history` table
+  (auto-created) + GET /api/v1/notifications/preferences/{user_id}/history.
+  Every manual test, one-off alert, and scheduled digest is recorded
+  (subject, channels, categories, job count, per-channel delivery) so the
+  user can see exactly what was sent and whether it was delivered.
+  Refactored the duplicate category-pills fallback into a shared
+  `_category_picker_multi` helper. 5 new tests.

@@ -612,6 +612,41 @@ def _category_picker(options: list[str], labels: dict[str, str]) -> str:
     )
 
 
+def _category_picker_multi(label: str, default: list[str]) -> list[str]:
+    """Multi-select category pills (with a multiselect fallback).
+
+    Returns the selected keys; callers translate an ``"all"`` selection into
+    an empty list (= every category).
+    """
+    domain_labels = {"all": "All categories"}
+    for d in _DOMAIN_ORDER:
+        domain_labels[d] = _DOMAIN_LABELS.get(d, d)
+    picker = getattr(st, "pills", None)
+    if picker is not None:
+        try:
+            return list(
+                picker(
+                    label,
+                    list(domain_labels.keys()),
+                    selection_mode="multi",
+                    default=default,
+                    format_func=lambda d: domain_labels.get(d, d),
+                )
+                or []
+            )
+        except TypeError:
+            pass
+    return list(
+        st.multiselect(
+            label,
+            list(domain_labels.keys()),
+            default=default,
+            format_func=lambda d: domain_labels.get(d, d),
+        )
+        or []
+    )
+
+
 # ---------------------------------------------------------------------------
 # Main app
 # ---------------------------------------------------------------------------
@@ -1188,35 +1223,10 @@ def show_settings() -> None:
     )
 
     # Categories to receive (multi-pills, "All categories" = everything).
-    domain_labels = {"all": "All categories"}
-    for d in _DOMAIN_ORDER:
-        domain_labels[d] = _DOMAIN_LABELS.get(d, d)
     default_domains = saved_domains or ["all"]
-    picker = getattr(st, "pills", None)
-    if picker is not None:
-        try:
-            selected_domains = picker(
-                "🏷 Categories to receive",
-                list(domain_labels.keys()),
-                selection_mode="multi",
-                default=default_domains,
-                format_func=lambda d: domain_labels.get(d, d),
-            )
-        except TypeError:
-            selected_domains = st.multiselect(
-                "🏷 Categories to receive",
-                list(domain_labels.keys()),
-                default=default_domains,
-                format_func=lambda d: domain_labels.get(d, d),
-            )
-    else:
-        selected_domains = st.multiselect(
-            "🏷 Categories to receive",
-            list(domain_labels.keys()),
-            default=default_domains,
-            format_func=lambda d: domain_labels.get(d, d),
-        )
-    selected_domains = list(selected_domains or [])
+    selected_domains = _category_picker_multi(
+        "🏷 Categories to receive", default_domains
+    )
     # Empty domains = every category.
     domains = [] if "all" in selected_domains else selected_domains
 
@@ -1289,6 +1299,104 @@ def show_settings() -> None:
         st.caption(
             "🔔 Your daily alert is filtered to: "
             + ", ".join(_DOMAIN_LABELS.get(d, d) for d in domains)
+        )
+
+    # --------------------------------------------------------------
+    # 🧪 One-off alert — test any categories without saving
+    # --------------------------------------------------------------
+    with st.expander("🧪 One-off alert — test any categories right now"):
+        st.markdown(
+            "Send a **single alert** with any categories you like. This does "
+            "**not** change your saved preferences above."
+        )
+
+        oneoff_selected = _category_picker_multi(
+            "Categories for this one-off alert", default_domains
+        )
+        oneoff_domains = [] if "all" in oneoff_selected else oneoff_selected
+        oneoff_chans = st.multiselect(
+            "Deliver this one-off alert via",
+            chan_options or ["email", "telegram"],
+            default=default_chans,
+            format_func=lambda c: _NOTIF_CHANNEL_LABELS.get(c, c),
+        )
+
+        if st.button("🚀 Send This One-Off Alert", use_container_width=True):
+            with st.spinner("Building and sending your one-off alert..."):
+                payload = {"domains": oneoff_domains, "channels": oneoff_chans}
+                result = _api(
+                    f"/notifications/preferences/{user_id}/send-alert",
+                    method="POST",
+                    json_data=payload,
+                    timeout=120,
+                )
+                if result:
+                    results = result.get("results") or {}
+                    delivered = [
+                        _NOTIF_CHANNEL_LABELS.get(c, c)
+                        for c, ok in results.items()
+                        if ok
+                    ]
+                    if delivered:
+                        cats = (
+                            "all categories"
+                            if not oneoff_domains
+                            else ", ".join(
+                                _DOMAIN_LABELS.get(d, d) for d in oneoff_domains
+                            )
+                        )
+                        st.success(
+                            f"✅ One-off alert sent — **{result.get('job_count', 0)} "
+                            f"jobs** ({cats}) via {', '.join(delivered)}. "
+                            "Saved preferences were not changed."
+                        )
+                    else:
+                        st.error(
+                            f"One-off alert had {result.get('job_count', 0)} jobs "
+                            f"but delivery failed: {results}"
+                        )
+                else:
+                    st.error("One-off alert failed — is the API reachable?")
+
+    st.markdown("")
+
+    # --------------------------------------------------------------
+    # 🕘 Recent Alerts — send history
+    # --------------------------------------------------------------
+    st.subheader("🕘 Recent Alerts")
+    history_data = (
+        fetch_data(f"/notifications/preferences/{user_id}/history?limit=15") or {}
+    )
+    history = history_data.get("history") or []
+    if not history:
+        st.caption(
+            "No alerts sent yet — use **Send Test Alert Now** above or wait "
+            "for the daily digest (07:00 / 13:00 / 19:00 UTC)."
+        )
+    else:
+        import pandas as pd
+
+        rows = []
+        for h in history:
+            sent = (h.get("sent_at") or "").replace("T", " ")[:16]
+            delivered = [
+                _NOTIF_CHANNEL_LABELS.get(c, c)
+                for c, ok in (h.get("results") or {}).items()
+                if ok
+            ]
+            rows.append(
+                {
+                    "Sent (UTC)": sent,
+                    "Subject": h.get("subject") or "",
+                    "Channels": ", ".join(h.get("channels") or []) or "—",
+                    "Categories": ", ".join(h.get("domains") or []) or "all",
+                    "Jobs": h.get("job_count") or 0,
+                    "Delivered": ", ".join(delivered) or "❌ none",
+                }
+            )
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.caption(
+            "Every manual test, one-off alert and scheduled digest is recorded here."
         )
 
     st.divider()

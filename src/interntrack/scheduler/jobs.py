@@ -60,6 +60,40 @@ async def _load_alert_preferences(
     return {}
 
 
+async def _record_alert_history(
+    session,
+    user_id: str,
+    subject: str | None,
+    channels: list,
+    domains: list,
+    job_count: int,
+    results: dict,
+) -> None:
+    """Persist an alert-send record for the dashboard history view.
+
+    Never raises — history must never break a digest send.
+    """
+    import contextlib
+
+    try:
+        from interntrack.domain.models import NotificationHistory
+
+        session.add(
+            NotificationHistory(
+                user_id=user_id,
+                subject=subject,
+                channels=list(channels or []),
+                domains=list(domains or []),
+                job_count=int(job_count or 0),
+                results=dict(results or {}),
+            )
+        )
+        await session.commit()
+    except Exception:
+        with contextlib.suppress(Exception):
+            await session.rollback()
+
+
 async def generate_daily_report():
     """Generate and send daily report, honoring saved alert preferences."""
     async with get_db_session() as session:
