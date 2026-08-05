@@ -23,16 +23,68 @@ async def run_job_discovery():
         print(f"[{datetime.now(UTC)}] Discovery: {len(jobs)} found, {len(saved)} saved")
 
 
-async def generate_daily_report():
-    """Generate and send daily report."""
-    async with get_db_session() as session:
-        service = ReportService(session)
-        report = await service.generate_daily_report()
+# Default user whose alert preferences apply to the scheduled digest.
+DEFAULT_ALERT_USER = "user1"
 
-        # Send notification
+
+async def _load_alert_preferences(
+    session,
+    user_id: str = DEFAULT_ALERT_USER,
+) -> dict:
+    """Load saved alert preferences for a user.
+
+    Returns an empty dict when nothing is saved — callers treat that as
+    "all domains, all configured channels, alerts on". A saved (even
+    disabled) row returns its stored values plus ``is_enabled`` so callers
+    can skip the digest when alerts are turned off. Never raises:
+    preference loading must not break the daily digest.
+    """
+    try:
+        from sqlalchemy import select
+
+        from interntrack.domain.models import AlertPreferences
+
+        result = await session.execute(
+            select(AlertPreferences).where(AlertPreferences.user_id == user_id)
+        )
+        pref = result.scalar_one_or_none()
+        if pref is not None:
+            return {
+                "domains": list(pref.domains or []),
+                "channels": list(pref.channels or []),
+                "min_match_score": pref.min_match_score,
+                "is_enabled": bool(pref.is_enabled),
+            }
+    except Exception:
+        return {}
+    return {}
+
+
+async def generate_daily_report():
+    """Generate and send daily report, honoring saved alert preferences."""
+    async with get_db_session() as session:
+        prefs = await _load_alert_preferences(session)
+        if prefs.get("is_enabled") is False:
+            print(f"[{datetime.now(UTC)}] Daily report skipped — alerts disabled")
+            return
+        domains = prefs.get("domains") or None
+        service = ReportService(session)
+        report = await service.generate_daily_report(
+            domains=domains,
+            min_match_score=prefs.get("min_match_score"),
+        )
+
+        # Send notification via preferred channels (or all configured).
         manager = NotificationManager(session)
-        message = await build_daily_report_message(report, session)
-        await manager.notify_all(message, subject="Daily Report")
+        message = await build_daily_report_message(report, session, domains=domains)
+        subject = "Daily Report"
+        if domains:
+            subject += f" ({', '.join(domains)})"
+        channels = prefs.get("channels") or None
+        if channels:
+            await manager.notify(channels, message, subject=subject)
+        else:
+            await manager.notify_all(message, subject=subject)
 
 
 def format_daily_report(report: dict) -> str:
@@ -151,10 +203,18 @@ def _job_lines(score, job: dict) -> list[str]:
     return lines
 
 
-async def build_daily_report_message(report: dict, session) -> str:
+async def build_daily_report_message(
+    report: dict,
+    session,
+    domains: list | None = None,
+) -> str:
     """Rich daily-report notification: summary counts plus the recent jobs
     grouped by domain (security / coding / data / …), each job carrying its
     apply link, expiry status, age badge, applied marker and match %.
+
+    ``domains`` (when given) only includes those sections and adds a
+    "filtered to …" footer; ``report['min_match_score']`` drops jobs whose
+    resume match % is below the threshold.
     """
     lines = [format_daily_report(report)]
     jobs = report.get("new_jobs") or []
@@ -163,10 +223,17 @@ async def build_daily_report_message(report: dict, session) -> str:
 
     resume_skills = await _latest_resume_skill_names(session)
     scored = [(_job_match_score(resume_skills, job), job) for job in jobs]
+    min_score = report.get("min_match_score")
+    if min_score:
+        scored = [(s, job) for s, job in scored if s is None or (s or 0) >= min_score]
+    if not scored:
+        return "\n".join(lines)
 
     grouped: dict[str, list] = {}
     for score, job in scored:
         domain = job.get("domain") or "other"
+        if domains and domain not in domains:
+            continue
         grouped.setdefault(domain, []).append((score, job))
 
     domain_order = [
@@ -193,6 +260,8 @@ async def build_daily_report_message(report: dict, session) -> str:
         "Match % = how well your uploaded resume fits each job · "
         "✅/⬜ = applied / not applied."
     )
+    if domains:
+        lines.append(f"🔔 Filtered to: {', '.join(domains)} only")
     return "\n".join(lines)
 
 

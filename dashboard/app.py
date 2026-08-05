@@ -418,6 +418,8 @@ def _api(
                 resp = httpx.post(url, files=files, timeout=timeout)
             else:
                 resp = httpx.post(url, json=json_data or {}, timeout=timeout)
+        elif method == "PUT":
+            resp = httpx.put(url, json=json_data or {}, timeout=timeout)
         else:
             resp = httpx.get(url, timeout=timeout)
         if resp.status_code == 200:
@@ -1130,10 +1132,170 @@ def show_learning() -> None:
 # ---------------------------------------------------------------------------
 
 
+_NOTIF_CHANNEL_LABELS = {
+    "email": "📧 Email",
+    "telegram": "✈️ Telegram",
+    "discord": "🎮 Discord",
+    "slack": "💬 Slack",
+}
+
+
 def show_settings() -> None:
     """Show settings page."""
     st.header("⚙️ Settings")
 
+    # ------------------------------------------------------------------
+    # 🔔 Notifications — daily job alert preferences
+    # ------------------------------------------------------------------
+    st.subheader("🔔 Notifications")
+    st.markdown(
+        "Control your **daily job alert** (sent every day to your email and "
+        "Telegram). Pick which **categories** to receive — e.g. select "
+        "*🔐 Cybersecurity* to get only security jobs with their apply links."
+    )
+
+    # Which channels are actually configured on the API?
+    channels_data = fetch_data("/notifications/channels") or {}
+    configured = channels_data.get("channels") or []
+    if not configured:
+        st.warning(
+            "⚠️ No notification channels are configured on the API yet. "
+            "Add `SMTP_USER` / `SMTP_PASSWORD` (email) and `TELEGRAM_BOT_TOKEN` / "
+            "`TELEGRAM_CHAT_ID` in the Vercel project env vars."
+        )
+    else:
+        st.caption(
+            "Configured channels: "
+            + " · ".join(
+                f"✅ **{_NOTIF_CHANNEL_LABELS.get(c, c)}**" for c in configured
+            )
+        )
+
+    user_id = "user1"
+    prefs = fetch_data(f"/notifications/preferences/{user_id}") or {}
+    saved_chans = prefs.get("channels") or []
+    saved_domains = prefs.get("domains") or []
+    saved_min = prefs.get("min_match_score") or 0
+
+    # Channels to deliver alerts through.
+    chan_options = [c for c in ("email", "telegram") if c in configured]
+    default_chans = [c for c in chan_options if c in saved_chans] or chan_options
+    selected_chans = st.multiselect(
+        "📤 Send alerts via",
+        chan_options or ["email", "telegram"],
+        default=default_chans,
+        format_func=lambda c: _NOTIF_CHANNEL_LABELS.get(c, c),
+    )
+
+    # Categories to receive (multi-pills, "All categories" = everything).
+    domain_labels = {"all": "All categories"}
+    for d in _DOMAIN_ORDER:
+        domain_labels[d] = _DOMAIN_LABELS.get(d, d)
+    default_domains = saved_domains or ["all"]
+    picker = getattr(st, "pills", None)
+    if picker is not None:
+        try:
+            selected_domains = picker(
+                "🏷 Categories to receive",
+                list(domain_labels.keys()),
+                selection_mode="multi",
+                default=default_domains,
+                format_func=lambda d: domain_labels.get(d, d),
+            )
+        except TypeError:
+            selected_domains = st.multiselect(
+                "🏷 Categories to receive",
+                list(domain_labels.keys()),
+                default=default_domains,
+                format_func=lambda d: domain_labels.get(d, d),
+            )
+    else:
+        selected_domains = st.multiselect(
+            "🏷 Categories to receive",
+            list(domain_labels.keys()),
+            default=default_domains,
+            format_func=lambda d: domain_labels.get(d, d),
+        )
+    selected_domains = list(selected_domains or [])
+    # Empty domains = every category.
+    domains = [] if "all" in selected_domains else selected_domains
+
+    # Optional minimum resume-match threshold.
+    min_score = st.slider(
+        "🎯 Only show jobs matching at least",
+        0,
+        100,
+        int(saved_min or 0),
+        help="0 = no filter. Uses your uploaded resume's match % per job.",
+    )
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("💾 Save Alert Preferences", use_container_width=True):
+            payload = {
+                "domains": domains,
+                "channels": selected_chans or chan_options or ["email", "telegram"],
+                "min_match_score": min_score or None,
+                "is_enabled": True,
+            }
+            result = _api(
+                f"/notifications/preferences/{user_id}",
+                method="PUT",
+                json_data=payload,
+                timeout=30,
+            )
+            if result:
+                cats = (
+                    _DOMAIN_LABELS.get(domains[0], domains[0])
+                    if len(domains) == 1
+                    else (f"{len(domains)} categories" if domains else "all categories")
+                )
+                st.success(
+                    f"✅ Preferences saved! Your daily alert now sends **{cats}** "
+                    f"via {', '.join(result.get('channels') or payload['channels'])}."
+                )
+            else:
+                st.error("Failed to save preferences — is the API reachable?")
+
+    with col2:
+        if st.button("🚀 Send Test Alert Now", use_container_width=True):
+            with st.spinner("Building your filtered alert and sending..."):
+                result = _api(
+                    f"/notifications/preferences/{user_id}/send-alert",
+                    method="POST",
+                    timeout=120,
+                )
+                if result:
+                    results = result.get("results") or {}
+                    delivered = [
+                        _NOTIF_CHANNEL_LABELS.get(c, c)
+                        for c, ok in results.items()
+                        if ok
+                    ]
+                    if delivered:
+                        st.success(
+                            f"✅ Sent **{result.get('job_count', 0)} matching jobs** "
+                            f"via {', '.join(delivered)}!"
+                        )
+                    else:
+                        st.error(
+                            f"Alert had {result.get('job_count', 0)} jobs but delivery "
+                            f"failed: {results}"
+                        )
+                else:
+                    st.error("Send failed — is the API reachable and configured?")
+
+    if domains:
+        st.caption(
+            "🔔 Your daily alert is filtered to: "
+            + ", ".join(_DOMAIN_LABELS.get(d, d) for d in domains)
+        )
+
+    st.divider()
+
+    # ------------------------------------------------------------------
+    # About
+    # ------------------------------------------------------------------
     st.subheader("About")
     st.write(f"**InternTrack** v{fetch_version()}")
     st.write("AI-powered internship and job tracking platform")

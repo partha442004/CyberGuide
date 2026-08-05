@@ -169,54 +169,64 @@ class ReportService:
         age = (utcnow() - posted).total_seconds() / 86400
         return max(0, int(age))
 
-    async def generate_daily_report(self) -> dict[str, Any]:
+    async def generate_daily_report(
+        self,
+        domains: list[str] | None = None,
+        min_match_score: int | None = None,
+    ) -> dict[str, Any]:
         """Generate daily report.
 
         Jobs are listed over a 7-day window so the alert can group them by
         how recently they were posted (today / 1 day ago / older), and each
         entry carries its expiry info (``expires_at``, ``is_active``) so the
         message can flag closing-soon and expired listings.
+
+        ``domains`` optionally restricts the report to the given domain keys
+        (security, coding, ...) — the summary counts then reflect the
+        filtered set. ``min_match_score`` is carried through so the alert
+        message can drop jobs whose resume match % is below the threshold.
         """
         recent_jobs = await self.job_repo.get_recent_jobs(days=7)
         new_apps = await self.app_repo.get_recent_applications(days=1)
         status_counts = await self.app_repo.get_status_counts()
         applied_ids = await self.app_repo.get_applied_job_ids()
 
+        jobs = [
+            {
+                "id": str(getattr(job, "id", "")),
+                "title": job.title,
+                "company": job.company,
+                "location": job.location,
+                "url": job.url,
+                "tags": list(getattr(job, "tags", None) or []),
+                "required_skills": list(getattr(job, "required_skills", None) or []),
+                "preferred_skills": list(getattr(job, "preferred_skills", None) or []),
+                "posted_at": self._fmt_dt(getattr(job, "posted_at", None)),
+                "created_at": self._fmt_dt(getattr(job, "created_at", None)),
+                "expires_at": self._fmt_dt(getattr(job, "expires_at", None)),
+                "is_active": bool(getattr(job, "is_active", True)),
+                "is_applied": str(getattr(job, "id", "")) in applied_ids,
+                "domain": classify_domain(
+                    str(getattr(job, "title", "")),
+                    list(getattr(job, "tags", None) or []),
+                ),
+                "age_days": self._job_age_days(job),
+            }
+            for job in recent_jobs[:25]
+        ]
+        if domains:
+            jobs = [job for job in jobs if job["domain"] in domains]
+
         return {
             "report_type": "daily",
             "generated_at": datetime.now(UTC).isoformat(),
             "summary": {
-                "new_jobs": len(recent_jobs),
+                "new_jobs": len(jobs),
                 "new_applications": len(new_apps),
                 "total_applications": sum(status_counts.values()),
             },
-            "new_jobs": [
-                {
-                    "id": str(getattr(job, "id", "")),
-                    "title": job.title,
-                    "company": job.company,
-                    "location": job.location,
-                    "url": job.url,
-                    "tags": list(getattr(job, "tags", None) or []),
-                    "required_skills": list(
-                        getattr(job, "required_skills", None) or []
-                    ),
-                    "preferred_skills": list(
-                        getattr(job, "preferred_skills", None) or []
-                    ),
-                    "posted_at": self._fmt_dt(getattr(job, "posted_at", None)),
-                    "created_at": self._fmt_dt(getattr(job, "created_at", None)),
-                    "expires_at": self._fmt_dt(getattr(job, "expires_at", None)),
-                    "is_active": bool(getattr(job, "is_active", True)),
-                    "is_applied": str(getattr(job, "id", "")) in applied_ids,
-                    "domain": classify_domain(
-                        str(getattr(job, "title", "")),
-                        list(getattr(job, "tags", None) or []),
-                    ),
-                    "age_days": self._job_age_days(job),
-                }
-                for job in recent_jobs[:25]
-            ],
+            "new_jobs": jobs,
+            "min_match_score": min_match_score,
             "closing_soon": [
                 {
                     "title": job.title,

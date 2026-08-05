@@ -338,6 +338,32 @@ class NotificationConfig(Base, TimestampMixin):
         return to_naive_utc(value)
 
 
+class AlertPreferences(Base, TimestampMixin):
+    """Saved daily-alert preferences: which domains and channels to use.
+
+    ``domains`` is a list of domain keys (security, coding, data, ...); an
+    empty list means every domain. ``channels`` lists the delivery channels
+    (email, telegram, ...); an empty list means every configured channel.
+    ``min_match_score`` optionally drops jobs whose resume match % is below
+    the threshold. The table is auto-created on startup by ``create_all``.
+    """
+
+    __tablename__ = "alert_preferences"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id = Column(
+        String(100),
+        nullable=False,
+        unique=True,
+        index=True,
+        default="user1",
+    )
+    domains = Column(JSON, nullable=True)
+    channels = Column(JSON, nullable=True)
+    min_match_score = Column(Integer, nullable=True)
+    is_enabled = Column(Boolean, default=True)
+
+
 class ScheduledReport(Base, TimestampMixin):
     """Scheduled report configuration."""
 
