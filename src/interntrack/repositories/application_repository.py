@@ -33,6 +33,11 @@ class ApplicationRepository(BaseRepository[Application]):
         )
         return list(result.scalars().all())
 
+    async def get_applied_job_ids(self) -> set[str]:
+        """Return the job IDs that have at least one application tracked."""
+        result = await self.session.execute(select(Application.job_id))
+        return {str(job_id) for (job_id,) in result.all()}
+
     async def get_status_counts(self) -> dict[str, int]:
         """Get count of applications by status."""
         query = select(Application.status, func.count(Application.id)).group_by(

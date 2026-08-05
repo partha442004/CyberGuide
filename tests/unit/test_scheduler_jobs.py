@@ -105,42 +105,51 @@ class TestBuildDailyReportMessage:
         assert "Apply" not in message
 
     @pytest.mark.asyncio
-    async def test_groups_jobs_by_age_sections(self):
-        """Jobs are grouped into New today / 1 day ago / older sections."""
+    async def test_groups_jobs_by_domain_sections(self):
+        """Jobs are grouped into domain sections with age badges."""
         from interntrack.scheduler.jobs import build_daily_report_message
 
         report = {
             "summary": {"new_jobs": 3, "new_applications": 0, "total_applications": 0},
             "new_jobs": [
                 {
-                    "title": "Today Job",
-                    "company": "A",
+                    "title": "SOC Analyst",
+                    "company": "SecureCo",
                     "url": "https://a/apply",
                     "age_days": 0,
+                    "domain": "security",
+                    "is_applied": True,
                 },
                 {
-                    "title": "Yesterday Job",
-                    "company": "B",
+                    "title": "Python Developer",
+                    "company": "TechCo",
                     "url": "https://b/apply",
                     "age_days": 1,
+                    "domain": "coding",
+                    "is_applied": False,
                 },
                 {
                     "title": "Old Job",
                     "company": "C",
                     "url": "https://c/apply",
                     "age_days": 5,
+                    "domain": "security",
+                    "is_applied": False,
                 },
             ],
         }
 
         message = await build_daily_report_message(report, None)
 
-        assert "New today (1)" in message
-        assert "1 day ago (1)" in message
-        assert "4+ days ago (1)" in message
-        assert "Today Job" in message
-        assert "Yesterday Job" in message
-        assert "Old Job" in message
+        assert "Cybersecurity / VAPT / SOC (2)" in message
+        assert "Coding / Software (1)" in message
+        assert "SOC Analyst" in message
+        assert "Python Developer" in message
+        assert "✅ Applied" in message
+        assert "⬜ Not applied" in message
+        assert "🟢 today" in message
+        assert "🟡 1d ago" in message
+        assert "⚪ 5d ago" in message
 
     @pytest.mark.asyncio
     async def test_expiry_badges_in_message(self):
@@ -184,6 +193,14 @@ class TestBuildDailyReportMessage:
         assert "Expired" in _expiry_note(
             {"is_active": True, "expires_at": "2020-01-01T00:00:00"},
         )
+
+    def test_age_badge(self):
+        from interntrack.scheduler.jobs import _age_badge
+
+        assert _age_badge(0) == "🟢 today"
+        assert _age_badge(1) == "🟡 1d ago"
+        assert _age_badge(2) == "🟠 2d ago"
+        assert _age_badge(7) == "⚪ 7d ago"
 
 
 @pytest.mark.asyncio

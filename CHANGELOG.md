@@ -1680,3 +1680,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   existing `expires_at`/`is_active` columns and the `get_closing_soon()`
   repository query. The report API now also exposes `posted_at`, `created_at`,
   `expires_at`, `is_active` and `age_days` per job.
+- **Daily alert now has domain sections + applied tracking** — jobs are
+  grouped by domain (🔐 Cybersecurity / VAPT / SOC, 💻 Coding / Software,
+  📊 Data & Analytics, 🎨 Design, 📣 Marketing / Sales, 💰 Finance / Admin,
+  📦 Other) using a new rule-based classifier that reads the role part of
+  the title (RSS titles prefix the company, e.g. "Keeper Security: Account
+  Manager" — the company name no longer leaks the job into the security
+  bucket). Each job line now also shows ✅ Applied / ⬜ Not applied (from the
+  applications table) plus its age badge (🟢 today / 🟡 1d / 🟠 Nd / ⚪ Nd)
+  and expiry status. New ApplicationRepository.get_applied_job_ids() backs
+  the applied marker; the report API exposes `is_applied` and `domain` per
+  job.

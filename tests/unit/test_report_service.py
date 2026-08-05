@@ -142,6 +142,8 @@ class _MockJob:
         created_at=None,
         posted_at=None,
         is_active=True,
+        job_id="j1",
+        tags=None,
     ):
         self.title = title
         self.company = company
@@ -151,6 +153,8 @@ class _MockJob:
         self.created_at = created_at
         self.posted_at = posted_at
         self.is_active = is_active
+        self.id = job_id
+        self.tags = tags
 
 
 class TestGenerateDailyReport:
@@ -160,10 +164,11 @@ class TestGenerateDailyReport:
     async def test_returns_expected_shape(self):
         service = ReportService(MagicMock())
         service.job_repo = AsyncMock()
-        service.job_repo.get_recent_jobs.return_value = [_MockJob()]
+        service.job_repo.get_recent_jobs.return_value = [_MockJob(job_id="j1")]
         service.app_repo = AsyncMock()
         service.app_repo.get_recent_applications.return_value = [object()]
         service.app_repo.get_status_counts.return_value = {"applied": 5}
+        service.app_repo.get_applied_job_ids.return_value = {"j1"}
         service.job_repo.get_closing_soon.return_value = [
             _MockJob(title="Closing", expires_at=datetime.now(UTC)),
         ]
@@ -177,6 +182,7 @@ class TestGenerateDailyReport:
             "total_applications": 5,
         }
         assert report["new_jobs"][0]["title"] == "Job"
+        assert report["new_jobs"][0]["is_applied"] is True
         assert report["closing_soon"][0]["title"] == "Closing"
         assert report["application_status"] == {"applied": 5}
 
@@ -205,6 +211,7 @@ class TestGenerateDailyReport:
         service.app_repo = AsyncMock()
         service.app_repo.get_recent_applications.return_value = []
         service.app_repo.get_status_counts.return_value = {}
+        service.app_repo.get_applied_job_ids.return_value = set()
         service.job_repo.get_closing_soon.return_value = []
 
         report = await service.generate_daily_report()
@@ -216,6 +223,50 @@ class TestGenerateDailyReport:
         assert old["posted_at"] is not None
         assert closed["age_days"] == 0
         assert closed["is_active"] is False
+
+
+class TestClassifyDomain:
+    """Tests for the domain classifier used in alert sections."""
+
+    def test_security_domain_wins(self):
+        from interntrack.services.report_service import classify_domain
+
+        assert classify_domain("SOC Analyst", []) == "security"
+        assert classify_domain("Penetration Tester / VAPT", []) == "security"
+        assert classify_domain("DevSecOps Engineer", []) == "security"
+        assert classify_domain("Information Security Manager") == "security"
+
+    def test_company_prefix_does_not_leak_into_domain(self):
+        """Only the role after 'Company: ' is classified."""
+        from interntrack.services.report_service import classify_domain
+
+        # "Keeper Security" in the company prefix must not make this a
+        # security role — the actual role is Account Manager.
+        assert classify_domain("Keeper Security: Account Manager", []) == "marketing"
+        assert classify_domain("SecureCorp: Python Developer", []) == "coding"
+        assert classify_domain("Acme: SOC Analyst", []) == "security"
+
+    def test_coding_domain(self):
+        from interntrack.services.report_service import classify_domain
+
+        assert classify_domain("Senior Python Developer", []) == "coding"
+        assert classify_domain("Full Stack Engineer", []) == "coding"
+        assert classify_domain("Data Engineer", []) == "coding"
+
+    def test_other_domains(self):
+        from interntrack.services.report_service import classify_domain
+
+        assert classify_domain("Data Analyst", []) == "data"
+        assert classify_domain("UX Designer", []) == "design"
+        assert classify_domain("Account Executive", []) == "marketing"
+        assert classify_domain("Accountant", []) == "finance"
+        assert classify_domain("Random Unknown Role", []) == "other"
+
+    def test_tags_contribute_to_classification(self):
+        from interntrack.services.report_service import classify_domain
+
+        assert classify_domain("Analyst", ["security", "siem"]) == "security"
+        assert classify_domain("Specialist", ["python", "kubernetes"]) == "coding"
 
 
 class TestGenerateWeeklyReport:

@@ -17,6 +17,111 @@ from interntrack.utils.helpers import to_naive_utc, utcnow
 # regardless of the current working directory.
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "reports" / "templates"
 
+# Job domain classification for alert sections. Order matters: the first
+# matching domain wins (security checked first so "Security Analyst" is never
+# swallowed by the generic coding bucket).
+_DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
+    (
+        "security",
+        (
+            "security",
+            "cyber",
+            "soc",
+            "pentest",
+            "vapt",
+            "infosec",
+            "appsec",
+            "devsecops",
+            "siem",
+            "malware",
+            "threat",
+            "vulnerab",
+            "incident response",
+            "red team",
+            "blue team",
+            "ethical hack",
+            "information security",
+        ),
+    ),
+    (
+        "coding",
+        (
+            "software",
+            "developer",
+            "engineer",
+            "programmer",
+            "backend",
+            "frontend",
+            "full stack",
+            "fullstack",
+            "devops",
+            "sre",
+            "python",
+            "javascript",
+            "typescript",
+            "java",
+            "react",
+            "node",
+            "sql",
+            "data engineer",
+            "machine learning",
+            "data scientist",
+            "ai",
+            "architect",
+        ),
+    ),
+    (
+        "data",
+        (
+            "data",
+            "analyst",
+            "analytics",
+            "bi ",
+            "business intelligence",
+            "database",
+        ),
+    ),
+    (
+        "design",
+        ("designer", "ux", "ui ", "graphic", "visual", "product design"),
+    ),
+    ("finance", ("finance", "accountant", "accounting", "audit", "tax", "bookkeep")),
+    (
+        "marketing",
+        (
+            "marketing",
+            "sales",
+            "account",
+            "growth",
+            "content",
+            "social media",
+            "brand",
+            "seo",
+            "customer success",
+            "business development",
+        ),
+    ),
+]
+
+
+def classify_domain(title: str, tags: list | None = None) -> str:
+    """Classify a job into a domain bucket for alert sections.
+
+    RSS feeds prefix titles with the company name ("Acme Corp: Security
+    Engineer"), so only the role part after the first ": " is classified to
+    stop a company name like "Keeper Security" from dragging its sales roles
+    into the security bucket.
+    """
+    raw = f"{title or ''}"
+    role = raw.split(": ", 1)[-1] if ": " in raw else raw
+    text = role.lower()
+    if tags:
+        text += " " + " ".join(str(t).lower() for t in tags)
+    for domain, keywords in _DOMAIN_KEYWORDS:
+        if any(k in text for k in keywords):
+            return domain
+    return "other"
+
 
 class ReportService:
     """Report service for generating analytics reports."""
@@ -75,6 +180,7 @@ class ReportService:
         recent_jobs = await self.job_repo.get_recent_jobs(days=7)
         new_apps = await self.app_repo.get_recent_applications(days=1)
         status_counts = await self.app_repo.get_status_counts()
+        applied_ids = await self.app_repo.get_applied_job_ids()
 
         return {
             "report_type": "daily",
@@ -102,6 +208,11 @@ class ReportService:
                     "created_at": self._fmt_dt(getattr(job, "created_at", None)),
                     "expires_at": self._fmt_dt(getattr(job, "expires_at", None)),
                     "is_active": bool(getattr(job, "is_active", True)),
+                    "is_applied": str(getattr(job, "id", "")) in applied_ids,
+                    "domain": classify_domain(
+                        str(getattr(job, "title", "")),
+                        list(getattr(job, "tags", None) or []),
+                    ),
                     "age_days": self._job_age_days(job),
                 }
                 for job in recent_jobs[:25]
