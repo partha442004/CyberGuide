@@ -189,7 +189,7 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
 
     # Strategy 2: PyMuPDF (fast, good quality)
     try:
-        import fitz  # type: ignore[import-untyped]  # PyMuPDF
+        import fitz  # type: ignore  # PyMuPDF (stubs vary across environments)
 
         doc = fitz.open(stream=file_bytes, filetype="pdf")
         text = ""
