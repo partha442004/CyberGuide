@@ -178,12 +178,12 @@ async def _deliver_alert(
             "telegram_chat_id": getattr(user, "telegram_chat_id", None),
         }
     results: dict = {}
+    user_location = getattr(user, "location", None) if user else None
     non_telegram = [c for c in targets if c != "telegram"]
     email_targets = [c for c in non_telegram if c == "email"]
     text_targets = [c for c in non_telegram if c != "email"]
     if email_targets:
         # Email gets the styled HTML digest; other text channels stay plain.
-        user_location = getattr(user, "location", None) if user else None
         html = await build_daily_report_html(
             report,
             session,
@@ -214,7 +214,7 @@ async def _deliver_alert(
             results.update(await manager.notify(text_targets, message, subject=subject))
     if "telegram" in targets:
         chunks = await build_alert_chunks(
-            report, session, domains=domains, weekly=weekly, user_id=user_id
+            report, session, domains=domains, weekly=weekly, user_id=user_id, user_location=user_location
         )
         # Every chunk must deliver for the send to count as delivered.
         telegram_ok = True
@@ -507,6 +507,7 @@ async def _score_and_group_jobs(
     session,
     domains: list | None = None,
     user_id: str | None = None,
+    user_location: str | None = None,
 ) -> list[tuple[str, list[tuple[float | None, dict]]]]:
     """Score, filter and group the report's jobs into domain sections.
 
@@ -525,11 +526,19 @@ async def _score_and_group_jobs(
     if not scored:
         return []
 
+    # Location filtering: only include jobs matching user's location
+    loc_lower = (user_location or "").strip().lower()
+
     grouped: dict[str, list] = {}
     for score, job in scored:
         domain = job.get("domain") or "other"
         if domains and domain not in domains:
             continue
+        # Filter by location when user has a preferred location
+        if loc_lower:
+            job_loc = (job.get("location") or "").lower()
+            if not _location_matches(job_loc, loc_lower):
+                continue
         grouped.setdefault(domain, []).append((score, job))
 
     domain_order = [
@@ -557,6 +566,7 @@ async def build_daily_report_message(
     domains: list | None = None,
     title: str = "📊 Daily Report",
     user_id: str | None = None,
+    user_location: str | None = None,
 ) -> str:
     """Rich daily-report notification: summary counts plus the recent jobs
     grouped by domain (security / coding / data / …), each job carrying its
@@ -567,7 +577,9 @@ async def build_daily_report_message(
     resume match % is below the threshold.
     """
     lines = [format_daily_report(report, title)]
-    sections = await _score_and_group_jobs(report, session, domains, user_id=user_id)
+    sections = await _score_and_group_jobs(
+        report, session, domains, user_id=user_id, user_location=user_location
+    )
     for domain, items in sections:
         lines.append("")
         lines.append(f"{_DOMAIN_ICONS.get(domain, domain)} ({len(items)}):")
@@ -600,6 +612,7 @@ async def build_alert_chunks(
     weekly: bool = False,
     jobs_per_chunk: int = 4,
     user_id: str | None = None,
+    user_location: str | None = None,
 ) -> list[tuple[str, list[tuple[str, str]]]]:
     """Split the alert digest into Telegram-sized chunks with Apply buttons.
 
@@ -609,7 +622,9 @@ async def build_alert_chunks(
     keyboard on Telegram.
     """
     title = "📅 Weekly Digest" if weekly else "📊 Daily Report"
-    sections = await _score_and_group_jobs(report, session, domains, user_id=user_id)
+    sections = await _score_and_group_jobs(
+        report, session, domains, user_id=user_id, user_location=user_location
+    )
     flat: list[tuple[str, float | None, dict]] = []
     for domain, items in sections:
         for score, job in items:
@@ -690,7 +705,9 @@ async def build_daily_report_html(
     location breakdown table at the bottom.  All job content is escaped
     (external scrape data). Watched-company jobs get their own section.
     """
-    sections = await _score_and_group_jobs(report, session, domains, user_id=user_id)
+    sections = await _score_and_group_jobs(
+        report, session, domains, user_id=user_id, user_location=user_location
+    )
     watched = await _watched_company_names(session, user_id)
     summary = report.get("summary") or {}
     generated = report.get("generated_at") or ""
