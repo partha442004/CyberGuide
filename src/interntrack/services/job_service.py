@@ -9,6 +9,23 @@ from interntrack.domain.exceptions import DuplicateJobError
 from interntrack.domain.models import Job
 from interntrack.repositories.job_repository import JobRepository
 
+# String column limits on the Job model. Postgres enforces varchar(N) on
+# insert (SQLite does not), so an over-long field from a scraper crashed
+# discovery with StringDataRightTruncationError. Every save path clamps to
+# these limits before hitting the DB.
+_JOB_FIELD_LIMITS = {"title": 500, "company": 200, "location": 200, "url": 2000}
+
+
+def _normalize_job_fields(job_data: dict) -> dict:
+    """Clamp string fields to the Job model's column limits."""
+    normalized = dict(job_data)
+    for field, limit in _JOB_FIELD_LIMITS.items():
+        value = normalized.get(field)
+        if isinstance(value, str):
+            stripped = value.strip()
+            normalized[field] = stripped[:limit] if len(stripped) > limit else stripped
+    return normalized
+
 
 class JobService:
     """Job service for job management."""
@@ -19,6 +36,7 @@ class JobService:
 
     async def create_job(self, job_data: dict) -> Job:
         """Create a new job, checking for duplicates."""
+        job_data = _normalize_job_fields(job_data)
         existing = await self.job_repo.get_by_url(job_data.get("url", ""))
         if existing:
             raise DuplicateJobError(
