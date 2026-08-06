@@ -27,14 +27,15 @@ class FakePage:
 
 
 class FakeDoc:
-    """Fake PyMuPDF document."""
+    """Fake PyMuPDF document (mirrors the real Document API)."""
 
     def __init__(self, pages):
         self._pages = pages
         self.closed = False
+        self.page_count = len(pages)
 
-    def __iter__(self):
-        return iter(self._pages)
+    def load_page(self, page_number):
+        return self._pages[page_number]
 
     def close(self):
         self.closed = True

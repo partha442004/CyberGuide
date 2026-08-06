@@ -300,8 +300,8 @@ class ResumeParser:
 
             doc = pymupdf.open(file_path)
             full_text = ""
-            for page in doc:
-                full_text += page.get_text()
+            for page_number in range(doc.page_count):
+                full_text += doc.load_page(page_number).get_text()
             doc.close()
             return full_text
         except ImportError:

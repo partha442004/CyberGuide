@@ -145,7 +145,8 @@ class TestLoginUser:
         rotated = await client.post(f"/api/v1/users/{user_id}/rotate-token")
         assert rotated.status_code == 200
         new_token = rotated.json()["access_token"]
-        assert new_token and new_token != old_token
+        assert new_token
+        assert new_token != old_token
 
         # The old token no longer works.
         old_login = await client.post(
