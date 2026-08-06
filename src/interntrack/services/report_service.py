@@ -185,6 +185,7 @@ class ReportService:
         domains: list[str] | None = None,
         min_match_score: int | None = None,
         since: datetime | None = None,
+        location: str | None = None,
     ) -> dict[str, Any]:
         """Generate daily report.
 
@@ -199,6 +200,7 @@ class ReportService:
         message can drop jobs whose resume match % is below the threshold.
         ``since`` (naive UTC) restricts jobs to those created after the
         previous alert so the three daily sends never repeat a listing.
+        ``location`` optionally filters jobs by location (e.g., "Bangalore").
         """
         recent_jobs = await self.job_repo.get_recent_jobs(days=7)
         if since is not None:
@@ -234,10 +236,17 @@ class ReportService:
                 ),
                 "age_days": self._job_age_days(job),
             }
-            for job in recent_jobs[:25]
+            for job in recent_jobs[:50]
         ]
         if domains:
             jobs = [job for job in jobs if job["domain"] in domains]
+        if location:
+            # Filter by location (case-insensitive partial match)
+            location_lower = location.lower()
+            jobs = [
+                job for job in jobs
+                if location_lower in (job.get("location") or "").lower()
+            ]
 
         return {
             "report_type": "daily",

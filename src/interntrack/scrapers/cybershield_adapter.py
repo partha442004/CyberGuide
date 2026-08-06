@@ -39,13 +39,18 @@ class CybershieldScraperAdapter(BaseScraper):
     async def fetch(
         self,
         query: str,
-        location: str | None = None,  # noqa: ARG002 (interface)
+        location: str | None = None,
         limit: int = 100,
     ) -> list[RawJob]:
         """Run the wrapped cybershield scraper and map results to RawJob."""
+        # Build scrape kwargs
+        scrape_kwargs: dict[str, Any] = {"keywords": [query], "max_pages": 2}
+        if location:
+            scrape_kwargs["location"] = location
+        
         try:
             scraped = await asyncio.wait_for(
-                self._cyber.scrape(keywords=[query], max_pages=2),
+                self._cyber.scrape(**scrape_kwargs),
                 timeout=_SOURCE_TIMEOUT,
             )
         except TimeoutError:
