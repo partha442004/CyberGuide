@@ -43,14 +43,46 @@ class NaukriScraper(BaseScraper):
         )
         super().__init__(config)
 
-    def _build_search_url(self, keyword: str, page: int = 1) -> str:
+    # Location mapping for Indian cities
+    CITY_LOCATION_MAP = {
+        "bangalore": "Bangalore",
+        "bengaluru": "Bangalore",
+        "mumbai": "Mumbai",
+        "delhi": "Delhi",
+        "hyderabad": "Hyderabad",
+        "pune": "Pune",
+        "chennai": "Chennai",
+        "kolkata": "Kolkata",
+        "india": "India",
+    }
+
+    def _extract_location_from_query(self, query: str) -> tuple[str, str]:
+        """Extract location and clean keyword from query.
+        
+        Returns (clean_keyword, location). If no location found in query,
+        returns (query, "India").
+        """
+        query_lower = query.lower()
+        
+        # Check for city names in query
+        for city_key, city_value in self.CITY_LOCATION_MAP.items():
+            if city_key in query_lower:
+                # Remove city from query to get clean keyword
+                clean_query = query_lower.replace(city_key, "").strip()
+                if not clean_query:
+                    clean_query = "cybersecurity"  # Default if only location provided
+                return clean_query, city_value
+        
+        return query, "India"
+
+    def _build_search_url(self, keyword: str, page: int = 1, location: str = "India") -> str:
         """Build search URL for Naukri API."""
         params = {
             "noOfResults": 100,
             "urlType": "search_by_key_loc",
             "searchType": "adv",
             "keyword": keyword,
-            "location": "India",
+            "location": location,
             "pageNum": page,
             "sort": "date",  # Sort by date
         }
@@ -184,19 +216,33 @@ class NaukriScraper(BaseScraper):
         self,
         keywords: Optional[List[str]] = None,
         max_pages: int = 5,
+        location: Optional[str] = None,
         **kwargs,
     ) -> List[ScrapedJob]:
-        """Scrape jobs from Naukri."""
+        """Scrape jobs from Naukri.
+        
+        Args:
+            keywords: List of search keywords. If None, uses DEFAULT_KEYWORDS.
+            max_pages: Maximum pages to scrape per keyword.
+            location: Location to search. If None, extracts from keywords.
+        """
         keywords = keywords or self.DEFAULT_KEYWORDS
         all_jobs: List[ScrapedJob] = []
         seen_ids = set()
 
         for keyword in keywords:
-            logger.info(f"Scraping Naukri for keyword: {keyword}")
+            # Extract location from keyword if not explicitly provided
+            if location:
+                search_location = location
+                search_keyword = keyword
+            else:
+                search_keyword, search_location = self._extract_location_from_query(keyword)
+            
+            logger.info(f"Scraping Naukri for keyword: {search_keyword} in {search_location}")
 
             for page in range(1, max_pages + 1):
                 try:
-                    url = self._build_search_url(keyword, page)
+                    url = self._build_search_url(search_keyword, page, search_location)
                     response = await self._fetch(url)
                     data = response.json()
 
