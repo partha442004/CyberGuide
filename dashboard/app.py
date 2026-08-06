@@ -922,6 +922,9 @@ def main() -> None:
                 "Overview",
                 "Jobs",
                 "Applications",
+                "Salary Insights",
+                "Weekly Digest",
+                "Bookmarks",
                 "Analytics",
                 "Resume Match",
                 "Learning",
@@ -941,6 +944,9 @@ def main() -> None:
         "Overview": show_overview,
         "Jobs": show_jobs,
         "Applications": show_applications,
+        "Salary Insights": show_salary_insights,
+        "Weekly Digest": show_weekly_digest,
+        "Bookmarks": show_bookmarks,
         "Analytics": show_analytics,
         "Resume Match": show_resume_match,
         "Learning": show_learning,
@@ -1506,6 +1512,136 @@ def show_resume_match() -> None:
 # ---------------------------------------------------------------------------
 # Page: Learning
 # ---------------------------------------------------------------------------
+
+
+
+def show_salary_insights() -> None:
+    """Show salary insights dashboard."""
+    st.header("Salary Insights")
+    st.markdown("Salary statistics by domain, location, and company")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        domain = st.selectbox(
+            "Domain",
+            ["All", "security", "development", "data", "devops", "design"],
+        )
+    with col2:
+        location = st.text_input("Location filter", placeholder="e.g. Bangalore")
+
+    params = {}
+    if domain != "All":
+        params["domain"] = domain
+    if location:
+        params["location"] = location
+
+    data = _api("/salary/overview", params=params)
+    if data and data.get("overall"):
+        overall = data["overall"]
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Avg Salary", f"${overall['avg']:,}")
+        with col2:
+            st.metric("Min Salary", f"${overall['min']:,}")
+        with col3:
+            st.metric("Max Salary", f"${overall['max']:,}")
+        with col4:
+            st.metric("Jobs with Salary", data.get("jobs_with_salary", 0))
+
+        if data.get("by_domain"):
+            st.subheader("By Domain")
+            for d, stats in data["by_domain"].items():
+                if stats:
+                    st.write(f"**{d.title()}**: ${stats['min']:,} - ${stats['max']:,} (avg: ${stats['avg']:,}, {stats['count']} jobs)")
+
+        if data.get("by_location"):
+            st.subheader("Top Locations")
+            for loc, stats in list(data["by_location"].items())[:5]:
+                if stats:
+                    st.write(f"**{loc}**: ${stats['min']:,} - ${stats['max']:,} (avg: ${stats['avg']:,})")
+    else:
+        st.info("No salary data available yet. Run discovery to find jobs with salary info.")
+
+
+def show_weekly_digest() -> None:
+    """Show weekly digest summary."""
+    st.header("Weekly Digest")
+    st.markdown("Your weekly job market summary")
+
+    data = _api("/digest/summary")
+    if data:
+        jobs = data.get("jobs", {})
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Jobs This Week", jobs.get("this_week", 0), jobs.get("trend_pct", 0))
+        with col2:
+            st.metric("Applications", data.get("applications", {}).get("this_week", 0))
+        with col3:
+            trend = jobs.get("trend", "new")
+            st.metric("Market Trend", trend.upper())
+
+        highlights = data.get("highlights", [])
+        if highlights:
+            st.subheader("Highlights")
+            for h in highlights:
+                if h:
+                    st.write(h)
+
+        companies = data.get("new_companies", [])
+        if companies:
+            st.subheader("New Companies This Week")
+            st.write(", ".join(companies[:10]))
+
+        skills = data.get("top_skills", [])
+        if skills:
+            st.subheader("Top Skills in Demand")
+            for s in skills[:5]:
+                st.write(f"- {s['skill']} ({s['count']} jobs)")
+    else:
+        st.info("No weekly data available yet.")
+
+
+def show_bookmarks() -> None:
+    """Show saved job bookmarks."""
+    st.header("Bookmarks")
+    st.markdown("Your saved jobs for later")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        tag_filter = st.text_input("Filter by tag")
+    with col2:
+        st.write("")
+
+    params = {}
+    if tag_filter:
+        params["tag"] = tag_filter
+
+    data = _api("/bookmarks", params=params)
+    if data and data.get("bookmarks"):
+        for bm in data["bookmarks"]:
+            job = bm.get("job", {})
+            if job:
+                with st.container():
+                    col1, col2, col3 = st.columns([4, 2, 1])
+                    with col1:
+                        st.markdown(f"**{job.get('title', 'Unknown')}**")
+                        st.caption(f"{job.get('company', 'Unknown')} | {job.get('location', 'Remote')}")
+                    with col2:
+                        if bm.get("tags"):
+                            st.caption(f"Tags: {', '.join(bm['tags'])}")
+                        if bm.get("notes"):
+                            st.caption(f"Note: {bm['notes'][:50]}")
+                    with col3:
+                        if job.get("url"):
+                            st.link_button("View", job["url"], use_container_width=True)
+                    st.divider()
+    else:
+        st.info("No bookmarks yet. Save jobs from the Jobs page!")
+        st.subheader("How to Bookmark")
+        st.write("1. Go to Jobs page")
+        st.write("2. Run discovery to find jobs")
+        st.write("3. Click Save on any job you like")
+        st.write("4. Come back here to see your saved jobs")
 
 
 def show_learning() -> None:
