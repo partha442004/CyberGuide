@@ -1067,6 +1067,38 @@ def show_jobs() -> None:
                     saved = result.get("saved", 0)
                     if found > 0:
                         st.success(f"✅ Found **{found}** jobs, saved **{saved}** new!")
+                        # Show the discovered jobs with full details
+                        jobs = result.get("jobs", [])
+                        if jobs:
+                            st.subheader(f"🔍 Discovered Jobs ({len(jobs)})")
+                            for job in jobs[:20]:  # Show up to 20 jobs
+                                title = job.get("title", "Untitled")
+                                company = job.get("company", "Unknown")
+                                location = job.get("location", "Remote")
+                                url = job.get("url", "")
+                                source = job.get("source", "")
+                                urgency = job.get("urgency", {})
+                                urgency_label = urgency.get("label", "")
+                                urgency_color = urgency.get("color", "#94a3b8")
+
+                                with st.container():
+                                    col1, col2, col3 = st.columns([4, 2, 1])
+                                    with col1:
+                                        st.markdown(f"**{title}**")
+                                        st.caption(f"🏢 {company} · 📍 {location}")
+                                    with col2:
+                                        if source:
+                                            st.caption(f"📡 {source}")
+                                        if urgency_label:
+                                            st.markdown(
+                                                f"<span style='color:{urgency_color};font-size:12px;'>"
+                                                f"● {urgency_label}</span>",
+                                                unsafe_allow_html=True,
+                                            )
+                                    with col3:
+                                        if url:
+                                            st.link_button("Apply", url, use_container_width=True)
+                                    st.divider()
                     else:
                         st.info("No new jobs found this time. Try a different query.")
                 else:
