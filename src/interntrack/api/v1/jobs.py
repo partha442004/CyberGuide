@@ -4,7 +4,7 @@ Jobs API endpoints.
 
 import contextlib
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.api.schemas.job import (
@@ -364,7 +364,15 @@ async def run_discovery_for_users(
     service = JobService(db)
     details = []
     total_found = total_saved = 0
+    # Vercel serverless functions are killed at maxDuration (60s). Each query
+    # can take ~15s against live job sites, so stop early once the budget is
+    # used up instead of letting the whole request die with a 500.
+    import time
+
+    deadline = time.monotonic() + 50
     for query in unique:
+        if time.monotonic() > deadline:
+            break
         jobs = await registry.fetch_all(query=query)
         saved = await service.save_jobs(jobs)
         total_found += len(jobs)
@@ -383,7 +391,7 @@ async def run_discovery_for_users(
 async def run_discovery(
     source: str | None = None,
     query: str = "python developer",
-    body: dict | None = None,
+    body: dict | None = Body(default=None),
     db: AsyncSession = Depends(get_db),
 ):
     """Run job discovery from sources.
@@ -394,7 +402,7 @@ async def run_discovery(
     dashboard's "Run Discovery" button searches what the user typed
     instead of silently falling back to the default.
     """
-    if body and body.get("query"):
+    if isinstance(body, dict) and body.get("query"):
         query = body["query"]
     from interntrack.scrapers.registry import get_default_registry
 
