@@ -77,9 +77,11 @@ class JobRepository(BaseRepository[Job]):
     async def get_recent_jobs(self, days: int = 7) -> list[Job]:
         """Get jobs posted in the last N days."""
         cutoff_date = utcnow() - timedelta(days=days)
+        # Use string comparison to avoid tz-aware/naive mismatch on Neon/asyncpg
+        cutoff_str = cutoff_date.strftime("%Y-%m-%d %H:%M:%S")
         query = (
             select(Job)
-            .where(Job.created_at >= cutoff_date)
+            .where(Job.created_at >= cutoff_str)
             .order_by(Job.created_at.desc())
         )
         result = await self.session.execute(query)
