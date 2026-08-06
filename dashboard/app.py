@@ -1156,6 +1156,58 @@ def _render_saved_jobs_tab(jobs: list) -> None:
         )
     st.markdown("")
 
+    # Location filter (text) — narrows to jobs matching a city/region.
+    filter_col1, filter_col2 = st.columns([2, 3])
+    with filter_col1:
+        location_query = st.text_input(
+            "📍 Location filter",
+            placeholder="e.g. Bangalore, Remote",
+            label_visibility="collapsed",
+        )
+    with filter_col2:
+        st.caption(
+            "Filter by city/region — e.g. *Bangalore*, *Bengaluru*, *Remote*. "
+            "Leave empty to see everything."
+        )
+
+    # Apply the location filter to every job (and regroup afterwards).
+    loc_lower = (location_query or "").strip().lower()
+    if loc_lower:
+        filtered: list = []
+        for job in jobs:
+            job_loc = (job.get("location") or "").lower()
+            if loc_lower in job_loc:
+                filtered.append(job)
+                continue
+            # Fuzzy city synonyms: Bangalore <-> Bengaluru, Mumbai <-> Bombay.
+            synonyms = {
+                "bangalore": ["bengaluru"],
+                "bengaluru": ["bangalore"],
+                "mumbai": ["bombay"],
+                "bombay": ["mumbai"],
+                "delhi": ["new delhi", "ncr"],
+                "hyderabad": ["secunderabad"],
+            }
+            for canonical, alts in synonyms.items():
+                if loc_lower == canonical and any(a in job_loc for a in alts):
+                    filtered.append(job)
+                    break
+                if loc_lower in alts and canonical in job_loc:
+                    filtered.append(job)
+                    break
+        jobs = filtered
+        # Regroup after filtering.
+        grouped = {}
+        for job in jobs:
+            domain = classify_domain(job.get("title", ""))
+            grouped.setdefault(domain, []).append(job)
+        domains_present = [d for d in _DOMAIN_ORDER if d in grouped]
+        fresh_count = sum(1 for j in jobs if _is_fresh_24h(j.get("posted_at")))
+
+    if not jobs:
+        st.info("No jobs match the current location filter.")
+        return
+
     # Category filter (pills).
     options = ["All"] + domains_present
     labels = {"All": "All categories"}
