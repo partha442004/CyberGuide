@@ -25,6 +25,8 @@ async def run_job_discovery():
 
 # Default user whose alert preferences apply to the scheduled digest.
 DEFAULT_ALERT_USER = "user1"
+DEFAULT_DOMAINS = ["security"]  # Default alert domain when no user prefs
+DEFAULT_LOCATION = "Bangalore"  # Default discovery location
 
 # The three daily send slots (see .github/workflows/daily-refresh.yml).
 # Default categories per slot, used when the user hasn't customized
@@ -952,6 +954,16 @@ DOMAIN_QUERIES = {
         "vapt",
         "cybersecurity internship",
         "penetration testing",
+        "cybersecurity bangalore",
+        "soc analyst bangalore",
+        "security analyst bangalore",
+        "vapt bangalore",
+        "penetration testing bangalore",
+        "information security bangalore",
+        "network security bangalore",
+        "application security bangalore",
+        "cloud security bangalore",
+        "security operations bangalore",
     ],
     "coding": [
         "software engineer",
@@ -997,7 +1009,10 @@ def discovery_queries_for(prefs: dict, user=None, limit: int = 4) -> list[str]:
     for domain in domains:
         queries.extend(DOMAIN_QUERIES.get(domain, []))
     if not domains:
-        queries.extend(DOMAIN_QUERIES["other"][:2])
+        # Use default domain (cybersecurity) when no preferences set
+        for d in DEFAULT_DOMAINS:
+            queries.extend(DOMAIN_QUERIES.get(d, [])[:4])
+        queries.extend(DOMAIN_QUERIES["other"][:1])
     if user is not None:
         for skill in (getattr(user, "skills", None) or [])[:3]:
             skill_name = str(skill).strip()
@@ -1005,6 +1020,8 @@ def discovery_queries_for(prefs: dict, user=None, limit: int = 4) -> list[str]:
                 queries.append(f"{skill_name} intern")
     # Location-aware: add queries with location appended
     location = (getattr(user, "location", None) or "").strip() if user else ""
+    if not location:
+        location = DEFAULT_LOCATION
     if location:
         for q in list(queries):
             queries.append(f"{q} {location}")
