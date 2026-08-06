@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Icon Generator</title>
+</head>
+<body>
+<canvas id="canvas" width="128" height="128"></canvas>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+// Draw icon
+const gradient = ctx.createLinearGradient(0, 0, 128, 128);
+gradient.addColorStop(0, '#6366f1');
+gradient.addColorStop(1, '#8b5cf6');
+
+ctx.fillStyle = gradient;
+ctx.beginPath();
+ctx.roundRect(0, 0, 128, 128, 20);
+ctx.fill();
+
+// Draw shield shape
+ctx.fillStyle = 'white';
+ctx.beginPath();
+ctx.moveTo(64, 20);
+ctx.lineTo(100, 40);
+ctx.lineTo(100, 80);
+ctx.lineTo(64, 110);
+ctx.lineTo(28, 80);
+ctx.lineTo(28, 40);
+ctx.closePath();
+ctx.fill();
+
+// Draw checkmark
+ctx.strokeStyle = '#6366f1';
+ctx.lineWidth = 8;
+ctx.lineCap = 'round';
+ctx.lineJoin = 'round';
+ctx.beginPath();
+ctx.moveTo(45, 65);
+ctx.lineTo(58, 80);
+ctx.lineTo(85, 45);
+ctx.stroke();
+
+document.title = 'Icon generated';
+</script>
+</body>
+</html>
