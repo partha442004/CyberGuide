@@ -1154,7 +1154,9 @@ def _share_job_form() -> None:
             title = st.text_input("Job title (optional)", placeholder="SOC Analyst")
         with col2:
             company = st.text_input("Company (optional)", placeholder="Acme Corp")
-        location = st.text_input("Location (optional)", placeholder="Remote / Bengaluru")
+        location = st.text_input(
+            "Location (optional)", placeholder="Remote / Bengaluru"
+        )
         submitted = st.form_submit_button("💾 Save Job", use_container_width=True)
 
     if submitted:
@@ -1169,9 +1171,7 @@ def _share_job_form() -> None:
         if location:
             payload["location"] = location.strip()
         with st.spinner("Saving job..."):
-            resp = _api_raw(
-                "/jobs/share", method="POST", json_data=payload, timeout=45
-            )
+            resp = _api_raw("/jobs/share", method="POST", json_data=payload, timeout=45)
         if resp is None:
             st.error("Share API unreachable. Is the API server running?")
         elif resp.status_code == 200:
