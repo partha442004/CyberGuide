@@ -116,6 +116,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   garbage-stream no-crash, and `parse_upload` skill extraction without
   pymupdf. All 50 resume-parser tests pass.
 
+### Added (v1.22.0)
+- **AI Resume Parser** — upload PDF, auto-extract skills/experience/education/contact
+- **Job Application Tracker v2** — status flow (saved→applied→interview→offer→joined), timeline, conversion stats
+- **Salary Insights API** — salary statistics by domain, location, company; comparison tool
+- **Weekly Digest API** — job trends, new companies, top skills, market summary
+- **Bookmark/Save Jobs** — save jobs for later with tags and notes
+- **Dashboard pages** — Salary Insights, Weekly Digest, Bookmarks pages added to Streamlit dashboard
+
 ### Changed
 
 - **CI Security job**: bumped `aiohttp` 3.13.4 → 3.14.3 to fix
