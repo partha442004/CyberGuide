@@ -79,7 +79,10 @@ class JobRepository(BaseRepository[Job]):
 
         Uses ``is_active`` rather than a ``created_at`` cutoff to avoid
         tz-aware / tz-naive comparison failures on Neon + asyncpg.
+        Returns empty list for non-positive ``days``.
         """
+        if days <= 0:
+            return []
         query = (
             select(Job)
             .where(Job.is_active)
