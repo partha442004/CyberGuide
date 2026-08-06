@@ -14,9 +14,14 @@ from interntrack.api.v1 import (
     users,
     watchlists,
 )
+from interntrack.api.v1.applications_v2 import router as applications_v2_router
+from interntrack.api.v1.bookmarks import router as bookmarks_router
 from interntrack.api.v1.domains import router as domains_router
 from interntrack.api.v1.observability import router as observability_router
+from interntrack.api.v1.resume_parser import router as resume_parser_router
+from interntrack.api.v1.salary_insights import router as salary_insights_router
 from interntrack.api.v1.usage import router as usage_router
+from interntrack.api.v1.weekly_digest import router as weekly_digest_router
 
 api_router = APIRouter()
 
@@ -47,4 +52,19 @@ api_router.include_router(usage_router, prefix="/v1/usage", tags=["Usage"])
 api_router.include_router(domains_router, prefix="/v1/domains", tags=["Domains"])
 api_router.include_router(
     observability_router, prefix="/v1/observability", tags=["Observability"]
+)
+api_router.include_router(
+    resume_parser_router, prefix="/v1/resume", tags=["Resume Parser"]
+)
+api_router.include_router(
+    applications_v2_router, prefix="/v1/applications/v2", tags=["Applications V2"]
+)
+api_router.include_router(
+    salary_insights_router, prefix="/v1/salary", tags=["Salary Insights"]
+)
+api_router.include_router(
+    weekly_digest_router, prefix="/v1/digest", tags=["Weekly Digest"]
+)
+api_router.include_router(
+    bookmarks_router, prefix="/v1/bookmarks", tags=["Bookmarks"]
 )
