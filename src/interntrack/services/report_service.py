@@ -104,6 +104,17 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
 ]
 
 
+def _fmt_created(job) -> str:
+    """Format job's created_at as a naive UTC string for tz-safe comparison."""
+    dt = getattr(job, "created_at", None)
+    if dt is None:
+        return ""
+    dt = to_naive_utc(dt)
+    if dt is None:
+        return ""
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+
 def classify_domain(title: str, tags: list | None = None) -> str:
     """Classify a job into a domain bucket for alert sections.
 
@@ -191,10 +202,12 @@ class ReportService:
         """
         recent_jobs = await self.job_repo.get_recent_jobs(days=7)
         if since is not None:
+            # Use string comparison to avoid tz-aware/naive mismatch on Neon/asyncpg
+            since_str = since.strftime("%Y-%m-%d %H:%M:%S") if hasattr(since, "strftime") else str(since)
             recent_jobs = [
                 job
                 for job in recent_jobs
-                if (getattr(job, "created_at", None) or utcnow()) > since
+                if _fmt_created(job) > since_str
             ]
         new_apps = await self.app_repo.get_recent_applications(days=1)
         status_counts = await self.app_repo.get_status_counts()
