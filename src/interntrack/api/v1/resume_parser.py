@@ -168,7 +168,8 @@ SKILL_TAXONOMY = {
 
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
-    """Extract text from PDF using PyMuPDF."""
+    """Extract text from PDF using multiple strategies with graceful fallbacks."""
+    # Strategy 1: PyMuPDF (fastest, best quality)
     try:
         import fitz  # PyMuPDF
 
@@ -177,20 +178,43 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
         for page in doc:
             text += page.get_text()
         doc.close()
-        return text
-    except ImportError:
-        # Fallback: try pdfplumber
-        try:
-            import io
-            import pdfplumber
+        if text.strip():
+            return text
+    except Exception:
+        pass
 
-            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-                text = ""
-                for page in pdf.pages:
-                    text += page.extract_text() or ""
+    # Strategy 2: pdfplumber (lighter, good fallback)
+    try:
+        import io
+
+        import pdfplumber
+
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            text = ""
+            for page in pdf.pages:
+                text += page.extract_text() or ""
+            if text.strip():
                 return text
-        except ImportError:
-            return ""
+    except Exception:
+        pass
+
+    # Strategy 3: raw byte extraction — look for readable ASCII/UTF-8 runs
+    try:
+        import re as _re
+
+        # Decode bytes, strip non-printable characters, keep readable text
+        raw = file_bytes.decode("latin-1", errors="ignore")
+        # Extract runs of printable characters (at least 4 chars)
+        runs = _re.findall(r"[\x20-\x7e\n\r\t]{4,}", raw)
+        text = " ".join(runs)
+        # Clean up common PDF artifacts
+        text = _re.sub(r"\s+", " ", text).strip()
+        if len(text) > 50:
+            return text
+    except Exception:
+        pass
+
+    return ""
 
 
 def extract_skills(text: str) -> list[dict]:
