@@ -193,3 +193,89 @@ class JobRepository(BaseRepository[Job]):
             await self.session.flush()
 
         return len(expired_ids)
+
+
+    async def archive_expired_jobs(self, days: int = 30) -> int:
+        """Move jobs older than `days` to the expired_jobs archive table.
+
+        Returns the number of jobs archived.
+        """
+        from datetime import timedelta
+        from interntrack.domain.models import ExpiredJob
+
+        cutoff = utcnow() - timedelta(days=days)
+
+        # Find old jobs
+        result = await self.session.execute(
+            select(Job).where(
+                and_(
+                    Job.is_active,
+                    Job.first_seen_at.isnot(None),
+                    Job.first_seen_at < cutoff,
+                )
+            )
+        )
+        old_jobs = result.scalars().all()
+
+        if not old_jobs:
+            return 0
+
+        archived = 0
+        for job in old_jobs:
+            # Create archive record
+            expired = ExpiredJob(
+                id=str(uuid4()),
+                original_id=job.id,
+                title=job.title,
+                company=job.company,
+                location=job.location,
+                description=job.description,
+                url=job.url,
+                source=job.source.value if job.source else None,
+                job_type=job.job_type.value if job.job_type else None,
+                experience_level=job.experience_level.value if job.experience_level else None,
+                salary_min=job.salary_min,
+                salary_max=job.salary_max,
+                salary_currency=job.salary_currency,
+                is_remote=job.is_remote,
+                tags=job.tags,
+                expired_at=utcnow(),
+                reason="stale",
+                original_created_at=job.created_at,
+            )
+            self.session.add(expired)
+
+            # Mark original as inactive
+            job.is_active = False
+            archived += 1
+
+        await self.session.commit()
+        return archived
+
+    async def get_expired_jobs(self, limit: int = 50) -> list:
+        """Get archived expired jobs."""
+        from interntrack.domain.models import ExpiredJob
+
+        result = await self.session.execute(
+            select(ExpiredJob).order_by(ExpiredJob.expired_at.desc()).limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def get_fresh_jobs(self, limit: int = 100) -> list[Job]:
+        """Get only fresh jobs (not expired, not stale)."""
+        from datetime import timedelta
+
+        cutoff = utcnow() - timedelta(days=30)
+        result = await self.session.execute(
+            select(Job).where(
+                and_(
+                    Job.is_active,
+                    or_(
+                        Job.first_seen_at.is_(None),
+                        Job.first_seen_at >= cutoff,
+                    ),
+                )
+            ).order_by(Job.created_at.desc()).limit(limit)
+        )
+        return list(result.scalars().all())
+

@@ -925,6 +925,7 @@ def main() -> None:
                 "Salary Insights",
                 "Weekly Digest",
                 "Bookmarks",
+                "Expired Jobs",
                 "Analytics",
                 "Resume Match",
                 "Learning",
@@ -947,6 +948,7 @@ def main() -> None:
         "Salary Insights": show_salary_insights,
         "Weekly Digest": show_weekly_digest,
         "Bookmarks": show_bookmarks,
+        "Expired Jobs": show_expired,
         "Analytics": show_analytics,
         "Resume Match": show_resume_match,
         "Learning": show_learning,
@@ -1642,6 +1644,42 @@ def show_bookmarks() -> None:
         st.write("2. Run discovery to find jobs")
         st.write("3. Click Save on any job you like")
         st.write("4. Come back here to see your saved jobs")
+
+
+
+def show_expired() -> None:
+    """Show expired/archived jobs."""
+    st.header("Expired Jobs")
+    st.markdown("Jobs older than 30 days are automatically archived here")
+
+    # Archive button
+    if st.button("Archive Old Jobs Now", type="secondary"):
+        with st.spinner("Archiving old jobs..."):
+            result = _api("/jobs/archive-expired", method="POST", params={"days": 30})
+            if result:
+                st.success(f"Archived {result.get('archived', 0)} jobs")
+            else:
+                st.error("Archive failed")
+
+    # List expired jobs
+    data = _api("/jobs/expired", params={"limit": 100})
+    if data and data.get("expired_jobs"):
+        st.subheader(f"Archived Jobs ({data.get('total', 0)})")
+        for job in data["expired_jobs"]:
+            with st.container():
+                col1, col2, col3 = st.columns([4, 2, 1])
+                with col1:
+                    st.markdown(f"**{job.get('title', 'Unknown')}**")
+                    st.caption(f"{job.get('company', 'Unknown')} | {job.get('location', 'Remote')}")
+                with col2:
+                    st.caption(f"Source: {job.get('source', 'unknown')}")
+                    st.caption(f"Expired: {job.get('expired_at', 'N/A')}")
+                with col3:
+                    if job.get('reason'):
+                        st.caption(f"Reason: {job['reason']}")
+                st.divider()
+    else:
+        st.info("No expired jobs yet. Jobs older than 30 days will be archived automatically.")
 
 
 def show_learning() -> None:
