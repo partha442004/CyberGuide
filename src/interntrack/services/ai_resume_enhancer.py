@@ -25,14 +25,14 @@ SKILL_SYNONYMS = {
     "golang": "go",
     "c plus plus": "c++",
     "c sharp": "c#",
-    
+
     # Security tools
     "metasploit framework": "metasploit",
     "burp": "burp suite",
     "burp professional": "burp suite",
     "nmap scanner": "nmap",
     "wireshark network": "wireshark",
-    
+
     # Cloud platforms
     "amazon web services": "aws",
     "microsoft azure": "azure",
