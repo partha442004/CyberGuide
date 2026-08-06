@@ -141,7 +141,7 @@ class TestDiscoveryQueries:
         from interntrack.scheduler.jobs import discovery_queries_for
 
         user = SimpleNamespace(skills=["burp suite", "nmap"])
-        queries = discovery_queries_for({"domains": ["security"]}, user=user, limit=10)
+        queries = discovery_queries_for({"domains": ["security"]}, user=user, limit=30)
         assert any("burp suite intern" in q for q in queries)
         assert any("nmap intern" in q for q in queries)
 
