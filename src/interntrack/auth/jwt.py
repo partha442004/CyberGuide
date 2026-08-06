@@ -98,7 +98,7 @@ def create_access_token(
     expire = datetime.now(UTC) + (
         expires_delta or timedelta(minutes=settings.jwt_access_token_expire_minutes)
     )
-    to_encode.update({"exp": expire.isoformat(), "type": "access"})
+    to_encode.update({"exp": int(expire.timestamp()), "type": "access"})
     return _encode(to_encode, settings.jwt_secret_key, settings.jwt_algorithm)
 
 
@@ -107,14 +107,30 @@ def create_refresh_token(data: dict[str, Any]) -> str:
     settings = get_settings()
     to_encode = data.copy()
     expire = datetime.now(UTC) + timedelta(days=settings.jwt_refresh_token_expire_days)
-    to_encode.update({"exp": expire.isoformat(), "type": "refresh"})
+    to_encode.update({"exp": int(expire.timestamp()), "type": "refresh"})
     return _encode(to_encode, settings.jwt_secret_key, settings.jwt_algorithm)
 
 
 def decode_token(token: str) -> dict:
-    """Decode and verify a JWT token."""
+    """Decode and verify a JWT token, rejecting expired tokens.
+
+    The ``exp`` claim is stored as a standard epoch-seconds timestamp;
+    tokens with a missing or past ``exp`` raise ValueError just like an
+    invalid signature (the PyJWT path validated this automatically, so
+    the stdlib fallback must too).
+    """
     settings = get_settings()
-    return _decode(token, settings.jwt_secret_key, settings.jwt_algorithm)
+    payload = _decode(token, settings.jwt_secret_key, settings.jwt_algorithm)
+    exp = payload.get("exp")
+    if exp is None:
+        raise ValueError("Token missing expiry")
+    try:
+        exp_ts = float(exp)
+    except (TypeError, ValueError):
+        raise ValueError("Invalid token expiry") from None
+    if exp_ts < datetime.now(UTC).timestamp():
+        raise ValueError("Token expired")
+    return payload
 
 
 async def get_current_user(
