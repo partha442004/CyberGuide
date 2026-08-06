@@ -16,6 +16,10 @@ DEFAULT_FEEDS = {
     "weworkremotely": "https://weworkremotely.com/remote-jobs.rss",
     "hackernews_jobs": "https://hnrss.org/newest?q=hiring",
     "remotive": "https://remotive.com/remote-jobs/feed",
+    # India-specific feeds
+    "naukri_rss": "https://www.naukri.com/jobapi/v3/rss?keyword=cybersecurity&location=Bangalore",
+    "linkedin_india": "https://www.linkedin.com/jobs/search?keywords=cybersecurity&location=Bangalore&format=rss",
+    "instahyre": "https://instahyre.com/api/jobs?location=Bangalore&domain=cybersecurity",
 }
 
 
