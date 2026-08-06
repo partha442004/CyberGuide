@@ -12,6 +12,7 @@ from interntrack.api.v1 import (
     reports,
     skills,
     users,
+    watchlists,
 )
 
 api_router = APIRouter()
@@ -32,3 +33,8 @@ api_router.include_router(
 )
 api_router.include_router(skills.router, prefix="/v1/skills", tags=["Skills"])
 api_router.include_router(dashboard.router, prefix="/v1/dashboard", tags=["Dashboard"])
+api_router.include_router(
+    watchlists.router,
+    prefix="/v1/watchlists",
+    tags=["Watchlists"],
+)

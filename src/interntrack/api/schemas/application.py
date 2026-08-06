@@ -22,6 +22,7 @@ class ApplicationCreate(BaseModel):
     """Schema for creating an application."""
 
     job_id: str
+    user_id: str | None = None
 
 
 class ApplicationUpdate(BaseModel):
@@ -39,6 +40,7 @@ class ApplicationResponse(BaseModel):
 
     id: str
     job_id: str
+    user_id: str | None = None
     status: str
     applied_at: datetime | None = None
     interview_at: datetime | None = None

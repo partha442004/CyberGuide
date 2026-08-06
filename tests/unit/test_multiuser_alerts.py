@@ -115,7 +115,7 @@ class TestDeliverAlertRecipient:
 
         with (
             patch(
-                "interntrack.scheduler.jobs.build_daily_report_message",
+                "interntrack.scheduler.jobs.build_daily_report_html",
                 new=AsyncMock(return_value="msg"),
             ),
             patch(
@@ -151,7 +151,7 @@ class TestDeliverAlertRecipient:
         build_message = AsyncMock(return_value="msg")
 
         with patch(
-            "interntrack.scheduler.jobs.build_daily_report_message",
+            "interntrack.scheduler.jobs.build_daily_report_html",
             new=build_message,
         ):
             await _deliver_alert(

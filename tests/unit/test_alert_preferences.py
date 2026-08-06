@@ -351,7 +351,7 @@ class TestPreferencesAPI:
                 return_value=mock_manager,
             ),
             patch(
-                "interntrack.scheduler.jobs.build_daily_report_message",
+                "interntrack.scheduler.jobs.build_daily_report_html",
                 new=AsyncMock(return_value="filtered message"),
             ),
         ):
@@ -991,7 +991,7 @@ class TestAlertChunks:
 
         with (
             patch(
-                "interntrack.scheduler.jobs.build_daily_report_message",
+                "interntrack.scheduler.jobs.build_daily_report_html",
                 new=AsyncMock(return_value="full email text"),
             ),
             patch(

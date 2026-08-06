@@ -68,6 +68,9 @@ class User(Base, TimestampMixin):
     domains = Column(JSON, nullable=True, default=list)
     skills = Column(JSON, nullable=True, default=list)
     is_active = Column(Boolean, default=True)
+    # Secret per-user token (shown once at signup). Accounts with a token
+    # require it at login; legacy accounts without one keep email-only login.
+    access_token = Column(String(64), nullable=True, index=True)
 
     def __repr__(self) -> str:
         return f"<User {self.name} <{self.email}>>"
@@ -190,6 +193,10 @@ class Application(Base, TimestampMixin):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
     job_id = Column(String(36), ForeignKey("jobs.id"), nullable=False)
+    # Optional owner of this application (multi-user); NULL keeps the legacy
+    # global behavior. Added as a nullable column so the live table upgrades
+    # via ``_sync_missing_columns``.
+    user_id = Column(String(100), nullable=True, index=True)
     status: Column = Column(
         Enum(
             ApplicationStatus,
@@ -224,6 +231,7 @@ class Application(Base, TimestampMixin):
     __table_args__ = (
         Index("idx_application_status", "status"),
         Index("idx_application_job", "job_id"),
+        Index("idx_application_user", "user_id"),
     )
 
     def __repr__(self) -> str:
@@ -445,6 +453,28 @@ class ScheduledReport(Base, TimestampMixin):
     def _coerce_naive_utc(self, _key: str, value):
         """Normalize aware datetimes to naive UTC for Postgres binding."""
         return to_naive_utc(value)
+
+
+class CompanyWatchlist(Base, TimestampMixin):
+    """Companies a user wants to track for new job postings.
+
+    Lives in its own ``company_watchlists`` table (not the cybershield
+    ``watchlists`` table that shares the same database). One row per
+    (user, company); the daily digest highlights new jobs from these
+    companies even when they fall outside the user's category filter.
+    """
+
+    __tablename__ = "company_watchlists"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id = Column(String(100), nullable=False, index=True)
+    company = Column(String(200), nullable=False)
+    notes = Column(Text, nullable=True)
+
+    __table_args__ = (Index("idx_cw_user_company", "user_id", "company"),)
+
+    def __repr__(self) -> str:
+        return f"<CompanyWatchlist {self.company} for {self.user_id}>"
 
 
 class Company(Base, TimestampMixin):

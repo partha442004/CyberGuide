@@ -136,7 +136,7 @@ job alerts and resume matching**:
 | What | How it works |
 |---|---|
 | **Sign up** | Dashboard → *My Account* → create account with name + email (+ optional location, experience level, Telegram chat ID, categories, skills, resume). Alerts are **auto-enabled** at signup with your chosen categories. |
-| **Login** | By email only (no password) — the profile is looked up by email. *Known limitation: anyone who knows an email can view that profile; a per-user access token is a planned follow-up.* |
+| **Login** | By email only (no password) — the profile is looked up by email; when an account has an **access token** it must be supplied to log in (returned at registration and via `/rotate-token`). Each user's tracking data (applications, watchlist, overview) is scoped by their own `user_id`. |
 | **Personalized alerts** | The daily digest (08:00 / 13:00 / 19:00 IST) and Sunday weekly recap are built **per user**: their categories, their `min_match_score`, their own no-duplicates window, and their own send history. |
 | **Resume match %** | Match scores are computed from **your own** uploaded resume (stored per `user_id`), not a shared one. |
 | **Delivery** | Emails go to **your** email address (the app's SMTP account is only the sender) and Telegram messages go to **your** chat ID when you provide one. Users without a chat ID simply don't get Telegram — nothing leaks to other users' chats. |
@@ -144,12 +144,19 @@ job alerts and resume matching**:
 ### Users API
 
 ```
-POST   /api/v1/users/register   # name + email + optional profile fields → creates account + auto-enables alerts
-POST   /api/v1/users/login      # { email } → profile
-GET    /api/v1/users            # list profiles
-GET    /api/v1/users/{id}       # one profile
-PUT    /api/v1/users/{id}       # update profile (name, location, experience, telegram_chat_id, domains, skills)
+POST   /api/v1/users/register         # name + email + optional profile fields → account + auto-enabled alerts + access token
+POST   /api/v1/users/login            # { email } → profile + access token
+POST   /api/v1/users/{id}/rotate-token  # invalidate the old token, get a new one
+GET    /api/v1/users                  # list profiles
+GET    /api/v1/users/{id}             # one profile
+PUT    /api/v1/users/{id}             # update profile (name, location, experience, telegram_chat_id, domains, skills)
 ```
+
+Personalized endpoints accept `user_id` so each user only sees/tracks their
+own data: applications, the company watchlist, and `/dashboard/overview` +
+charts are all scoped per user when a `user_id` is given (no `user_id` →
+legacy shared view). The access token is a login credential — it is checked
+at login and rotated via the API, and should be treated like a password.
 
 Resumes continue to use the existing endpoint (keyed by `user_id`):
 `POST /api/v1/resumes/upload?user_id=...` and
@@ -168,14 +175,30 @@ Resumes continue to use the existing endpoint (keyed by `user_id`):
 | PUT | `/api/v1/jobs/{id}` | Update job |
 | DELETE | `/api/v1/jobs/{id}` | Delete job |
 | POST | `/api/v1/jobs/discovery/run` | Run job discovery |
+| POST | `/api/v1/jobs/discovery/run-for-users` | Per-user discovery (cron: each enabled user's categories/skills → queries) |
+| POST | `/api/v1/jobs/share` | **Share a job** — paste any URL (LinkedIn post, careers page) → auto-fetches title/company and saves it |
+| POST | `/api/v1/jobs/search` | Search saved jobs |
+| GET | `/api/v1/jobs/stats/overview` | Job statistics |
+| GET | `/api/v1/jobs/closing/soon` | Jobs closing soon |
 
 ### Applications
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/v1/applications/` | List applications |
-| POST | `/api/v1/applications/` | Create application |
+| GET | `/api/v1/applications/` | List applications (`?user_id=` scoped) |
+| POST | `/api/v1/applications/` | Create application (with `user_id`) |
+| GET | `/api/v1/applications/{id}` | Get application |
+| PUT | `/api/v1/applications/{id}` | Update application |
 | PATCH | `/api/v1/applications/{id}/status` | Update status |
-| GET | `/api/v1/applications/metrics/overview` | Get metrics |
+| DELETE | `/api/v1/applications/{id}` | Delete application |
+| GET | `/api/v1/applications/metrics/overview` | Get metrics (`?user_id=` scoped) |
+| GET | `/api/v1/applications/timeline/recent` | Recent applications timeline |
+
+### Watchlist
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/watchlists/?user_id=...` | Your watched companies |
+| POST | `/api/v1/watchlists/` | Watch a company (appears in your daily digest) |
+| DELETE | `/api/v1/watchlists/{id}` | Unwatch |
 
 ### Reports
 | Method | Endpoint | Description |

@@ -388,6 +388,7 @@ class TestApplicationsAPIUnit:
         from interntrack.api.v1.applications import create_application
 
         mock_service = MagicMock()
+        mock_service.get_application_for_job = AsyncMock(return_value=None)
         mock_service.create_application = AsyncMock(
             return_value=_make_app_mock(id="new-app"),
         )
@@ -402,6 +403,10 @@ class TestApplicationsAPIUnit:
             )
 
         assert result["id"] == "new-app"
+        mock_service.get_application_for_job.assert_awaited_once_with(
+            "job-1",
+            user_id=None,
+        )
 
     @pytest.mark.asyncio
     async def test_update_application_found(self):
@@ -818,7 +823,7 @@ class TestReportsAPIUnit:
                 new=recorder,
             ),
             patch(
-                "interntrack.scheduler.jobs.build_daily_report_message",
+                "interntrack.scheduler.jobs.build_daily_report_html",
                 new=AsyncMock(return_value="weekly text"),
             ),
         ):

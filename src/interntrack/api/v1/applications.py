@@ -3,6 +3,7 @@ Applications API endpoints.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.api.schemas.application import (
@@ -22,17 +23,33 @@ router = APIRouter()
 @router.get("/", response_model=ApplicationListResponse)
 async def list_applications(
     status: str | None = None,
+    user_id: str | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all applications."""
+    """List applications, optionally filtered by status and/or user."""
     service = ApplicationService(db)
 
     if status:
         from interntrack.domain.enums import ApplicationStatus
 
-        apps = await service.get_applications_by_status(ApplicationStatus(status))
+        apps = await service.get_applications_by_status(
+            ApplicationStatus(status),
+            user_id=user_id,
+        )
+    elif user_id:
+        # Per-user listing (all statuses).
+        from interntrack.domain.models import Application
+
+        result = await db.execute(
+            select(Application)
+            .where(Application.user_id == user_id)
+            .order_by(Application.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        apps = list(result.scalars().all())
     else:
         apps = await service.app_repo.get_all(skip=skip, limit=limit)
 
@@ -57,9 +74,19 @@ async def create_application(
     app_data: ApplicationCreate,
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new application."""
+    """Create a new application (optionally owned by a user).
+
+    When ``user_id`` is given and the user already applied to the job,
+    returns the existing application (idempotent — no duplicate rows).
+    """
     service = ApplicationService(db)
-    return await service.create_application(app_data.job_id)
+    existing = await service.get_application_for_job(
+        app_data.job_id,
+        user_id=app_data.user_id,
+    )
+    if existing:
+        return existing
+    return await service.create_application(app_data.job_id, user_id=app_data.user_id)
 
 
 @router.put("/{application_id}", response_model=ApplicationResponse)
@@ -111,18 +138,20 @@ async def update_status(
 
 @router.get("/metrics/overview", response_model=ApplicationMetrics)
 async def get_metrics(
+    user_id: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """Get application metrics."""
+    """Get application metrics (optionally scoped to one user)."""
     service = ApplicationService(db)
-    return await service.get_metrics()
+    return await service.get_metrics(user_id=user_id)
 
 
 @router.get("/timeline/recent")
 async def get_timeline(
     days: int = Query(30, ge=1, le=365),
+    user_id: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """Get application timeline."""
+    """Get application timeline (optionally scoped to one user)."""
     service = ApplicationService(db)
-    return await service.get_application_timeline(days)
+    return await service.get_application_timeline(days, user_id=user_id)
