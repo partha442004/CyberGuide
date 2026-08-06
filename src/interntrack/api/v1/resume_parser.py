@@ -168,8 +168,26 @@ SKILL_TAXONOMY = {
 
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
-    """Extract text from PDF using multiple strategies with graceful fallbacks."""
-    # Strategy 1: PyMuPDF (fastest, best quality)
+    """Extract text from PDF using multiple strategies with graceful fallbacks.
+
+    Strategy order: pypdf (pure Python, works everywhere) → PyMuPDF → pdfplumber → raw bytes.
+    """
+    # Strategy 1: pypdf (pure Python, works on Vercel and all environments)
+    try:
+        from io import BytesIO
+
+        from pypdf import PdfReader
+
+        reader = PdfReader(BytesIO(file_bytes))
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() or ""
+        if text.strip():
+            return text
+    except Exception:
+        pass
+
+    # Strategy 2: PyMuPDF (fast, good quality)
     try:
         import fitz  # PyMuPDF
 
@@ -183,7 +201,7 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
     except Exception:
         pass
 
-    # Strategy 2: pdfplumber (lighter, good fallback)
+    # Strategy 3: pdfplumber (good fallback)
     try:
         import io
 
@@ -198,16 +216,13 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
     except Exception:
         pass
 
-    # Strategy 3: raw byte extraction — look for readable ASCII/UTF-8 runs
+    # Strategy 4: raw byte extraction — look for readable ASCII/UTF-8 runs
     try:
         import re as _re
 
-        # Decode bytes, strip non-printable characters, keep readable text
         raw = file_bytes.decode("latin-1", errors="ignore")
-        # Extract runs of printable characters (at least 4 chars)
         runs = _re.findall(r"[\x20-\x7e\n\r\t]{4,}", raw)
         text = " ".join(runs)
-        # Clean up common PDF artifacts
         text = _re.sub(r"\s+", " ", text).strip()
         if len(text) > 50:
             return text
