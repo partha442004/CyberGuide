@@ -4,6 +4,37 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.20.12] - 2026-08-06
+
+### Fixed
+
+- **Job discovery 500 on Vercel — root cause found and fixed.** Discovery
+  scraped fine but every save to the Neon Postgres DB crashed with
+  `StringDataRightTruncationError: value too long for type character
+  varying(200)`. SQLite (local dev) doesn't enforce varchar lengths, so this
+  was invisible locally: a scraper returned a company/location over 200
+  chars and Postgres rejected the insert → the whole request returned
+  INTERNAL_ERROR. Job fields are now clamped to the model's column limits
+  (`title` 500, `company` 200, `location` 200, `url` 2000) in
+  `JobService.create_job`, so every save path (discovery, share-a-job,
+  create API) is safe. Verified end-to-end against the live Neon DB and the
+  live Vercel API: `POST /discovery/run` → `{"discovered":88,"saved":10}`.
+- **Vercel discovery timeout** — `vercel.json` now sets `maxDuration: 60`
+  and `run-for-users` stops early once a 50s budget is used, so the cron's
+  multi-query discovery finishes before the serverless limit instead of
+  dying with a 500.
+- **Dashboard discovery query was silently ignored** — `run_discovery`
+  declared `body: dict | None = None` without `Body()`, so FastAPI treated
+  it as a query parameter and the JSON `{"query": ...}` from the dashboard
+  was dropped (it always searched the default "python developer"). The body
+  is now read via `Body(default=None)` with an `isinstance` guard.
+- **CI gates** — fixed a ruff PT018 composite assertion and an unformatted
+  block in `dashboard/app.py`, plus a mypy error in
+  `cybershield/services/resume_service.py` (pymupdf `Document` is not
+  iterable in its type stubs; now iterates `page_count`/`load_page`), and
+  synced the `FakeDoc` test fixture to the real pymupdf API. Full CI (lint,
+  typecheck, security, version, tests, smoke) is green again.
+
 ## [1.20.11] - 2026-08-06
 
 ### Added
