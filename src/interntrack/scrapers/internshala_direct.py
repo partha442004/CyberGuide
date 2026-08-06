@@ -28,7 +28,9 @@ class InternshalaDirectScraper(BaseScraper):
 
         search_url = f"{self.BASE_URL}/internships/keyword/{query.replace(' ', '-')}/"
         if location:
-            search_url = f"{self.BASE_URL}/internships/{location.lower().replace(' ', '-')}/{query.replace(' ', '-')}/"
+            city = location.lower().replace(" ", "-")
+            q = query.replace(" ", "-")
+            search_url = f"{self.BASE_URL}/internships/{city}/{q}/"
 
         jobs: list[RawJob] = []
         try:
@@ -36,7 +38,9 @@ class InternshalaDirectScraper(BaseScraper):
                 timeout=20,
                 follow_redirects=True,
                 headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    ),
                     "Accept": "text/html,application/xhtml+xml",
                 },
             ) as client:

@@ -189,8 +189,6 @@ class Job(Base, TimestampMixin):
         return f"<Job {self.title} at {self.company}>"
 
 
-
-
 class ExpiredJob(Base, TimestampMixin):
     """Archived expired job listing.
 

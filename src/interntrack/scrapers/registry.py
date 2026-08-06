@@ -108,18 +108,18 @@ def get_default_registry() -> ScraperRegistry:
     from interntrack.scrapers.glassdoor import GlassdoorScraper
     from interntrack.scrapers.glassdoor_india import GlassdoorIndiaScraper
     from interntrack.scrapers.google_jobs import GoogleJobsScraper
+    from interntrack.scrapers.hackernews import HackerNewsScraper
     from interntrack.scrapers.hired import HiredScraper
+    from interntrack.scrapers.indeed import IndeedScraper
     from interntrack.scrapers.indeed_api import IndeedAPIScraper
     from interntrack.scrapers.indeed_india import IndeedIndiaScraper
     from interntrack.scrapers.internshala_direct import InternshalaDirectScraper
+    from interntrack.scrapers.linkedin import LinkedInScraper
     from interntrack.scrapers.linkedin_india import LinkedInIndiaScraper
     from interntrack.scrapers.linkedin_jobs_api import LinkedInJobsAPIScraper
+    from interntrack.scrapers.rss_feeds import RSSFeedScraper
     from interntrack.scrapers.timesjobs import TimesJobsScraper
     from interntrack.scrapers.wellfound import WellfoundScraper
-    from interntrack.scrapers.hackernews import HackerNewsScraper
-    from interntrack.scrapers.indeed import IndeedScraper
-    from interntrack.scrapers.linkedin import LinkedInScraper
-    from interntrack.scrapers.rss_feeds import RSSFeedScraper
 
     registry.register(HackerNewsScraper())
     registry.register(RSSFeedScraper())

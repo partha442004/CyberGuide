@@ -214,7 +214,12 @@ async def _deliver_alert(
             results.update(await manager.notify(text_targets, message, subject=subject))
     if "telegram" in targets:
         chunks = await build_alert_chunks(
-            report, session, domains=domains, weekly=weekly, user_id=user_id, user_location=user_location
+            report,
+            session,
+            domains=domains,
+            weekly=weekly,
+            user_id=user_id,
+            user_location=user_location,
         )
         # Every chunk must deliver for the send to count as delivered.
         telegram_ok = True
@@ -815,9 +820,7 @@ async def build_daily_report_html(
 
     # Role x location breakdown table
     if loc_lower:
-        parts.append(
-            _location_breakdown_table(location_sections, other_sections, loc_lower)
-        )
+        parts.append(_location_breakdown_table(location_sections, other_sections))
 
     parts.append(
         "<p style='color:#64748b;font-size:12px;margin-top:22px;'>"
@@ -858,13 +861,13 @@ def _location_breakdown_table(sections, other_sections):
         return ""
     from collections import Counter
 
-    dom_loc = {}
+    dom_loc: dict[str, Counter] = {}
     for _, job in all_jobs:
-        d = job.get("domain") or "other"
+        d = str(job.get("domain") or "other")
         loc = (job.get("location") or "Remote")[:30]
         dom_loc.setdefault(d, Counter())
         dom_loc[d][loc] += 1
-    loc_totals = Counter()
+    loc_totals: Counter[str] = Counter()
     for c in dom_loc.values():
         loc_totals.update(c)
     top_locs = [loc for loc, _ in loc_totals.most_common(6)]
@@ -1065,15 +1068,16 @@ async def verify_job_links():
             print(f"[{datetime.now(UTC)}] Found {len(dead_links)} dead links")
 
 
-
 async def archive_old_jobs(days: int = 30):
     """Archive jobs older than N days to keep the database lean."""
     async with get_db_session() as session:
         from interntrack.repositories.job_repository import JobRepository
+
         repo = JobRepository(session)
         count = await repo.archive_expired_jobs(days=days)
         if count > 0:
             print(f"[{datetime.now(UTC)}] Archived {count} expired jobs")
+
 
 async def deactivate_expired_jobs():
     """Deactivate expired job listings."""

@@ -65,6 +65,4 @@ api_router.include_router(
 api_router.include_router(
     weekly_digest_router, prefix="/v1/digest", tags=["Weekly Digest"]
 )
-api_router.include_router(
-    bookmarks_router, prefix="/v1/bookmarks", tags=["Bookmarks"]
-)
+api_router.include_router(bookmarks_router, prefix="/v1/bookmarks", tags=["Bookmarks"])

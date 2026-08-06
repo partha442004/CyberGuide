@@ -205,12 +205,11 @@ class ReportService:
         recent_jobs = await self.job_repo.get_recent_jobs(days=7)
         if since is not None:
             # Use string comparison to avoid tz-aware/naive mismatch on Neon/asyncpg
-            since_str = since.strftime("%Y-%m-%d %H:%M:%S") if hasattr(since, "strftime") else str(since)
-            recent_jobs = [
-                job
-                for job in recent_jobs
-                if _fmt_created(job) > since_str
-            ]
+            if hasattr(since, "strftime"):
+                since_str = since.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                since_str = str(since)
+            recent_jobs = [job for job in recent_jobs if _fmt_created(job) > since_str]
         new_apps = await self.app_repo.get_recent_applications(days=1)
         status_counts = await self.app_repo.get_status_counts()
         applied_ids = await self.app_repo.get_applied_job_ids()
@@ -244,8 +243,9 @@ class ReportService:
             # Filter by location (case-insensitive partial match)
             location_lower = location.lower()
             jobs = [
-                job for job in jobs
-                if location_lower in (job.get("location") or "").lower()
+                job
+                for job in jobs
+                if location_lower in str(job.get("location") or "").lower()
             ]
 
         return {

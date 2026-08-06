@@ -58,12 +58,12 @@ class NaukriScraper(BaseScraper):
 
     def _extract_location_from_query(self, query: str) -> tuple[str, str]:
         """Extract location and clean keyword from query.
-        
+
         Returns (clean_keyword, location). If no location found in query,
         returns (query, "India").
         """
         query_lower = query.lower()
-        
+
         # Check for city names in query
         for city_key, city_value in self.CITY_LOCATION_MAP.items():
             if city_key in query_lower:
@@ -72,7 +72,7 @@ class NaukriScraper(BaseScraper):
                 if not clean_query:
                     clean_query = "cybersecurity"  # Default if only location provided
                 return clean_query, city_value
-        
+
         return query, "India"
 
     def _build_search_url(self, keyword: str, page: int = 1, location: str = "India") -> str:
@@ -220,7 +220,7 @@ class NaukriScraper(BaseScraper):
         **kwargs,
     ) -> List[ScrapedJob]:
         """Scrape jobs from Naukri.
-        
+
         Args:
             keywords: List of search keywords. If None, uses DEFAULT_KEYWORDS.
             max_pages: Maximum pages to scrape per keyword.
@@ -237,7 +237,7 @@ class NaukriScraper(BaseScraper):
                 search_keyword = keyword
             else:
                 search_keyword, search_location = self._extract_location_from_query(keyword)
-            
+
             logger.info(f"Scraping Naukri for keyword: {search_keyword} in {search_location}")
 
             for page in range(1, max_pages + 1):

@@ -6,7 +6,6 @@ Uses PyMuPDF for PDF text extraction and rule-based skill matching
 """
 
 import re
-from typing import Any
 
 from fastapi import APIRouter, File, UploadFile
 
@@ -170,7 +169,8 @@ SKILL_TAXONOMY = {
 def extract_text_from_pdf(file_bytes: bytes) -> str:
     """Extract text from PDF using multiple strategies with graceful fallbacks.
 
-    Strategy order: pypdf (pure Python, works everywhere) → PyMuPDF → pdfplumber → raw bytes.
+    Strategy order: pypdf (pure Python, works everywhere) → PyMuPDF →
+    pdfplumber → raw bytes.
     """
     # Strategy 1: pypdf (pure Python, works on Vercel and all environments)
     try:
@@ -184,12 +184,12 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
             text += page.extract_text() or ""
         if text.strip():
             return text
-    except Exception:
+    except Exception:  # noqa: S110
         pass
 
     # Strategy 2: PyMuPDF (fast, good quality)
     try:
-        import fitz  # PyMuPDF
+        import fitz  # type: ignore[import-untyped]  # PyMuPDF
 
         doc = fitz.open(stream=file_bytes, filetype="pdf")
         text = ""
@@ -198,14 +198,14 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
         doc.close()
         if text.strip():
             return text
-    except Exception:
+    except Exception:  # noqa: S110
         pass
 
     # Strategy 3: pdfplumber (good fallback)
     try:
         import io
 
-        import pdfplumber
+        import pdfplumber  # type: ignore[import-not-found]
 
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
             text = ""
@@ -213,7 +213,7 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
                 text += page.extract_text() or ""
             if text.strip():
                 return text
-    except Exception:
+    except Exception:  # noqa: S110
         pass
 
     # Strategy 4: raw byte extraction — look for readable ASCII/UTF-8 runs
@@ -226,7 +226,7 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
         text = _re.sub(r"\s+", " ", text).strip()
         if len(text) > 50:
             return text
-    except Exception:
+    except Exception:  # noqa: S110
         pass
 
     return ""
@@ -295,7 +295,6 @@ def extract_experience(text: str) -> list[dict]:
             if match:
                 # Look for job title in surrounding lines
                 title = ""
-                company = ""
                 for j in range(max(0, i - 3), min(len(lines), i + 3)):
                     for tp in title_patterns:
                         tmatch = re.search(tp, lines[j], re.IGNORECASE)
@@ -324,7 +323,7 @@ def extract_experience(text: str) -> list[dict]:
 
 def extract_education(text: str) -> list[dict]:
     """Extract education entries from resume text."""
-    education = []
+    education: list[dict] = []
 
     edu_patterns = [
         r"((?:bachelor|master|phd|b\.?s\.?|m\.?s\.?|b\.?tech|m\.?tech|b\.?e\.?|m\.?e\.?)\s+(?:of|in)?\s*[\w\s]+)",
@@ -398,7 +397,9 @@ async def parse_resume(file: UploadFile = File(...)):
     text = extract_text_from_pdf(content)
     if not text:
         return {
-            "error": "Could not extract text from PDF. The file may be scanned/image-based."
+            "error": (
+                "Could not extract text from PDF. The file may be scanned/image-based."
+            )
         }
 
     # Extract structured data
@@ -408,7 +409,7 @@ async def parse_resume(file: UploadFile = File(...)):
     contact = extract_contact(text)
 
     # Categorize skills
-    skill_categories = {}
+    skill_categories: dict[str, list] = {}
     for skill in skills:
         cat = skill["category"]
         if cat not in skill_categories:

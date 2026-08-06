@@ -4,6 +4,7 @@ Glassdoor India scraper for Indian job market.
 Scrapes cybersecurity jobs from Glassdoor India (glassdoor.co.in).
 """
 
+import contextlib
 import logging
 import re
 from urllib.parse import urlencode
@@ -52,10 +53,15 @@ class GlassdoorIndiaScraper(BaseScraper):
             }
 
             url = f"{self.BASE_URL}/Job/jobs.htm?{urlencode(params)}"
-            response = await self._get(url, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Accept-Language": "en-IN,en;q=0.9",
-            })
+            response = await self._get(
+                url,
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    ),
+                    "Accept-Language": "en-IN,en;q=0.9",
+                },
+            )
 
             if response.status_code == 200:
                 from bs4 import BeautifulSoup
@@ -85,9 +91,13 @@ class GlassdoorIndiaScraper(BaseScraper):
             title = title_elem.get_text(strip=True) if title_elem else None
 
             # Extract company
-            company_elem = card.find("span", class_="EmployerProfile_compactEmployerName__LE242")
+            company_elem = card.find(
+                "span", class_="EmployerProfile_compactEmployerName__LE242"
+            )
             if not company_elem:
-                company_elem = card.find("div", class_="EmployerProfile_employerInfo__GaPbq")
+                company_elem = card.find(
+                    "div", class_="EmployerProfile_employerInfo__GaPbq"
+                )
             company = company_elem.get_text(strip=True) if company_elem else "Unknown"
 
             # Extract URL
@@ -95,7 +105,11 @@ class GlassdoorIndiaScraper(BaseScraper):
             url = None
             if link_elem:
                 href = link_elem.get("href", "")
-                url = href if href.startswith("http") else f"https://www.glassdoor.co.in{href}"
+                url = (
+                    href
+                    if href.startswith("http")
+                    else f"https://www.glassdoor.co.in{href}"
+                )
 
             # Extract location
             location_elem = card.find("div", class_="JobCard_jobLocation__bq6iT")
@@ -105,17 +119,17 @@ class GlassdoorIndiaScraper(BaseScraper):
             salary_elem = card.find("div", class_="JobCard_salaryEstimate__arV5J")
             salary_min, salary_max = None, None
             if salary_elem:
-                salary_min, salary_max = self._parse_salary(salary_elem.get_text(strip=True))
+                salary_min, salary_max = self._parse_salary(
+                    salary_elem.get_text(strip=True)
+                )
 
             # Extract rating
             rating_elem = card.find("div", class_="EmployerProfile_rating__o_dhJ")
             rating = None
             if rating_elem:
                 rating_text = rating_elem.get_text(strip=True)
-                try:
+                with contextlib.suppress(ValueError):
                     rating = float(rating_text.replace("/5", "").strip())
-                except ValueError:
-                    pass
 
             if not title:
                 return None
@@ -123,7 +137,8 @@ class GlassdoorIndiaScraper(BaseScraper):
             return RawJob(
                 title=title,
                 company=company,
-                url=url or f"https://www.glassdoor.co.in/Job/jobs.htm?sc.keyword={title}",
+                url=url
+                or f"https://www.glassdoor.co.in/Job/jobs.htm?sc.keyword={title}",
                 location=location,
                 salary_min=salary_min,
                 salary_max=salary_max,
@@ -144,13 +159,13 @@ class GlassdoorIndiaScraper(BaseScraper):
             min_sal = int(salary_match.group(1).replace(",", ""))
             max_sal = int(salary_match.group(2).replace(",", ""))
             return (min_sal, max_sal)
-        
+
         # Look for single salary
         single_match = re.search(r"₹([\d,]+)", text)
         if single_match:
             sal = int(single_match.group(1).replace(",", ""))
             return (sal, sal)
-        
+
         return (None, None)
 
     def _extract_tags(self, title: str) -> list[str]:

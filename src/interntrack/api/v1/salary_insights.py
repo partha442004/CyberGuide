@@ -3,7 +3,7 @@ Salary Insights API — salary statistics per domain, location, experience level
 """
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.database.session import get_db
@@ -55,15 +55,15 @@ async def salary_overview(
 
     # Collect salary data
     salaries = []
-    by_domain = {}
-    by_location = {}
+    by_domain: dict[str, list] = {}
+    by_location: dict[str, list] = {}
 
     for job in jobs:
         if job.salary_max and job.salary_max > 0:
             salaries.append(job.salary_max)
-            domain_key = _classify_domain(job.title, job.description)
+            domain_key = _classify_domain(str(job.title), str(job.description or ""))
             by_domain.setdefault(domain_key, []).append(job.salary_max)
-            loc = job.location or "Remote"
+            loc = str(job.location or "Remote")
             by_location.setdefault(loc, []).append(job.salary_max)
 
     if not salaries:
@@ -120,7 +120,9 @@ async def domain_salary(
 
     # Filter by domain
     domain_jobs = [
-        j for j in all_jobs if _classify_domain(j.title, j.description) == domain
+        j
+        for j in all_jobs
+        if _classify_domain(str(j.title), str(j.description or "")) == domain
     ]
 
     # Filter by location
@@ -140,10 +142,10 @@ async def domain_salary(
         }
 
     # Top companies by salary
-    company_salaries = {}
+    company_salaries: dict[str, list] = {}
     for job in domain_jobs:
         if job.salary_max and job.salary_max > 0:
-            company_salaries.setdefault(job.company, []).append(job.salary_max)
+            company_salaries.setdefault(str(job.company), []).append(job.salary_max)
 
     top_companies = sorted(
         company_salaries.items(),
@@ -189,7 +191,9 @@ async def compare_salaries(
     comparison = {}
     for domain in domain_list:
         domain_jobs = [
-            j for j in all_jobs if _classify_domain(j.title, j.description) == domain
+            j
+            for j in all_jobs
+            if _classify_domain(str(j.title), str(j.description or "")) == domain
         ]
         salaries = [
             j.salary_max for j in domain_jobs if j.salary_max and j.salary_max > 0

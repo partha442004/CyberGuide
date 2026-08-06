@@ -2,7 +2,7 @@
 Weekly Digest API — Sunday summary with trends, new companies, top skills.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
@@ -20,7 +20,7 @@ async def weekly_summary(
     db: AsyncSession = Depends(get_db),
 ):
     """Get weekly summary with trends compared to last week."""
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     week_ago = now - timedelta(days=7)
     two_weeks_ago = now - timedelta(days=14)
 
@@ -52,10 +52,10 @@ async def weekly_summary(
     jobs_result = await db.execute(query_jobs)
     recent_jobs = jobs_result.scalars().all()
 
-    skill_counts = {}
+    skill_counts: dict[str, int] = {}
     for job in recent_jobs:
         if job.tags:
-            for tag in job.tags:
+            for tag in list(job.tags):
                 skill_counts[tag] = skill_counts.get(tag, 0) + 1
 
     top_skills = sorted(skill_counts.items(), key=lambda x: x[1], reverse=True)[:10]
@@ -103,7 +103,7 @@ async def job_trends(
     db: AsyncSession = Depends(get_db),
 ):
     """Get job discovery trends over time."""
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     start = now - timedelta(days=days)
 
     query = select(Job).where(Job.created_at >= start)
@@ -111,13 +111,13 @@ async def job_trends(
     jobs = result.scalars().all()
 
     # Group by day
-    by_day = {}
+    by_day: dict[str, int] = {}
     for job in jobs:
         day = str(job.created_at.date()) if job.created_at else "unknown"
         by_day[day] = by_day.get(day, 0) + 1
 
     # Group by source
-    by_source = {}
+    by_source: dict[str, int] = {}
     for job in jobs:
         source = job.source.value if job.source else "unknown"
         by_source[source] = by_source.get(source, 0) + 1
@@ -125,9 +125,9 @@ async def job_trends(
     # Group by domain
     from interntrack.api.v1.salary_insights import _classify_domain
 
-    by_domain = {}
+    by_domain: dict[str, int] = {}
     for job in jobs:
-        domain = _classify_domain(job.title, job.description)
+        domain = _classify_domain(str(job.title), str(job.description or ""))
         by_domain[domain] = by_domain.get(domain, 0) + 1
 
     return {

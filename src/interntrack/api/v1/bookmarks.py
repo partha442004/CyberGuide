@@ -2,7 +2,7 @@
 Bookmark API — save interesting jobs for later with reminders.
 """
 
-from datetime import datetime, timezone
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -56,7 +56,7 @@ async def list_bookmarks(
     # Enrich job bookmarks with job details
     enriched = []
     for bm in bookmarks:
-        item = {
+        item: dict[str, Any] = {
             "id": bm.id,
             "item_type": bm.item_type,
             "item_id": bm.item_id,
@@ -154,9 +154,9 @@ async def update_bookmark(
         raise HTTPException(status_code=404, detail="Bookmark not found")
 
     if payload.notes is not None:
-        bookmark.notes = payload.notes
+        bookmark.notes = payload.notes  # type: ignore[assignment]
     if payload.tags is not None:
-        bookmark.tags = payload.tags
+        bookmark.tags = payload.tags  # type: ignore[assignment]
 
     await db.commit()
 
@@ -169,7 +169,7 @@ async def list_tags(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Bookmark))
     bookmarks = result.scalars().all()
 
-    all_tags = set()
+    all_tags: set[str] = set()
     for bm in bookmarks:
         if bm.tags:
             all_tags.update(bm.tags)

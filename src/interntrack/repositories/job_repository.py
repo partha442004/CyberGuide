@@ -3,8 +3,9 @@ Job repository with job-specific queries.
 """
 
 from datetime import timedelta
+from uuid import uuid4
 
-from sqlalchemy import and_, func, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.domain.enums import JobSource, JobType
@@ -84,10 +85,7 @@ class JobRepository(BaseRepository[Job]):
         if days <= 0:
             return []
         query = (
-            select(Job)
-            .where(Job.is_active)
-            .order_by(Job.created_at.desc())
-            .limit(200)
+            select(Job).where(Job.is_active).order_by(Job.created_at.desc()).limit(200)
         )
         result = await self.session.execute(query)
         return list(result.scalars().all())
@@ -201,13 +199,13 @@ class JobRepository(BaseRepository[Job]):
 
         return len(expired_ids)
 
-
     async def archive_expired_jobs(self, days: int = 30) -> int:
         """Move jobs older than `days` to the expired_jobs archive table.
 
         Returns the number of jobs archived.
         """
         from datetime import timedelta
+
         from interntrack.domain.models import ExpiredJob
 
         cutoff = utcnow() - timedelta(days=days)
@@ -240,7 +238,9 @@ class JobRepository(BaseRepository[Job]):
                 url=job.url,
                 source=job.source.value if job.source else None,
                 job_type=job.job_type.value if job.job_type else None,
-                experience_level=job.experience_level.value if job.experience_level else None,
+                experience_level=job.experience_level.value
+                if job.experience_level
+                else None,
                 salary_min=job.salary_min,
                 salary_max=job.salary_max,
                 salary_currency=job.salary_currency,
@@ -253,7 +253,7 @@ class JobRepository(BaseRepository[Job]):
             self.session.add(expired)
 
             # Mark original as inactive
-            job.is_active = False
+            job.is_active = False  # type: ignore[assignment]
             archived += 1
 
         await self.session.commit()
@@ -274,7 +274,8 @@ class JobRepository(BaseRepository[Job]):
 
         cutoff = utcnow() - timedelta(days=30)
         result = await self.session.execute(
-            select(Job).where(
+            select(Job)
+            .where(
                 and_(
                     Job.is_active,
                     or_(
@@ -282,7 +283,8 @@ class JobRepository(BaseRepository[Job]):
                         Job.first_seen_at >= cutoff,
                     ),
                 )
-            ).order_by(Job.created_at.desc()).limit(limit)
+            )
+            .order_by(Job.created_at.desc())
+            .limit(limit)
         )
         return list(result.scalars().all())
-

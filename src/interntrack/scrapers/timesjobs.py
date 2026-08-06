@@ -51,10 +51,15 @@ class TimesJobsScraper(BaseScraper):
                 params["location"] = location
 
             url = f"{self.BASE_URL}/job/search?{urlencode(params)}"
-            response = await self._get(url, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Accept-Language": "en-IN,en;q=0.9",
-            })
+            response = await self._get(
+                url,
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    ),
+                    "Accept-Language": "en-IN,en;q=0.9",
+                },
+            )
 
             if response.status_code == 200:
                 from bs4 import BeautifulSoup
@@ -102,18 +107,21 @@ class TimesJobsScraper(BaseScraper):
             if location_elem:
                 location_text = location_elem.get_text(strip=True)
                 # Extract location from icons text
-                location_match = re.search(r"location:?\s*([^·]+)", location_text, re.IGNORECASE)
+                location_match = re.search(
+                    r"location:?\s*([^·]+)", location_text, re.IGNORECASE
+                )
                 if location_match:
                     location = location_match.group(1).strip()
 
             # Extract experience
             experience_elem = card.find("span", class_="top-job-icons")
-            experience = None
             if experience_elem:
                 exp_text = experience_elem.get_text(strip=True)
-                exp_match = re.search(r"experience:?\s*([^·]+)", exp_text, re.IGNORECASE)
+                exp_match = re.search(
+                    r"experience:?\s*([^·]+)", exp_text, re.IGNORECASE
+                )
                 if exp_match:
-                    experience = exp_match.group(1).strip()
+                    exp_match.group(1).strip()
 
             # Extract salary
             salary_elem = card.find("span", class_="top-job-icons")
@@ -128,12 +136,13 @@ class TimesJobsScraper(BaseScraper):
 
             # Extract posted date
             posted_elem = card.find("span", class_="top-job-icons")
-            posted_date = None
             if posted_elem:
                 posted_text = posted_elem.get_text(strip=True)
-                posted_match = re.search(r"posted:?\s*([^·]+)", posted_text, re.IGNORECASE)
+                posted_match = re.search(
+                    r"posted:?\s*([^·]+)", posted_text, re.IGNORECASE
+                )
                 if posted_match:
-                    posted_date = posted_match.group(1).strip()
+                    posted_match.group(1).strip()
 
             if not title:
                 return None
@@ -162,13 +171,13 @@ class TimesJobsScraper(BaseScraper):
             min_sal = int(salary_match.group(1).replace(",", ""))
             max_sal = int(salary_match.group(2).replace(",", ""))
             return (min_sal, max_sal)
-        
+
         # Look for single salary
         single_match = re.search(r"₹([\d,]+)", text)
         if single_match:
             sal = int(single_match.group(1).replace(",", ""))
             return (sal, sal)
-        
+
         return (None, None)
 
     def _extract_tags(self, title: str, description: str | None) -> list[str]:

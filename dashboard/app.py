@@ -1105,7 +1105,9 @@ def show_jobs() -> None:
                                             )
                                     with col3:
                                         if url:
-                                            st.link_button("Apply", url, use_container_width=True)
+                                            st.link_button(
+                                                "Apply", url, use_container_width=True
+                                            )
                                     st.divider()
                     else:
                         st.info("No new jobs found this time. Try a different query.")
@@ -1568,7 +1570,6 @@ def show_resume_match() -> None:
 # ---------------------------------------------------------------------------
 
 
-
 def show_salary_insights() -> None:
     """Show salary insights dashboard."""
     st.header("Salary Insights")
@@ -1606,15 +1607,21 @@ def show_salary_insights() -> None:
             st.subheader("By Domain")
             for d, stats in data["by_domain"].items():
                 if stats:
-                    st.write(f"**{d.title()}**: ${stats['min']:,} - ${stats['max']:,} (avg: ${stats['avg']:,}, {stats['count']} jobs)")
+                    st.write(
+                        f"**{d.title()}**: ${stats['min']:,} - ${stats['max']:,} (avg: ${stats['avg']:,}, {stats['count']} jobs)"
+                    )
 
         if data.get("by_location"):
             st.subheader("Top Locations")
             for loc, stats in list(data["by_location"].items())[:5]:
                 if stats:
-                    st.write(f"**{loc}**: ${stats['min']:,} - ${stats['max']:,} (avg: ${stats['avg']:,})")
+                    st.write(
+                        f"**{loc}**: ${stats['min']:,} - ${stats['max']:,} (avg: ${stats['avg']:,})"
+                    )
     else:
-        st.info("No salary data available yet. Run discovery to find jobs with salary info.")
+        st.info(
+            "No salary data available yet. Run discovery to find jobs with salary info."
+        )
 
 
 def show_weekly_digest() -> None:
@@ -1627,7 +1634,9 @@ def show_weekly_digest() -> None:
         jobs = data.get("jobs", {})
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("Jobs This Week", jobs.get("this_week", 0), jobs.get("trend_pct", 0))
+            st.metric(
+                "Jobs This Week", jobs.get("this_week", 0), jobs.get("trend_pct", 0)
+            )
         with col2:
             st.metric("Applications", data.get("applications", {}).get("this_week", 0))
         with col3:
@@ -1679,7 +1688,9 @@ def show_bookmarks() -> None:
                     col1, col2, col3 = st.columns([4, 2, 1])
                     with col1:
                         st.markdown(f"**{job.get('title', 'Unknown')}**")
-                        st.caption(f"{job.get('company', 'Unknown')} | {job.get('location', 'Remote')}")
+                        st.caption(
+                            f"{job.get('company', 'Unknown')} | {job.get('location', 'Remote')}"
+                        )
                     with col2:
                         if bm.get("tags"):
                             st.caption(f"Tags: {', '.join(bm['tags'])}")
@@ -1696,7 +1707,6 @@ def show_bookmarks() -> None:
         st.write("2. Run discovery to find jobs")
         st.write("3. Click Save on any job you like")
         st.write("4. Come back here to see your saved jobs")
-
 
 
 def show_expired() -> None:
@@ -1722,16 +1732,20 @@ def show_expired() -> None:
                 col1, col2, col3 = st.columns([4, 2, 1])
                 with col1:
                     st.markdown(f"**{job.get('title', 'Unknown')}**")
-                    st.caption(f"{job.get('company', 'Unknown')} | {job.get('location', 'Remote')}")
+                    st.caption(
+                        f"{job.get('company', 'Unknown')} | {job.get('location', 'Remote')}"
+                    )
                 with col2:
                     st.caption(f"Source: {job.get('source', 'unknown')}")
                     st.caption(f"Expired: {job.get('expired_at', 'N/A')}")
                 with col3:
-                    if job.get('reason'):
+                    if job.get("reason"):
                         st.caption(f"Reason: {job['reason']}")
                 st.divider()
     else:
-        st.info("No expired jobs yet. Jobs older than 30 days will be archived automatically.")
+        st.info(
+            "No expired jobs yet. Jobs older than 30 days will be archived automatically."
+        )
 
 
 def show_learning() -> None:

@@ -2,11 +2,12 @@
 Tests for new scrapers: Hired, AngelList, Indeed API, LinkedIn Jobs API.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from interntrack.scrapers.hired import HiredScraper
+import pytest
+
 from interntrack.scrapers.angellist import AngelListScraper
+from interntrack.scrapers.hired import HiredScraper
 from interntrack.scrapers.indeed_api import IndeedAPIScraper
 from interntrack.scrapers.linkedin_jobs_api import LinkedInJobsAPIScraper
 
@@ -25,7 +26,7 @@ class TestHiredScraper:
     @pytest.mark.asyncio
     async def test_fetch_returns_jobs(self):
         scraper = HiredScraper()
-        
+
         # Mock the response
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -40,7 +41,7 @@ class TestHiredScraper:
             </div>
         </html>
         """
-        
+
         with patch.object(scraper, "_get", new=AsyncMock(return_value=mock_response)):
             jobs = await scraper.fetch("security", limit=5)
             assert len(jobs) > 0
@@ -50,8 +51,10 @@ class TestHiredScraper:
     @pytest.mark.asyncio
     async def test_fetch_handles_errors(self):
         scraper = HiredScraper()
-        
-        with patch.object(scraper, "_get", new=AsyncMock(side_effect=Exception("Network error"))):
+
+        with patch.object(
+            scraper, "_get", new=AsyncMock(side_effect=Exception("Network error"))
+        ):
             jobs = await scraper.fetch("security", limit=5)
             assert jobs == []
 
@@ -76,7 +79,7 @@ class TestAngelListScraper:
     @pytest.mark.asyncio
     async def test_fetch_returns_jobs(self):
         scraper = AngelListScraper()
-        
+
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.text = """
@@ -90,7 +93,7 @@ class TestAngelListScraper:
             </div>
         </html>
         """
-        
+
         with patch.object(scraper, "_get", new=AsyncMock(return_value=mock_response)):
             jobs = await scraper.fetch("security analyst", limit=5)
             assert len(jobs) > 0
@@ -99,8 +102,10 @@ class TestAngelListScraper:
     @pytest.mark.asyncio
     async def test_fetch_handles_errors(self):
         scraper = AngelListScraper()
-        
-        with patch.object(scraper, "_get", new=AsyncMock(side_effect=Exception("Error"))):
+
+        with patch.object(
+            scraper, "_get", new=AsyncMock(side_effect=Exception("Error"))
+        ):
             jobs = await scraper.fetch("security", limit=5)
             assert jobs == []
 
@@ -119,7 +124,7 @@ class TestIndeedAPIScraper:
     @pytest.mark.asyncio
     async def test_fetch_returns_jobs(self):
         scraper = IndeedAPIScraper()
-        
+
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.text = """
@@ -132,7 +137,7 @@ class TestIndeedAPIScraper:
             </div>
         </html>
         """
-        
+
         with patch.object(scraper, "_get", new=AsyncMock(return_value=mock_response)):
             jobs = await scraper.fetch("security engineer", limit=5)
             assert len(jobs) > 0
@@ -142,8 +147,10 @@ class TestIndeedAPIScraper:
     @pytest.mark.asyncio
     async def test_fetch_handles_errors(self):
         scraper = IndeedAPIScraper()
-        
-        with patch.object(scraper, "_get", new=AsyncMock(side_effect=Exception("Error"))):
+
+        with patch.object(
+            scraper, "_get", new=AsyncMock(side_effect=Exception("Error"))
+        ):
             jobs = await scraper.fetch("security", limit=5)
             assert jobs == []
 
@@ -166,7 +173,7 @@ class TestLinkedInJobsAPIScraper:
     @pytest.mark.asyncio
     async def test_fetch_returns_jobs(self):
         scraper = LinkedInJobsAPIScraper()
-        
+
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.text = """
@@ -179,7 +186,7 @@ class TestLinkedInJobsAPIScraper:
             </li>
         </html>
         """
-        
+
         with patch.object(scraper, "_get", new=AsyncMock(return_value=mock_response)):
             jobs = await scraper.fetch("cyber security", limit=5)
             assert len(jobs) > 0
@@ -189,11 +196,11 @@ class TestLinkedInJobsAPIScraper:
     @pytest.mark.asyncio
     async def test_fetch_handles_auth_wall(self):
         scraper = LinkedInJobsAPIScraper()
-        
+
         mock_response = MagicMock()
         mock_response.status_code = 999
         mock_response.text = "authwall challenge"
-        
+
         with patch.object(scraper, "_get", new=AsyncMock(return_value=mock_response)):
             jobs = await scraper.fetch("security", limit=5)
             assert jobs == []
@@ -201,7 +208,9 @@ class TestLinkedInJobsAPIScraper:
     @pytest.mark.asyncio
     async def test_fetch_handles_errors(self):
         scraper = LinkedInJobsAPIScraper()
-        
-        with patch.object(scraper, "_get", new=AsyncMock(side_effect=Exception("Error"))):
+
+        with patch.object(
+            scraper, "_get", new=AsyncMock(side_effect=Exception("Error"))
+        ):
             jobs = await scraper.fetch("security", limit=5)
             assert jobs == []
