@@ -1065,6 +1065,16 @@ async def verify_job_links():
             print(f"[{datetime.now(UTC)}] Found {len(dead_links)} dead links")
 
 
+
+async def archive_old_jobs(days: int = 30):
+    """Archive jobs older than N days to keep the database lean."""
+    async with get_db_session() as session:
+        from interntrack.repositories.job_repository import JobRepository
+        repo = JobRepository(session)
+        count = await repo.archive_expired_jobs(days=days)
+        if count > 0:
+            print(f"[{datetime.now(UTC)}] Archived {count} expired jobs")
+
 async def deactivate_expired_jobs():
     """Deactivate expired job listings."""
     async with get_db_session() as session:

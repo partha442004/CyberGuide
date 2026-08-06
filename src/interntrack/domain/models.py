@@ -189,6 +189,42 @@ class Job(Base, TimestampMixin):
         return f"<Job {self.title} at {self.company}>"
 
 
+
+
+class ExpiredJob(Base, TimestampMixin):
+    """Archived expired job listing.
+
+    Jobs older than 30 days are moved here to keep the active jobs table
+    lean and fast. The full job data is preserved for historical analysis.
+    """
+
+    __tablename__ = "expired_jobs"
+
+    id = Column(String(36), primary_key=True)
+    original_id = Column(String(36), index=True, nullable=False)
+    title = Column(String(500), nullable=False)
+    company = Column(String(200), nullable=False)
+    location = Column(String(200), nullable=True)
+    description = Column(Text, nullable=True)
+    url = Column(String(2000), nullable=True)
+    source = Column(String(50), nullable=True)
+    job_type = Column(String(50), nullable=True)
+    experience_level = Column(String(50), nullable=True)
+    salary_min = Column(Integer, nullable=True)
+    salary_max = Column(Integer, nullable=True)
+    salary_currency = Column(String(10), nullable=True)
+    is_remote = Column(Boolean, default=False)
+    tags = Column(JSON, nullable=True)
+    expired_at = Column(DateTime, nullable=False)
+    reason = Column(String(100), nullable=True)  # expired, stale, manual
+    original_created_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("idx_expired_original", "original_id"),
+        Index("idx_expired_company", "company"),
+    )
+
+
 class Application(Base, TimestampMixin):
     """Job application tracking model."""
 
