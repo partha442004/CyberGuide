@@ -14,6 +14,9 @@ from interntrack.api.v1 import (
     users,
     watchlists,
 )
+from interntrack.api.v1.domains import router as domains_router
+from interntrack.api.v1.observability import router as observability_router
+from interntrack.api.v1.usage import router as usage_router
 
 api_router = APIRouter()
 
@@ -37,4 +40,11 @@ api_router.include_router(
     watchlists.router,
     prefix="/v1/watchlists",
     tags=["Watchlists"],
+)
+
+# New feature routers
+api_router.include_router(usage_router, prefix="/v1/usage", tags=["Usage"])
+api_router.include_router(domains_router, prefix="/v1/domains", tags=["Domains"])
+api_router.include_router(
+    observability_router, prefix="/v1/observability", tags=["Observability"]
 )
