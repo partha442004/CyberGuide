@@ -24,26 +24,15 @@ jobs:
     env:
       API_BASE: https://cyberguide-api.vercel.app
     steps:
-      - name: Run job discovery (cybersecurity)
-        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *'
+      # Per-user discovery: the API derives search queries from every enabled
+      # account's preferred domains + skills (e.g. a cybersecurity user gets
+      # 'soc analyst', 'vapt', 'penetration testing' searches), falling back
+      # to the classic fixed queries when no accounts exist yet.
+      - name: Run job discovery (per-user queries)
         run: |
           curl -sSf --max-time 290 -X POST \
-            "$API_BASE/api/v1/jobs/discovery/run?query=cybersecurity" \
-            || echo "discovery (cybersecurity) failed or timed out"
-
-      - name: Run job discovery (software engineering)
-        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 7 * * *'
-        run: |
-          curl -sSf --max-time 290 -X POST \
-            "$API_BASE/api/v1/jobs/discovery/run?query=software%20engineering" \
-            || echo "discovery (software engineering) failed or timed out"
-
-      - name: Run job discovery (python developer)
-        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 13 * * *'
-        run: |
-          curl -sSf --max-time 290 -X POST \
-            "$API_BASE/api/v1/jobs/discovery/run?query=python%20developer" \
-            || echo "discovery (python developer) failed or timed out"
+            "$API_BASE/api/v1/jobs/discovery/run-for-users" \
+            || echo "per-user discovery failed or timed out"
 
       - name: Generate daily report (morning slot — security)
         if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *'

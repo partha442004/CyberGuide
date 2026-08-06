@@ -32,6 +32,8 @@ class TestRegisterUser:
         assert data["experience_level"] == "senior"
         assert data["telegram_chat_id"] == "12345"
         assert data["id"]
+        # The secret access token is returned once at signup.
+        assert data.get("access_token")
 
         # Alerts auto-enabled with the chosen domains.
         prefs = await client.get(f"/api/v1/notifications/preferences/{data['id']}")
@@ -92,19 +94,36 @@ class TestLoginUser:
     """POST /api/v1/users/login (email only)."""
 
     @pytest.mark.asyncio
-    async def test_login_by_email_returns_profile(self, client):
-        await client.post(
+    async def test_login_with_access_token_returns_profile(self, client):
+        register = await client.post(
             "/api/v1/users/register",
             json={"name": "Grace", "email": "grace@example.com"},
         )
+        assert register.status_code == 201
+        token = register.json()["access_token"]
+        assert token
+
         response = await client.post(
             "/api/v1/users/login",
-            json={"email": "GRACE@example.com"},  # case-insensitive
+            json={"email": "GRACE@example.com", "token": token},  # case-insensitive
         )
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "Grace"
         assert data["email"] == "grace@example.com"
+
+    @pytest.mark.asyncio
+    async def test_login_with_wrong_token_rejected(self, client):
+        register = await client.post(
+            "/api/v1/users/register",
+            json={"name": "Token", "email": "token@example.com"},
+        )
+        assert register.status_code == 201
+        response = await client.post(
+            "/api/v1/users/login",
+            json={"email": "token@example.com", "token": "wrong-token"},
+        )
+        assert response.status_code == 401
 
     @pytest.mark.asyncio
     async def test_login_unknown_email_404(self, client):
@@ -113,6 +132,32 @@ class TestLoginUser:
             json={"email": "nobody@example.com"},
         )
         assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_rotate_token_replaces_secret(self, client):
+        register = await client.post(
+            "/api/v1/users/register",
+            json={"name": "Rotate", "email": "rotate@example.com"},
+        )
+        user_id = register.json()["id"]
+        old_token = register.json()["access_token"]
+
+        rotated = await client.post(f"/api/v1/users/{user_id}/rotate-token")
+        assert rotated.status_code == 200
+        new_token = rotated.json()["access_token"]
+        assert new_token and new_token != old_token
+
+        # The old token no longer works.
+        old_login = await client.post(
+            "/api/v1/users/login",
+            json={"email": "rotate@example.com", "token": old_token},
+        )
+        assert old_login.status_code == 401
+        new_login = await client.post(
+            "/api/v1/users/login",
+            json={"email": "rotate@example.com", "token": new_token},
+        )
+        assert new_login.status_code == 200
 
 
 class TestUserProfile:

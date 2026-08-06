@@ -30,6 +30,22 @@ class JobCreate(JobBase):
     source: str = "manual"
 
 
+class JobShareRequest(BaseModel):
+    """Schema for sharing/saving a job from a link the user found.
+
+    Only ``url`` is required. When ``title``/``company`` are omitted the API
+    fetches the page and auto-detects them from its OpenGraph meta tags (so a
+    LinkedIn post, company careers page, or any job board link can be saved
+    without typing anything).
+    """
+
+    url: str = Field(..., max_length=2000)
+    title: str | None = Field(None, min_length=1, max_length=500)
+    company: str | None = Field(None, min_length=1, max_length=200)
+    location: str | None = Field(None, max_length=200)
+    description: str | None = None
+
+
 class JobUpdate(BaseModel):
     """Schema for updating a job."""
 

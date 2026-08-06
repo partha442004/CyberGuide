@@ -1033,7 +1033,7 @@ def show_jobs() -> None:
     """Show jobs page with working discovery & search."""
     st.header("💼 Jobs")
 
-    tab1, tab2 = st.tabs(["🔍 Discovery", "📋 Saved Jobs"])
+    tab1, tab2, tab3 = st.tabs(["🔍 Discovery", "📋 Saved Jobs", "🔗 Share a Job"])
 
     # ------ Tab 1: Discovery ------
     with tab1:
@@ -1082,50 +1082,120 @@ def show_jobs() -> None:
         jobs_data = fetch_data("/jobs/?limit=100")
         if not jobs_data or not jobs_data.get("jobs"):
             st.info("No jobs saved yet. Run discovery from the Discovery tab!")
+        else:
+            _render_saved_jobs_tab(jobs_data["jobs"])
+
+    # ------ Tab 3: Share a Job (paste any link) ------
+    with tab3:
+        _share_job_form()
+
+
+def _render_saved_jobs_tab(jobs: list) -> None:
+    """Render the Saved Jobs tab: category stats, filter pills and sections."""
+    # Group jobs by domain category.
+    grouped: dict[str, list] = {}
+    for job in jobs:
+        domain = classify_domain(job.get("title", ""))
+        grouped.setdefault(domain, []).append(job)
+
+    fresh_count = sum(1 for j in jobs if _is_fresh_24h(j.get("posted_at")))
+    domains_present = [d for d in _DOMAIN_ORDER if d in grouped]
+
+    # Summary stat row.
+    stat_cols = st.columns(4)
+    with stat_cols[0]:
+        _stat_tile(len(jobs), "Saved Jobs")
+    with stat_cols[1]:
+        _stat_tile(len(domains_present), "Categories")
+    with stat_cols[2]:
+        _stat_tile(fresh_count, "New · 24h")
+    with stat_cols[3]:
+        _stat_tile(
+            sum(len(grouped[d]) for d in ("security", "coding", "data")),
+            "Tech Roles",
+        )
+    st.markdown("")
+
+    # Category filter (pills).
+    options = ["All"] + domains_present
+    labels = {"All": "All categories"}
+    for d in domains_present:
+        labels[d] = f"{_DOMAIN_LABELS.get(d, d)} ({len(grouped[d])})"
+    selected = _category_picker(options, labels)
+
+    # Render sections.
+    domains = domains_present if selected == "All" else [selected]
+    for domain in domains:
+        items = grouped.get(domain)
+        if not items:
+            continue
+        _category_header(domain, len(items), len(jobs))
+        for job in items:
+            _render_job(job)
+
+
+def _share_job_form() -> None:
+    """Share-a-job form: paste any job link to save it and include in alerts."""
+    st.markdown(
+        '<div class="section-title">Share a Job You Found</div>'
+        '<div class="section-sub">Found a role on LinkedIn, a company site, or '
+        "anywhere else? Paste the link — the app saves it and it appears in "
+        "your Saved Jobs and daily alerts.</div>",
+        unsafe_allow_html=True,
+    )
+
+    with st.form("share_job_form", clear_on_submit=True):
+        url = st.text_input(
+            "Job link *",
+            placeholder="https://www.linkedin.com/jobs/view/... or any careers page",
+        )
+        col1, col2 = st.columns(2)
+        with col1:
+            title = st.text_input("Job title (optional)", placeholder="SOC Analyst")
+        with col2:
+            company = st.text_input("Company (optional)", placeholder="Acme Corp")
+        location = st.text_input("Location (optional)", placeholder="Remote / Bengaluru")
+        submitted = st.form_submit_button("💾 Save Job", use_container_width=True)
+
+    if submitted:
+        if not url or not url.strip().startswith(("http://", "https://")):
+            st.error("Please paste a valid job link (https://...).")
             return
-
-        jobs = jobs_data["jobs"]
-
-        # Group jobs by domain category.
-        grouped: dict[str, list] = {}
-        for job in jobs:
-            domain = classify_domain(job.get("title", ""))
-            grouped.setdefault(domain, []).append(job)
-
-        fresh_count = sum(1 for j in jobs if _is_fresh_24h(j.get("posted_at")))
-        domains_present = [d for d in _DOMAIN_ORDER if d in grouped]
-
-        # Summary stat row.
-        stat_cols = st.columns(4)
-        with stat_cols[0]:
-            _stat_tile(len(jobs), "Saved Jobs")
-        with stat_cols[1]:
-            _stat_tile(len(domains_present), "Categories")
-        with stat_cols[2]:
-            _stat_tile(fresh_count, "New · 24h")
-        with stat_cols[3]:
-            _stat_tile(
-                sum(len(grouped[d]) for d in ("security", "coding", "data")),
-                "Tech Roles",
+        payload = {"url": url.strip()}
+        if title:
+            payload["title"] = title.strip()
+        if company:
+            payload["company"] = company.strip()
+        if location:
+            payload["location"] = location.strip()
+        with st.spinner("Saving job..."):
+            resp = _api_raw(
+                "/jobs/share", method="POST", json_data=payload, timeout=45
             )
-        st.markdown("")
-
-        # Category filter (pills).
-        options = ["All"] + domains_present
-        labels = {"All": "All categories"}
-        for d in domains_present:
-            labels[d] = f"{_DOMAIN_LABELS.get(d, d)} ({len(grouped[d])})"
-        selected = _category_picker(options, labels)
-
-        # Render sections.
-        domains = domains_present if selected == "All" else [selected]
-        for domain in domains:
-            items = grouped.get(domain)
-            if not items:
-                continue
-            _category_header(domain, len(items), len(jobs))
-            for job in items:
-                _render_job(job)
+        if resp is None:
+            st.error("Share API unreachable. Is the API server running?")
+        elif resp.status_code == 200:
+            data = resp.json()
+            if data.get("duplicate"):
+                st.info("ℹ️ This job was already saved — no duplicate created.")
+            else:
+                job = data.get("job", {})
+                st.success(
+                    f"✅ Saved **{job.get('title')}** at **{job.get('company')}**!"
+                )
+                st.caption("It's now in Saved Jobs and included in your daily alerts.")
+        else:
+            detail = ""
+            with suppress(Exception):
+                detail = resp.json().get("detail", "")
+            st.error(
+                f"Couldn't save the job. "
+                f"{detail or 'Please fill in the title and company manually.'}"
+            )
+        st.caption(
+            "💡 Tip: if auto-detection can't read a link, just paste the title "
+            "and company too — that always works."
+        )
 
 
 # ---------------------------------------------------------------------------

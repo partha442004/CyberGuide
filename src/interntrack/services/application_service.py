@@ -20,17 +20,24 @@ class ApplicationService:
         self,
         job_id: str,
         status: ApplicationStatus = ApplicationStatus.SAVED,
+        user_id: str | None = None,
     ) -> Application:
-        """Create a new application."""
-        application = Application(job_id=job_id, status=status)
+        """Create a new application (optionally owned by a user)."""
+        application = Application(job_id=job_id, status=status, user_id=user_id)
         return await self.app_repo.create(application)
 
     async def get_application(self, application_id: str) -> Application | None:
         """Get an application by ID."""
         return await self.app_repo.get_by_id(application_id)
 
-    async def get_application_for_job(self, job_id: str) -> Application | None:
-        """Get application for a specific job."""
+    async def get_application_for_job(
+        self,
+        job_id: str,
+        user_id: str | None = None,
+    ) -> Application | None:
+        """Get application for a specific job (per user when given)."""
+        if user_id:
+            return await self.app_repo.get_by_job_id_for_user(job_id, user_id)
         return await self.app_repo.get_by_job_id(job_id)
 
     async def update_status(
@@ -45,30 +52,35 @@ class ApplicationService:
     async def get_applications_by_status(
         self,
         status: ApplicationStatus,
+        user_id: str | None = None,
     ) -> list[Application]:
-        """Get all applications with a specific status."""
-        return await self.app_repo.get_by_status(status)
+        """Get all applications with a specific status (optionally per user)."""
+        return await self.app_repo.get_by_status(status, user_id=user_id)
 
-    async def get_status_counts(self) -> dict[str, int]:
-        """Get count of applications by status."""
-        return await self.app_repo.get_status_counts()
+    async def get_status_counts(self, user_id: str | None = None) -> dict[str, int]:
+        """Get count of applications by status (optionally per user)."""
+        return await self.app_repo.get_status_counts(user_id=user_id)
 
-    async def get_application_timeline(self, days: int = 30) -> list[dict]:
-        """Get application timeline for charts."""
-        return await self.app_repo.get_application_timeline(days)
+    async def get_application_timeline(
+        self,
+        days: int = 30,
+        user_id: str | None = None,
+    ) -> list[dict]:
+        """Get application timeline for charts (optionally per user)."""
+        return await self.app_repo.get_application_timeline(days, user_id=user_id)
 
-    async def get_metrics(self) -> dict:
-        """Get application metrics."""
-        status_counts = await self.get_status_counts()
+    async def get_metrics(self, user_id: str | None = None) -> dict:
+        """Get application metrics (optionally scoped to one user)."""
+        status_counts = await self.get_status_counts(user_id=user_id)
         total = sum(status_counts.values())
 
         return {
             "total_applications": total,
             "status_counts": status_counts,
-            "rejection_rate": await self.app_repo.get_rejection_rate(),
-            "response_rate": await self.app_repo.get_response_rate(),
+            "rejection_rate": await self.app_repo.get_rejection_rate(user_id=user_id),
+            "response_rate": await self.app_repo.get_response_rate(user_id=user_id),
             "recent_applications": len(
-                await self.app_repo.get_recent_applications(days=7),
+                await self.app_repo.get_recent_applications(days=7, user_id=user_id),
             ),
         }
 

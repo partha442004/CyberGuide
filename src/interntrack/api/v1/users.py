@@ -8,12 +8,15 @@ personalized per user. Login is email-only (no password) per the product
 decision; the returned ``user_id`` is stored in the dashboard session.
 """
 
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.api.schemas.user import (
+    UserAuthResponse,
     UserCreate,
     UserListResponse,
     UserLogin,
@@ -53,7 +56,12 @@ async def _get_user_or_404(db: AsyncSession, user_id: str) -> User:
     return user
 
 
-@router.post("/register", response_model=UserResponse, status_code=201)
+def _new_access_token() -> str:
+    """Cryptographically random secret token for an account."""
+    return secrets.token_urlsafe(32)
+
+
+@router.post("/register", response_model=UserAuthResponse, status_code=201)
 async def register_user(
     payload: UserCreate,
     db: AsyncSession = Depends(get_db),
@@ -62,7 +70,9 @@ async def register_user(
 
     The user's chosen domains and the API's configured channels are saved
     into a fresh ``AlertPreferences`` row, so personalized digests start
-    immediately. Returns 409 when the email is already registered.
+    immediately. The response includes the account's secret ``access_token``
+    (shown once) — login requires it from now on. Returns 409 when the
+    email is already registered.
     """
     existing = await db.execute(select(User).where(User.email == payload.email))
     if existing.scalar_one_or_none() is not None:
@@ -87,6 +97,7 @@ async def register_user(
         domains=_normalize_domains(payload.domains),
         skills=[str(s).strip() for s in payload.skills if str(s).strip()],
         is_active=True,
+        access_token=_new_access_token(),
     )
     db.add(user)
     try:
@@ -110,15 +121,15 @@ async def register_user(
     )
     await db.commit()
     await db.refresh(user)
-    return UserResponse.model_validate(user)
+    return UserAuthResponse.model_validate(user)
 
 
-@router.post("/login", response_model=UserResponse)
+@router.post("/login", response_model=UserAuthResponse)
 async def login_user(
     payload: UserLogin,
     db: AsyncSession = Depends(get_db),
 ):
-    """Look up a profile by email (login = email, no password)."""
+    """Look up a profile by email (+ per-user access token when set)."""
     result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
     if user is None:
@@ -128,7 +139,28 @@ async def login_user(
         )
     if not user.is_active:
         raise HTTPException(status_code=403, detail="This account is disabled")
-    return UserResponse.model_validate(user)
+    if user.access_token and not secrets.compare_digest(
+        str(user.access_token),
+        payload.token or "",
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing access token",
+        )
+    return UserAuthResponse.model_validate(user)
+
+
+@router.post("/{user_id}/rotate-token", response_model=UserAuthResponse)
+async def rotate_user_token(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Replace the account's secret token (old one stops working)."""
+    user = await _get_user_or_404(db, user_id)
+    user.access_token = _new_access_token()  # type: ignore[assignment]
+    await db.commit()
+    await db.refresh(user)
+    return UserAuthResponse.model_validate(user)
 
 
 @router.get("", response_model=UserListResponse)

@@ -177,18 +177,33 @@ async def _deliver_alert(
         }
     results: dict = {}
     non_telegram = [c for c in targets if c != "telegram"]
-    if non_telegram:
+    email_targets = [c for c in non_telegram if c == "email"]
+    text_targets = [c for c in non_telegram if c != "email"]
+    if email_targets:
+        # Email gets the styled HTML digest; other text channels stay plain.
+        html = await build_daily_report_html(
+            report, session, domains=domains, title=title, user_id=user_id
+        )
+        if recipient:
+            results.update(
+                await manager.notify(
+                    email_targets, html, subject=subject, recipient=recipient
+                )
+            )
+        else:
+            results.update(await manager.notify(email_targets, html, subject=subject))
+    if text_targets:
         message = await build_daily_report_message(
             report, session, domains=domains, title=title, user_id=user_id
         )
         if recipient:
             results.update(
                 await manager.notify(
-                    non_telegram, message, subject=subject, recipient=recipient
+                    text_targets, message, subject=subject, recipient=recipient
                 )
             )
         else:
-            results.update(await manager.notify(non_telegram, message, subject=subject))
+            results.update(await manager.notify(text_targets, message, subject=subject))
     if "telegram" in targets:
         chunks = await build_alert_chunks(
             report, session, domains=domains, weekly=weekly, user_id=user_id
@@ -551,7 +566,15 @@ async def build_daily_report_message(
         for score, job in items:
             lines.extend(_job_lines(score, job))
 
-    if sections:
+    # Watched-company jobs get their own highlight section.
+    watched_jobs = _watched_jobs(report, await _watched_company_names(session, user_id))
+    if watched_jobs:
+        lines.append("")
+        lines.append(f"🏢 Watched companies ({len(watched_jobs)}):")
+        for job in watched_jobs:
+            lines.extend(_job_lines(None, job))
+
+    if sections or watched_jobs:
         lines.append("")
         lines.append(
             "Match % = how well your uploaded resume fits each job · "
@@ -604,6 +627,224 @@ async def build_alert_chunks(
                 buttons.append((f"✅ Apply — {job_title}", url))
         chunks.append(("\n".join(lines), buttons))
     return chunks
+
+
+async def _watched_company_names(session, user_id: str | None) -> set:
+    """Lowercased company names the user is watching, or an empty set."""
+    if not user_id:
+        return set()
+    try:
+        from sqlalchemy import select
+
+        from interntrack.domain.models import CompanyWatchlist
+
+        result = await session.execute(
+            select(CompanyWatchlist.company).where(CompanyWatchlist.user_id == user_id)
+        )
+        return {str(r[0]).strip().lower() for r in result.all() if r[0]}
+    except Exception:
+        return set()
+
+
+def _watched_jobs(report: dict, watched: set) -> list[dict]:
+    """The report's jobs whose company is on the watched list."""
+    if not watched:
+        return []
+    out = []
+    for job in report.get("new_jobs") or []:
+        company = str(job.get("company") or "").strip().lower()
+        if company and company in watched:
+            out.append(job)
+    return out
+
+
+def _esc(value) -> str:
+    """HTML-escape untrusted job content for email rendering."""
+    import html as _html
+
+    return _html.escape(str(value or ""))
+
+
+async def build_daily_report_html(
+    report: dict,
+    session,
+    domains: list | None = None,
+    title: str = "📊 Daily Report",
+    user_id: str | None = None,
+) -> str:
+    """Styled HTML digest for email delivery.
+
+    Every domain section renders as a colored card list with match %,
+    expiry status and an Apply button per job. All job content is escaped
+    (external scrape data). Watched-company jobs get their own section.
+    """
+    sections = await _score_and_group_jobs(report, session, domains, user_id=user_id)
+    watched = await _watched_company_names(session, user_id)
+    summary = report.get("summary") or {}
+    generated = report.get("generated_at") or ""
+
+    parts = [
+        (
+            "<div style='font-family:Inter,-apple-system,Segoe UI,Roboto,"
+            "sans-serif;max-width:680px;margin:0 auto;color:#0f172a;'>"
+        ),
+        (
+            f"<div style='background:linear-gradient(135deg,#667eea,#764ba2);"
+            "color:#fff;border-radius:14px;padding:22px 26px;'>"
+            f"<div style='font-size:20px;font-weight:800;'>{_esc(title)}</div>"
+            f"<div style='opacity:.85;font-size:13px;'>{_esc(generated)}</div>"
+            f"<div style='margin-top:10px;font-size:14px;'>"
+            f"New jobs: <b>{summary.get('new_jobs', 0)}</b> · "
+            f"New applications: <b>{summary.get('new_applications', 0)}</b></div></div>"
+        ),
+    ]
+
+    for domain, items in sections:
+        label = _DOMAIN_ICONS.get(domain, domain)
+        style = {
+            "security": "#e5484d",
+            "coding": "#3b82f6",
+            "data": "#8b5cf6",
+            "design": "#ec4899",
+            "finance": "#10b981",
+            "marketing": "#f59e0b",
+            "other": "#64748b",
+        }.get(domain, "#64748b")
+        parts.append(
+            f"<div style='margin:24px 0 8px;padding:12px 16px;border-radius:10px;"
+            f"background:#f1f5f9;border-left:5px solid {style};'>"
+            f"<b style='font-size:15px;'>{_esc(label)}</b> "
+            f"<span style='background:{style};color:#fff;border-radius:999px;"
+            f"padding:2px 10px;font-size:12px;'>{len(items)}</span></div>"
+        )
+        for score, job in items:
+            parts.append(_job_html_card(score, job, style))
+
+    watched_jobs = _watched_jobs(report, watched)
+    if watched_jobs:
+        parts.append(
+            "<div style='margin:24px 0 8px;padding:12px 16px;border-radius:10px;"
+            "background:#f1f5f9;border-left:5px solid #0ea5e9;'>"
+            f"<b style='font-size:15px;'>🏢 Watched companies</b> "
+            f"<span style='background:#0ea5e9;color:#fff;border-radius:999px;"
+            f"padding:2px 10px;font-size:12px;'>{len(watched_jobs)}</span></div>"
+        )
+        for job in watched_jobs:
+            parts.append(_job_html_card(None, job, "#0ea5e9"))
+
+    parts.append(
+        "<p style='color:#64748b;font-size:12px;margin-top:22px;'>"
+        "Match % = how well your uploaded resume fits each job · "
+        "✅/⬜ = applied / not applied.</p></div>"
+    )
+    return "".join(parts)
+
+
+def _job_html_card(score, job: dict, accent: str) -> str:
+    """One job as an HTML card with an Apply button."""
+    title = _esc(job.get("title") or "Untitled")
+    company = _esc(job.get("company") or "")
+    url = _esc(job.get("url") or "")
+    location = _esc(job.get("location") or "Remote")
+    score_txt = f"{score:.0f}%" if score is not None else "—"
+    applied = job.get("is_applied", False)
+    status_txt = "✅ Applied" if applied else "⬜ Not applied"
+    age = _age_badge(int(job.get("age_days", 0) or 0))
+    expiry = _esc(_expiry_note(job).strip())
+    card = (
+        "<div style='border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;"
+        "margin:10px 0;'>"
+        "<div style='display:flex;justify-content:space-between;align-items:center;'>"
+        f"<div><b style='font-size:15px;'>{title}</b>"
+        f"<div style='color:#64748b;font-size:13px;'>"
+        f"{company} · {location} · {age}</div></div>"
+        "<div style='text-align:center;'>"
+        f"<div style='font-size:20px;font-weight:800;color:{accent};'>{score_txt}</div>"
+        "<div style='color:#94a3b8;font-size:11px;'>match</div></div></div>"
+        "<div style='margin-top:8px;font-size:13px;color:#475569;'>"
+        f"{status_txt}{(' · ' + expiry) if expiry else ''}</div>"
+    )
+    if url:
+        card += (
+            "<div style='margin-top:10px;'>"
+            f"<a href='{url}' style='background:{accent};color:#fff;"
+            "text-decoration:none;border-radius:8px;padding:8px 18px;"
+            "font-weight:600;font-size:13px;display:inline-block;'>Apply now</a>"
+            "</div>"
+        )
+    card += "</div>"
+    return card
+
+
+# Search queries used to discover jobs for each alert category (per-user
+# discovery derives its query list from the user's chosen domains + skills).
+DOMAIN_QUERIES = {
+    "security": [
+        "cybersecurity",
+        "soc analyst",
+        "security analyst",
+        "vapt",
+        "cybersecurity internship",
+        "penetration testing",
+    ],
+    "coding": [
+        "software engineer",
+        "software developer",
+        "python developer",
+        "full stack developer",
+        "software engineering internship",
+        "backend developer",
+    ],
+    "data": [
+        "data analyst",
+        "data science",
+        "business intelligence analyst",
+        "data analytics internship",
+    ],
+    "design": [
+        "ux designer",
+        "graphic designer",
+        "product designer",
+        "design internship",
+    ],
+    "finance": ["finance intern", "accountant", "audit", "finance analyst"],
+    "marketing": [
+        "marketing intern",
+        "digital marketing",
+        "sales intern",
+        "growth marketing",
+    ],
+    "other": ["internship", "entry level", "graduate trainee"],
+}
+
+
+def discovery_queries_for(prefs: dict, user=None, limit: int = 4) -> list[str]:
+    """Search queries matching a user's alert domains + resume skills.
+
+    Domain keywords produce the bulk of the queries; up to three skills from
+    the user's profile are appended as ``<skill> intern`` searches so niche
+    roles (e.g. VAPT, Burp Suite) get discovered too. Deduplicated and
+    capped at ``limit``.
+    """
+    domains = prefs.get("domains") or []
+    queries: list[str] = []
+    for domain in domains:
+        queries.extend(DOMAIN_QUERIES.get(domain, []))
+    if not domains:
+        queries.extend(DOMAIN_QUERIES["other"][:2])
+    if user is not None:
+        for skill in (getattr(user, "skills", None) or [])[:3]:
+            skill_name = str(skill).strip()
+            if skill_name:
+                queries.append(f"{skill_name} intern")
+    seen: set[str] = set()
+    unique: list[str] = []
+    for query in queries:
+        key = query.strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            unique.append(query.strip())
+    return unique[:limit]
 
 
 async def verify_job_links():

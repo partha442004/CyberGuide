@@ -192,3 +192,91 @@ class TestLinkedInScraper:
 
         result = await scraper.fetch("python developer")
         assert result == []
+
+
+# Real guest-API markup observed live (2026-08): legacy ``result-card``
+# classes are gone and the search cards use ``job-search-card``.
+_NEW_MARKUP = """
+<!DOCTYPE html>
+<li>
+  <div class="base-card relative w-full hover:no-underline focus:no-underline
+    base-card--link base-search-card base-search-card--link job-search-card"
+    data-entity-urn="urn:li:jobPosting:4447606116">
+    <a class="base-card__full-link absolute top-0 right-0 bottom-0 left-0"
+       href="https://www.linkedin.com/jobs/view/cybersecurity-ai-trainer-4447606116"></a>
+    <div class="base-search-card__info">
+      <h3 class="base-search-card__title">
+        Cybersecurity AI Trainer, $125–$150/hour
+      </h3>
+      <h4 class="base-search-card__subtitle">
+        <a class="hidden-nested-link" href="https://www.linkedin.com/company/linkedin">
+          LinkedIn
+        </a>
+      </h4>
+      <div class="base-search-card__metadata">
+        <span class="job-search-card__location">United States</span>
+        <time class="job-search-card__listdate" datetime="2026-08-01">3 days ago</time>
+      </div>
+    </div>
+  </div>
+</li>
+"""
+
+
+class TestLinkedInScraperNewMarkup:
+    """Tests for the current job-search-card markup."""
+
+    @pytest.mark.asyncio
+    async def test_fetch_parses_current_markup(self):
+        from interntrack.scrapers.linkedin import LinkedInScraper
+
+        scraper = LinkedInScraper()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = _NEW_MARKUP
+        scraper._get = AsyncMock(return_value=mock_response)
+
+        jobs = await scraper.fetch("cybersecurity")
+        assert len(jobs) == 1
+        job = jobs[0]
+        assert job.title == "Cybersecurity AI Trainer, $125–$150/hour"
+        assert job.company == "LinkedIn"
+        assert (
+            job.url
+            == "https://www.linkedin.com/jobs/view/cybersecurity-ai-trainer-4447606116"
+        )
+        assert job.location == "United States"
+        assert job.posted_at is not None
+        assert job.posted_at.date().isoformat() == "2026-08-01"
+        assert job.source == "linkedin"
+        assert job.raw_data == {"job_id": "4447606116"}
+
+    @pytest.mark.asyncio
+    async def test_fetch_skips_auth_wall(self):
+        from interntrack.scrapers.linkedin import LinkedInScraper
+
+        scraper = LinkedInScraper()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = (
+            "<html><body>authwall <p>Join now to see who viewed this</p></body></html>"
+        )
+        scraper._get = AsyncMock(return_value=mock_response)
+
+        jobs = await scraper.fetch("cybersecurity")
+        assert jobs == []
+
+    @pytest.mark.asyncio
+    async def test_fetch_multi_page_markup_respects_limit(self):
+        from interntrack.scrapers.linkedin import LinkedInScraper
+
+        # Three copies of the same card.
+        html = "".join(f"<li>{_NEW_MARKUP}</li>" for _ in range(3))
+        scraper = LinkedInScraper()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = html
+        scraper._get = AsyncMock(return_value=mock_response)
+
+        jobs = await scraper.fetch("cybersecurity", limit=2)
+        assert len(jobs) == 2

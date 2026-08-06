@@ -14,14 +14,19 @@ router = APIRouter()
 
 @router.get("/overview")
 async def get_dashboard_overview(
+    user_id: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """Get dashboard overview data."""
+    """Get dashboard overview data.
+
+    ``user_id`` scopes the application metrics to that user's own tracking
+    (jobs remain global); without it the legacy global metrics are returned.
+    """
     job_service = JobService(db)
     app_service = ApplicationService(db)
 
     job_stats = await job_service.get_job_statistics()
-    app_metrics = await app_service.get_metrics()
+    app_metrics = await app_service.get_metrics(user_id=user_id)
 
     return {
         "jobs": job_stats,
@@ -41,11 +46,12 @@ async def get_job_type_chart(
 
 @router.get("/charts/application-timeline")
 async def get_application_timeline_chart(
+    user_id: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """Get application timeline for charts."""
+    """Get application timeline for charts (optionally per user)."""
     service = ApplicationService(db)
-    return {"data": await service.get_application_timeline(days=30)}
+    return {"data": await service.get_application_timeline(days=30, user_id=user_id)}
 
 
 @router.get("/charts/top-companies")

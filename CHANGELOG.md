@@ -4,6 +4,47 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.20.11] - 2026-08-06
+
+### Added
+
+- **Share a job** — `POST /api/v1/jobs/share` accepts *any* job link (LinkedIn
+  feed post, company careers page, any job board), auto-fetches the page's
+  OpenGraph title/company/description, dedupes by URL, and saves it. Shared
+  jobs appear in the dashboard **and** in the daily email/Telegram alerts.
+  The dashboard's Jobs page has a new *Share a Job* tab (works even with zero
+  saved jobs).
+- **Hardened LinkedIn scraper** — the guest jobs API still returns real
+  cybersecurity jobs, but the parser only looked for legacy `result-card`
+  classes that LinkedIn removed. The scraper now tries the legacy selectors
+  first and falls back to the current 2024+ `base-search-card` /
+  `job-search-card` markup, adds browser-like headers, and detects the
+  auth-wall/999 response so it degrades gracefully instead of silently
+  contributing 0 jobs.
+- **Per-user access tokens** — register/login return a secret access token
+  (checked at login, rotated via `POST /api/v1/users/{id}/rotate-token`).
+  Tracking data (applications, watchlist, personalized overview) is scoped
+  per user by `user_id`, so each account only sees its own data.
+- **Per-user discovery** — `POST /api/v1/jobs/discovery/run-for-users` builds
+  search queries from each enabled user's categories/skills; the daily-refresh
+  cron now calls it so alerts are personalized end-to-end.
+- **Company watchlist** — new `watchlists` API (list/add/remove); watched
+  companies are highlighted in the daily digest. Dashboard watchlist UI added.
+- **Personalized Overview** — `/dashboard/overview` and chart endpoints accept
+  `user_id` and scope application metrics to that user's own tracking.
+- **Dashboard: real Apply tracking + status updates** — the Apply button now
+  actually creates an application via the API (with the logged-in user) and
+  status updates call the backend instead of showing a fake toast.
+- **Dashboard: job-card match % + expiry badges, search + filters** — cards
+  show resume match score and closing-soon badges; Saved Jobs gained
+  keyword/remote/domain filters and sorting.
+
+### Fixed
+
+- Dashboard Jobs page crash — `_category_header` KeyError when real jobs
+  existed (`_CATEGORY_STYLE` had no `icon` key); now defensive and every
+  category has an icon.
+
 ## [1.20.10] - 2026-08-04
 
 ### Added

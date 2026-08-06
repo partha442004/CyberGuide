@@ -36,9 +36,15 @@ class UserCreate(BaseModel):
 
 
 class UserLogin(BaseModel):
-    """Login payload — email only (no password per product decision)."""
+    """Login payload — email (+ optional per-user access token).
+
+    Accounts created after the token feature ship with an ``access_token``
+    and require it here; legacy accounts without a token keep email-only
+    login so nothing breaks.
+    """
 
     email: str
+    token: str | None = None
 
     @field_validator("email")
     @classmethod
@@ -72,6 +78,16 @@ class UserResponse(BaseModel):
     created_at: datetime | None = None
 
     model_config = {"from_attributes": True}
+
+
+class UserAuthResponse(UserResponse):
+    """Profile + the secret access token (returned only at signup/login/rotate).
+
+    Deliberately separate from :class:`UserResponse` so the token is never
+    exposed through ``GET /users`` or the list endpoint.
+    """
+
+    access_token: str
 
 
 class UserListResponse(BaseModel):

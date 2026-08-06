@@ -19,18 +19,45 @@ class ApplicationRepository(BaseRepository[Application]):
     def __init__(self, session: AsyncSession):
         super().__init__(Application, session)
 
+    @staticmethod
+    def _user_filter(user_id: str | None):
+        """Optional user scoping for queries (None = all users / legacy)."""
+        if user_id:
+            return Application.user_id == user_id
+        return None
+
     async def get_by_job_id(self, job_id: str) -> Application | None:
-        """Get application by job ID."""
+        """Get application by job ID (legacy, any user)."""
         result = await self.session.execute(
             select(Application).where(Application.job_id == job_id),
         )
         return result.scalar_one_or_none()
 
-    async def get_by_status(self, status: ApplicationStatus) -> list[Application]:
-        """Get all applications with a specific status."""
+    async def get_by_job_id_for_user(
+        self,
+        job_id: str,
+        user_id: str,
+    ) -> Application | None:
+        """Get a user's application for a job (dedupe Apply per user)."""
         result = await self.session.execute(
-            select(Application).where(Application.status == status),
+            select(Application).where(
+                Application.job_id == job_id,
+                Application.user_id == user_id,
+            ),
         )
+        return result.scalar_one_or_none()
+
+    async def get_by_status(
+        self,
+        status: ApplicationStatus,
+        user_id: str | None = None,
+    ) -> list[Application]:
+        """Get all applications with a specific status (optionally per user)."""
+        filters = [Application.status == status]
+        user_filter = self._user_filter(user_id)
+        if user_filter is not None:
+            filters.append(user_filter)
+        result = await self.session.execute(select(Application).where(*filters))
         return list(result.scalars().all())
 
     async def get_applied_job_ids(self) -> set[str]:
@@ -38,40 +65,56 @@ class ApplicationRepository(BaseRepository[Application]):
         result = await self.session.execute(select(Application.job_id))
         return {str(job_id) for (job_id,) in result.all()}
 
-    async def get_status_counts(self) -> dict[str, int]:
-        """Get count of applications by status."""
-        query = select(Application.status, func.count(Application.id)).group_by(
-            Application.status,
-        )
+    async def get_status_counts(
+        self,
+        user_id: str | None = None,
+    ) -> dict[str, int]:
+        """Get count of applications by status (optionally per user)."""
+        query = select(Application.status, func.count(Application.id))
+        user_filter = self._user_filter(user_id)
+        if user_filter is not None:
+            query = query.where(user_filter)
+        query = query.group_by(Application.status)
         result = await self.session.execute(query)
         # Use .value (lowercase) to keep the same key casing as the enum values
         # that clients previously received after JSON encoding.
         return {status.value: count for status, count in result.all()}
 
-    async def get_recent_applications(self, days: int = 30) -> list[Application]:
-        """Get applications from the last N days."""
+    async def get_recent_applications(
+        self,
+        days: int = 30,
+        user_id: str | None = None,
+    ) -> list[Application]:
+        """Get applications from the last N days (optionally per user)."""
         cutoff_date = utcnow() - timedelta(days=days)
+        filters = [Application.created_at >= cutoff_date]
+        user_filter = self._user_filter(user_id)
+        if user_filter is not None:
+            filters.append(user_filter)
         query = (
-            select(Application)
-            .where(Application.created_at >= cutoff_date)
-            .order_by(Application.created_at.desc())
+            select(Application).where(*filters).order_by(Application.created_at.desc())
         )
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
-    async def get_application_timeline(self, days: int = 30) -> list[dict]:
-        """Get application timeline for charts."""
+    async def get_application_timeline(
+        self,
+        days: int = 30,
+        user_id: str | None = None,
+    ) -> list[dict]:
+        """Get application timeline for charts (optionally per user)."""
         cutoff_date = utcnow() - timedelta(days=days)
-        query = (
-            select(
-                func.date(Application.created_at).label("date"),
-                Application.status,
-                func.count(Application.id).label("count"),
-            )
-            .where(Application.created_at >= cutoff_date)
-            .group_by(func.date(Application.created_at), Application.status)
-            .order_by(func.date(Application.created_at))
-        )
+        query = select(
+            func.date(Application.created_at).label("date"),
+            Application.status,
+            func.count(Application.id).label("count"),
+        ).where(Application.created_at >= cutoff_date)
+        user_filter = self._user_filter(user_id)
+        if user_filter is not None:
+            query = query.where(user_filter)
+        query = query.group_by(
+            func.date(Application.created_at), Application.status
+        ).order_by(func.date(Application.created_at))
         result = await self.session.execute(query)
         return [
             {"date": str(row.date), "status": row.status, "count": row.count}
@@ -138,20 +181,40 @@ class ApplicationRepository(BaseRepository[Application]):
         await self.session.flush()
         return application
 
-    async def get_rejection_rate(self) -> float:
-        """Calculate rejection rate."""
-        total = await self.count()
+    async def _count_by_status(
+        self,
+        status: ApplicationStatus,
+        user_id: str | None = None,
+    ) -> int:
+        """Count applications with a status (optionally per user)."""
+        query = select(func.count(Application.id)).where(Application.status == status)
+        user_filter = self._user_filter(user_id)
+        if user_filter is not None:
+            query = query.where(user_filter)
+        result = await self.session.execute(query)
+        return int(result.scalar_one() or 0)
+
+    async def get_rejection_rate(self, user_id: str | None = None) -> float:
+        """Calculate rejection rate (optionally per user)."""
+        total = await self.count_with_user(user_id)
         if total == 0:
             return 0.0
-
-        rejected = await self.count({"status": ApplicationStatus.REJECTED})
+        rejected = await self._count_by_status(ApplicationStatus.REJECTED, user_id)
         return round(rejected / total * 100, 2)
 
-    async def get_response_rate(self) -> float:
+    async def get_response_rate(self, user_id: str | None = None) -> float:
         """Calculate response rate (interviews / applications)."""
-        applied = await self.count({"status": ApplicationStatus.APPLIED})
+        applied = await self._count_by_status(ApplicationStatus.APPLIED, user_id)
         if applied == 0:
             return 0.0
-
-        interviews = await self.count({"status": ApplicationStatus.INTERVIEW})
+        interviews = await self._count_by_status(ApplicationStatus.INTERVIEW, user_id)
         return round(interviews / applied * 100, 2)
+
+    async def count_with_user(self, user_id: str | None = None) -> int:
+        """Count applications (optionally per user)."""
+        query = select(func.count()).select_from(Application)
+        user_filter = self._user_filter(user_id)
+        if user_filter is not None:
+            query = query.where(user_filter)
+        result = await self.session.execute(query)
+        return int(result.scalar_one() or 0)
