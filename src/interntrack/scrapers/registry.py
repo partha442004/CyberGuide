@@ -109,9 +109,11 @@ def get_default_registry() -> ScraperRegistry:
     from interntrack.scrapers.glassdoor_india import GlassdoorIndiaScraper
     from interntrack.scrapers.google_jobs import GoogleJobsScraper
     from interntrack.scrapers.hired import HiredScraper
+    from interntrack.scrapers.indeed_api import IndeedAPIScraper
     from interntrack.scrapers.indeed_india import IndeedIndiaScraper
     from interntrack.scrapers.internshala_direct import InternshalaDirectScraper
     from interntrack.scrapers.linkedin_india import LinkedInIndiaScraper
+    from interntrack.scrapers.linkedin_jobs_api import LinkedInJobsAPIScraper
     from interntrack.scrapers.timesjobs import TimesJobsScraper
     from interntrack.scrapers.wellfound import WellfoundScraper
     from interntrack.scrapers.hackernews import HackerNewsScraper
@@ -133,6 +135,8 @@ def get_default_registry() -> ScraperRegistry:
     registry.register(GlassdoorIndiaScraper())
     registry.register(HiredScraper())
     registry.register(AngelListScraper())
+    registry.register(LinkedInJobsAPIScraper())
+    registry.register(IndeedAPIScraper())
 
     # Direct security-company Greenhouse career boards (no API key, never
     # blocks) - the most reliable source of real vendor security roles.
