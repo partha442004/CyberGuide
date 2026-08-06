@@ -53,6 +53,38 @@ async def list_jobs(
     return JobListResponse(jobs=jobs, total=total, skip=skip, limit=limit)
 
 
+@router.post("/archive-expired")
+async def archive_expired(days: int = 30, db: AsyncSession = Depends(get_db)):
+    """Archive jobs older than N days to keep the database lean."""
+    repo = JobRepository(db)
+    count = await repo.archive_expired_jobs(days=days)
+    return {"archived": count, "message": f"Archived {count} jobs older than {days} days"}
+
+
+@router.get("/expired")
+async def list_expired(limit: int = 50, db: AsyncSession = Depends(get_db)):
+    """List archived expired jobs."""
+    repo = JobRepository(db)
+    expired = await repo.get_expired_jobs(limit=limit)
+    return {
+        "expired_jobs": [
+            {
+                "id": e.id,
+                "title": e.title,
+                "company": e.company,
+                "location": e.location,
+                "source": e.source,
+                "expired_at": str(e.expired_at) if e.expired_at else None,
+                "reason": e.reason,
+            }
+            for e in expired
+        ],
+        "total": len(expired),
+    }
+
+
+
+
 @router.get("/{job_id}", response_model=JobResponse)
 async def get_job(
     job_id: str,
@@ -387,36 +419,6 @@ async def run_discovery_for_users(
     }
 
 
-
-
-@router.post("/archive-expired")
-async def archive_expired(days: int = 30, db: AsyncSession = Depends(get_db)):
-    """Archive jobs older than N days to keep the database lean."""
-    repo = JobRepository(db)
-    count = await repo.archive_expired_jobs(days=days)
-    return {"archived": count, "message": f"Archived {count} jobs older than {days} days"}
-
-
-@router.get("/expired")
-async def list_expired(limit: int = 50, db: AsyncSession = Depends(get_db)):
-    """List archived expired jobs."""
-    repo = JobRepository(db)
-    expired = await repo.get_expired_jobs(limit=limit)
-    return {
-        "expired_jobs": [
-            {
-                "id": e.id,
-                "title": e.title,
-                "company": e.company,
-                "location": e.location,
-                "source": e.source,
-                "expired_at": str(e.expired_at) if e.expired_at else None,
-                "reason": e.reason,
-            }
-            for e in expired
-        ],
-        "total": len(expired),
-    }
 
 
 @router.post("/discovery/run")
