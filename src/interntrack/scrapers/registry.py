@@ -106,7 +106,9 @@ def get_default_registry() -> ScraperRegistry:
     # still arrive via the remoteok RSS feed inside RSSFeedScraper.
     from interntrack.scrapers.glassdoor import GlassdoorScraper
     from interntrack.scrapers.google_jobs import GoogleJobsScraper
+    from interntrack.scrapers.indeed_india import IndeedIndiaScraper
     from interntrack.scrapers.internshala_direct import InternshalaDirectScraper
+    from interntrack.scrapers.timesjobs import TimesJobsScraper
     from interntrack.scrapers.wellfound import WellfoundScraper
     from interntrack.scrapers.hackernews import HackerNewsScraper
     from interntrack.scrapers.indeed import IndeedScraper
@@ -121,6 +123,8 @@ def get_default_registry() -> ScraperRegistry:
     registry.register(InternshalaDirectScraper())
     registry.register(WellfoundScraper())
     registry.register(GoogleJobsScraper())
+    registry.register(IndeedIndiaScraper())
+    registry.register(TimesJobsScraper())
 
     # Direct security-company Greenhouse career boards (no API key, never
     # blocks) - the most reliable source of real vendor security roles.
