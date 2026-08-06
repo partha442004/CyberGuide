@@ -3,9 +3,18 @@ JWT authentication helpers for InternTrack.
 
 Provides token creation, verification, and dependency injection
 for FastAPI endpoints that require authentication.
+
+Uses a minimal stdlib-only HMAC-SHA256 JWT implementation (no PyJWT
+dependency) so it works identically in every deployment environment.
 """
 
-from datetime import UTC, datetime, timedelta
+import base64
+import hashlib
+import hmac
+import json
+import threading
+from collections import defaultdict
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from fastapi import Depends, HTTPException, Request
@@ -13,76 +22,70 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from interntrack.config import get_settings
 
-try:
-    import jwt
-except ImportError:
-    # Fallback: minimal HMAC-SHA256 JWT using stdlib
-    import base64
-    import hashlib
-    import json
 
-    class _JWT:
-        """Minimal JWT implementation using stdlib only."""
+class _JWT:
+    """Minimal JWT implementation using stdlib only (HS256)."""
 
-        @staticmethod
-        def encode(payload: dict, key: str, algorithm: str = "HS256") -> str:
-            header = (
-                base64.urlsafe_b64encode(
-                    json.dumps({"alg": "HS256", "typ": "JWT"}).encode()
-                )
-                .rstrip(b"=")
-                .decode()
+    @staticmethod
+    def encode(payload: dict[str, Any], key: str, algorithm: str = "HS256") -> str:
+        """Encode a payload dict into a signed JWT string."""
+        header = (
+            base64.urlsafe_b64encode(
+                json.dumps({"alg": algorithm, "typ": "JWT"}).encode()
             )
-            body = (
-                base64.urlsafe_b64encode(json.dumps(payload).encode())
-                .rstrip(b"=")
-                .decode()
+            .rstrip(b"=")
+            .decode()
+        )
+        body = (
+            base64.urlsafe_b64encode(json.dumps(payload).encode()).rstrip(b"=").decode()
+        )
+        sig_input = f"{header}.{body}".encode()
+        sig = (
+            base64.urlsafe_b64encode(
+                hmac.new(key.encode(), sig_input, hashlib.sha256).digest()
             )
-            sig_input = f"{header}.{body}".encode()
-            sig = (
-                base64.urlsafe_b64encode(
-                    hmac.new(key.encode(), sig_input, hashlib.sha256).digest()
-                )
-                .rstrip(b"=")
-                .decode()
+            .rstrip(b"=")
+            .decode()
+        )
+        return f"{header}.{body}.{sig}"
+
+    @staticmethod
+    def decode(token: str, key: str, algorithms: list[str] | None = None) -> dict:
+        """Decode and verify a JWT string, returning the payload dict."""
+        del algorithms  # always HS256 in this stdlib implementation
+        parts = token.split(".")
+        if len(parts) != 3:
+            raise ValueError("Invalid token")
+        header, body, sig = parts
+        sig_input = f"{header}.{body}".encode()
+        expected = (
+            base64.urlsafe_b64encode(
+                hmac.new(key.encode(), sig_input, hashlib.sha256).digest()
             )
-            return f"{header}.{body}.{sig}"
+            .rstrip(b"=")
+            .decode()
+        )
+        if not hmac.compare_digest(sig, expected):
+            raise ValueError("Invalid signature")
+        padding = 4 - len(body) % 4
+        body_padded = body + "=" * padding
+        payload = json.loads(base64.urlsafe_b64decode(body_padded))
+        if not isinstance(payload, dict):
+            raise ValueError("Invalid token payload")
+        return payload
 
-        @staticmethod
-        def decode(token: str, key: str, algorithms: list | None = None) -> dict:
-            import hmac
-
-            parts = token.split(".")
-            if len(parts) != 3:
-                raise ValueError("Invalid token")
-            header, body, sig = parts
-            sig_input = f"{header}.{body}".encode()
-            expected = (
-                base64.urlsafe_b64encode(
-                    hmac.new(key.encode(), sig_input, hashlib.sha256).digest()
-                )
-                .rstrip(b"=")
-                .decode()
-            )
-            if not hmac.compare_digest(sig, expected):
-                raise ValueError("Invalid signature")
-            padding = 4 - len(body) % 4
-            body_padded = body + "=" * padding
-            return json.loads(base64.urlsafe_b64decode(body_padded))
-
-    import hmac
-
-    jwt = _JWT()  # type: ignore[assignment]
-
-# Re-export for type checking
-try:
-    import jwt as _jwt_module
-
-    _HAS_PYJWT = True
-except ImportError:
-    _HAS_PYJWT = False
 
 _bearer = HTTPBearer(auto_error=False)
+
+
+def _encode(payload: dict[str, Any], key: str, algorithm: str) -> str:
+    """Encode with the stdlib JWT (always available, no external dep)."""
+    return _JWT.encode(payload, key, algorithm)
+
+
+def _decode(token: str, key: str, algorithm: str) -> dict:
+    """Decode with the stdlib JWT (always available, no external dep)."""
+    return _JWT.decode(token, key, [algorithm])
 
 
 def create_access_token(
@@ -95,55 +98,23 @@ def create_access_token(
     expire = datetime.now(UTC) + (
         expires_delta or timedelta(minutes=settings.jwt_access_token_expire_minutes)
     )
-    to_encode.update({"exp": expire, "type": "access"})
-    if _HAS_PYJWT:
-        return _jwt_module.encode(
-            to_encode,
-            settings.jwt_secret_key,
-            algorithm=settings.jwt_algorithm,
-        )
-    return jwt.encode(  # type: ignore[union-attr]
-        to_encode,
-        settings.jwt_secret_key,
-        settings.jwt_algorithm,
-    )
+    to_encode.update({"exp": expire.isoformat(), "type": "access"})
+    return _encode(to_encode, settings.jwt_secret_key, settings.jwt_algorithm)
 
 
 def create_refresh_token(data: dict[str, Any]) -> str:
     """Create a JWT refresh token with longer expiry."""
     settings = get_settings()
     to_encode = data.copy()
-    expire = datetime.now(UTC) + timedelta(
-        days=settings.jwt_refresh_token_expire_days,
-    )
-    to_encode.update({"exp": expire, "type": "refresh"})
-    if _HAS_PYJWT:
-        return _jwt_module.encode(
-            to_encode,
-            settings.jwt_secret_key,
-            algorithm=settings.jwt_algorithm,
-        )
-    return jwt.encode(  # type: ignore[union-attr]
-        to_encode,
-        settings.jwt_secret_key,
-        settings.jwt_algorithm,
-    )
+    expire = datetime.now(UTC) + timedelta(days=settings.jwt_refresh_token_expire_days)
+    to_encode.update({"exp": expire.isoformat(), "type": "refresh"})
+    return _encode(to_encode, settings.jwt_secret_key, settings.jwt_algorithm)
 
 
 def decode_token(token: str) -> dict:
     """Decode and verify a JWT token."""
     settings = get_settings()
-    if _HAS_PYJWT:
-        return _jwt_module.decode(
-            token,
-            settings.jwt_secret_key,
-            algorithms=[settings.jwt_algorithm],
-        )
-    return jwt.decode(  # type: ignore[union-attr]
-        token,
-        settings.jwt_secret_key,
-        [settings.jwt_algorithm],
-    )
+    return _decode(token, settings.jwt_secret_key, settings.jwt_algorithm)
 
 
 async def get_current_user(
@@ -160,7 +131,9 @@ async def get_current_user(
     try:
         payload = decode_token(credentials.credentials)
     except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(
+            status_code=401, detail="Invalid or expired token"
+        ) from None
     if payload.get("type") != "access":
         raise HTTPException(status_code=401, detail="Invalid token type")
     user_id = payload.get("sub")
@@ -170,7 +143,7 @@ async def get_current_user(
 
 
 async def optional_user(
-    request: Request,
+    request: Request,  # noqa: ARG001
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> dict | None:
     """Like get_current_user but returns None when no token is present
@@ -186,10 +159,6 @@ async def optional_user(
 
 # ─── Usage Tracking ─────────────────────────────────────────────────
 
-import threading  # noqa: E402
-from collections import defaultdict  # noqa: E402
-from datetime import date  # noqa: E402
-
 _lock = threading.Lock()
 _daily_usage: dict[str, dict[date, int]] = defaultdict(lambda: defaultdict(int))
 _monthly_usage: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
@@ -198,7 +167,7 @@ _monthly_usage: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int)
 def track_api_usage(user_id: str) -> bool:
     """Record an API call for the user. Returns False if quota exceeded."""
     settings = get_settings()
-    today = date.today()
+    today = datetime.now(UTC).date()
     month_key = today.strftime("%Y-%m")
 
     with _lock:
@@ -222,7 +191,7 @@ def track_api_usage(user_id: str) -> bool:
 def get_usage_stats(user_id: str) -> dict:
     """Get current usage stats for a user."""
     settings = get_settings()
-    today = date.today()
+    today = datetime.now(UTC).date()
     month_key = today.strftime("%Y-%m")
 
     with _lock:
@@ -245,9 +214,7 @@ def get_usage_stats(user_id: str) -> dict:
 
 # ─── Real-time Discovery Cache ──────────────────────────────────────
 
-from datetime import datetime as _dt  # noqa: E402
-
-_discovery_cache: dict[str, tuple[_dt, list[dict]]] = {}
+_discovery_cache: dict[str, tuple[datetime, list[dict]]] = {}
 _CACHE_TTL_SECONDS = 7200  # 2 hours
 
 
@@ -257,7 +224,7 @@ def get_cached_discovery(query: str, location: str | None = None) -> list[dict] 
     with _lock:
         if key in _discovery_cache:
             ts, results = _discovery_cache[key]
-            if (_dt.utcnow() - ts).total_seconds() < _CACHE_TTL_SECONDS:
+            if (datetime.now(UTC) - ts).total_seconds() < _CACHE_TTL_SECONDS:
                 return results
             del _discovery_cache[key]
     return None
@@ -267,4 +234,4 @@ def set_discovery_cache(query: str, location: str | None, results: list[dict]):
     """Store discovery results in cache."""
     key = f"{query}:{location or ''}"
     with _lock:
-        _discovery_cache[key] = (_dt.utcnow(), results)
+        _discovery_cache[key] = (datetime.now(UTC), results)

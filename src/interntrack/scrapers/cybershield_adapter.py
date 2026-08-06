@@ -47,7 +47,7 @@ class CybershieldScraperAdapter(BaseScraper):
         scrape_kwargs: dict[str, Any] = {"keywords": [query], "max_pages": 2}
         if location:
             scrape_kwargs["location"] = location
-        
+
         try:
             scraped = await asyncio.wait_for(
                 self._cyber.scrape(**scrape_kwargs),

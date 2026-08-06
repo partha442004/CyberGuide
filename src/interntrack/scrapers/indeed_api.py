@@ -52,11 +52,16 @@ class IndeedAPIScraper(BaseScraper):
                 params["l"] = location
 
             url = f"{self.BASE_URL}/jobs?{urlencode(params)}"
-            response = await self._get(url, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Accept": "text/html,application/xhtml+xml",
-                "Accept-Language": "en-US,en;q=0.9",
-            })
+            response = await self._get(
+                url,
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    ),
+                    "Accept": "text/html,application/xhtml+xml",
+                    "Accept-Language": "en-US,en;q=0.9",
+                },
+            )
 
             if response.status_code == 200:
                 from bs4 import BeautifulSoup

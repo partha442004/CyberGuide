@@ -167,7 +167,7 @@ class ApplicationRepository(BaseRepository[Application]):
         application.status = new_status  # type: ignore[assignment]
 
         if new_status == ApplicationStatus.APPLIED and not application.applied_at:
-            application.applied_at = utcnow()  # type: ignore[assignment]
+            application.applied_at = utcnow()
 
         # Add status history entry
         history = ApplicationStatusHistory(

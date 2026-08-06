@@ -5,7 +5,7 @@ Status flow: saved → applied → interview → assessment → offer → joined
 Also: rejected, withdrawn
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -174,25 +174,27 @@ async def update_application(
     if payload.status not in allowed_next:
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot transition from '{current_status}' to '{payload.status}'. Allowed: {allowed_next}",
+            detail=(
+                f"Cannot transition from '{current_status}' to "
+                f"'{payload.status}'. Allowed: {allowed_next}"
+            ),
         )
 
     # Update status
     new_status = ApplicationStatus(payload.status)
-    old_status = app.status
-    app.status = new_status
+    app.status = new_status  # type: ignore[assignment]
 
     # Set timestamps based on status
     if payload.status == "applied" and not app.applied_at:
-        app.applied_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        app.applied_at = datetime.now(UTC).replace(tzinfo=None)  # type: ignore[assignment]
     if payload.status == "interview" and payload.interview_at:
         app.interview_at = datetime.fromisoformat(
             payload.interview_at.replace("Z", "+00:00")
-        ).replace(tzinfo=None)
+        ).replace(tzinfo=None)  # type: ignore[assignment]
 
     # Update notes
     if payload.notes:
-        app.notes = payload.notes
+        app.notes = payload.notes  # type: ignore[assignment]
 
     await db.commit()
 
@@ -219,7 +221,7 @@ async def application_stats(
     applications = result.scalars().all()
 
     # Count by status
-    status_counts = {}
+    status_counts: dict[str, int] = {}
     for app in applications:
         status = app.status.value if app.status else "saved"
         status_counts[status] = status_counts.get(status, 0) + 1
@@ -303,9 +305,9 @@ async def application_timeline(
     timeline.append(
         {
             "status": current_status,
-            "icon": status_info.get("icon", "❓"),
+            "icon": str(status_info.get("icon", "❓")),
             "timestamp": str(app.updated_at) if app.updated_at else None,
-            "note": app.notes or f"Status: {current_status}",
+            "note": str(app.notes or f"Status: {current_status}"),
         }
     )
 

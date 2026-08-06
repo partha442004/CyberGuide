@@ -49,10 +49,15 @@ class HiredScraper(BaseScraper):
                 params["location"] = location
 
             url = f"{self.BASE_URL}/jobs?{urlencode(params)}"
-            response = await self._get(url, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Accept-Language": "en-US,en;q=0.9",
-            })
+            response = await self._get(
+                url,
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    ),
+                    "Accept-Language": "en-US,en;q=0.9",
+                },
+            )
 
             if response.status_code == 200:
                 from bs4 import BeautifulSoup
@@ -102,11 +107,15 @@ class HiredScraper(BaseScraper):
             salary_elem = card.find("span", class_="salary")
             salary_min, salary_max = None, None
             if salary_elem:
-                salary_min, salary_max = self._parse_salary(salary_elem.get_text(strip=True))
+                salary_min, salary_max = self._parse_salary(
+                    salary_elem.get_text(strip=True)
+                )
 
             # Extract skills
             skills_elem = card.find_all("span", class_="skill")
-            skills = [s.get_text(strip=True) for s in skills_elem] if skills_elem else []
+            skills = (
+                [s.get_text(strip=True) for s in skills_elem] if skills_elem else []
+            )
 
             if not title:
                 return None

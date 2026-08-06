@@ -4,8 +4,8 @@ LinkedIn India scraper for Indian job market.
 Scrapes cybersecurity jobs from LinkedIn India (linkedin.com/in).
 """
 
+import contextlib
 import logging
-import re
 from datetime import datetime
 
 from interntrack.scrapers.base import BaseScraper, RawJob, matches_query
@@ -62,10 +62,15 @@ class LinkedInIndiaScraper(BaseScraper):
             }
 
             url = f"{self.BASE_URL}?{'&'.join(f'{k}={v}' for k, v in params.items())}"
-            response = await self._get(url, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Accept-Language": "en-IN,en;q=0.9",
-            })
+            response = await self._get(
+                url,
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    ),
+                    "Accept-Language": "en-IN,en;q=0.9",
+                },
+            )
 
             # Check for auth wall
             if response.status_code == 999 or any(
@@ -112,7 +117,11 @@ class LinkedInIndiaScraper(BaseScraper):
             url = None
             if link_elem:
                 href = link_elem.get("href", "")
-                url = href if href.startswith("http") else f"https://www.linkedin.com{href}"
+                url = (
+                    href
+                    if href.startswith("http")
+                    else f"https://www.linkedin.com{href}"
+                )
 
             # Extract location
             location_elem = card.find("span", class_="job-search-card__location")
@@ -124,10 +133,10 @@ class LinkedInIndiaScraper(BaseScraper):
             if date_elem:
                 datetime_attr = date_elem.get("datetime")
                 if datetime_attr:
-                    try:
-                        posted_at = datetime.fromisoformat(datetime_attr.replace("Z", "+00:00"))
-                    except ValueError:
-                        pass
+                    with contextlib.suppress(ValueError):
+                        posted_at = datetime.fromisoformat(
+                            datetime_attr.replace("Z", "+00:00")
+                        )
 
             if not title:
                 return None

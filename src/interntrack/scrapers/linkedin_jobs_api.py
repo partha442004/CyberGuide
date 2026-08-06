@@ -5,8 +5,8 @@ Uses LinkedIn's public job search API for fetching jobs.
 Note: LinkedIn has strict rate limits and requires proper headers.
 """
 
+import contextlib
 import logging
-import re
 from datetime import datetime
 from urllib.parse import urlencode
 
@@ -55,11 +55,16 @@ class LinkedInJobsAPIScraper(BaseScraper):
                 params["location"] = location
 
             url = f"{self.BASE_URL}?{urlencode(params)}"
-            response = await self._get(url, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Accept": "text/html,application/xhtml+xml",
-                "Accept-Language": "en-US,en;q=0.9",
-            })
+            response = await self._get(
+                url,
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    ),
+                    "Accept": "text/html,application/xhtml+xml",
+                    "Accept-Language": "en-US,en;q=0.9",
+                },
+            )
 
             if response.status_code == 200:
                 from bs4 import BeautifulSoup
@@ -97,7 +102,11 @@ class LinkedInJobsAPIScraper(BaseScraper):
             url = None
             if link_elem:
                 href = link_elem.get("href", "")
-                url = href if href.startswith("http") else f"https://www.linkedin.com{href}"
+                url = (
+                    href
+                    if href.startswith("http")
+                    else f"https://www.linkedin.com{href}"
+                )
 
             # Extract location
             location_elem = card.find("span", class_="job-search-card__location")
@@ -109,10 +118,10 @@ class LinkedInJobsAPIScraper(BaseScraper):
             if date_elem:
                 datetime_attr = date_elem.get("datetime")
                 if datetime_attr:
-                    try:
-                        posted_at = datetime.fromisoformat(datetime_attr.replace("Z", "+00:00"))
-                    except ValueError:
-                        pass
+                    with contextlib.suppress(ValueError):
+                        posted_at = datetime.fromisoformat(
+                            datetime_attr.replace("Z", "+00:00")
+                        )
 
             if not title:
                 return None

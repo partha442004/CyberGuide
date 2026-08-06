@@ -10,7 +10,7 @@ def utcnow():
     return datetime.now(UTC).replace(tzinfo=None)
 
 
-def to_naive_utc(dt):
+def to_naive_utc(dt: datetime | None) -> datetime | None:
     """Convert an aware datetime to naive UTC, or return naive as-is."""
     if dt is None:
         return None

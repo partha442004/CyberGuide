@@ -50,10 +50,15 @@ class IndeedIndiaScraper(BaseScraper):
                 params["l"] = location
 
             url = f"{self.BASE_URL}/jobs?{urlencode(params)}"
-            response = await self._get(url, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Accept-Language": "en-IN,en;q=0.9",
-            })
+            response = await self._get(
+                url,
+                headers={
+                    "User-Agent": (
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    ),
+                    "Accept-Language": "en-IN,en;q=0.9",
+                },
+            )
 
             if response.status_code == 200:
                 from bs4 import BeautifulSoup
@@ -135,8 +140,10 @@ class IndeedIndiaScraper(BaseScraper):
     def _parse_salary(self, salary_text: str) -> tuple:
         """Parse salary from text (INR format)."""
         # Remove currency symbols and parse
-        salary_text = salary_text.replace("₹", "").replace(",", "").replace("PA", "").strip()
-        
+        salary_text = (
+            salary_text.replace("₹", "").replace(",", "").replace("PA", "").strip()
+        )
+
         numbers = re.findall(r"[\d]+", salary_text)
         if len(numbers) >= 2:
             return (

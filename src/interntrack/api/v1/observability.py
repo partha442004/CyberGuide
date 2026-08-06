@@ -46,7 +46,8 @@ async def discovery_history(
         source = job.source.value if job.source else "unknown"
         by_source[source] = by_source.get(source, 0) + 1
 
-        by_company[job.company] = by_company.get(job.company, 0) + 1
+        company_key = str(job.company)
+        by_company[company_key] = by_company.get(company_key, 0) + 1
 
     top_companies = sorted(by_company.items(), key=lambda x: x[1], reverse=True)[:10]
 

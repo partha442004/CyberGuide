@@ -214,7 +214,9 @@ async def domain_jobs(
     # Classify and filter
     matched_jobs = []
     for job in all_jobs:
-        job_domains = _classify_job(job.title, job.description, job.tags or [])
+        job_domains = _classify_job(
+            str(job.title), str(job.description or ""), list(job.tags or [])
+        )
         if domain in job_domains:
             # Apply filters
             if (
@@ -313,7 +315,9 @@ async def trending_skills(
 
     skill_counts: dict[str, int] = {}
     for job in all_jobs:
-        job_domains = _classify_job(job.title, job.description, job.tags or [])
+        job_domains = _classify_job(
+            str(job.title), str(job.description or ""), list(job.tags or [])
+        )
         if domain not in job_domains:
             continue
         text = f"{job.title} {job.description or ''}".lower()

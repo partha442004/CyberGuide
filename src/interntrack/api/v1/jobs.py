@@ -18,6 +18,7 @@ from interntrack.api.schemas.job import (
 )
 from interntrack.database.session import get_db
 from interntrack.domain.exceptions import DuplicateJobError
+from interntrack.repositories.job_repository import JobRepository
 from interntrack.services.job_service import JobService
 
 router = APIRouter()
@@ -58,7 +59,10 @@ async def archive_expired(days: int = 30, db: AsyncSession = Depends(get_db)):
     """Archive jobs older than N days to keep the database lean."""
     repo = JobRepository(db)
     count = await repo.archive_expired_jobs(days=days)
-    return {"archived": count, "message": f"Archived {count} jobs older than {days} days"}
+    return {
+        "archived": count,
+        "message": f"Archived {count} jobs older than {days} days",
+    }
 
 
 @router.get("/expired")
@@ -81,8 +85,6 @@ async def list_expired(limit: int = 50, db: AsyncSession = Depends(get_db)):
         ],
         "total": len(expired),
     }
-
-
 
 
 @router.get("/{job_id}", response_model=JobResponse)
@@ -417,8 +419,6 @@ async def run_discovery_for_users(
         "found": total_found,
         "saved": total_saved,
     }
-
-
 
 
 @router.post("/discovery/run")
