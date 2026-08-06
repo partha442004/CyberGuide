@@ -58,6 +58,23 @@ class TestJobService:
         mock_job_repo.create.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_create_job_truncates_overlong_fields(self, service, mock_job_repo):
+        """Over-long fields are clamped so Postgres varchar(N) never rejects."""
+        job_data = {
+            "title": "T" * 600,
+            "company": "C" * 300,
+            "location": "L" * 300,
+            "url": "https://example.com/job/1",
+        }
+
+        await service.create_job(job_data)
+
+        created = mock_job_repo.create.call_args[0][0]
+        assert len(created.title) == 500
+        assert len(created.company) == 200
+        assert len(created.location) == 200
+
+    @pytest.mark.asyncio
     async def test_create_job_duplicate_url(self, service, mock_job_repo):
         """Test that duplicate URL raises DuplicateJobError."""
         mock_job_repo.get_by_url.return_value = Job(id="existing")
