@@ -1526,10 +1526,34 @@ def show_settings() -> None:
     # 🔔 Notifications — daily job alert preferences
     # ------------------------------------------------------------------
     st.subheader("🔔 Notifications")
+
+    # Visual flow explaining how notifications work
     st.markdown(
-        "Control your **daily job alert** (sent every day to your email and "
-        "Telegram). Pick which **categories** to receive — e.g. select "
-        "*🔐 Cybersecurity* to get only security jobs with their apply links."
+        "<div style='background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);"
+        "border-radius:16px;padding:24px 28px;color:white;margin-bottom:20px;'>"
+        "<div style='font-size:18px;font-weight:800;margin-bottom:12px;'>"
+        "How your daily job alerts work</div>"
+        "<div style='display:flex;gap:16px;flex-wrap:wrap;'>"
+        "<div style='flex:1;min-width:140px;background:rgba(255,255,255,0.15);"
+        "border-radius:12px;padding:14px;text-align:center;'>"
+        "<div style='font-size:28px;'>🔍</div>"
+        "<div style='font-weight:700;font-size:13px;margin:4px 0;'>1. Discover</div>"
+        "<div style='font-size:11px;opacity:0.85;'>Scrapers find new jobs from "
+        "LinkedIn, RemoteOK, HackerNews and more, 3x daily</div></div>"
+        "<div style='flex:1;min-width:140px;background:rgba(255,255,255,0.15);"
+        "border-radius:12px;padding:14px;text-align:center;'>"
+        "<div style='font-size:28px;'>🎯</div>"
+        "<div style='font-weight:700;font-size:13px;margin:4px 0;'>2. Match</div>"
+        "<div style='font-size:11px;opacity:0.85;'>Filtered by your categories, "
+        "location, and resume match % - only relevant jobs kept</div></div>"
+        "<div style='flex:1;min-width:140px;background:rgba(255,255,255,0.15);"
+        "border-radius:12px;padding:14px;text-align:center;'>"
+        "<div style='font-size:28px;'>📬</div>"
+        "<div style='font-weight:700;font-size:13px;margin:4px 0;'>3. Deliver</div>"
+        "<div style='font-size:11px;opacity:0.85;'>Styled HTML email and Telegram "
+        "sent at 08:00, 13:00, 19:00 IST with Apply buttons</div></div>"
+        "</div></div>",
+        unsafe_allow_html=True,
     )
 
     # Which channels are actually configured on the API?
@@ -1558,6 +1582,38 @@ def show_settings() -> None:
     saved_chans = prefs.get("channels") or []
     saved_domains = prefs.get("domains") or []
     saved_min = prefs.get("min_match_score") or 0
+    saved_location = prefs.get("location") or ""
+
+    # Channel status indicators
+    if configured:
+        st.markdown("**📤 Delivery channels**")
+        chan_cols = st.columns(len(configured) if len(configured) <= 3 else 3)
+        for i, ch in enumerate(configured):
+            label = _NOTIF_CHANNEL_LABELS.get(ch, ch)
+            is_active = ch in saved_chans or not saved_chans
+            icon = "✅" if is_active else "⬜"
+            with chan_cols[i % len(chan_cols)]:
+                st.markdown(
+                    f"<div style='padding:8px 14px;border-radius:8px;"
+                    f"background:{'#dcfce7' if is_active else '#f1f5f9'};"
+                    f"border:1px solid {'#86efac' if is_active else '#e2e8f0'};'>"
+                    f"<b>{icon} {label}</b></div>",
+                    unsafe_allow_html=True,
+                )
+
+    # Location
+    st.markdown("---")
+    st.markdown(
+        "**📍 Preferred location** - Jobs in your area appear first in the "
+        "daily email. Works with fuzzy matching (e.g. Bangalore also "
+        "matches Bengaluru)."
+    )
+    location = st.text_input(
+        "Your city",
+        value=saved_location,
+        placeholder="e.g. Bangalore, Mumbai, Delhi",
+        help="Leave empty to see jobs from all locations.",
+    )
 
     # Channels to deliver alerts through.
     chan_options = [c for c in ("email", "telegram") if c in configured]
@@ -1619,6 +1675,7 @@ def show_settings() -> None:
                 "is_enabled": True,
                 "slot_domains": slot_picks,
                 "weekly_enabled": weekly_enabled,
+                "location": location.strip() or None,
             }
             result = _api(
                 f"/notifications/preferences/{user_id}",
@@ -1640,6 +1697,14 @@ def show_settings() -> None:
                     f"via {', '.join(result.get('channels') or payload['channels'])}"
                     f"{extra}. Weekly digest: {'on' if weekly_enabled else 'off'}."
                 )
+                # Also save location to user profile
+                if location.strip():
+                    _api(
+                        f"/users/{user_id}",
+                        method="PUT",
+                        json_data={"location": location.strip()},
+                        timeout=15,
+                    )
             else:
                 st.error("Failed to save preferences — is the API reachable?")
 
@@ -1793,6 +1858,43 @@ def show_settings() -> None:
             "Alerts only include **new jobs** since the previous send (no repeats). "
             "Sends run at 08:00 / 13:00 / 19:00 IST (+ a Sunday weekly recap), and "
             "Telegram alerts now carry tap-to-apply buttons."
+        )
+
+    # Preview section
+    st.markdown("---")
+    with st.expander("Preview: What your daily email looks like", expanded=False):
+        st.markdown(
+            "<div style='font-family:Inter,sans-serif;max-width:100%;"
+            "background:white;border-radius:14px;overflow:hidden;"
+            "border:1px solid #e2e8f0;margin-top:8px;'>"
+            "<div style='background:linear-gradient(135deg,#667eea,#764ba2);"
+            "color:white;padding:18px 22px;'>"
+            "<div style='font-size:16px;font-weight:800;'>Daily Report</div>"
+            "<div style='opacity:0.85;font-size:11px;'>Today - 3x per day</div>"
+            "<div style='margin-top:8px;font-size:13px;'>"
+            "New jobs: <b>8</b> | Applied: <b>2</b></div></div>"
+            "<div style='padding:16px;'>"
+            "<div style='color:#64748b;font-size:12px;font-weight:600;"
+            "margin-bottom:8px;'>Security</div>"
+            "<div style='border:1px solid #e2e8f0;border-radius:10px;"
+            "padding:12px 14px;margin-bottom:8px;'>"
+            "<div style='display:flex;justify-content:space-between;'>"
+            "<div><b>SOC Analyst</b></div>"
+            "<div style='font-size:18px;font-weight:800;color:#e5484d;'>85%</div></div>"
+            "<div style='color:#64748b;font-size:12px;'>"
+            "Acme Security - Bangalore - Posted 2d ago</div>"
+            "<div style='margin-top:8px;'>"
+            "<span style='background:#e5484d;color:white;border-radius:6px;"
+            "padding:4px 12px;font-size:11px;font-weight:600;'>Apply now</span>"
+            "</div></div>"
+            "<div style='color:#94a3b8;font-size:10px;padding:0 16px 14px;'>"
+            "Match % = resume fit | Applied/Not applied</div>"
+            "</div></div>",
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "This is a sample - your actual email will show your matched jobs "
+            "with real apply links, match scores, and expiry badges."
         )
 
     st.divider()
