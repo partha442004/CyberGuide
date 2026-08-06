@@ -181,8 +181,14 @@ async def _deliver_alert(
     text_targets = [c for c in non_telegram if c != "email"]
     if email_targets:
         # Email gets the styled HTML digest; other text channels stay plain.
+        user_location = getattr(user, "location", None) if user else None
         html = await build_daily_report_html(
-            report, session, domains=domains, title=title, user_id=user_id
+            report,
+            session,
+            domains=domains,
+            title=title,
+            user_id=user_id,
+            user_location=user_location,
         )
         if recipient:
             results.update(
@@ -671,17 +677,42 @@ async def build_daily_report_html(
     domains: list | None = None,
     title: str = "📊 Daily Report",
     user_id: str | None = None,
+    user_location: str | None = None,
 ) -> str:
     """Styled HTML digest for email delivery.
 
     Every domain section renders as a colored card list with match %,
-    expiry status and an Apply button per job. All job content is escaped
+    expiry status and an Apply button per job.  When the user has a
+    ``user_location`` set, jobs are split into a **Your area** section
+    (fuzzy location match) and **Other locations**, with a role x
+    location breakdown table at the bottom.  All job content is escaped
     (external scrape data). Watched-company jobs get their own section.
     """
     sections = await _score_and_group_jobs(report, session, domains, user_id=user_id)
     watched = await _watched_company_names(session, user_id)
     summary = report.get("summary") or {}
     generated = report.get("generated_at") or ""
+
+    # Split sections by location when user has a preferred location
+    loc_lower = (user_location or "").strip().lower()
+    location_sections = []
+    other_sections = []
+    if loc_lower and sections:
+        for domain, items in sections:
+            here = []
+            there = []
+            for score, job in items:
+                job_loc = (job.get("location") or "").lower()
+                if _location_matches(job_loc, loc_lower):
+                    here.append((score, job))
+                else:
+                    there.append((score, job))
+            if here:
+                location_sections.append((domain, here))
+            if there:
+                other_sections.append((domain, there))
+    else:
+        location_sections = sections
 
     parts = [
         (
@@ -732,12 +763,147 @@ async def build_daily_report_html(
         for job in watched_jobs:
             parts.append(_job_html_card(None, job, "#0ea5e9"))
 
+    # Other locations section
+    if loc_lower and other_sections:
+        other_count = sum(len(items) for _, items in other_sections)
+        parts.append(
+            "<div style='margin:28px 0 8px;padding:12px 16px;border-radius:10px;"
+            "background:#fff7ed;border-left:5px solid #f97316;'>"
+            "<b style='font-size:15px;'>🌍 Other locations</b> "
+            "<span style='background:#f97316;color:#fff;border-radius:999px;"
+            "padding:2px 10px;font-size:12px;'>" + str(other_count) + "</span></div>"
+        )
+        for domain, items in other_sections:
+            label = _DOMAIN_ICONS.get(domain, domain)
+            accent = {
+                "security": "#e5484d",
+                "coding": "#3b82f6",
+                "data": "#8b5cf6",
+                "design": "#ec4899",
+                "finance": "#10b981",
+                "marketing": "#f59e0b",
+                "other": "#64748b",
+            }.get(domain, "#64748b")
+            parts.append(
+                "<div style='margin:16px 0 6px;padding:8px 14px;border-radius:8px;"
+                "background:#fff7ed;border-left:4px solid " + accent + ";'>"
+                "<b style='font-size:13px;'>" + _esc(label) + "</b> "
+                "<span style='background:" + accent + ";color:#fff;border-radius:999px;"
+                "padding:1px 8px;font-size:11px;'>" + str(len(items)) + "</span></div>"
+            )
+            for score, job in items:
+                parts.append(_job_html_card(score, job, accent))
+
+    # Role x location breakdown table
+    if loc_lower:
+        parts.append(
+            _location_breakdown_table(location_sections, other_sections, loc_lower)
+        )
+
     parts.append(
         "<p style='color:#64748b;font-size:12px;margin-top:22px;'>"
         "Match % = how well your uploaded resume fits each job · "
         "✅/⬜ = applied / not applied.</p></div>"
     )
     return "".join(parts)
+
+
+def _location_matches(job_loc, user_loc):
+    """Fuzzy location match with synonyms."""
+    if not job_loc or not user_loc:
+        return False
+    if user_loc in job_loc:
+        return True
+    synonyms = {
+        "bangalore": ["bengaluru", "bengalore"],
+        "bengaluru": ["bangalore", "bengalore"],
+        "mumbai": ["bombay"],
+        "bombay": ["mumbai"],
+        "delhi": ["new delhi", "ncr"],
+        "hyderabad": ["secunderabad"],
+    }
+    for canonical, alts in synonyms.items():
+        if user_loc == canonical and any(a in job_loc for a in alts):
+            return True
+        if user_loc in alts and canonical in job_loc:
+            return True
+    return False
+
+
+def _location_breakdown_table(sections, other_sections):
+    """HTML table: job counts by domain x top locations."""
+    all_jobs = []
+    for _, items in (sections or []) + (other_sections or []):
+        all_jobs.extend(items)
+    if not all_jobs:
+        return ""
+    from collections import Counter
+
+    dom_loc = {}
+    for _, job in all_jobs:
+        d = job.get("domain") or "other"
+        loc = (job.get("location") or "Remote")[:30]
+        dom_loc.setdefault(d, Counter())
+        dom_loc[d][loc] += 1
+    loc_totals = Counter()
+    for c in dom_loc.values():
+        loc_totals.update(c)
+    top_locs = [loc for loc, _ in loc_totals.most_common(6)]
+    if not top_locs:
+        return ""
+    d_order = ["security", "coding", "data", "design", "finance", "marketing", "other"]
+    rows = []
+    td = "padding:6px 10px;border:1px solid #e2e8f0;"
+    for d in d_order:
+        if d not in dom_loc:
+            continue
+        c = dom_loc[d]
+        cells = "".join(
+            "<td style='" + td + "text-align:center;'>" + str(c.get(loc, 0)) + "</td>"
+            for loc in top_locs
+        )
+        t = sum(c.values())
+        rows.append(
+            "<tr><td style='"
+            + td
+            + "font-weight:600;'>"
+            + d.title()
+            + "</td>"
+            + cells
+            + "<td style='"
+            + td
+            + "font-weight:600;text-align:center;'>"
+            + str(t)
+            + "</td></tr>"
+        )
+    tc = ""
+    for loc in top_locs:
+        v = sum(dom_loc[d].get(loc, 0) for d in dom_loc)
+        tc += (
+            "<td style='"
+            + td
+            + "font-weight:700;text-align:center;'>"
+            + str(v)
+            + "</td>"
+        )  # noqa: E501
+    hc = "".join(
+        "<th style='" + td + "background:#f1f5f9;'>" + loc + "</th>" for loc in top_locs
+    )
+    return (
+        "<div style='margin:28px 0 12px;padding:16px;border-radius:12px;border:1px solid #e2e8f0;background:#fafbfc;'>"  # noqa: E501
+        "<b style='font-size:15px;'>📊 Jobs by role × location</b>"
+        "<div style='overflow-x:auto;margin-top:10px;'>"
+        "<table style='width:100%;border-collapse:collapse;font-size:13px;'>"
+        "<tr><th style='"
+        + td
+        + "background:#f1f5f9;'>Domain</th>"
+        + hc
+        + "<th style='"
+        + td
+        + "background:#f1f5f9;'>Total</th></tr>"
+        + "".join(rows)
+        + "</table></div></div>"
+    )
 
 
 def _job_html_card(score, job: dict, accent: str) -> str:
@@ -837,6 +1003,11 @@ def discovery_queries_for(prefs: dict, user=None, limit: int = 4) -> list[str]:
             skill_name = str(skill).strip()
             if skill_name:
                 queries.append(f"{skill_name} intern")
+    # Location-aware: add queries with location appended
+    location = (getattr(user, "location", None) or "").strip() if user else ""
+    if location:
+        for q in list(queries):
+            queries.append(f"{q} {location}")
     seen: set[str] = set()
     unique: list[str] = []
     for query in queries:
