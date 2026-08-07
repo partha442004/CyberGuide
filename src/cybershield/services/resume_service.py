@@ -275,6 +275,150 @@ URL_PATTERNS = {
 }
 
 
+class ResumeScorer:
+    """Score a resume for ATS (Applicant Tracking System) compatibility.
+
+    Weighted criteria mirror the documented resume engine
+    (``docs/cscip/14-resume-engine.md``): presence of contact info,
+    skills / experience / education sections, keyword match against the
+    job, and structure/length signals. Works purely on the stored
+    ``ResumeData`` JSON columns (no raw text is persisted), so it runs
+    offline on Vercel against the exact data the match endpoints hold.
+    """
+
+    # ATS scoring criteria (weights sum to 100).
+    CRITERIA: Dict[str, Dict[str, Any]] = {
+        "contact_info": {"weight": 10, "description": "Contact information present"},
+        "skills_section": {"weight": 15, "description": "Skills section exists"},
+        "experience_section": {"weight": 20, "description": "Work experience present"},
+        "education_section": {"weight": 10, "description": "Education section present"},
+        "keywords_match": {"weight": 25, "description": "Keywords match job description"},
+        "formatting": {"weight": 10, "description": "Clean formatting"},
+        "length": {"weight": 10, "description": "Appropriate length"},
+    }
+
+    def calculate_ats_score(
+        self,
+        resume_data: Dict[str, Any],
+        job_keywords: List[str] | None = None,
+    ) -> Dict[str, Any]:
+        """Calculate ATS compatibility score.
+
+        ``resume_data`` mirrors the parsed resume (keys: ``skills``,
+        ``education``, ``experience``, ``certifications``, ``links``).
+        ``job_keywords`` are the job's required/preferred skills + tags;
+        when omitted, keyword matching is neutral (50). Returns the
+        weighted score plus per-criterion scores and actionable feedback.
+        """
+        scores: Dict[str, int] = {}
+        feedback: List[str] = []
+
+        def _as_items(value) -> list:
+            return list(value or [])
+
+        skills = _as_items(resume_data.get("skills"))
+        education = _as_items(resume_data.get("education"))
+        experience = _as_items(resume_data.get("experience"))
+        certifications = _as_items(resume_data.get("certifications"))
+        links = resume_data.get("links") or {}
+
+        # Contact info: email / phone / github / linkedin all count.
+        has_contact = bool(
+            links.get("email") or links.get("phone") or links.get("github") or links.get("linkedin")
+        )
+        scores["contact_info"] = 100 if has_contact else 0
+        if not has_contact:
+            feedback.append(
+                "Add email / phone / LinkedIn / GitHub links — ATS resume parsers read contact info from the header."
+            )
+
+        # Section presence.
+        scores["skills_section"] = 100 if skills else 0
+        if not skills:
+            feedback.append(
+                "Add a dedicated skills section (comma-separated) so ATS keyword matching can pick them up."
+            )
+        scores["experience_section"] = 100 if experience else 0
+        if not experience:
+            feedback.append(
+                "Include a work experience / internship section — the biggest ATS weight."
+            )
+        scores["education_section"] = 100 if education else 0
+        if not education:
+            feedback.append("Add your education details (degree, institution, years).")
+
+        # Keyword match: resume skills vs the job's skill list.
+        if job_keywords:
+            resume_skill_names = {
+                str(s.get("name", "")).lower() if isinstance(s, dict) else str(s).lower()
+                for s in skills
+                if (str(s.get("name", "")) if isinstance(s, dict) else str(s))
+            }
+            job_skills = {str(k).lower() for k in job_keywords if str(k).strip()}
+            if job_skills:
+                matched = resume_skill_names & job_skills
+                scores["keywords_match"] = int(len(matched) / len(job_skills) * 100)
+                if len(matched) < max(1, len(job_skills) // 2):
+                    feedback.append(
+                        f"Your resume matches only {len(matched)} of {len(job_skills)} "
+                        "job keywords — mirror the job description's exact terms "
+                        "(e.g. the listed tools) in your skills section."
+                    )
+            else:
+                scores["keywords_match"] = 50
+        else:
+            scores["keywords_match"] = 50
+
+        # Structure signals (no raw text persisted, so use section breadth
+        # as the proxy for a clean, parseable layout).
+        sections_present = sum(1 for s in (skills, experience, education, certifications) if s)
+        scores["formatting"] = 100 if sections_present >= 3 else 60
+        if sections_present < 3:
+            feedback.append(
+                "Use clear section headings (SKILLS / EXPERIENCE / EDUCATION) — ATS "
+                "parsers rely on them to bucket content."
+            )
+
+        skill_count = len(skills)
+        if 4 <= skill_count <= 30:
+            scores["length"] = 100
+        elif 1 <= skill_count <= 60:
+            scores["length"] = 70
+        else:
+            scores["length"] = 40
+        if skill_count < 4:
+            feedback.append(
+                "List more of your tools and technologies — ATS keyword matching "
+                "rewards breadth (aim for 8-15 skills)."
+            )
+
+        # Weighted total.
+        total_score = 0
+        total_weight = 0
+        for criterion, details in self.CRITERIA.items():
+            weight = int(details.get("weight") or 0)
+            total_score += scores.get(criterion, 0) * weight
+            total_weight += weight
+        ats_score = round(total_score / total_weight, 1) if total_weight > 0 else 0
+
+        breakdown = [
+            {
+                "criterion": criterion,
+                "score": scores.get(criterion, 0),
+                "weight": details["weight"],
+                "description": details["description"],
+            }
+            for criterion, details in self.CRITERIA.items()
+        ]
+
+        return {
+            "ats_score": ats_score,
+            "criteria_scores": scores,
+            "breakdown": breakdown,
+            "feedback": feedback[:4],
+        }
+
+
 class ResumeParser:
     """Parse resume PDFs and extract structured data."""
 
