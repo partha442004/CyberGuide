@@ -884,7 +884,7 @@ def _my_top_matches(user_id: str, limit: int = 8) -> list[tuple[dict, float]]:
 @st.cache_data(ttl=300, show_spinner=False)
 def _team_count() -> int:
     """Number of registered accounts (cached 5 min to avoid a call per rerun)."""
-    data = fetch_data("/users/") or {}
+    data = fetch_data("/users") or {}
     return len(data.get("users") or [])
 
 
