@@ -52,6 +52,21 @@ class TestScraperRegistryExtended:
         assert "paloalto" in sources
         assert len(sources) >= 13
 
+    def test_internshala_uses_direct_html_scraper(self):
+        """The reliable HTML scraper must win over the JSON-API adapter.
+
+        Regression: the cybershield Internshala adapter (which calls a
+        now-broken JSON endpoint) was registered under the same key and
+        silently replaced InternshalaDirectScraper, so internshala always
+        returned 0 jobs.
+        """
+        from interntrack.scrapers.internshala_direct import InternshalaDirectScraper
+        from interntrack.scrapers.registry import get_default_registry
+
+        registry = get_default_registry()
+        scraper = registry.get("internshala")
+        assert isinstance(scraper, InternshalaDirectScraper)
+
     @pytest.mark.asyncio
     async def test_fetch_all_no_sources(self):
         from interntrack.scrapers.registry import ScraperRegistry

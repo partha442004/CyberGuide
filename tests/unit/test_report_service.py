@@ -236,6 +236,42 @@ class TestClassifyDomain:
         assert classify_domain("DevSecOps Engineer", []) == "security"
         assert classify_domain("Information Security Manager") == "security"
 
+    def test_security_keywords_cover_modern_titles(self):
+        """GRC / threat intel / OSINT / DFIR / web-app titles classify security."""
+        from interntrack.services.report_service import classify_domain
+
+        for title in [
+            "GRC Analyst",
+            "Threat Intelligence Analyst",
+            "Penetration Tester",
+            "OSINT Investigator",
+            "DFIR Consultant",
+            "Forensic Analyst",
+            "Bug Bounty Hunter",
+            "Cloud Security Engineer",
+            "Network Security Administrator",
+            "Zero Trust Architect",
+            "CISSP Certified Analyst",
+            "Security Operations Center Lead",
+            "Exploit Developer",
+            "CTF Player",
+        ]:
+            assert classify_domain(title, []) == "security", title
+
+    def test_webapp_attack_terms_classify_security(self):
+        """SQLi / XSS titles are security, not coding/data."""
+        from interntrack.services.report_service import classify_domain
+
+        assert classify_domain("Web Application Security (SQLi)", []) == "security"
+        assert classify_domain("Security Engineer - XSS Research", []) == "security"
+
+    def test_sql_developer_still_coding(self):
+        """Plain SQL dev roles must NOT be dragged into security."""
+        from interntrack.services.report_service import classify_domain
+
+        assert classify_domain("SQL Developer", []) == "coding"
+        assert classify_domain("Senior SQL Developer", []) == "coding"
+
     def test_company_prefix_does_not_leak_into_domain(self):
         """Only the role after 'Company: ' is classified."""
         from interntrack.services.report_service import classify_domain

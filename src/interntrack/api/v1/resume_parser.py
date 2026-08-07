@@ -60,6 +60,24 @@ SKILL_TAXONOMY = {
         "tcpdump",
         "snort",
         "suricata",
+        # Web-app security: keep these BEFORE bare "sql" (in programming) so
+        # a resume listing SQLi / XSS is extracted as security, not coding.
+        "sqli",
+        "sql injection",
+        "sqlmap",
+        "xss",
+        "csrf",
+        "ssrf",
+        "idor",
+        "grc",
+        "osint",
+        "dfir",
+        "cissp",
+        "ceh",
+        "ethical hacking",
+        "cybersecurity",
+        "threat intelligence",
+        "security operations",
     ],
     "programming": [
         "python",
@@ -233,27 +251,37 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
 
 
 def extract_skills(text: str) -> list[dict]:
-    """Extract skills from resume text using taxonomy matching."""
+    """Extract skills from resume text using taxonomy matching.
+
+    Matching is word-boundary based so short skills (``sql``, ``ids``,
+    ``ctf``) never match inside unrelated words — e.g. a resume listing
+    ``sqli`` / ``SQL injection`` yields the security skill, not a bare
+    ``sql`` (programming) hit that would surface SQL-developer jobs to a
+    security candidate.
+    """
     text_lower = text.lower()
     found_skills = []
 
     for category, skills in SKILL_TAXONOMY.items():
         for skill in skills:
-            if skill in text_lower:
-                # Find context around the skill
-                idx = text_lower.find(skill)
-                start = max(0, idx - 50)
-                end = min(len(text), idx + len(skill) + 50)
-                context = text[start:end].strip()
+            pattern = rf"(?<![a-z0-9]){re.escape(skill)}(?![a-z0-9])"
+            match = re.search(pattern, text_lower)
+            if not match:
+                continue
+            # Find context around the skill
+            idx = match.start()
+            start = max(0, idx - 50)
+            end = min(len(text), idx + len(skill) + 50)
+            context = text[start:end].strip()
 
-                found_skills.append(
-                    {
-                        "name": skill,
-                        "category": category,
-                        "context": context,
-                        "confidence": 0.9 if len(skill) > 3 else 0.7,
-                    }
-                )
+            found_skills.append(
+                {
+                    "name": skill,
+                    "category": category,
+                    "context": context,
+                    "confidence": 0.9 if len(skill) > 3 else 0.7,
+                }
+            )
 
     # Deduplicate
     seen = set()
