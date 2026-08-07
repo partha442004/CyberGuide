@@ -158,6 +158,29 @@ class TestDiscoveryQueries:
         queries = discovery_queries_for({"domains": []})
         assert queries  # non-empty
 
+    def test_location_queries_survive_limit_cap(self):
+        """With a location set, Bangalore-suffixed queries come FIRST so the
+        [:limit] cap keeps them instead of plain keywords."""
+        from interntrack.scheduler.jobs import discovery_queries_for
+
+        user = SimpleNamespace(skills=[], location="Bangalore")
+        queries = discovery_queries_for(
+            {"domains": ["security"]},
+            user=user,
+            limit=4,
+        )
+        assert len(queries) == 4
+        assert all("Bangalore" in q for q in queries)
+
+    def test_location_extraction_from_query(self):
+        """Discovery queries like 'cybersecurity bangalore' resolve the city."""
+        from interntrack.api.v1.jobs import _extract_location_from_query
+
+        assert _extract_location_from_query("cybersecurity bangalore") == "Bangalore"
+        assert _extract_location_from_query("python developer mumbai") == "Mumbai"
+        assert _extract_location_from_query("soc analyst bengaluru") == "Bangalore"
+        assert _extract_location_from_query("devops engineer") is None
+
 
 class TestPerUserDiscoveryEndpoint:
     """POST /jobs/discovery/run-for-users derives queries per user."""

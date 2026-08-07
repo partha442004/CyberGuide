@@ -122,7 +122,7 @@ class JobRepository(BaseRepository[Job]):
         return [tuple(row) for row in result.all()]
 
     async def search_jobs(self, query_str: str, limit: int = 50) -> list[Job]:
-        """Search jobs by title, company, or description."""
+        """Search jobs by title, company, description, or location."""
         search_term = f"%{query_str}%"
         query = (
             select(Job)
@@ -133,6 +133,7 @@ class JobRepository(BaseRepository[Job]):
                         Job.title.ilike(search_term)
                         | Job.company.ilike(search_term)
                         | Job.description.ilike(search_term)
+                        | Job.location.ilike(search_term)
                     ),
                 ),
             )
