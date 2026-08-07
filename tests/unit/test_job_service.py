@@ -67,7 +67,9 @@ class TestJobService:
         assert classify_job_type("Penetration Tester (Contract)") == "contract"
         assert classify_job_type("Freelance VAPT Consultant") == "freelance"
         assert classify_job_type("Senior Security Engineer (Full Time)") == "full_time"
-        assert classify_job_type("Security Engineer") == "unknown"
+        # No explicit marker -> defaults to full-time (most postings).
+        assert classify_job_type("Security Engineer") == "full_time"
+        assert classify_job_type("SOC Analyst") == "full_time"
 
     @pytest.mark.asyncio
     async def test_create_job_infers_job_type(self, service, mock_job_repo):
