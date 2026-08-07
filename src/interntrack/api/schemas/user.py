@@ -17,6 +17,8 @@ class UserCreate(BaseModel):
     experience_level: str | None = None
     domains: list[str] = []
     skills: list[str] = []
+    # Lowercased email of the friend whose invite link brought this user in.
+    referred_by: str | None = None
 
     @field_validator("email")
     @classmethod
@@ -25,6 +27,14 @@ class UserCreate(BaseModel):
         if "@" not in email or "." not in email.split("@")[-1]:
             raise ValueError("Invalid email address")
         return email
+
+    @field_validator("referred_by")
+    @classmethod
+    def _validate_referred_by(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        email = value.strip().lower()
+        return email if "@" in email else None
 
     @field_validator("name")
     @classmethod
@@ -74,6 +84,7 @@ class UserResponse(BaseModel):
     experience_level: str | None = None
     domains: list[str] = []
     skills: list[str] = []
+    referred_by: str | None = None
     is_active: bool = True
     created_at: datetime | None = None
 

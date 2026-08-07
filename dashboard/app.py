@@ -16,8 +16,10 @@ try:
     from dashboard.invite import (
         DEFAULT_DASHBOARD_URL,
         build_invite_link,
+        count_referrals,
         invite_caption,
         parse_invite_params,
+        team_rows,
     )
 except ImportError:  # pragma: no cover - older deployment without invite.py
     from urllib.parse import quote as _quote
@@ -43,6 +45,14 @@ except ImportError:  # pragma: no cover - older deployment without invite.py
     def invite_caption(invite: dict) -> str | None:  # noqa: ARG001
         """No invite support on old deployments."""
         return None
+
+    def count_referrals(users: list, referrer_email: str | None) -> int:  # noqa: ARG001
+        """No referral support on old deployments."""
+        return 0
+
+    def team_rows(users: list, me_email: str | None = None) -> list:  # noqa: ARG001
+        """No team view on old deployments."""
+        return []
 
 
 # Page config
@@ -881,11 +891,16 @@ def _my_top_matches(user_id: str, limit: int = 8) -> list[tuple[dict, float]]:
     return scored[:limit]
 
 
-@st.cache_data(ttl=300, show_spinner=False)
-def _team_count() -> int:
-    """Number of registered accounts (cached 5 min to avoid a call per rerun)."""
+@st.cache_data(ttl=60, show_spinner=False)
+def _team_members() -> list:
+    """Registered user profiles (cached 60s so a new member shows up fast)."""
     data = fetch_data("/users") or {}
-    return len(data.get("users") or [])
+    return list(data.get("users") or [])
+
+
+def _team_count() -> int:
+    """Number of registered accounts."""
+    return len(_team_members())
 
 
 def show_account() -> None:
@@ -949,12 +964,54 @@ def show_account() -> None:
             "When they open it → Create account → their preferred categories "
             "and city are already filled in."
         )
-        members = _team_count()
+        members = _team_members()
         if members:
             st.caption(
-                f"👥 **{members} account(s)** already getting personalized "
+                f"👥 **{len(members)} account(s)** already getting personalized "
                 "alerts on this platform."
             )
+
+        # Referral count — how many friends joined through *this* account's link.
+        referrals = count_referrals(members, user.get("email"))
+        if referrals:
+            st.success(
+                f"🎁 **{referrals} friend(s)** signed up through your invite link!"
+            )
+        else:
+            st.caption(
+                "🎁 Share your link above — when a friend signs up through it, "
+                "it's counted right here."
+            )
+
+        # Team directory — who is on the platform.
+        st.subheader("🌍 Team directory")
+        rows = team_rows(members, me_email=user.get("email"))
+        if rows:
+            for row in rows[:20]:
+                badges = []
+                if row["is_me"]:
+                    badges.append('<span class="chip">👤 You</span>')
+                if row["referred_by_me"]:
+                    badges.append('<span class="chip">🎁 via your link</span>')
+                domain_labels = (
+                    ", ".join(_DOMAIN_LABELS.get(d, d) for d in row["domains"])
+                    or "All categories"
+                )
+                st.markdown(
+                    f"**{escape(row['name'])}** "
+                    f"<span style='opacity:0.6'>{escape(row['email'])}</span> "
+                    f"<span style='opacity:0.6'>· {escape(row['location'])}</span>",
+                    unsafe_allow_html=True,
+                )
+                st.caption(f"🏷 {escape(domain_labels)}")
+                if badges:
+                    st.markdown(
+                        '<div class="chip-row">' + "".join(badges) + "</div>",
+                        unsafe_allow_html=True,
+                    )
+                st.divider()
+        else:
+            st.caption("No members yet — be the first to invite someone!")
 
         if st.button("🚪 Log out", use_container_width=True):
             _logout_user()
@@ -1022,6 +1079,7 @@ def show_account() -> None:
                 "telegram_chat_id": telegram_chat_id.strip() or None,
                 "domains": [] if "all" in domains else domains,
                 "skills": [s.strip() for s in skills.split(",") if s.strip()],
+                "referred_by": _invite.get("invite") or None,
             }
             resp = _api_raw(
                 "/users/register", method="POST", json_data=payload, timeout=30

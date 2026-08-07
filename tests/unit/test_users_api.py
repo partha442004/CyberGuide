@@ -44,6 +44,36 @@ class TestRegisterUser:
         assert pref_data["user_id"] == data["id"]
 
     @pytest.mark.asyncio
+    async def test_register_stores_referrer_email(self, client):
+        """The invite-link referrer is normalized (lowercased) and stored."""
+        response = await client.post(
+            "/api/v1/users/register",
+            json={
+                "name": "Friend One",
+                "email": "friend1@example.com",
+                "domains": ["data"],
+                "referred_by": "PARTHASARATHI@Example.com",
+            },
+        )
+        assert response.status_code == 201, response.text
+        data = response.json()
+        assert data["referred_by"] == "parthasarathi@example.com"
+
+    @pytest.mark.asyncio
+    async def test_register_ignores_invalid_referrer(self, client):
+        """A referrer that isn't an email is dropped silently."""
+        response = await client.post(
+            "/api/v1/users/register",
+            json={
+                "name": "Friend Two",
+                "email": "friend2@example.com",
+                "referred_by": "not-an-email",
+            },
+        )
+        assert response.status_code == 201, response.text
+        assert response.json().get("referred_by") is None
+
+    @pytest.mark.asyncio
     async def test_register_duplicate_email_conflict(self, client):
         await client.post(
             "/api/v1/users/register",
@@ -159,6 +189,88 @@ class TestLoginUser:
             json={"email": "rotate@example.com", "token": new_token},
         )
         assert new_login.status_code == 200
+
+
+class TestDeleteUser:
+    """DELETE /api/v1/users/{user_id} — full account removal."""
+
+    @pytest.mark.asyncio
+    async def test_delete_removes_account_and_related_rows(self, client):
+        """Deleting a user also removes their alert preferences + history."""
+        register = await client.post(
+            "/api/v1/users/register",
+            json={
+                "name": "Leaver",
+                "email": "leaver@example.com",
+                "domains": ["security"],
+            },
+        )
+        assert register.status_code == 201
+        user_id = register.json()["id"]
+        # Alerts were auto-enabled at signup.
+        prefs = await client.get(f"/api/v1/notifications/preferences/{user_id}")
+        assert prefs.status_code == 200
+
+        response = await client.delete(f"/api/v1/users/{user_id}")
+        assert response.status_code == 204
+
+        # The profile is gone...
+        gone = await client.get(f"/api/v1/users/{user_id}")
+        assert gone.status_code == 404
+        # ...and the saved preferences row went with it: the preferences
+        # endpoint lazily re-creates a *default* row on read, so the domains
+        # the user chose at signup are gone (security -> []).
+        prefs_gone = await client.get(f"/api/v1/notifications/preferences/{user_id}")
+        assert prefs_gone.status_code == 200
+        assert prefs_gone.json().get("domains") == []
+
+    @pytest.mark.asyncio
+    async def test_delete_removes_applications_too(self, client, db_session):
+        """A leaving user's applications (and their status history) go too."""
+        from interntrack.domain.models import Job
+
+        register = await client.post(
+            "/api/v1/users/register",
+            json={"name": "App Owner", "email": "appowner@example.com"},
+        )
+        user_id = register.json()["id"]
+        # Seed a job row directly, then create an application via the API.
+        job = Job(
+            title="Security Engineer",
+            company="TestCorp",
+            url="https://example.com/job-1",
+        )
+        db_session.add(job)
+        await db_session.commit()
+        await db_session.refresh(job)
+        app = await client.post(
+            "/api/v1/applications/",
+            json={"job_id": str(job.id), "user_id": user_id},
+        )
+        assert app.status_code in (200, 201), app.text
+
+        await client.delete(f"/api/v1/users/{user_id}")
+
+        listing = await client.get(f"/api/v1/applications/?user_id={user_id}")
+        assert listing.status_code == 200
+        assert listing.json().get("applications") == []
+
+    @pytest.mark.asyncio
+    async def test_delete_unknown_user_returns_404(self, client):
+        response = await client.delete("/api/v1/users/does-not-exist")
+        assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_list_excludes_deleted_user(self, client):
+        register = await client.post(
+            "/api/v1/users/register",
+            json={"name": "Temp", "email": "temp@example.com"},
+        )
+        user_id = register.json()["id"]
+        await client.delete(f"/api/v1/users/{user_id}")
+        listing = await client.get("/api/v1/users")
+        emails = [u["email"] for u in listing.json().get("users", [])]
+        assert "temp@example.com" not in emails
 
 
 class TestUserProfile:

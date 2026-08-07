@@ -71,6 +71,9 @@ class User(Base, TimestampMixin):
     # Secret per-user token (shown once at signup). Accounts with a token
     # require it at login; legacy accounts without one keep email-only login.
     access_token = Column(String(64), nullable=True, index=True)
+    # Lowercased email of the friend who invited this user (via the
+    # dashboard's invite link) — powers the referral counter.
+    referred_by = Column(String(200), nullable=True, index=True)
 
     def __repr__(self) -> str:
         return f"<User {self.name} <{self.email}>>"

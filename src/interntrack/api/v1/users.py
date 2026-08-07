@@ -11,7 +11,7 @@ decision; the returned ``user_id`` is stored in the dashboard session.
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -98,6 +98,7 @@ async def register_user(
         skills=[str(s).strip() for s in payload.skills if str(s).strip()],
         is_active=True,
         access_token=_new_access_token(),
+        referred_by=payload.referred_by or None,
     )
     db.add(user)
     try:
@@ -184,6 +185,80 @@ async def get_user(
     """Get one user's profile."""
     user = await _get_user_or_404(db, user_id)
     return UserResponse.model_validate(user)
+
+
+@router.delete("/{user_id}", status_code=204)
+async def delete_user(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Permanently delete an account and all of its data.
+
+    Removes the profile plus every user-scoped row: alert preferences,
+    notification history, applications (+ their status history), company
+    watchlists, user skills, and the resume records in the shared
+    ``resume_data`` / ``resume_match_results`` tables (when present). Returns
+    404 for an unknown user id.
+    """
+    from sqlalchemy import text
+
+    from interntrack.domain.models import (
+        Application,
+        ApplicationStatusHistory,
+        CompanyWatchlist,
+        NotificationHistory,
+        UserSkill,
+    )
+
+    user = await _get_user_or_404(db, user_id)
+
+    # Cross-module resume rows live in the shared database under cybershield's
+    # ``resume_data`` table. Best-effort cleanup runs FIRST because the table
+    # only exists on the live Postgres (not in a fresh interntrack-only test
+    # database); a failed probe is rolled back before the real deletes below
+    # so it can never undo them.
+    try:
+        await db.execute(
+            text(
+                "DELETE FROM resume_match_results "
+                "WHERE resume_id IN (SELECT id FROM resume_data "
+                "WHERE user_id = :uid)"
+            ),
+            {"uid": user_id},
+        )
+        await db.execute(
+            text("DELETE FROM resume_data WHERE user_id = :uid"),
+            {"uid": user_id},
+        )
+    except Exception:  # noqa: BLE001 - best-effort cross-module cleanup
+        await db.rollback()
+
+    # Applications first — their status-history rows reference application ids.
+    app_ids = list(
+        (await db.execute(select(Application.id).where(Application.user_id == user_id)))
+        .scalars()
+        .all()
+    )
+    if app_ids:
+        await db.execute(
+            delete(ApplicationStatusHistory).where(
+                ApplicationStatusHistory.application_id.in_(app_ids)
+            )
+        )
+    await db.execute(delete(Application).where(Application.user_id == user_id))
+    await db.execute(
+        delete(CompanyWatchlist).where(CompanyWatchlist.user_id == user_id)
+    )
+    await db.execute(delete(UserSkill).where(UserSkill.user_id == user_id))
+    await db.execute(
+        delete(AlertPreferences).where(AlertPreferences.user_id == user_id)
+    )
+    await db.execute(
+        delete(NotificationHistory).where(NotificationHistory.user_id == user_id)
+    )
+
+    await db.delete(user)
+    await db.commit()
 
 
 @router.put("/{user_id}", response_model=UserResponse)
