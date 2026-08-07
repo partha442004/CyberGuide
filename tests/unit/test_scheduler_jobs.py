@@ -154,6 +154,8 @@ class TestBuildDailyReportMessage:
     @pytest.mark.asyncio
     async def test_expiry_badges_in_message(self):
         """Closing-soon and expired jobs get visible badges."""
+        from datetime import UTC, datetime, timedelta
+
         from interntrack.scheduler.jobs import build_daily_report_message
 
         report = {
@@ -165,7 +167,7 @@ class TestBuildDailyReportMessage:
                     "url": "https://a/apply",
                     "age_days": 0,
                     "is_active": True,
-                    "expires_at": "2026-08-07T00:00:00",
+                    "expires_at": ((datetime.now(UTC) + timedelta(days=1)).isoformat()),
                 },
                 {
                     "title": "Dead Job",
@@ -183,15 +185,23 @@ class TestBuildDailyReportMessage:
         assert "Expired / closed" in message
 
     def test_expiry_note(self):
+        from datetime import UTC, datetime, timedelta
+
         from interntrack.scheduler.jobs import _expiry_note
 
         assert _expiry_note({"is_active": False}) == "   ❌ Expired / closed"
         assert _expiry_note({"is_active": True}) == ""
         assert "Closing soon" in _expiry_note(
-            {"is_active": True, "expires_at": "2026-08-07T00:00:00"},
+            {
+                "is_active": True,
+                "expires_at": (datetime.now(UTC) + timedelta(days=1)).isoformat(),
+            },
         )
         assert "Expired" in _expiry_note(
-            {"is_active": True, "expires_at": "2020-01-01T00:00:00"},
+            {
+                "is_active": True,
+                "expires_at": (datetime.now(UTC) - timedelta(days=1)).isoformat(),
+            },
         )
 
     def test_age_badge(self):
