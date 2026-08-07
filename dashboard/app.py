@@ -450,6 +450,8 @@ def _api_raw(
             return httpx.post(url, json=json_data or {}, timeout=timeout)
         if method == "PUT":
             return httpx.put(url, json=json_data or {}, timeout=timeout)
+        if method == "PATCH":
+            return httpx.patch(url, json=json_data or {}, timeout=timeout)
         return httpx.get(url, timeout=timeout)
     return None
 
@@ -648,7 +650,7 @@ def _render_job(job: dict) -> None:
                 key=f"apply_{job.get('id', title)}",
                 use_container_width=True,
             ):
-                st.toast("Application tracked! Visit Applications to update status.")
+                _track_application(job.get("id"), title)
 
 
 def _category_picker(options: list[str], labels: dict[str, str]) -> str:
@@ -724,6 +726,40 @@ def _current_user_id() -> str:
     """The active user's id — the logged-in account or the legacy default."""
     user = _current_user()
     return user["id"] if user else "user1"
+
+
+def _track_application(job_id: Any, title: str) -> None:
+    """Create an application for the current user via the real API."""
+    user_id = _current_user_id()
+    resp = _api_raw(
+        "/applications/",
+        method="POST",
+        json_data={"job_id": str(job_id), "user_id": user_id},
+        timeout=20,
+    )
+    if resp is not None and resp.status_code in (200, 201):
+        st.success(
+            f"✅ Application tracked for **{title}**! Update its status on the "
+            "Applications page."
+        )
+    elif resp is not None and resp.status_code == 422:
+        st.error("Couldn't track the application — the job may not be saved yet.")
+    else:
+        st.error("Applications API unreachable. Is the API server running?")
+
+
+def _update_application_status(app_id: str, status: str) -> None:
+    """Persist an application status change via the real API."""
+    resp = _api_raw(
+        f"/applications/{app_id}/status",
+        method="PATCH",
+        json_data={"status": status},
+        timeout=20,
+    )
+    if resp is not None and resp.status_code == 200:
+        st.success(f"✅ Status updated to **{status}**")
+    else:
+        st.error("Could not update status — is the API server running?")
 
 
 def _login_user(profile: dict) -> None:
@@ -1346,7 +1382,7 @@ def show_applications() -> None:
                 if st.button(
                     "Update", key=f"update_{app['id']}", use_container_width=True
                 ):
-                    st.success(f"Status updated to {new_status}")
+                    _update_application_status(app["id"], new_status)
     else:
         st.info("No applications found. Apply to jobs from the Jobs page!")
 
@@ -1529,8 +1565,12 @@ def show_resume_match() -> None:
                             if (score or 0) >= 40
                             else "🔴"
                         )
+                        ats = m.get("ats_score")
+                        ats_tag = ""
+                        if ats is not None:
+                            ats_tag = f" · ATS: {ats:.0f}%"
                         with st.expander(
-                            f"{color} **{m.get('job_title', 'N/A')}** at {m.get('company', 'N/A')} — Match: {score or 0}%"
+                            f"{color} **{m.get('job_title', 'N/A')}** at {m.get('company', 'N/A')} — Match: {score or 0}%{ats_tag}"
                         ):
                             matched = m.get("matched_skills", [])
                             related = m.get("related_skills", [])
@@ -1553,6 +1593,11 @@ def show_resume_match() -> None:
                             if suggestions:
                                 st.write("💡 **Suggestions:**")
                                 for s in suggestions:
+                                    st.write(f"- {s}")
+                            ats_feedback = m.get("ats_feedback", [])
+                            if ats_feedback:
+                                st.write("📄 **ATS improvements:**")
+                                for s in ats_feedback:
                                     st.write(f"- {s}")
                 else:
                     st.info("No matches found. Upload your resume first!")

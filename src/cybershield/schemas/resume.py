@@ -79,6 +79,8 @@ class ResumeMatchResponse(BaseModel):
     related_skills: List[str] = []
     missing_skills: List[str] = []
     suggestions: List[str] = []
+    ats_score: Optional[float] = None
+    ats_feedback: List[str] = []
 
 
 class ResumeMatchRequest(BaseModel):

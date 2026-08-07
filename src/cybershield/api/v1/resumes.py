@@ -18,7 +18,11 @@ from cybershield.schemas.resume import (
     ResumeMatchResponse,
     ResumeUploadResponse,
 )
-from cybershield.services.resume_service import SECURITY_SKILLS, ResumeParser
+from cybershield.services.resume_service import (
+    SECURITY_SKILLS,
+    ResumeParser,
+    ResumeScorer,
+)
 from cybershield.utils import utcnow
 
 router = APIRouter()
@@ -158,6 +162,21 @@ def _as_list(value: Any) -> list:
     return list(value or [])
 
 
+def _resume_data_for_ats(resume: ResumeData) -> dict:
+    """Build the parsed-resume dict the ATS scorer consumes."""
+    return {
+        "skills": _as_list(resume.skills),
+        "education": _as_list(resume.education),
+        "experience": _as_list(resume.experience),
+        "certifications": _as_list(resume.certifications),
+        "projects": _as_list(resume.projects),
+        "links": {
+            "github": resume.github_url or "",
+            "linkedin": resume.linkedin_url or "",
+        },
+    }
+
+
 def _serialize_resume_response(resume: ResumeData) -> ResumeUploadResponse:
     """Helper to serialize ResumeData to response model."""
     return ResumeUploadResponse(
@@ -201,7 +220,11 @@ def _skill_category(skill: str) -> Optional[str]:
     return _SKILL_CATEGORY_MAP.get(skill)
 
 
-def _calculate_job_match(resume_skills: set, job: _JobMatchData) -> ResumeMatchResponse:
+def _calculate_job_match(
+    resume_skills: set,
+    job: _JobMatchData,
+    resume_data: dict | None = None,
+) -> ResumeMatchResponse:
     """Calculate match score between resume skills and a job.
 
     Scores in three tiers so domain-transition candidates are treated
@@ -214,6 +237,10 @@ def _calculate_job_match(resume_skills: set, job: _JobMatchData) -> ResumeMatchR
 
     Falls back to the job's ``tags`` column (used by the interntrack Job
     model / live Neon table) when the dedicated skill columns are empty.
+
+    When ``resume_data`` (the full parsed resume) is given, an **ATS
+    score** is also computed against the job's skill list, so the response
+    carries both the skill-match % and the ATS-compatibility %.
     """
     job_required = _extract_skill_names(getattr(job, "required_skills", None))
     job_preferred = _extract_skill_names(getattr(job, "preferred_skills", None))
@@ -301,6 +328,19 @@ def _calculate_job_match(resume_skills: set, job: _JobMatchData) -> ResumeMatchR
         else:
             suggestions.append("Build projects with required skills")
 
+    # ATS compatibility % against the job's skill list (when the full
+    # resume is available — e.g. from the match endpoints).
+    ats_score: float | None = None
+    ats_feedback: list = []
+    if resume_data:
+        scorer = ResumeScorer()
+        ats_result = scorer.calculate_ats_score(
+            resume_data,
+            job_keywords=list(all_job_skills),
+        )
+        ats_score = float(ats_result["ats_score"])
+        ats_feedback = list(ats_result.get("feedback") or [])
+
     return ResumeMatchResponse(
         job_id=job.id,
         job_title=job.title,
@@ -310,6 +350,8 @@ def _calculate_job_match(resume_skills: set, job: _JobMatchData) -> ResumeMatchR
         related_skills=related,
         missing_skills=missing,
         suggestions=suggestions,
+        ats_score=ats_score,
+        ats_feedback=ats_feedback,
     )
 
 
@@ -416,8 +458,12 @@ async def match_resume_to_job(
     # Extract resume skill names
     resume_skills = _extract_skill_names(resume.skills)
 
-    # Calculate match using shared helper
-    match_response = _calculate_job_match(resume_skills, job)
+    # Calculate match using shared helper (ATS score needs the full resume)
+    match_response = _calculate_job_match(
+        resume_skills,
+        job,
+        resume_data=_resume_data_for_ats(resume),
+    )
 
     # Store match result — only when a score exists (jobs with no skills
     # score None, and ``match_score`` is a NOT NULL column: persisting None
@@ -430,6 +476,7 @@ async def match_resume_to_job(
             matched_skills=match_response.matched_skills,
             missing_skills=match_response.missing_skills,
             suggestions=match_response.suggestions,
+            ats_score=match_response.ats_score,
         )
         session.add(match_result)
         await session.flush()
@@ -485,6 +532,7 @@ async def match_resume_batch(
 
     # Extract resume skill names
     resume_skills = _extract_skill_names(resume.skills)
+    resume_data = _resume_data_for_ats(resume)
 
     matches = []
     scores = []
@@ -494,8 +542,12 @@ async def match_resume_batch(
         if not job:
             continue
 
-        # Calculate match using shared helper
-        match_response = _calculate_job_match(resume_skills, job)
+        # Calculate match using shared helper (ATS score needs the resume)
+        match_response = _calculate_job_match(
+            resume_skills,
+            job,
+            resume_data=resume_data,
+        )
 
         # Persist only scores — ``match_score`` is NOT NULL, so a job with
         # no skills (score None) must not be inserted or the whole batch
@@ -508,6 +560,7 @@ async def match_resume_batch(
                 matched_skills=match_response.matched_skills,
                 missing_skills=match_response.missing_skills,
                 suggestions=match_response.suggestions,
+                ats_score=match_response.ats_score,
             )
             session.add(match_result)
 

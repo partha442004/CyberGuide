@@ -341,6 +341,41 @@ class TestMatchResumeToJob:
         assert data["match_score"] > 0
 
     @pytest.mark.asyncio
+    async def test_match_returns_ats_score(self, client: AsyncClient, db_session):
+        """The match response includes the ATS compatibility score."""
+        resume = ResumeData(
+            user_id="u-ats",
+            file_path="a.pdf",
+            file_hash="h-ats",
+            skills=[
+                {"name": "python", "category": "scripting"},
+                {"name": "aws", "category": "cloud_security"},
+                {"name": "docker", "category": "cicd_security"},
+            ],
+            education=[{"degree": "B.Tech"}],
+            experience=[{"role": "intern"}],
+            github_url="https://github.com/u",
+        )
+        job = Job(
+            title="DevSecOps",
+            company="Acme",
+            url="https://acme.com/job/ats",
+            source="test",
+            job_type="full_time",
+            required_skills=["python", "docker", "aws"],
+            preferred_skills=[],
+        )
+        db_session.add_all([resume, job])
+        await db_session.flush()
+
+        response = await client.post(f"/api/v1/resumes/match/{job.id}", params={"user_id": "u-ats"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["ats_score"] is not None
+        assert data["ats_score"] >= 50
+        assert isinstance(data["ats_feedback"], list)
+
+    @pytest.mark.asyncio
     async def test_match_no_resume_returns_404(self, client: AsyncClient, db_session):
         job = Job(
             title="Dev",
