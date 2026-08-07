@@ -204,6 +204,29 @@ class TestBuildDailyReportMessage:
             },
         )
 
+    @pytest.mark.asyncio
+    async def test_closing_soon_section_in_message(self):
+        """Deadline jobs lead the daily digest so they aren't missed."""
+        from interntrack.scheduler.jobs import build_daily_report_message
+
+        report = {
+            "summary": {"new_jobs": 1, "new_applications": 0, "total_applications": 0},
+            "new_jobs": [],
+            "closing_soon": [
+                {
+                    "title": "VAPT Intern",
+                    "company": "SecureCo",
+                    "expires_at": "2026-08-09T00:00:00",
+                },
+            ],
+        }
+
+        message = await build_daily_report_message(report, None)
+
+        assert "🚨 Closing soon (1):" in message
+        assert "VAPT Intern" in message
+        assert "SecureCo" in message
+
     def test_age_badge(self):
         from interntrack.scheduler.jobs import _age_badge
 

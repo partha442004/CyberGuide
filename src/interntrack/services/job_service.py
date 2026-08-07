@@ -44,6 +44,20 @@ class JobService:
                 job_data.get("company", "Unknown"),
             )
 
+        # Cross-source dedup: the same posting often arrives from several
+        # boards (LinkedIn India, Indeed India, TimesJobs, ...) under
+        # different URLs. URL-only dedup lets copies through, so also match
+        # normalized title+company within a recent window.
+        same = await self.job_repo.find_cross_source_duplicate(
+            job_data.get("title", ""),
+            job_data.get("company", ""),
+        )
+        if same:
+            raise DuplicateJobError(
+                job_data.get("title", "Unknown"),
+                job_data.get("company", "Unknown"),
+            )
+
         job = Job(**job_data)
         return await self.job_repo.create(job)
 

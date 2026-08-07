@@ -582,6 +582,20 @@ async def build_daily_report_message(
     resume match % is below the threshold.
     """
     lines = [format_daily_report(report, title)]
+
+    # ⏳ Closing-soon jobs (expiring within 2 days) get a priority section so
+    # the user can apply before the deadline instead of discovering the
+    # posting is gone.
+    closing_soon = report.get("closing_soon") or []
+    if closing_soon:
+        lines.append("")
+        lines.append(f"🚨 Closing soon ({len(closing_soon)}):")
+        for item in closing_soon[:5]:
+            lines.append(
+                f"   ⏳ {_esc(item.get('title'))} @ {_esc(item.get('company'))}"
+                f" — {_esc(item.get('expires_at'))}"
+            )
+
     sections = await _score_and_group_jobs(
         report, session, domains, user_id=user_id, user_location=user_location
     )
@@ -634,7 +648,23 @@ async def build_alert_chunks(
     for domain, items in sections:
         for score, job in items:
             flat.append((domain, score, job))
+
+    # Closing-soon jobs lead the first chunk so deadlines aren't missed.
+    closing_soon = report.get("closing_soon") or []
+    closing_lines: list[str] = []
+    if closing_soon:
+        closing_lines.append(f"🚨 Closing soon ({len(closing_soon)}):")
+        for item in closing_soon[:5]:
+            closing_lines.append(
+                f"   ⏳ {_esc(item.get('title'))} @ {_esc(item.get('company'))}"
+                f" — {_esc(item.get('expires_at'))}"
+            )
+
     if not flat:
+        if closing_lines:
+            return [
+                ("\n".join([format_daily_report(report, title)] + closing_lines), [])
+            ]
         return [(format_daily_report(report, title), [])]
 
     chunks: list[tuple[str, list[tuple[str, str]]]] = []
@@ -642,6 +672,8 @@ async def build_alert_chunks(
         part = flat[start : start + jobs_per_chunk]
         lines = [format_daily_report(report, title)]
         buttons: list[tuple[str, str]] = []
+        if start == 0 and closing_lines:
+            lines.extend(closing_lines)
         for domain, score, job in part:
             domain_label = _DOMAIN_ICONS.get(domain, domain)
             if not lines or lines[-1] != domain_label:

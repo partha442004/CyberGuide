@@ -26,6 +26,7 @@ class TestJobService:
         repo = AsyncMock()
         repo.get_by_url.return_value = None
         repo.get_by_id.return_value = None
+        repo.find_cross_source_duplicate.return_value = None
         repo.create.return_value = Job(
             id="test-id-123",
             title="Test Job",
@@ -87,6 +88,42 @@ class TestJobService:
 
         with pytest.raises(DuplicateJobError):
             await service.create_job(job_data)
+
+    @pytest.mark.asyncio
+    async def test_create_job_cross_source_duplicate(self, service, mock_job_repo):
+        """Same posting from another board (different URL) is rejected."""
+        mock_job_repo.get_by_url.return_value = None
+        mock_job_repo.find_cross_source_duplicate.return_value = Job(id="other")
+
+        job_data = {
+            "title": "Penetration Tester",
+            "company": "Brillio",
+            "url": "https://linkedin.com/jobs/other-source",
+        }
+
+        with pytest.raises(DuplicateJobError):
+            await service.create_job(job_data)
+
+    @pytest.mark.asyncio
+    async def test_create_job_passes_title_company_to_dedup(
+        self, service, mock_job_repo
+    ):
+        """The cross-source check receives the normalized job title+company."""
+        mock_job_repo.get_by_url.return_value = None
+        mock_job_repo.find_cross_source_duplicate.return_value = None
+
+        await service.create_job(
+            {
+                "title": "SOC Analyst",
+                "company": "Zscaler",
+                "url": "https://example.com/z",
+            }
+        )
+
+        mock_job_repo.find_cross_source_duplicate.assert_awaited_once_with(
+            "SOC Analyst",
+            "Zscaler",
+        )
 
     @pytest.mark.asyncio
     async def test_get_job(self, service, mock_job_repo):

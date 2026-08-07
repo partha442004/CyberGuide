@@ -2,6 +2,7 @@
 Job repository with job-specific queries.
 """
 
+import re
 from datetime import timedelta
 from uuid import uuid4
 
@@ -12,6 +13,17 @@ from interntrack.domain.enums import JobSource, JobType
 from interntrack.domain.models import Job
 from interntrack.repositories.base import BaseRepository
 from interntrack.utils.helpers import utcnow
+
+_DEDUP_NON_ALNUM = re.compile(r"[^a-z0-9]+")
+
+
+def _normalize_dedup_text(value: str) -> str:
+    """Lowercase, collapse punctuation/whitespace for duplicate matching.
+
+    "Penetration Tester (Texas)" and "Penetration Tester - Texas" both
+    become "penetrationtestertexas".
+    """
+    return _DEDUP_NON_ALNUM.sub("", (value or "").lower())
 
 
 class JobRepository(BaseRepository[Job]):
@@ -44,6 +56,44 @@ class JobRepository(BaseRepository[Job]):
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
+
+    async def find_cross_source_duplicate(
+        self,
+        title: str,
+        company: str,
+        tolerance_days: int = 14,
+    ) -> Job | None:
+        """Find a job with the same normalized title+company from ANY source.
+
+        The same posting is frequently scraped by several boards (e.g.
+        LinkedIn India, Indeed India, TimesJobs, Internshala) under different
+        URLs, so URL-based dedup lets 2-3 copies of the same job through.
+        Candidates are fetched by company within a recent window, then the
+        title is normalized (case-insensitive, punctuation/whitespace
+        collapsed) in Python — SQL can't collapse punctuation portably
+        across SQLite/Postgres.
+        """
+        cutoff_date = utcnow() - timedelta(days=tolerance_days)
+        norm_title = _normalize_dedup_text(title)
+        norm_company = _normalize_dedup_text(company)
+        if not norm_title or not norm_company:
+            return None
+        query = (
+            select(Job)
+            .where(
+                and_(
+                    func.lower(Job.company) == company.lower(),
+                    Job.created_at >= cutoff_date,
+                ),
+            )
+            .order_by(Job.created_at.desc())
+            .limit(50)
+        )
+        result = await self.session.execute(query)
+        for candidate in result.scalars().all():
+            if _normalize_dedup_text(str(candidate.title)) == norm_title:
+                return candidate
+        return None
 
     async def get_active_jobs(
         self,
