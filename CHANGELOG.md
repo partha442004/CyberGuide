@@ -9,10 +9,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 - **Job-type inference.** Scrapers rarely provide a job_type, so the
-  dashboard job-type chart was 100% "unknown". New `classify_job_type`
-  infers internship / part-time / contract / freelance / full-time from
-  the title and applies it at save time; `POST /jobs/backfill-job-types`
-  backfills older rows still marked unknown.
+  dashboard job-type chart was ~98% "unknown". New `classify_job_type`
+  infers internship / part-time / contract / freelance from explicit
+  title markers and defaults the rest to full-time (matches reality for
+  ~95% of postings). Applied at save time; `POST /jobs/backfill-job-types`
+  backfilled the live DB — chart went from 580 unknown to 590 full-time
+  + 1 internship.
 
 ## [1.23.0] - 2026-08-07
 
