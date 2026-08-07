@@ -99,6 +99,27 @@ class TestCalculateJobMatch:
         assert any("Build projects" in s for s in result.suggestions)
         assert any("Learn missing skills" in s for s in result.suggestions)
 
+    def test_generic_security_tag_matches_cybersecurity_resume(self):
+        """A job tagged only with the generic word ``security`` must match
+        a resume listing ``cybersecurity`` (the live IBM 0.0 case) instead
+        of flatlining, via the domain-level synonym group."""
+        job = self._make_job(required_skills=[], preferred_skills=[], tags=["security"])
+        result = _calculate_job_match({"cybersecurity", "vapt", "burp suite"}, job)
+        assert result.match_score is not None
+        assert result.match_score > 0
+        assert "security" in result.matched_skills
+
+    def test_software_engineer_tag_matches_resume(self):
+        """Domain-level synonyms cover software roles too."""
+        job = self._make_job(
+            required_skills=[],
+            preferred_skills=[],
+            tags=["software engineer"],
+        )
+        result = _calculate_job_match({"software developer", "python"}, job)
+        assert result.match_score is not None
+        assert result.match_score > 0
+
 
 class TestSerializeResumeResponse:
     def test_serializes_all_fields(self):
