@@ -61,6 +61,51 @@ def _new_access_token() -> str:
     return secrets.token_urlsafe(32)
 
 
+async def _send_welcome(user: User, db: AsyncSession) -> None:
+    """Send a welcome message to a brand-new account (best-effort).
+
+    Uses the same HTML-friendly text for email and Telegram. Never raises:
+    a welcome that can't be delivered must not block or fail registration.
+    """
+    try:
+        from interntrack.services.notification_service import NotificationManager
+
+        channels = _configured_channels()
+        if not channels:
+            return
+        manager = NotificationManager(db)
+        name = _esc_html(str(user.name or "there"))
+        domains = list(user.domains or [])
+        domains_txt = ", ".join(_esc_html(d) for d in domains)
+        message = (
+            f"<b>Hey {name} 👋</b><br/><br/>"
+            "Your account is ready and your <b>personalized job alerts are ON</b>.<br/>"
+            "Every day at 8:00 / 13:00 / 19:00 IST we'll send jobs"
+            + (f" in <b>{domains_txt}</b>" if domains_txt else "")
+            + " to this inbox"
+            + (" and your Telegram" if user.telegram_chat_id else "")
+            + ".<br/><br/>"
+            "Upload your resume for match %, track applications, and invite "
+            "friends from the dashboard.<br/>Good luck! 🚀"
+        )
+        await manager.notify(
+            channels,
+            message,
+            subject="🎉 Welcome to InternTrack!",
+            recipient={
+                "email": user.email,
+                "telegram_chat_id": user.telegram_chat_id,
+            },
+        )
+    except Exception:  # noqa: BLE001 - best-effort onboarding message
+        return
+
+
+def _esc_html(value: str) -> str:
+    """Escape untrusted text before embedding in an HTML message."""
+    return str(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 @router.post("/register", response_model=UserAuthResponse, status_code=201)
 async def register_user(
     payload: UserCreate,
@@ -122,6 +167,8 @@ async def register_user(
     )
     await db.commit()
     await db.refresh(user)
+    # Best-effort welcome message (email + Telegram) — never blocks signup.
+    await _send_welcome(user, db)
     return UserAuthResponse.model_validate(user)
 
 

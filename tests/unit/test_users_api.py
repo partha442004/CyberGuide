@@ -191,6 +191,94 @@ class TestLoginUser:
         assert new_login.status_code == 200
 
 
+class TestWelcomeMessage:
+    """_send_welcome delivers a best-effort onboarding message."""
+
+    @pytest.mark.asyncio
+    async def test_welcome_sent_to_channels_with_recipient(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from interntrack.api.v1.users import _send_welcome
+        from interntrack.domain.models import User
+
+        fake_manager = MagicMock()
+        fake_manager.notify = AsyncMock(return_value={"email": True})
+        user = User(
+            name="Ada <script>",
+            email="ada@example.com",
+            telegram_chat_id="123",
+            domains=["security", "coding"],
+        )
+        with (
+            patch(
+                "interntrack.api.v1.users._configured_channels",
+                return_value=["email", "telegram"],
+            ),
+            patch(
+                "interntrack.services.notification_service.NotificationManager",
+                return_value=fake_manager,
+            ),
+        ):
+            await _send_welcome(user, AsyncMock())
+
+        fake_manager.notify.assert_awaited_once()
+        _, kwargs = fake_manager.notify.call_args
+        channels, message = fake_manager.notify.call_args.args
+        assert channels == ["email", "telegram"]
+        assert "Welcome" in kwargs.get("subject", "")
+        # Untrusted name is HTML-escaped before embedding.
+        assert "Ada &lt;script&gt;" in message
+        assert "security, coding" in message
+        assert kwargs["recipient"] == {
+            "email": "ada@example.com",
+            "telegram_chat_id": "123",
+        }
+
+    @pytest.mark.asyncio
+    async def test_welcome_skipped_when_no_channels(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from interntrack.api.v1.users import _send_welcome
+        from interntrack.domain.models import User
+
+        fake_manager = MagicMock()
+        fake_manager.notify = AsyncMock()
+        with (
+            patch(
+                "interntrack.api.v1.users._configured_channels",
+                return_value=[],
+            ),
+            patch(
+                "interntrack.services.notification_service.NotificationManager",
+                return_value=fake_manager,
+            ),
+        ):
+            await _send_welcome(User(name="X", email="x@x.com"), AsyncMock())
+        fake_manager.notify.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_welcome_failure_never_raises(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from interntrack.api.v1.users import _send_welcome
+        from interntrack.domain.models import User
+
+        fake_manager = MagicMock()
+        fake_manager.notify = AsyncMock(side_effect=RuntimeError("smtp down"))
+        with (
+            patch(
+                "interntrack.api.v1.users._configured_channels",
+                return_value=["email"],
+            ),
+            patch(
+                "interntrack.services.notification_service.NotificationManager",
+                return_value=fake_manager,
+            ),
+        ):
+            await _send_welcome(User(name="X", email="x@x.com"), AsyncMock())
+        # Never raises — registration must not fail on a welcome send.
+
+
 class TestDeleteUser:
     """DELETE /api/v1/users/{user_id} — full account removal."""
 
