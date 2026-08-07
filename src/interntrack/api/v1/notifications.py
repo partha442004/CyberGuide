@@ -84,6 +84,58 @@ async def send_test_notification(
     )
 
 
+@router.get("/telegram/chat-id")
+async def discover_telegram_chat_id():
+    """Discover the chat ID of the person who last messaged the bot.
+
+    Calls Telegram's ``getUpdates`` with the configured bot token and returns
+    the newest chat that messaged the bot, so a user can find their own chat
+    ID by sending the bot any message (e.g. ``/start``) first. Returns a
+    helpful hint when no update is available yet or Telegram is unreachable
+    — never raises.
+    """
+    from interntrack.config import get_settings
+
+    settings = get_settings()
+    if not settings.telegram_bot_token:
+        return {
+            "chat_id": None,
+            "hint": "No TELEGRAM_BOT_TOKEN configured on the API.",
+        }
+    try:
+        import httpx
+
+        url = f"https://api.telegram.org/bot{settings.telegram_bot_token}/getUpdates"
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, timeout=10)
+        data = response.json()
+        if not data.get("ok"):
+            return {
+                "chat_id": None,
+                "hint": f"Telegram error: {data.get('description', 'unknown')}.",
+            }
+        # Newest update first; the chat id can sit under several update kinds.
+        for update in reversed(data.get("result") or []):
+            for key in ("message", "edited_message", "channel_post", "my_chat_member"):
+                chat_id = ((update.get(key) or {}).get("chat") or {}).get("id")
+                if chat_id:
+                    return {
+                        "chat_id": str(chat_id),
+                        "hint": "Found the chat that last messaged the bot.",
+                    }
+        return {
+            "chat_id": None,
+            "hint": "No messages yet — send the bot any message (e.g. /start) "
+            "and try again. Make sure *you* are the last person to message "
+            "it, otherwise you may get a teammate's chat ID.",
+        }
+    except Exception as e:  # pragma: no cover - network path
+        return {
+            "chat_id": None,
+            "hint": f"Could not reach Telegram: {e}",
+        }
+
+
 @router.post("/send")
 async def send_notification(
     channels: list[str],
