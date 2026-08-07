@@ -65,6 +65,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   match-endpoint ATS assertion: **2297 tests pass**, ruff + format + mypy
   clean.
 
+### Added
+
+- **Auto-tagging at save time.** Jobs saved with no tags (share-a-job
+  entries, thin RSS feeds, minimal boards) previously scored
+  `match_score: null` against every resume — the "no match %" gap. New
+  `auto_tag_job` in `job_service.py` derives skill tags from the title +
+  description on word boundaries (50+ cybersecurity / software / data
+  keywords) before the DB insert, so every saved job earns real match
+  scores and ATS keyword signals. Scraper-provided tags always win.
+- **Company Watchlist dashboard page.** The `/watchlists` API and the
+  digest's "🏢 Watched companies" section already existed, but there was
+  no UI to manage the list. The dashboard now has a Watchlist page
+  (sidebar + routing) to add / list / remove watched companies with live
+  active-job counts — and their new jobs stay highlighted in your daily
+  email / Telegram digest.
+
+### Notes
+
+- 4 new tests (auto-tag from title+description, scraper-tags-win,
+  no-keyword no-op, word boundaries): **2301 tests pass**, ruff + format
+  + mypy clean.
+
 ## [1.26.0] - 2026-08-07
 
 ### Added
