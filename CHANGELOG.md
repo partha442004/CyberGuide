@@ -4,6 +4,30 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.21.1] - 2026-08-07
+
+### Fixed
+
+- **India/Bangalore job discovery was returning ZERO India jobs.** The live
+  DB had 521 jobs but none from Bangalore/India, so configured
+  cybersecurity+Bangalore alerts never matched anything. Root cause: the
+  discovery query builder appended location-suffixed queries ("cybersecurity
+  bangalore") AFTER plain ones and the [:limit] cap truncated them away;
+  and discovery never passed a location to the scrapers, so the US guest
+  APIs (geo-locked) returned US jobs regardless of the query keywords.
+  - `discovery_queries_for`: location-suffixed queries now go FIRST so the
+    cap keeps "cybersecurity Bangalore" instead of plain "cybersecurity".
+  - `run_discovery_for_users`: passes each user's location to
+    `registry.fetch_all`, activating the India scrapers (LinkedIn India,
+    Internshala, TimesJobs, Indeed India).
+  - `run_discovery`: extracts an Indian city from the query string
+    ("cybersecurity bangalore" → query + location="Bangalore") via the new
+    whole-word `_extract_location_from_query` helper.
+  - `search_jobs`: now also matches the `location` field, so searching
+    "bangalore" finds jobs by location (was title/company/description only).
+  - Verified live: search "bangalore" now returns 8 real Bangalore security
+    jobs (Barracuda, Zscaler, Brillio) after seeding runs.
+
 ## [1.20.13] - 2026-08-07
 
 ### Fixed
