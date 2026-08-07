@@ -130,6 +130,71 @@ def count_referrals(users: list, referrer_email: str | None) -> int:
     )
 
 
+def referral_leaderboard(users: list, limit: int = 5) -> list[dict]:
+    """Members ranked by how many people they invited (count > 0).
+
+    Returns ``[{email, name, count}]`` sorted desc; ``limit`` caps the list.
+    Referrer emails are matched case-insensitively.
+    """
+    counts: dict[str, int] = {}
+    names: dict[str, str] = {}
+    for u in users:
+        referred_by = str(u.get("referred_by") or "").strip().lower()
+        if referred_by and "@" in referred_by:
+            counts[referred_by] = counts.get(referred_by, 0) + 1
+            names.setdefault(referred_by, str(u.get("name") or referred_by))
+    board = [
+        {"email": email, "name": names[email], "count": count}
+        for email, count in counts.items()
+    ]
+    board.sort(key=lambda r: r["count"], reverse=True)
+    return board[:limit]
+
+
+def team_growth_stats(
+    users: list,
+    me_email: str | None = None,
+    days: int = 7,
+) -> dict:
+    """Aggregate team metrics for the dashboard growth panel.
+
+    Returns ``{team_size, joined_recently, my_referrals, referrals_recently}``
+    where ``*_recently`` counts rows created within the last ``days`` days
+    and ``my_referrals`` excludes the referrer's own account.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    cutoff = datetime.now(UTC) - timedelta(days=days)
+    me = (me_email or "").strip().lower()
+    my_referrals = 0
+    referrals_recently = 0
+    joined_recently = 0
+    for u in users:
+        created = u.get("created_at")
+        is_recent = False
+        if created:
+            try:
+                dt = datetime.fromisoformat(str(created).replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=UTC)
+                is_recent = dt >= cutoff
+            except (ValueError, TypeError):
+                is_recent = False
+        if is_recent:
+            joined_recently += 1
+        referred_by = str(u.get("referred_by") or "").strip().lower()
+        if me and referred_by == me and str(u.get("email") or "").strip().lower() != me:
+            my_referrals += 1
+            if is_recent:
+                referrals_recently += 1
+    return {
+        "team_size": len(users),
+        "joined_recently": joined_recently,
+        "my_referrals": my_referrals,
+        "referrals_recently": referrals_recently,
+    }
+
+
 def team_rows(users: list, me_email: str | None = None) -> list[dict]:
     """Shape the member directory for display (newest first, me flagged).
 

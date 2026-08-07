@@ -13,6 +13,8 @@ from dashboard.invite import (
     count_referrals,
     invite_caption,
     parse_invite_params,
+    referral_leaderboard,
+    team_growth_stats,
     team_rows,
 )
 
@@ -204,3 +206,89 @@ class TestTeamRows:
         assert caption is not None
         assert "<img" not in caption
         assert "a@b.com" in caption
+
+
+class TestReferralLeaderboard:
+    _USERS = [
+        {"email": "a@x.com", "name": "A", "referred_by": "me@x.com"},
+        {"email": "b@x.com", "name": "B", "referred_by": "ME@X.com"},
+        {"email": "c@x.com", "name": "C", "referred_by": "other@x.com"},
+        {"email": "d@x.com", "name": "D", "referred_by": "other@x.com"},
+        {"email": "e@x.com", "name": "E", "referred_by": None},
+    ]
+
+    def test_ranks_by_count_desc_case_insensitive(self):
+        board = referral_leaderboard(self._USERS)
+        assert [row["count"] for row in board] == [2, 2]
+        # me@x.com grouped case-insensitively (a@ + b@ both referred by it).
+        assert {row["email"] for row in board} == {"me@x.com", "other@x.com"}
+
+    def test_uneven_counts_order_desc(self):
+        users = [
+            {"email": "a@x.com", "name": "A", "referred_by": "low@x.com"},
+            {"email": "b@x.com", "name": "B", "referred_by": "high@x.com"},
+            {"email": "c@x.com", "name": "C", "referred_by": "high@x.com"},
+            {"email": "d@x.com", "name": "D", "referred_by": "high@x.com"},
+        ]
+        board = referral_leaderboard(users)
+        assert board[0]["email"] == "high@x.com"
+        assert board[0]["count"] == 3
+        assert board[1]["email"] == "low@x.com"
+
+    def test_excludes_referrers_with_no_matches(self):
+        users = [{"email": "x@x.com", "name": "X", "referred_by": None}]
+        assert referral_leaderboard(users) == []
+
+    def test_limit_caps_board(self):
+        board = referral_leaderboard(self._USERS, limit=1)
+        assert len(board) == 1
+
+
+class TestTeamGrowthStats:
+    _BASE = {"email": "me@x.com", "name": "Me", "referred_by": None}
+
+    def test_counts_team_and_recent_joiners(self):
+        users = [
+            self._BASE,
+            {
+                "email": "f@x.com",
+                "name": "F",
+                "referred_by": "me@x.com",
+                "created_at": "2026-08-01T10:00:00+00:00",
+            },
+        ]
+        stats = team_growth_stats(users, "me@x.com")
+        assert stats["team_size"] == 2
+        # Only the friend has a created_at timestamp -> 1 recent joiner.
+        assert stats["joined_recently"] == 1
+        assert stats["my_referrals"] == 1
+        assert stats["referrals_recently"] == 1
+
+    def test_old_joiners_not_recent(self):
+        users = [
+            self._BASE,
+            {"email": "old@x.com", "name": "Old", "created_at": "2020-01-01T00:00:00"},
+        ]
+        stats = team_growth_stats(users)
+        assert stats["joined_recently"] == 0
+
+    def test_excludes_self_referral(self):
+        users = [
+            self._BASE,
+            {"email": "me@x.com", "name": "Me", "referred_by": "me@x.com"},
+        ]
+        stats = team_growth_stats(users, "me@x.com")
+        assert stats["my_referrals"] == 0
+
+    def test_missing_dates_never_crash(self):
+        users = [
+            {
+                "email": "a@x.com",
+                "name": "A",
+                "referred_by": "me@x.com",
+                "created_at": "not-a-date",
+            }
+        ]
+        stats = team_growth_stats(users, "me@x.com")
+        assert stats["my_referrals"] == 1
+        assert stats["referrals_recently"] == 0

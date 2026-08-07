@@ -19,6 +19,8 @@ try:
         count_referrals,
         invite_caption,
         parse_invite_params,
+        referral_leaderboard,
+        team_growth_stats,
         team_rows,
     )
 except ImportError:  # pragma: no cover - older deployment without invite.py
@@ -49,6 +51,19 @@ except ImportError:  # pragma: no cover - older deployment without invite.py
     def count_referrals(users: list, referrer_email: str | None) -> int:  # noqa: ARG001
         """No referral support on old deployments."""
         return 0
+
+    def referral_leaderboard(users: list, limit: int = 5) -> list:  # noqa: ARG001
+        """No leaderboard on old deployments."""
+        return []
+
+    def team_growth_stats(users: list, me_email: str | None = None) -> dict:  # noqa: ARG001
+        """No growth stats on old deployments."""
+        return {
+            "team_size": 0,
+            "joined_recently": 0,
+            "my_referrals": 0,
+            "referrals_recently": 0,
+        }
 
     def team_rows(users: list, me_email: str | None = None) -> list:  # noqa: ARG001
         """No team view on old deployments."""
@@ -495,6 +510,8 @@ def _api_raw(
             return httpx.put(url, json=json_data or {}, timeout=timeout)
         if method == "PATCH":
             return httpx.patch(url, json=json_data or {}, timeout=timeout)
+        if method == "DELETE":
+            return httpx.delete(url, timeout=timeout)
         return httpx.get(url, timeout=timeout)
     return None
 
@@ -983,6 +1000,32 @@ def show_account() -> None:
                 "it's counted right here."
             )
 
+        # Team growth panel — who joined, and who invited the most.
+        growth = team_growth_stats(members, user.get("email"))
+        g1, g2, g3, g4 = st.columns(4)
+        with g1:
+            st.metric("👥 Team", growth["team_size"])
+        with g2:
+            st.metric("🆕 Joined (7d)", growth["joined_recently"])
+        with g3:
+            st.metric("🎁 Your referrals", growth["my_referrals"])
+        with g4:
+            st.metric("🎁 Referred (7d)", growth["referrals_recently"])
+
+        board = referral_leaderboard(members)
+        if board:
+            st.markdown("**🏆 Top inviters**")
+            medals = ["🥇", "🥈", "🥉"]
+            my_email = (user.get("email") or "").lower()
+            for i, row in enumerate(board):
+                medal = medals[i] if i < len(medals) else f"{i + 1}."
+                is_me = row["email"].lower() == my_email
+                suffix = " (you)" if is_me else ""
+                st.caption(
+                    f"{medal} {escape(row['name'])}{suffix} — "
+                    f"{row['count']} referral(s)"
+                )
+
         # Team directory — who is on the platform.
         st.subheader("🌍 Team directory")
         rows = team_rows(members, me_email=user.get("email"))
@@ -1013,10 +1056,38 @@ def show_account() -> None:
         else:
             st.caption("No members yet — be the first to invite someone!")
 
+        # ── Danger zone: self-service account deletion ────────────────
+        st.divider()
+        st.subheader("🗑 Delete my account")
+        st.caption(
+            "Permanently removes your profile, applications, alert history, "
+            "watchlists and resume. **This cannot be undone.**"
+        )
+        confirm = st.checkbox("I understand — delete everything permanently")
+        if st.button(
+            "Delete my account",
+            disabled=not confirm,
+            use_container_width=True,
+        ):
+            resp = _api_raw(f"/users/{user.get('id')}", method="DELETE", timeout=30)
+            if resp is not None and resp.status_code in (200, 204, 404):
+                # 404 = the account is already gone (e.g. deleted elsewhere).
+                st.session_state["account_deleted"] = True
+                _logout_user()
+                st.rerun()
+            elif resp is None:
+                st.error("Could not reach the API — is it running?")
+            else:
+                st.error("The API refused the deletion — please try again.")
+
         if st.button("🚪 Log out", use_container_width=True):
             _logout_user()
             st.rerun()
         return
+
+    # A just-deleted account lands here (signed out) with a visible goodbye.
+    if st.session_state.pop("account_deleted", False):
+        st.success("Your account and all its data were deleted. Sorry to see you go!")
 
     # ── Not signed in: register or log in ─────────────────────────────
     st.markdown(
