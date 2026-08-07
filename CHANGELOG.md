@@ -14,6 +14,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   science roles) so generic tags earn synonym credit — live check: IBM
   "Security Consultant" went 0.0% → 42%.
 
+### Fixed
+
+- **Resume match-batch / match 500 on skill-less jobs (the "Match API
+  unavailable" error in the dashboard).** Any job whose `tags` and skill
+  columns were empty (common for share-a-job entries and thin scrapes)
+  scored `None`; the endpoints then tried to insert
+  `ResumeMatchResult(match_score=None)` into a NOT NULL column, raising an
+  IntegrityError that surfaced as HTTP 500 — so the dashboard's "Find Best
+  Matching Jobs" silently failed. Persisting is now skipped for None
+  scores while the response still returns `match_score: null` for those
+  jobs. Verified live: a 3-job batch that 500'd now returns 200 with a
+  real score for skill-tagged jobs and `null` for the rest.
+- **Digest location split now works for the default user.** The email /
+  Telegram "📍 Your area / 🌍 Other locations" split required a user
+  profile with a location; the legacy `user1` path (no profile) never got
+  it. `_deliver_alert` now falls back to `DEFAULT_LOCATION` ("Bangalore"),
+  matching what discovery already searches — so the default user's digest
+  renders the split and role × location table too.
+
+### Notes
+
+- **Hirist & Cutshort probed as new India sources:** Hirist 404s on its
+  search URL patterns and Cutshort renders job cards client-side via
+  Algolia (its `__NEXT_DATA__` holds no postings), so neither is reliably
+  scrapable server-side. The reliable source set stays LinkedIn India,
+  the 11 security-vendor Greenhouse boards, RSS feeds and Internshala.
+
 ## [1.26.0] - 2026-08-07
 
 ### Added
