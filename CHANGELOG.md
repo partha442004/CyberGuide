@@ -1119,6 +1119,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [Unreleased] - Invite-a-friend + My Matches (multi-user growth)
+
+### Added
+
+- **🤝 Invite a friend** — the My Account page now generates a
+  personalized signup link (`?invite=&ref=&domains=&loc=`) that
+  pre-fills a friend's location + preferred categories on the register
+  form, with an "Invited by …" caption. The link base is overridable
+  via the `DASHBOARD_URL` secret/env and the account count is shown
+  (cached). New `dashboard/invite.py` holds pure, unit-tested helpers;
+  the app falls back gracefully if the module isn't deployed yet.
+- **🎯 My Matches page** — per-user personal stats: top resume matches
+  with colored scores, application pipeline counts, and a personal
+  alert-history timeline (subject, domains, channels ✅/❌, job count,
+  when sent). Scoped to the signed-in account or the legacy `user1`.
+- **Shared match helper** — the `/resumes/match-batch` call used by the
+  Saved Jobs tab and My Matches is now one `_match_jobs_to_resume()`
+  helper so the query construction can't drift.
+
+### Security
+
+- Invite referrer text is sanitized (markdown/HTML-significant chars
+  stripped) before rendering, so crafted invite URLs can't inject
+  links or markup into the signup page.
+
+### Tests
+
+- 17 new unit tests for the invite helpers (link building, param
+  parsing incl. list vs comma values, domain whitelist + lowercase,
+  markdown-injection sanitization, build→parse round-trip). Full suite
+  **2320 passed**, ruff + format clean.
+
 ### Added
 
 - **Multi-user accounts with personalized job alerts** — anyone can now
