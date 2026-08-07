@@ -4,6 +4,40 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.20.13] - 2026-08-07
+
+### Fixed
+
+- **CI fully green on GitHub Actions again** — all six jobs pass:
+  Lint (ruff), Typecheck (mypy), Version consistency, Security (bandit +
+  safety + trivy), Tests (pytest, 2262 tests), and Smoke (live API boot).
+  This round fixed:
+  - **Lint:** 46+ ruff errors (E501 line-length, ISC004 parenthesized
+    regex strings, S110 noqa on intentional PDF fallbacks, ARG/DTZ/B904)
+    across scrapers, services, and API modules.
+  - **Real runtime bugs:** missing `JobRepository` import in
+    `api/v1/jobs.py` (NameError on any jobs endpoint), missing `uuid4`/`or_`
+    imports in `job_repository.py`, and missing JWT Settings fields
+    (`jwt_secret_key`, `jwt_algorithm`, token expiries, API quotas) in
+    `config.py` — the latter was an AttributeError crash for JWT auth and
+    usage tracking.
+  - **JWT hardening:** `exp` claim now stored as standard epoch-seconds
+    integer; `decode_token` rejects missing/past `exp` (the old PyJWT path
+    auto-validated this — the stdlib fallback now does too).
+  - **mypy:** 50+ errors fixed across 12 files (Column assignment ignores,
+    `str()` coercion of Column attrs, dict annotations, scheduler signature
+    mismatch, typed `to_naive_utc`). Full src tree now type-clean.
+  - **Date-flaky tests:** `test_scheduler_jobs.py` expiry tests hardcoded
+    `2026-08-07T00:00:00` (now in the past) so `_expiry_note` returned
+    "Expired" instead of "Closing soon". Dates are now computed relative
+    to `datetime.now(UTC)` so they pass on any day.
+  - **CI infra flakiness:** the mypy/lint jobs failed repeatedly from the
+    GitHub Actions outage ("Failed to resolve action download info. Service
+    Unavailable") — re-runs pass; the fitz `type: ignore` now covers both
+    the local env (import-untyped) and CI (import-not-found).
+
+
+
 ## [1.20.12] - 2026-08-06
 
 ### Fixed
