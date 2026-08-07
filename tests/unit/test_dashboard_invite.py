@@ -14,6 +14,7 @@ from dashboard.invite import (
     invite_caption,
     parse_invite_params,
     referral_leaderboard,
+    team_domain_split,
     team_growth_stats,
     team_rows,
 )
@@ -242,6 +243,30 @@ class TestReferralLeaderboard:
     def test_limit_caps_board(self):
         board = referral_leaderboard(self._USERS, limit=1)
         assert len(board) == 1
+
+
+class TestTeamDomainSplit:
+    def test_counts_known_domains_sorted_desc(self):
+        users = [
+            {"domains": ["security", "coding"]},
+            {"domains": ["security"]},
+            {"domains": ["data", "security"]},
+            {"domains": []},
+        ]
+        split = team_domain_split(users)
+        assert split == [
+            {"domain": "security", "count": 3},
+            {"domain": "coding", "count": 1},
+            {"domain": "data", "count": 1},
+        ]
+
+    def test_unknown_domains_ignored(self):
+        split = team_domain_split([{"domains": ["quantum", "security"]}])
+        assert split == [{"domain": "security", "count": 1}]
+
+    def test_no_domains_returns_empty(self):
+        assert team_domain_split([]) == []
+        assert team_domain_split([{"domains": []}]) == []
 
 
 class TestTeamGrowthStats:

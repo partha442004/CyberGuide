@@ -149,6 +149,37 @@ async def _record_alert_history(
             await session.rollback()
 
 
+async def _team_digest_stats(
+    session,
+    email: str | None = None,
+) -> dict | None:
+    """Team snapshot for the weekly email: member count + your referrals.
+
+    Returns ``{team_size, my_referrals}`` or ``None`` when no accounts exist
+    (or the query fails). ``my_referrals`` counts accounts whose
+    ``referred_by`` matches this user's email, excluding their own account.
+    """
+    try:
+        from sqlalchemy import select
+
+        from interntrack.domain.models import User
+
+        result = await session.execute(select(User))
+        users = list(result.scalars().all())
+        if not users:
+            return None
+        my_email = (email or "").strip().lower()
+        my_refs = 0
+        for u in users:
+            referred = str(getattr(u, "referred_by", "") or "").lower()
+            own_email = str(getattr(u, "email", "") or "").strip().lower()
+            if my_email and referred == my_email and own_email != my_email:
+                my_refs += 1
+        return {"team_size": len(users), "my_referrals": my_refs}
+    except Exception:  # noqa: BLE001 - best-effort email enrichment
+        return None
+
+
 async def _deliver_alert(
     manager,
     channels: list | None,
@@ -183,6 +214,15 @@ async def _deliver_alert(
     # the digest must render the split with the same fallback — otherwise the
     # default user never sees the location split at all.
     user_location = (getattr(user, "location", None) or "").strip() or DEFAULT_LOCATION
+    # The weekly email closes with a team snapshot (members + your referrals).
+    # A new dict (not mutation) so the caller's report stays untouched.
+    if weekly:
+        team = await _team_digest_stats(
+            session,
+            getattr(user, "email", None),
+        )
+        if team:
+            report = {**report, "team": team}
     non_telegram = [c for c in targets if c != "telegram"]
     email_targets = [c for c in non_telegram if c == "email"]
     text_targets = [c for c in non_telegram if c != "email"]
@@ -1041,6 +1081,25 @@ async def build_daily_report_html(
     # Role x location breakdown table
     if loc_lower:
         parts.append(_location_breakdown_table(location_sections, other_sections))
+
+    # Team snapshot (attached by _deliver_alert on weekly sends).
+    team = report.get("team")
+    if team:
+        team_size = int(team.get("team_size", 0) or 0)
+        my_refs = int(team.get("my_referrals", 0) or 0)
+        parts.append(
+            "<div style='background:#f1f5f9;border-radius:12px;padding:14px 18px;"
+            "margin:18px 0;font-size:13px;'>"
+            "<div style='font-weight:800;font-size:14px;'>👥 Your team</div>"
+            "<div style='margin-top:6px;color:#334155;'>"
+            f"<b>{team_size}</b> people get personalized alerts on this platform"
+            + (
+                f" · <b>{my_refs}</b> joined through <b>your</b> invite link 🎁"
+                if my_refs
+                else ""
+            )
+            + "</div></div>"
+        )
 
     parts.append(
         "<p style='color:#64748b;font-size:12px;margin-top:22px;'>"
