@@ -12,6 +12,39 @@ import httpx
 import plotly.express as px
 import streamlit as st
 
+try:
+    from dashboard.invite import (
+        DEFAULT_DASHBOARD_URL,
+        build_invite_link,
+        invite_caption,
+        parse_invite_params,
+    )
+except ImportError:  # pragma: no cover - older deployment without invite.py
+    from urllib.parse import quote as _quote
+
+    DEFAULT_DASHBOARD_URL = "https://cyberguide2026aug.streamlit.app/"
+
+    def build_invite_link(**kwargs) -> str:  # type: ignore[no-untyped-def]
+        """Fallback link builder (no domain validation) for old deployments."""
+        params = []
+        if kwargs.get("email"):
+            params.append(f"invite={_quote(str(kwargs['email']).strip())}")
+        if kwargs.get("name"):
+            params.append(f"ref={_quote(str(kwargs['name']).strip())}")
+        if kwargs.get("location"):
+            params.append(f"loc={_quote(str(kwargs['location']).strip())}")
+        url = str(kwargs.get("base_url") or DEFAULT_DASHBOARD_URL).rstrip("/") + "/"
+        return url + ("?" + "&".join(params) if params else "")
+
+    def parse_invite_params(raw: dict) -> dict:  # noqa: ARG001
+        """No invite support on old deployments."""
+        return {}
+
+    def invite_caption(invite: dict) -> str | None:  # noqa: ARG001
+        """No invite support on old deployments."""
+        return None
+
+
 # Page config
 st.set_page_config(
     page_title="InternTrack Dashboard",
@@ -790,6 +823,71 @@ def _logout_user() -> None:
     st.session_state.pop("user", None)
 
 
+def _invite_params() -> dict:
+    """Read + validate invite query params (``?invite=&ref=&domains=&loc=``).
+
+    Works on current Streamlit (``st.query_params``) with a fallback to the
+    older ``st.experimental_get_query_params`` so a friend opening an invite
+    link always lands on a pre-filled signup form.
+    """
+    qp = getattr(st, "query_params", None)
+    if qp is None:
+        with suppress(Exception):
+            qp = st.experimental_get_query_params()
+        if qp is None:
+            return {}
+    try:
+        raw = {key: qp[key] for key in qp}
+    except Exception:
+        return {}
+    return parse_invite_params(raw)
+
+
+def _match_jobs_to_resume(jobs: list, user_id: str) -> Any:
+    """POST jobs to ``/resumes/match-batch`` — returns the raw result or None.
+
+    Shared by the Saved Jobs tab and the My Matches page so the query-string
+    construction and cap can never drift between the two.
+    """
+    job_ids = [j.get("id") for j in jobs if j.get("id")][:50]
+    if not job_ids:
+        return None
+    return _api(
+        f"/resumes/match-batch?user_id={user_id}&job_ids=" + "&job_ids=".join(job_ids),
+        method="POST",
+        timeout=45,
+    )
+
+
+def _my_top_matches(user_id: str, limit: int = 8) -> list[tuple[dict, float]]:
+    """Best resume matches for a user against the newest jobs, score > 0.
+
+    Returns ``[(job, score)]`` sorted by score desc; empty when the user has
+    no resume yet or the API is unreachable.
+    """
+    jobs = fetch_data("/jobs/?limit=50") or {}
+    job_list = jobs.get("jobs") or []
+    result = _match_jobs_to_resume(job_list, user_id)
+    if not result or not result.get("matches"):
+        return []
+    by_id = {str(j.get("id")): j for j in job_list}
+    scored: list[tuple[dict, float]] = []
+    for match in result["matches"]:
+        score = match.get("match_score")
+        job = by_id.get(str(match.get("job_id")))
+        if job and isinstance(score, (int, float)) and score > 0:
+            scored.append((job, float(score)))
+    scored.sort(key=lambda item: item[1], reverse=True)
+    return scored[:limit]
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _team_count() -> int:
+    """Number of registered accounts (cached 5 min to avoid a call per rerun)."""
+    data = fetch_data("/users/") or {}
+    return len(data.get("users") or [])
+
+
 def show_account() -> None:
     """Register / login page (email-based accounts, no passwords)."""
     st.header("👤 My Account")
@@ -830,6 +928,34 @@ def show_account() -> None:
         else:
             st.caption("No skills saved yet — upload your resume to extract them.")
 
+        # ── Invite a friend (multi-user growth) ────────────────────────
+        st.divider()
+        st.subheader("🤝 Invite a friend")
+        st.markdown(
+            "Send your friend a **personalized signup link** — their form is "
+            "pre-filled with your categories and location. Each person gets "
+            "their own daily alerts in *their* domain, sent to *their* email / "
+            "Telegram."
+        )
+        invite_url = build_invite_link(
+            base_url=_get_setting("DASHBOARD_URL", DEFAULT_DASHBOARD_URL),
+            email=user.get("email"),
+            name=user.get("name"),
+            domains=user.get("domains") or [],
+            location=user.get("location") or None,
+        )
+        st.text_input("Share this invite link", value=invite_url)
+        st.caption(
+            "When they open it → Create account → their preferred categories "
+            "and city are already filled in."
+        )
+        members = _team_count()
+        if members:
+            st.caption(
+                f"👥 **{members} account(s)** already getting personalized "
+                "alerts on this platform."
+            )
+
         if st.button("🚪 Log out", use_container_width=True):
             _logout_user()
             st.rerun()
@@ -844,10 +970,18 @@ def show_account() -> None:
     tab_register, tab_login = st.tabs(["✨ Create account", "🔑 Log in"])
 
     with tab_register:
+        _invite = _invite_params()
+        _invite_caption = invite_caption(_invite)
+        if _invite_caption:
+            st.info(_invite_caption)
         with st.form("register_form"):
             name = st.text_input("Full name *")
             email = st.text_input("Email *")
-            location = st.text_input("Location", placeholder="e.g. Bengaluru, India")
+            location = st.text_input(
+                "Location",
+                value=_invite.get("location", ""),
+                placeholder="e.g. Bengaluru, India",
+            )
             experience = st.selectbox(
                 "Experience level",
                 ["", "fresher", "intern", "junior", "senior"],
@@ -864,7 +998,8 @@ def show_account() -> None:
                 help="Message @userinfobot on Telegram to see your chat ID — "
                 "alerts then reach *your* Telegram instead of the shared chat.",
             )
-            domains = _category_picker_multi("🏷 Preferred categories", ["security"])
+            default_domains = _invite.get("domains", ["security"])
+            domains = _category_picker_multi("🏷 Preferred categories", default_domains)
             skills = st.text_input(
                 "Skills (comma-separated)",
                 placeholder="e.g. python, burp suite, nmap, linux",
@@ -958,6 +1093,116 @@ def show_account() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Page: My Matches (personal stats)
+# ---------------------------------------------------------------------------
+
+
+def show_my_matches() -> None:
+    """Personal match center: top matches, pipeline stats, alert history.
+
+    Everything here is scoped to the signed-in user (or the legacy ``user1``
+    default when browsing signed-out), so each friend sees only their own
+    numbers.
+    """
+    st.header("🎯 My Matches")
+    user_id = _current_user_id()
+    user = _current_user()
+
+    if user:
+        st.caption(
+            f"Personal stats for **{escape(user.get('name', ''))}** — "
+            f"{escape(user.get('email', ''))}"
+        )
+    else:
+        st.caption(
+            "Browsing as **user1** (legacy account) — create your own account "
+            "on My Account to get personalized numbers."
+        )
+
+    # ── Top-line metrics ──────────────────────────────────────────────
+    history = fetch_data(f"/notifications/preferences/{user_id}/history?limit=20") or {}
+    sends = history.get("history") or []
+    apps = fetch_data(f"/applications/?user_id={user_id}&limit=200") or {}
+    app_list = apps.get("applications") or []
+    matches = _my_top_matches(user_id)
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("📬 Alerts sent to me", len(sends))
+    with col2:
+        st.metric("📋 Applications tracked", len(app_list))
+    with col3:
+        st.metric("🎯 Best match now", f"{matches[0][1]:.0f}%" if matches else "—")
+
+    # ── Top matches ───────────────────────────────────────────────────
+    st.subheader("🏆 Your best matches right now")
+    if matches:
+        for job, score in matches:
+            title = str(job.get("title") or "Untitled role")
+            company = str(job.get("company") or "Unknown")
+            color = (
+                "#059669" if score >= 70 else ("#d97706" if score >= 40 else "#dc2626")
+            )
+            st.markdown(
+                f"**{escape(title)}**",
+            )
+            st.markdown(
+                '<div class="chip-row">'
+                f'<span class="chip" style="color:{color};background:rgba(5,150,105,0.08);'
+                f'border-color:rgba(5,150,105,0.25);font-weight:700;">🎯 {score:.0f}%</span>'
+                f'<span class="chip">🏢 {escape(company)}</span>'
+                f'<span class="chip">📍 {escape(str(job.get("location") or "Remote"))}</span>'
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            if job.get("url"):
+                st.link_button("🔗 View", job["url"], key=f"mm_{job.get('id')}")
+            st.divider()
+    else:
+        st.info(
+            "No match scores yet — upload your resume on the **Resume Match** "
+            "page, then come back here for your personal top picks."
+        )
+
+    # ── Application pipeline ──────────────────────────────────────────
+    st.subheader("📋 Your application pipeline")
+    if app_list:
+        counts: dict[str, int] = {}
+        for a in app_list:
+            status = str(a.get("status") or "saved")
+            counts[status] = counts.get(status, 0) + 1
+        chips = "".join(
+            f'<span class="chip">{escape(s)}: {c}</span>' for s, c in counts.items()
+        )
+        st.markdown(f'<div class="chip-row">{chips}</div>', unsafe_allow_html=True)
+    else:
+        st.caption(
+            "No applications yet — hit **Apply** on any job card to start tracking."
+        )
+
+    # ── Alert history timeline ────────────────────────────────────────
+    st.subheader("📬 Your alert history")
+    if sends:
+        for row in sends:
+            channels = row.get("channels") or []
+            results = row.get("results") or {}
+            status_icons = "".join("✅" if results.get(c) else "❌" for c in channels)
+            status_icons = status_icons or "—"
+            domains_txt = ", ".join(row.get("domains") or []) or "all categories"
+            st.markdown(
+                f"**{escape(str(row.get('subject') or 'Alert'))}** — "
+                f"{row.get('job_count') or 0} job(s) · {_time_ago(row.get('sent_at'))}"
+            )
+            st.caption(f"🏷 {escape(domains_txt)} · channels {status_icons}")
+            st.divider()
+    else:
+        st.caption(
+            "No alert history yet — your first digest arrives at the next "
+            "scheduled refresh (8:00 / 13:00 / 19:00 IST)."
+        )
+
+
+# ---------------------------------------------------------------------------
 # Main app
 # ---------------------------------------------------------------------------
 
@@ -983,6 +1228,7 @@ def main() -> None:
                 "Expired Jobs",
                 "Analytics",
                 "Resume Match",
+                "My Matches",
                 "Learning",
                 "Settings",
                 "My Account",
@@ -1007,6 +1253,7 @@ def main() -> None:
         "Expired Jobs": show_expired,
         "Analytics": show_analytics,
         "Resume Match": show_resume_match,
+        "My Matches": show_my_matches,
         "Learning": show_learning,
         "Settings": show_settings,
         "My Account": show_account,
@@ -1279,12 +1526,7 @@ def _render_saved_jobs_tab(jobs: list) -> None:
         with st.spinner("Matching against your resume..."):
             job_ids = [j["id"] for j in jobs if j.get("id")][:50]
             if job_ids:
-                result = _api(
-                    f"/resumes/match-batch?user_id={_current_user_id()}&job_ids="
-                    + "&job_ids=".join(job_ids),
-                    method="POST",
-                    timeout=45,
-                )
+                result = _match_jobs_to_resume(jobs, _current_user_id())
                 if result and result.get("matches"):
                     match_scores = {
                         m.get("job_id"): m.get("match_score") for m in result["matches"]
