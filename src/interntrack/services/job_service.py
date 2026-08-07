@@ -15,6 +15,30 @@ from interntrack.repositories.job_repository import JobRepository
 # these limits before hitting the DB.
 _JOB_FIELD_LIMITS = {"title": 500, "company": 200, "location": 200, "url": 2000}
 
+# Title keywords that imply a job type. Checked against the lowercased
+# title so the dashboard's "job types" chart isn't 100% unknown — most
+# scrapers never set job_type.
+_JOB_TYPE_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
+    ("internship", ("intern", "internship", "fresher", "trainee")),
+    ("part_time", ("part-time", "part time", "parttime")),
+    ("contract", ("contract", "contractor", "freelance contract")),
+    ("freelance", ("freelance", "gig", "remote contract")),
+    ("full_time", ("full-time", "full time")),
+]
+
+
+def classify_job_type(title: str) -> str:
+    """Infer a job type from the title ("internship", "full_time", ...).
+
+    Falls back to "unknown" when nothing matches; most scrapers don't
+    provide a job_type, so this fills the gap at save time.
+    """
+    text = (title or "").lower()
+    for job_type, keywords in _JOB_TYPE_KEYWORDS:
+        if any(k in text for k in keywords):
+            return job_type
+    return "unknown"
+
 
 def _normalize_job_fields(job_data: dict) -> dict:
     """Clamp string fields to the Job model's column limits."""
@@ -24,6 +48,15 @@ def _normalize_job_fields(job_data: dict) -> dict:
         if isinstance(value, str):
             stripped = value.strip()
             normalized[field] = stripped[:limit] if len(stripped) > limit else stripped
+    # Infer a job type when the scraper didn't provide one, so dashboards
+    # and filters show meaningful categories instead of all-unknown.
+    if not normalized.get("job_type") or str(normalized.get("job_type")).lower() in (
+        "unknown",
+        "none",
+    ):
+        normalized["job_type"] = classify_job_type(
+            normalized.get("title", ""),
+        )
     return normalized
 
 

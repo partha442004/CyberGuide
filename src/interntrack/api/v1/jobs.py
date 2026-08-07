@@ -90,6 +90,22 @@ async def list_jobs(
     return JobListResponse(jobs=jobs, total=total, skip=skip, limit=limit)
 
 
+@router.post("/backfill-job-types")
+async def backfill_job_types(
+    limit: int = Query(500, ge=1, le=2000),
+    db: AsyncSession = Depends(get_db),
+):
+    """Infer job_type for existing jobs still marked unknown.
+
+    Scrapers rarely set job_type, so new jobs get it inferred at save
+    time; this backfills older rows so the dashboard job-type chart and
+    filters show meaningful categories.
+    """
+    repo = JobRepository(db)
+    updated = await repo.backfill_job_types(limit=limit)
+    return {"updated": updated}
+
+
 @router.post("/archive-expired")
 async def archive_expired(days: int = 30, db: AsyncSession = Depends(get_db)):
     """Archive jobs older than N days to keep the database lean."""

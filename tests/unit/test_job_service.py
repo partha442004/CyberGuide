@@ -58,6 +58,46 @@ class TestJobService:
         assert result.title == "Test Job"
         mock_job_repo.create.assert_called_once()
 
+    def test_classify_job_type(self):
+        from interntrack.services.job_service import classify_job_type
+
+        assert classify_job_type("Security Intern") == "internship"
+        assert classify_job_type("Cybersecurity Fresher Trainee") == "internship"
+        assert classify_job_type("SOC Analyst - Part Time") == "part_time"
+        assert classify_job_type("Penetration Tester (Contract)") == "contract"
+        assert classify_job_type("Freelance VAPT Consultant") == "freelance"
+        assert classify_job_type("Senior Security Engineer (Full Time)") == "full_time"
+        assert classify_job_type("Security Engineer") == "unknown"
+
+    @pytest.mark.asyncio
+    async def test_create_job_infers_job_type(self, service, mock_job_repo):
+        """A missing job_type is inferred from the title at save time."""
+        await service.create_job(
+            {
+                "title": "Cybersecurity Intern",
+                "company": "SecureCo",
+                "url": "https://example.com/intern",
+            }
+        )
+
+        created = mock_job_repo.create.call_args[0][0]
+        assert created.job_type == "internship"
+
+    @pytest.mark.asyncio
+    async def test_create_job_keeps_provided_job_type(self, service, mock_job_repo):
+        """A scraper-provided job_type is respected."""
+        await service.create_job(
+            {
+                "title": "Security Analyst",
+                "company": "SecureCo",
+                "url": "https://example.com/analyst",
+                "job_type": "full_time",
+            }
+        )
+
+        created = mock_job_repo.create.call_args[0][0]
+        assert created.job_type == "full_time"
+
     @pytest.mark.asyncio
     async def test_create_job_truncates_overlong_fields(self, service, mock_job_repo):
         """Over-long fields are clamped so Postgres varchar(N) never rejects."""

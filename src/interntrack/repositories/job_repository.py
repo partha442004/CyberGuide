@@ -95,6 +95,37 @@ class JobRepository(BaseRepository[Job]):
                 return candidate
         return None
 
+    async def backfill_job_types(self, limit: int = 500) -> int:
+        """Infer job_type for existing jobs still marked unknown.
+
+        Returns the number of rows updated. Used after a deploy so the
+        dashboard's job-type chart isn't all "unknown" (scrapers never
+        populate job_type, so the classifier fills it in at save time for
+        new jobs; this covers jobs saved before the classifier existed).
+        """
+        from interntrack.services.job_service import classify_job_type
+
+        query = (
+            select(Job)
+            .where(
+                or_(
+                    Job.job_type.is_(None),
+                    func.lower(Job.job_type) == "unknown",
+                ),
+            )
+            .limit(limit)
+        )
+        result = await self.session.execute(query)
+        jobs = list(result.scalars().all())
+        for job in jobs:
+            inferred = classify_job_type(str(job.title or ""))
+            if inferred != "unknown" and (
+                not job.job_type or job.job_type == "unknown"
+            ):
+                job.job_type = inferred  # type: ignore[assignment]
+        await self.session.flush()
+        return len([j for j in jobs if j.job_type and j.job_type != "unknown"])
+
     async def get_active_jobs(
         self,
         skip: int = 0,
