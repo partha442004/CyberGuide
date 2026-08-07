@@ -4,6 +4,22 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.22.0] - 2026-08-07
+
+### Added
+
+- **Cross-source duplicate detection.** The same posting is frequently
+  scraped by several boards (LinkedIn India, Indeed India, TimesJobs,
+  Internshala) under different URLs, so URL-only dedup let 2-3 copies of
+  one job into the DB (e.g. "Penetration Tester | Brillio" twice).
+  `JobRepository.find_cross_source_duplicate` fetches recent candidates
+  by company and compares normalized titles (case-insensitive,
+  punctuation/whitespace collapsed) in Python — wired into
+  `JobService.create_job` after the URL check.
+- **Closing-soon section in daily alerts.** The daily digest (email +
+  Telegram) now leads with a "🚨 Closing soon" block listing the up-to-5
+  jobs expiring within 2 days, so deadlines are visible before they pass.
+
 ## [1.21.1] - 2026-08-07
 
 ### Fixed
