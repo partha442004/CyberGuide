@@ -419,17 +419,20 @@ async def match_resume_to_job(
     # Calculate match using shared helper
     match_response = _calculate_job_match(resume_skills, job)
 
-    # Store match result
-    match_result = ResumeMatchResult(
-        resume_id=resume.id,
-        job_id=job_id,
-        match_score=match_response.match_score,
-        matched_skills=match_response.matched_skills,
-        missing_skills=match_response.missing_skills,
-        suggestions=match_response.suggestions,
-    )
-    session.add(match_result)
-    await session.flush()
+    # Store match result — only when a score exists (jobs with no skills
+    # score None, and ``match_score`` is a NOT NULL column: persisting None
+    # would raise an IntegrityError and 500 the whole request).
+    if match_response.match_score is not None:
+        match_result = ResumeMatchResult(
+            resume_id=resume.id,
+            job_id=job_id,
+            match_score=match_response.match_score,
+            matched_skills=match_response.matched_skills,
+            missing_skills=match_response.missing_skills,
+            suggestions=match_response.suggestions,
+        )
+        session.add(match_result)
+        await session.flush()
 
     return match_response
 
@@ -494,16 +497,19 @@ async def match_resume_batch(
         # Calculate match using shared helper
         match_response = _calculate_job_match(resume_skills, job)
 
-        # Store match result
-        match_result = ResumeMatchResult(
-            resume_id=resume.id,
-            job_id=job_id,
-            match_score=match_response.match_score,
-            matched_skills=match_response.matched_skills,
-            missing_skills=match_response.missing_skills,
-            suggestions=match_response.suggestions,
-        )
-        session.add(match_result)
+        # Persist only scores — ``match_score`` is NOT NULL, so a job with
+        # no skills (score None) must not be inserted or the whole batch
+        # fails with an IntegrityError (the live 500 on match-batch).
+        if match_response.match_score is not None:
+            match_result = ResumeMatchResult(
+                resume_id=resume.id,
+                job_id=job_id,
+                match_score=match_response.match_score,
+                matched_skills=match_response.matched_skills,
+                missing_skills=match_response.missing_skills,
+                suggestions=match_response.suggestions,
+            )
+            session.add(match_result)
 
         if match_response.match_score is not None:
             scores.append(match_response.match_score)
