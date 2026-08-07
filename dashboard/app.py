@@ -543,6 +543,58 @@ def _api(
     return None
 
 
+def _telegram_finder_block(chat_id: str | None = None, auto_save: bool = False) -> None:
+    """Render the 'find my Telegram chat ID' helper (Settings + register).
+
+    Calls the API's ``GET /notifications/telegram/chat-id`` to look up the
+    newest chat that messaged the bot. On the register tab (``auto_save``
+    False) the found chat ID is stored in session state so the form can
+    pre-fill it; on the Settings page (``auto_save`` True) it is written
+    straight to the signed-in user's profile via ``PUT /users/{id}``.
+    ``chat_id`` is the current value (if any) shown as already-known.
+    """
+    st.markdown(
+        "**📱 Don't know your Telegram chat ID?** Message the bot once "
+        "(e.g. `/start`) — and make sure *you* are the last person to message "
+        "it — then click below and we'll find it for you."
+    )
+    if chat_id:
+        st.caption(f"Current chat ID: `{chat_id}`")
+    if st.button(
+        "🔎 Find my Telegram chat ID",
+        key=f"find_tg_{chat_id or 'none'}_{st.session_state.get('tg_find_n', 0)}",
+    ):
+        st.session_state["tg_find_n"] = st.session_state.get("tg_find_n", 0) + 1
+        found = fetch_data("/notifications/telegram/chat-id")
+        if found and found.get("chat_id"):
+            cid = found["chat_id"]
+            if auto_save:
+                saved = _api(
+                    f"/users/{_current_user_id()}",
+                    method="PUT",
+                    json_data={"telegram_chat_id": cid},
+                    timeout=15,
+                )
+                if saved:
+                    st.success(
+                        f"✅ Found your chat ID: `{cid}` — saved to your account! "
+                        "Your alerts now reach your own Telegram."
+                    )
+                else:
+                    st.error(
+                        f"✅ Found your chat ID: `{cid}`, but saving it failed — "
+                        "paste it in My Account → Telegram chat ID."
+                    )
+            else:
+                st.success(
+                    f"✅ Found your chat ID: `{cid}` — it's filled in below, just save."
+                )
+                st.session_state["found_telegram_chat_id"] = cid
+        else:
+            hint = (found or {}).get("hint") or "Nothing found yet."
+            st.warning(f"{hint} Then press the button again.")
+
+
 def fetch_data(endpoint: str) -> Any:
     """GET from the API — returns None when unreachable."""
     return _api(endpoint, method="GET")
@@ -1142,6 +1194,7 @@ def show_account() -> None:
         _invite_caption = invite_caption(_invite)
         if _invite_caption:
             st.info(_invite_caption)
+        _telegram_finder_block()
         with st.form("register_form"):
             name = st.text_input("Full name *")
             email = st.text_input("Email *")
@@ -1163,8 +1216,10 @@ def show_account() -> None:
             )
             telegram_chat_id = st.text_input(
                 "Telegram chat ID (optional)",
+                value=st.session_state.pop("found_telegram_chat_id", ""),
                 help="Message @userinfobot on Telegram to see your chat ID — "
-                "alerts then reach *your* Telegram instead of the shared chat.",
+                "alerts then reach *your* Telegram instead of the shared chat. "
+                "Tip: use the 'Find my Telegram chat ID' button above.",
             )
             default_domains = _invite.get("domains", ["security"])
             domains = _category_picker_multi("🏷 Preferred categories", default_domains)
@@ -2477,6 +2532,8 @@ def show_settings() -> None:
     saved_domains = prefs.get("domains") or []
     saved_min = prefs.get("min_match_score") or 0
     saved_location = prefs.get("location") or ""
+    _user_profile_settings = _current_user() or {}
+    saved_telegram_chat_id = _user_profile_settings.get("telegram_chat_id") or None
 
     # Channel status indicators
     if configured:
@@ -2494,6 +2551,11 @@ def show_settings() -> None:
                     f"<b>{icon} {label}</b></div>",
                     unsafe_allow_html=True,
                 )
+
+    # Telegram chat-ID helper (only meaningful when Telegram is configured).
+    if "telegram" in configured:
+        st.markdown("---")
+        _telegram_finder_block(saved_telegram_chat_id, auto_save=True)
 
     # Location
     st.markdown("---")

@@ -254,6 +254,95 @@ class TestNotificationsAPI:
         # 422 is expected due to param annotation issue in source code
         assert response.status_code in [200, 422]
 
+    def test_telegram_chat_id_no_token(self, client, monkeypatch):
+        from types import SimpleNamespace
+
+        import interntrack.config as config_module
+
+        fake = SimpleNamespace(
+            telegram_bot_token=None,
+            telegram_chat_id=None,
+            smtp_user=None,
+            smtp_password=None,
+        )
+        monkeypatch.setattr(config_module, "get_settings", lambda: fake)
+        response = client.get("/api/v1/notifications/telegram/chat-id")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["chat_id"] is None
+        assert "TELEGRAM_BOT_TOKEN" in data["hint"]
+
+    def test_telegram_chat_id_found(self, client, monkeypatch):
+        from types import SimpleNamespace
+        from unittest import mock
+
+        import interntrack.config as config_module
+
+        fake = SimpleNamespace(
+            telegram_bot_token="123:abc",  # noqa: S106 - fake token for test
+            telegram_chat_id=None,
+            smtp_user=None,
+            smtp_password=None,
+        )
+        monkeypatch.setattr(config_module, "get_settings", lambda: fake)
+        with mock.patch("httpx.AsyncClient") as mc:
+            resp = mock.MagicMock()
+            resp.json.return_value = {
+                "ok": True,
+                "result": [{"message": {"chat": {"id": 999}}}, {"update_id": 1}],
+            }
+            mc.return_value.__aenter__.return_value.get.return_value = resp
+            response = client.get("/api/v1/notifications/telegram/chat-id")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["chat_id"] == "999"
+
+    def test_telegram_chat_id_no_updates(self, client, monkeypatch):
+        from types import SimpleNamespace
+        from unittest import mock
+
+        import interntrack.config as config_module
+
+        fake = SimpleNamespace(
+            telegram_bot_token="123:abc",  # noqa: S106 - fake token for test
+            telegram_chat_id=None,
+            smtp_user=None,
+            smtp_password=None,
+        )
+        monkeypatch.setattr(config_module, "get_settings", lambda: fake)
+        with mock.patch("httpx.AsyncClient") as mc:
+            resp = mock.MagicMock()
+            resp.json.return_value = {"ok": True, "result": []}
+            mc.return_value.__aenter__.return_value.get.return_value = resp
+            response = client.get("/api/v1/notifications/telegram/chat-id")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["chat_id"] is None
+        assert "No messages yet" in data["hint"]
+
+    def test_telegram_chat_id_api_error(self, client, monkeypatch):
+        from types import SimpleNamespace
+        from unittest import mock
+
+        import interntrack.config as config_module
+
+        fake = SimpleNamespace(
+            telegram_bot_token="123:abc",  # noqa: S106 - fake token for test
+            telegram_chat_id=None,
+            smtp_user=None,
+            smtp_password=None,
+        )
+        monkeypatch.setattr(config_module, "get_settings", lambda: fake)
+        with mock.patch("httpx.AsyncClient") as mc:
+            resp = mock.MagicMock()
+            resp.json.return_value = {"ok": False, "description": "bot was blocked"}
+            mc.return_value.__aenter__.return_value.get.return_value = resp
+            response = client.get("/api/v1/notifications/telegram/chat-id")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["chat_id"] is None
+        assert "bot was blocked" in data["hint"]
+
 
 # ─── Dashboard API ────────────────────────────────────────────────────────────
 
