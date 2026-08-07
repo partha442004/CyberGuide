@@ -1146,6 +1146,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Tests
 
+- Fix: team count uses /users (no trailing slash) 2014 avoids a 307 redirect that silently hid the account count.
 - 17 new unit tests for the invite helpers (link building, param
   parsing incl. list vs comma values, domain whitelist + lowercase,
   markdown-injection sanitization, build→parse round-trip). Full suite
