@@ -4,6 +4,16 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.24.0] - 2026-08-07
+
+### Added
+
+- **Job-type inference.** Scrapers rarely provide a job_type, so the
+  dashboard job-type chart was 100% "unknown". New `classify_job_type`
+  infers internship / part-time / contract / freelance / full-time from
+  the title and applies it at save time; `POST /jobs/backfill-job-types`
+  backfills older rows still marked unknown.
+
 ## [1.23.0] - 2026-08-07
 
 ### Added
