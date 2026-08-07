@@ -275,6 +275,7 @@ class TestJobsAPIUnit:
         assert result["discovered"] == 1
         mock_registry.fetch_all.assert_awaited_once_with(
             query="data science internship",
+            location=None,
             sources=None,
         )
 
@@ -305,6 +306,7 @@ class TestJobsAPIUnit:
         assert result["discovered"] == 0
         mock_registry.fetch_all.assert_awaited_once_with(
             query="python developer",
+            location=None,
             sources=None,
         )
 

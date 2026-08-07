@@ -3,6 +3,7 @@ Jobs API endpoints.
 """
 
 import contextlib
+import re
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +23,41 @@ from interntrack.repositories.job_repository import JobRepository
 from interntrack.services.job_service import JobService
 
 router = APIRouter()
+
+# Indian cities (plus common aliases) recognized inside discovery queries so
+# the right scrapers target them. e.g. "cybersecurity bangalore" resolves to
+# query="cybersecurity", location="Bangalore".
+_INDIA_LOCATIONS: dict[str, str] = {
+    "bangalore": "Bangalore",
+    "bengaluru": "Bangalore",
+    "mumbai": "Mumbai",
+    "bombay": "Mumbai",
+    "delhi": "Delhi",
+    "new delhi": "Delhi",
+    "hyderabad": "Hyderabad",
+    "pune": "Pune",
+    "chennai": "Chennai",
+    "kolkata": "Kolkata",
+    "noida": "Noida",
+    "gurgaon": "Gurgaon",
+    "gurugram": "Gurgaon",
+    "india": "India",
+}
+
+
+def _extract_location_from_query(query: str) -> str | None:
+    """Return the Indian city found in ``query`` (or None).
+
+    Uses whole-word matching so "india" doesn't match "indianapolis". Does
+    not modify the query itself — the caller decides whether to keep the city
+    words in the keyword string (harmless, and the India scrapers accept
+    them either way).
+    """
+    lowered = (query or "").lower()
+    for alias, canonical in _INDIA_LOCATIONS.items():
+        if re.search(rf"\b{re.escape(alias)}\b", lowered):
+            return canonical
+    return None
 
 
 @router.get("/", response_model=JobListResponse)
@@ -381,18 +417,41 @@ async def run_discovery_for_users(
     no accounts yet it falls back to the classic fixed queries. The GitHub
     Actions cron calls this three times a day in place of the hardcoded ones.
     """
-    from interntrack.scheduler.jobs import _enabled_alert_targets, discovery_queries_for
+    from interntrack.scheduler.jobs import (
+        DEFAULT_LOCATION,
+        _enabled_alert_targets,
+        discovery_queries_for,
+    )
     from interntrack.scrapers.registry import get_default_registry
 
     targets = await _enabled_alert_targets(db)
-    queries: list[str] = []
+    # (query, location) pairs so each user's location is passed straight to
+    # the scrapers — this is what makes the India scrapers (LinkedIn India,
+    # Internshala, TimesJobs, Indeed India) actually target Bangalore instead
+    # of the US geo-locked guest APIs.
+    query_locations: list[tuple[str, str | None]] = []
     for target in targets:
-        queries.extend(
-            discovery_queries_for(target["prefs"], target["user"], limit=limit)
-        )
-    if not queries:
-        queries = ["cybersecurity", "software engineering", "python developer"]
-    unique = list(dict.fromkeys(q for q in queries if q.strip()))
+        user = target["user"]
+        location = (getattr(user, "location", None) or "").strip() if user else None
+        for q in discovery_queries_for(
+            target["prefs"],
+            target["user"],
+            limit=limit,
+        ):
+            query_locations.append((q, location or DEFAULT_LOCATION))
+    if not query_locations:
+        query_locations = [
+            ("cybersecurity", DEFAULT_LOCATION),
+            ("software engineering", DEFAULT_LOCATION),
+            ("python developer", DEFAULT_LOCATION),
+        ]
+    unique: list[tuple[str, str | None]] = []
+    seen: set[str] = set()
+    for q, loc in query_locations:
+        key = q.strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            unique.append((q.strip(), loc))
 
     registry = get_default_registry()
     service = JobService(db)
@@ -404,10 +463,10 @@ async def run_discovery_for_users(
     import time
 
     deadline = time.monotonic() + 50
-    for query in unique:
+    for query, location in unique:
         if time.monotonic() > deadline:
             break
-        jobs = await registry.fetch_all(query=query)
+        jobs = await registry.fetch_all(query=query, location=location)
         saved = await service.save_jobs(jobs)
         total_found += len(jobs)
         total_saved += len(saved)
@@ -441,7 +500,14 @@ async def run_discovery(
     from interntrack.scrapers.registry import get_default_registry
 
     registry = get_default_registry()
-    jobs = await registry.fetch_all(query=query, sources=[source] if source else None)
+    # "cybersecurity bangalore" -> query="cybersecurity", location="Bangalore"
+    # so the India scrapers target Bangalore instead of US geo-locked APIs.
+    location = _extract_location_from_query(query)
+    jobs = await registry.fetch_all(
+        query=query,
+        location=location,
+        sources=[source] if source else None,
+    )
     service = JobService(db)
     saved = await service.save_jobs(jobs)
 

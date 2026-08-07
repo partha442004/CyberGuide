@@ -1038,13 +1038,19 @@ def discovery_queries_for(prefs: dict, user=None, limit: int = 4) -> list[str]:
             skill_name = str(skill).strip()
             if skill_name:
                 queries.append(f"{skill_name} intern")
-    # Location-aware: add queries with location appended
+    # Location-aware: location-suffixed queries go FIRST so the [:limit] cap
+    # keeps them (a Bangalore user's alerts should search "cybersecurity
+    # bangalore" before plain "cybersecurity"). The dedupe below then drops
+    # the redundant plain duplicates when the limit allows more queries.
     location = (getattr(user, "location", None) or "").strip() if user else ""
     if not location:
         location = DEFAULT_LOCATION
+    located_queries: list[str] = []
     if location:
         for q in list(queries):
-            queries.append(f"{q} {location}")
+            if location.lower() not in q.lower():
+                located_queries.append(f"{q} {location}")
+    queries = located_queries + list(queries)
     seen: set[str] = set()
     unique: list[str] = []
     for query in queries:
