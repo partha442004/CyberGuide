@@ -4,6 +4,21 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.23.0] - 2026-08-07
+
+### Added
+
+- **Application follow-up reminders in the daily digest.** Applications that
+  are applied/interviewing but still un-reminded now appear in a leading
+  "⏰ Follow up" section of the email and Telegram alerts (capped at 5),
+  so you get nudged to chase applications you haven't heard back from.
+  Scoped per user (multi-user safe) and marked reminded only after a
+  channel actually delivered.
+- **Salary + experience badges on job cards.** Alert cards now show a
+  compact salary line (INR → ₹6L / ₹25K, USD → $80k) and experience level
+  when the source provides them, alongside the existing match %, expiry
+  and age badges.
+
 ## [1.22.0] - 2026-08-07
 
 ### Added
