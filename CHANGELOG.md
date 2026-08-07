@@ -1121,6 +1121,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **👥 Weekly email team snapshot** — the Sunday weekly digest now closes
+  with a "Your team" block: how many people get personalized alerts on
+  the platform, plus how many joined through *your* invite link (only
+  shown when non-zero). Daily digests are untouched.
+- **🏷 Team by category** — the dashboard growth panel now shows a
+  chip row of which categories your team picked (most popular first),
+  from the new `team_domain_split` helper.
+
+### Tests
+
+- 7 new tests (domain split filtering/sorting, digest-stats counting
+  incl. case-insensitivity + self-exclusion, weekly team-block HTML
+  rendering with/without referrals). Full suite **2348 passed**, ruff +
+  format + mypy clean.
+
+### Added
+
 - **🗑 Self-service account deletion** — the My Account page has a "Delete
   my account" danger zone (checkbox confirm). It calls the new
   `DELETE /api/v1/users/{user_id}` endpoint, treats a 404 as
