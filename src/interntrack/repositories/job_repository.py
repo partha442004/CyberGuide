@@ -126,6 +126,35 @@ class JobRepository(BaseRepository[Job]):
         await self.session.flush()
         return len([j for j in jobs if j.job_type and j.job_type != "unknown"])
 
+    async def backfill_job_tags(self, limit: int = 500) -> int:
+        """Auto-tag existing jobs that have no tags.
+
+        Jobs saved before auto-tagging existed carry ``tags = []`` and
+        therefore score ``match_score: null`` against every resume. This
+        applies the same title+description keyword derivation to older
+        rows so they earn real match/ATS scores too. Returns the number of
+        rows updated.
+        """
+        from interntrack.services.job_service import auto_tag_job
+
+        query = select(Job).order_by(Job.created_at.desc()).limit(int(limit) * 2 + 100)
+        result = await self.session.execute(query)
+        jobs = list(result.scalars().all())
+        updated = 0
+        for job in jobs:
+            if job.tags:  # already tagged (list is truthy when non-empty)
+                continue
+            tagged = auto_tag_job({"title": job.title, "description": job.description})
+            tags = tagged.get("tags")
+            if tags:
+                job.tags = tags
+                updated += 1
+                if updated >= int(limit):
+                    break
+        if updated:
+            await self.session.flush()
+        return updated
+
     async def get_active_jobs(
         self,
         skip: int = 0,

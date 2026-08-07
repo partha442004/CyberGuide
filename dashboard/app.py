@@ -589,12 +589,14 @@ def _category_header(domain: str, count: int, total: int) -> None:
     )
 
 
-def _render_job(job: dict) -> None:
+def _render_job(job: dict, match_score: Any = None) -> None:
     """One job as a clean, hoverable card with real widgets.
 
     All scraped fields (title, company, location, description, ...) are
     untrusted external content, so every value interpolated into HTML is
-    escaped before rendering with ``unsafe_allow_html``.
+    escaped before rendering with ``unsafe_allow_html``. When
+    ``match_score`` is given (from the Resume Match run), a colored
+    match chip is shown on the card.
     """
     title = escape(str(job.get("title", "Untitled")))
     company = escape(str(job.get("company", "Unknown")))
@@ -605,6 +607,22 @@ def _render_job(job: dict) -> None:
 
         with col_l:
             st.markdown(f'<div class="job-title">{title}</div>', unsafe_allow_html=True)
+
+            if match_score is not None:
+                score = float(match_score)
+                if score >= 70:
+                    chip_color, icon = "#059669", "🟢"
+                elif score >= 40:
+                    chip_color, icon = "#d97706", "🟡"
+                else:
+                    chip_color, icon = "#dc2626", "🔴"
+                st.markdown(
+                    f'<div class="chip-row"><span class="chip" '
+                    f'style="color:{chip_color};background:rgba(5,150,105,0.08);'
+                    f'border-color:rgba(5,150,105,0.25);font-weight:700;">'
+                    f"{icon} Match: {score:.0f}%</span></div>",
+                    unsafe_allow_html=True,
+                )
 
             chips = []
             if job.get("company") and str(job.get("company")) != "Unknown":
@@ -1255,6 +1273,38 @@ def _render_saved_jobs_tab(jobs: list) -> None:
         labels[d] = f"{_DOMAIN_LABELS.get(d, d)} ({len(grouped[d])})"
     selected = _category_picker(options, labels)
 
+    # Resume match % on every card — one click, cached in the session.
+    match_scores: dict = st.session_state.get("saved_job_match_scores") or {}
+    if st.button("🎯 Match these jobs to my resume", use_container_width=True):
+        with st.spinner("Matching against your resume..."):
+            job_ids = [j["id"] for j in jobs if j.get("id")][:50]
+            if job_ids:
+                result = _api(
+                    f"/resumes/match-batch?user_id={_current_user_id()}&job_ids="
+                    + "&job_ids=".join(job_ids),
+                    method="POST",
+                    timeout=45,
+                )
+                if result and result.get("matches"):
+                    match_scores = {
+                        m.get("job_id"): m.get("match_score") for m in result["matches"]
+                    }
+                    st.session_state["saved_job_match_scores"] = match_scores
+                    st.success(
+                        f"✅ Matched {len(match_scores)} jobs — average "
+                        f"{result.get('average_score')}%"
+                    )
+                else:
+                    st.info(
+                        "No match scores — upload your resume on the Resume "
+                        "Match page first."
+                    )
+    elif not match_scores:
+        st.caption(
+            "💡 Click **Match these jobs to my resume** to see your match % on "
+            "every card."
+        )
+
     # Render sections.
     domains = domains_present if selected == "All" else [selected]
     for domain in domains:
@@ -1263,7 +1313,7 @@ def _render_saved_jobs_tab(jobs: list) -> None:
             continue
         _category_header(domain, len(items), len(jobs))
         for job in items:
-            _render_job(job)
+            _render_job(job, match_scores.get(job.get("id")))
 
 
 def _share_job_form() -> None:

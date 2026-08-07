@@ -106,6 +106,22 @@ async def backfill_job_types(
     return {"updated": updated}
 
 
+@router.post("/backfill-tags")
+async def backfill_job_tags(
+    limit: int = Query(500, ge=1, le=2000),
+    db: AsyncSession = Depends(get_db),
+):
+    """Auto-tag existing jobs saved before auto-tagging existed.
+
+    Jobs with empty ``tags`` score ``match_score: null`` against every
+    resume; this derives skill tags from their title + description so
+    they earn real match/ATS scores, matching what new saves already do.
+    """
+    repo = JobRepository(db)
+    updated = await repo.backfill_job_tags(limit=limit)
+    return {"updated": updated}
+
+
 @router.post("/archive-expired")
 async def archive_expired(days: int = 30, db: AsyncSession = Depends(get_db)):
     """Archive jobs older than N days to keep the database lean."""
