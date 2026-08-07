@@ -12,7 +12,8 @@ from typing import Any
 from interntrack.domain.enums import JobSource
 from interntrack.scrapers.base import BaseScraper, RawJob, matches_query
 
-# Security vendors with public Greenhouse boards (verified reachable).
+# Security vendors with public Greenhouse boards (verified reachable;
+# each returns 200 + a JSON job list from boards-api.greenhouse.io).
 GREENHOUSE_COMPANIES = [
     "zscaler",
     "okta",
@@ -21,6 +22,10 @@ GREENHOUSE_COMPANIES = [
     "veracode",
     "beyondtrust",
     "threatlocker",
+    "expel",
+    "dragos",
+    "tanium",
+    "sumologic",
 ]
 
 _BOARD_URL = "https://boards-api.greenhouse.io/v1/boards/{company}/jobs"

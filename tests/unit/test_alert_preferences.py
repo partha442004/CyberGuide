@@ -943,13 +943,15 @@ class TestAlertChunks:
         ):
             chunks = await build_alert_chunks(self._report(5), AsyncMock())
 
-        # 5 jobs at 4 per chunk -> 2 chunks.
-        assert len(chunks) == 2
+        # 5 jobs at 4 per chunk -> 2 job chunks, plus the closing
+        # role × location breakdown table as a final chunk.
+        assert len(chunks) == 3
         assert len(chunks[0][1]) == 4  # 4 Apply buttons
         assert len(chunks[1][1]) == 1
         assert "Security Job 0" in chunks[0][0]
         assert "✅ Apply — Security Job 4" in chunks[1][1][0][0]
         assert chunks[1][1][0][1] == "https://apply/4"
+        assert "Jobs by role × location" in chunks[2][0]
 
     @pytest.mark.asyncio
     async def test_empty_report_single_chunk_no_buttons(self):
