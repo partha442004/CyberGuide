@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.api.schemas.report import ReportResponse
 from interntrack.database.session import get_db
+from interntrack.services.application_service import ApplicationService
 from interntrack.services.report_service import ReportService
 
 router = APIRouter()
@@ -67,6 +68,15 @@ async def _send_alert_digest(
         job_count=len(report.get("new_jobs") or []),
         results=results,
     )
+    # Successfully-reminded applications stop being nudged. Only mark when at
+    # least one channel actually delivered (a dict like {"telegram": False} is
+    # truthy but means nothing was sent).
+    if results and any(results.values()):
+        for item in report.get("follow_up") or []:
+            app_id = item.get("application_id")
+            if app_id:
+                with contextlib.suppress(Exception):
+                    await ApplicationService(db).mark_reminded(app_id)
     return results
 
 
@@ -140,6 +150,7 @@ async def get_daily_report(
             domains=domains,
             min_match_score=prefs.get("min_match_score"),
             since=prefs.get("last_alert_at"),
+            user_id=target["user_id"],
         )
 
         # Advance the no-duplicates window regardless of whether anything

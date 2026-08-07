@@ -499,12 +499,42 @@ def _job_lines(score, job: dict) -> list[str]:
     head += " ✅ Applied" if applied else " ⬜ Not applied"
     head += f" · {_age_badge(int(job.get('age_days', 0) or 0))}"
     lines = [head]
+    salary = _salary_txt(job)
+    if salary:
+        lines.append(f"   💰 {salary}")
+    exp_level = str(job.get("experience_level") or "").strip()
+    if exp_level:
+        lines.append(f"   🎓 {exp_level}")
     if url:
         lines.append(f"   🔗 Apply: {url}")
     note = _expiry_note(job)
     if note:
         lines.append(note)
     return lines
+
+
+def _salary_txt(job: dict) -> str:
+    """Compact salary line ("₹10L–₹15L" / "$80k–$100k") or "" when unknown."""
+    lo = job.get("salary_min")
+    hi = job.get("salary_max")
+    if not lo and not hi:
+        return ""
+    currency = str(job.get("salary_currency") or "USD").upper()
+    symbol = "₹" if currency == "INR" else "$"
+    # Pick the scale from the larger bound so max-only INR salaries format
+    # consistently (150000 -> 1.5L, not 150K).
+    biggest = max(lo or 0, hi or 0)
+
+    def fmt(value) -> str:
+        if currency == "INR" and value >= 100000:
+            return f"{value / 100000:.1f}".rstrip("0").rstrip(".") + "L"
+        if currency == "INR":
+            return f"{value / 1000:.0f}K"
+        return f"{value / 1000:.0f}k"
+
+    if lo and hi:
+        return f"{symbol}{fmt(lo)}–{symbol}{fmt(hi)}"
+    return f"{symbol}{fmt(biggest)}"
 
 
 async def _score_and_group_jobs(
@@ -596,6 +626,22 @@ async def build_daily_report_message(
                 f" — {_esc(item.get('expires_at'))}"
             )
 
+    # ⏰ Follow-up reminders for applications that are pending action.
+    follow_up = report.get("follow_up") or []
+    if follow_up:
+        lines.append("")
+        lines.append(f"⏰ Follow up ({len(follow_up)}):")
+        for item in follow_up[:5]:
+            title = item.get("job_title") or "Application"
+            company = item.get("company") or ""
+            status = item.get("status") or ""
+            line = f"   🔔 {_esc(title)}"
+            if company:
+                line += f" @ {_esc(company)}"
+            if status:
+                line += f" ({_esc(status)})"
+            lines.append(line)
+
     sections = await _score_and_group_jobs(
         report, session, domains, user_id=user_id, user_location=user_location
     )
@@ -659,6 +705,21 @@ async def build_alert_chunks(
                 f"   ⏳ {_esc(item.get('title'))} @ {_esc(item.get('company'))}"
                 f" — {_esc(item.get('expires_at'))}"
             )
+
+    # ⏰ Follow-up reminders lead the first chunk too.
+    follow_up = report.get("follow_up") or []
+    if follow_up:
+        closing_lines.append(f"⏰ Follow up ({len(follow_up)}):")
+        for item in follow_up[:5]:
+            title = item.get("job_title") or "Application"
+            company = item.get("company") or ""
+            status = item.get("status") or ""
+            line = f"   🔔 {_esc(title)}"
+            if company:
+                line += f" @ {_esc(company)}"
+            if status:
+                line += f" ({_esc(status)})"
+            closing_lines.append(line)
 
     if not flat:
         if closing_lines:
@@ -785,6 +846,31 @@ async def build_daily_report_html(
             f"New applications: <b>{summary.get('new_applications', 0)}</b></div></div>"
         ),
     ]
+
+    # ⏰ Follow-up reminders section (email).
+    follow_up = report.get("follow_up") or []
+    if follow_up:
+        fu_rows = []
+        for item in follow_up[:5]:
+            title = _esc(item.get("job_title") or "Application")
+            company = _esc(item.get("company") or "")
+            status = _esc(item.get("status") or "")
+            fu_rows.append(
+                "<div style='display:flex;justify-content:space-between;"
+                "align-items:center;border-bottom:1px dashed #e2e8f0;"
+                "padding:10px 0;'>"
+                f"<div><b style='font-size:14px;'>{title}</b>"
+                f"<div style='color:#64748b;font-size:13px;'>"
+                f"{company} · {status}</div></div>"
+                "<div style='color:#e5484d;font-size:12px;font-weight:700;'>"
+                "⏰ FOLLOW UP</div></div>"
+            )
+        parts.append(
+            "<div style='margin-top:24px;background:#fff7ed;"
+            "border:1px solid #fed7aa;border-radius:12px;padding:16px 18px;'>"
+            f"<div style='font-size:14px;font-weight:800;color:#9a3412;'>"
+            f"⏰ Follow up ({len(follow_up)})</div>{''.join(fu_rows)}</div>"
+        )
 
     for domain, items in sections:
         label = _DOMAIN_ICONS.get(domain, domain)
@@ -971,6 +1057,9 @@ def _job_html_card(score, job: dict, accent: str) -> str:
     status_txt = "✅ Applied" if applied else "⬜ Not applied"
     age = _age_badge(int(job.get("age_days", 0) or 0))
     expiry = _esc(_expiry_note(job).strip())
+    salary = _esc(_salary_txt(job))
+    exp_level = _esc(str(job.get("experience_level") or "").strip())
+    meta_bits = [bit for bit in (status_txt, expiry, salary, exp_level) if bit]
     card = (
         "<div style='border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;"
         "margin:10px 0;'>"
@@ -982,7 +1071,7 @@ def _job_html_card(score, job: dict, accent: str) -> str:
         f"<div style='font-size:20px;font-weight:800;color:{accent};'>{score_txt}</div>"
         "<div style='color:#94a3b8;font-size:11px;'>match</div></div></div>"
         "<div style='margin-top:8px;font-size:13px;color:#475569;'>"
-        f"{status_txt}{(' · ' + expiry) if expiry else ''}</div>"
+        f"{' · '.join(meta_bits)}</div>"
     )
     if url:
         card += (

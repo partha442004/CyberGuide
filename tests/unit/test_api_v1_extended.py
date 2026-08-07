@@ -667,6 +667,7 @@ class TestReportsAPIUnit:
             domains=["security"],
             min_match_score=None,
             since=None,
+            user_id="user1",
         )
         assert result["report_type"] == "daily"
 
@@ -722,6 +723,7 @@ class TestReportsAPIUnit:
             domains=["security"],
             min_match_score=None,
             since=None,
+            user_id="user1",
         )
         assert result["report_type"] == "daily"
 
@@ -776,6 +778,7 @@ class TestReportsAPIUnit:
             domains=["coding"],
             min_match_score=None,
             since=None,
+            user_id="user1",
         )
         assert result["report_type"] == "daily"
 
