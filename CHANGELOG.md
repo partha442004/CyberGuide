@@ -87,6 +87,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   no-keyword no-op, word boundaries): **2301 tests pass**, ruff + format
   + mypy clean.
 
+### Added
+
+- **Backfill tags for existing jobs.** `POST /api/v1/jobs/backfill-tags`
+  applies the auto-tagging derivation to jobs saved before it existed
+  (empty `tags` → `match_score: null` against every resume). Mirrors the
+  `backfill-job-types` endpoint — run once after deploy so all ~590
+  existing jobs earn real match/ATS scores, not just new saves.
+- **Match % on dashboard job cards.** The Saved Jobs tab now has a
+  "🎯 Match these jobs to my resume" button that batch-matches up to 50
+  jobs and renders a colored match chip on each card (🟢 ≥ 70% / 🟡 ≥ 40%
+  / 🔴 below), cached in the session so you can browse with scores shown.
+
+### Notes
+
+- 2 new tests (backfill tags tags tag-less jobs / respects limit):
+  **2303 tests pass**, ruff + format + mypy clean.
+
 ## [1.26.0] - 2026-08-07
 
 ### Added
