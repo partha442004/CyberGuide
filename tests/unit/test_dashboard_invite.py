@@ -14,6 +14,7 @@ from dashboard.invite import (
     invite_caption,
     parse_invite_params,
     referral_leaderboard,
+    referral_time_series,
     team_domain_split,
     team_growth_stats,
     team_rows,
@@ -245,6 +246,72 @@ class TestReferralLeaderboard:
         assert len(board) == 1
 
 
+class TestReferralTimeSeries:
+    def test_buckets_referrals_by_month(self):
+        from datetime import UTC, datetime
+
+        now = datetime.now(UTC)
+
+        def shift(dt, months):
+            """Same day, ``months`` months earlier (year-boundary safe)."""
+            total = dt.year * 12 + (dt.month - 1) - months
+            return datetime(total // 12, total % 12 + 1, 1, tzinfo=UTC)
+
+        month_two_ago = shift(now, 2).strftime("%Y-%m")
+        month_one_ago = shift(now, 1).strftime("%Y-%m")
+        this_month = now.strftime("%Y-%m")
+        users = [
+            {
+                "email": "a@x.com",
+                "referred_by": "me@x.com",
+                "created_at": shift(now, 1).isoformat(),
+            },
+            {
+                "email": "b@x.com",
+                "referred_by": "ME@x.com",
+                "created_at": shift(now, 2).isoformat(),
+            },
+            {
+                "email": "c@x.com",
+                "referred_by": "other@x.com",
+                "created_at": shift(now, 2).isoformat(),
+            },
+            {"email": "me@x.com", "referred_by": "me@x.com"},  # self -> excluded
+        ]
+        series = referral_time_series(users, "me@x.com", months=3)
+        assert len(series) == 3
+        assert series[0] == {"month": month_two_ago, "count": 1}
+        assert series[1] == {"month": month_one_ago, "count": 1}
+        assert series[2] == {"month": this_month, "count": 0}
+
+    def test_zero_fills_months(self):
+        users = []
+        series = referral_time_series(users, "me@x.com", months=6)
+        assert len(series) == 6
+        assert all(r["count"] == 0 for r in series)
+
+    def test_empty_referrer_returns_empty(self):
+        assert referral_time_series([], None) == []
+        assert referral_time_series([], "") == []
+
+    def test_bad_dates_ignored(self):
+        users = [{"email": "a@x.com", "referred_by": "me@x.com", "created_at": "junk"}]
+        series = referral_time_series(users, "me@x.com", months=2)
+        assert all(r["count"] == 0 for r in series)
+        assert len(series) == 2
+
+    def test_ignores_referrals_outside_window(self):
+        users = [
+            {
+                "email": "old@x.com",
+                "referred_by": "me@x.com",
+                "created_at": "2025-01-01T00:00:00+00:00",
+            }
+        ]
+        series = referral_time_series(users, "me@x.com", months=3)
+        assert all(r["count"] == 0 for r in series)
+
+
 class TestTeamDomainSplit:
     def test_counts_known_domains_sorted_desc(self):
         users = [
@@ -273,13 +340,15 @@ class TestTeamGrowthStats:
     _BASE = {"email": "me@x.com", "name": "Me", "referred_by": None}
 
     def test_counts_team_and_recent_joiners(self):
+        from datetime import UTC, datetime, timedelta
+
         users = [
             self._BASE,
             {
                 "email": "f@x.com",
                 "name": "F",
                 "referred_by": "me@x.com",
-                "created_at": "2026-08-01T10:00:00+00:00",
+                "created_at": (datetime.now(UTC) - timedelta(days=1)).isoformat(),
             },
         ]
         stats = team_growth_stats(users, "me@x.com")

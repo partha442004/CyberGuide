@@ -130,6 +130,58 @@ def count_referrals(users: list, referrer_email: str | None) -> int:
     )
 
 
+def referral_time_series(
+    users: list,
+    referrer_email: str | None,
+    months: int = 6,
+) -> list[dict]:
+    """Monthly referral history for a referrer, oldest month first.
+
+    Returns ``[{month: "YYYY-MM", count: int}]`` covering the last ``months``
+    months (zero-filled for months with no referrals), counting accounts
+    whose ``referred_by`` matches the referrer's email (case-insensitive,
+    own account excluded), bucketed by the account's ``created_at`` month.
+    Empty list when no referrer email is given.
+    """
+    from datetime import UTC, datetime
+
+    if not referrer_email:
+        return []
+    target = referrer_email.strip().lower()
+    now = datetime.now(UTC)
+
+    # Month keys oldest -> newest (handle the year boundary explicitly).
+    keys: list[str] = []
+    year, month = now.year, now.month
+    for _ in range(months):
+        keys.append(f"{year:04d}-{month:02d}")
+        month -= 1
+        if month == 0:
+            year -= 1
+            month = 12
+    keys.reverse()
+    counts = dict.fromkeys(keys, 0)
+
+    for u in users:
+        referred = str(u.get("referred_by") or "").strip().lower()
+        own = str(u.get("email") or "").strip().lower()
+        if referred != target or own == target:
+            continue
+        created = u.get("created_at")
+        if not created:
+            continue
+        try:
+            dt = datetime.fromisoformat(str(created).replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=UTC)
+        except (ValueError, TypeError):
+            continue
+        key = dt.strftime("%Y-%m")
+        if key in counts:
+            counts[key] += 1
+    return [{"month": key, "count": counts[key]} for key in keys]
+
+
 def referral_leaderboard(users: list, limit: int = 5) -> list[dict]:
     """Members ranked by how many people they invited (count > 0).
 

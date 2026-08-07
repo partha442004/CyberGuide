@@ -20,6 +20,7 @@ try:
         invite_caption,
         parse_invite_params,
         referral_leaderboard,
+        referral_time_series,
         team_domain_split,
         team_growth_stats,
         team_rows,
@@ -55,6 +56,10 @@ except ImportError:  # pragma: no cover - older deployment without invite.py
 
     def referral_leaderboard(users: list, limit: int = 5) -> list:  # noqa: ARG001
         """No leaderboard on old deployments."""
+        return []
+
+    def referral_time_series(users: list, referrer_email: str | None) -> list:  # noqa: ARG001
+        """No referral analytics on old deployments."""
         return []
 
     def team_growth_stats(users: list, me_email: str | None = None) -> dict:  # noqa: ARG001
@@ -1044,6 +1049,22 @@ def show_account() -> None:
                 f'<div class="chip-row">{split_chips}</div>',
                 unsafe_allow_html=True,
             )
+
+        # Referral growth chart — your invites per month (last 6 months).
+        series = referral_time_series(members, user.get("email"))
+        if any(r["count"] > 0 for r in series):
+            st.markdown("**📈 Referrals per month**")
+            import pandas as pd
+
+            df = pd.DataFrame(series)
+            fig = px.bar(
+                df,
+                x="month",
+                y="count",
+                labels={"month": "Month", "count": "Referrals"},
+                color_discrete_sequence=["#667eea"],
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
         # Team directory — who is on the platform.
         st.subheader("🌍 Team directory")
