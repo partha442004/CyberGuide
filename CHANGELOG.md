@@ -4,6 +4,37 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.25.0] - 2026-08-07
+
+### Added
+
+- **Security-domain classifier v2.** The alert/dashboard domain bucket now
+  recognizes the full modern security title set — GRC, threat
+  intelligence, penetration testing, OSINT, DFIR, forensics, bug bounty,
+  zero trust, cloud/network security, and web-app attack terms (SQLi,
+  XSS, CSRF) — so SOC / VAPT / GRC roles always land in the
+  "security" category.
+- **SQLi → security fix.** Resume matching (`match_score_v2`) and the
+  resume parser now compare skills on word boundaries, so a security
+  resume that lists "sqli" / "SQL injection" is scored as a security
+  candidate instead of being pulled into coding/data by the bare "sql"
+  keyword (this is what previously surfaced SQL-developer jobs to a
+  cybersecurity resume).
+
+### Fixed
+
+- **Internshala source restored.** The reliable HTML scraper
+  (`InternshalaDirectScraper`) was being silently overwritten in the
+  registry by a broken JSON-API adapter under the same key — Internshala
+  always returned 0 jobs. The direct scraper now wins.
+- **Dead/bot-gated RSS feeds dropped.** remoteok (410), Naukri RSS (404),
+  Instahyre (Cloudflare 403), LinkedIn jobs "RSS" (login wall) and the
+  hnrss feeds (news shells) are gone; feeds now support {query}/{location}
+  placeholders.
+- **Naukri scraper headers.** The jobapi now gets the appid/systemid/
+  browser headers it requires (still reCAPTCHA-gated server-side, but no
+  longer a blind 400).
+
 ## [1.24.0] - 2026-08-07
 
 ### Added
