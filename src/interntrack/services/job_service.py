@@ -25,6 +25,97 @@ _JOB_TYPE_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ("freelance", ("freelance", "gig")),
 ]
 
+# Common skill keywords extracted from a job's title + description when the
+# scraper provided no ``tags`` (very common: share-a-job entries, thin RSS
+# feeds, boards that only give title/company). Jobs without tags score
+# ``match_score: null`` against every resume and never appear in keyword
+# matching, which is exactly the "no match %" complaint. Deriving tags at
+# save time gives those jobs real match scores and ATS keyword signals.
+_AUTO_TAG_KEYWORDS: tuple[str, ...] = (
+    # Programming / software
+    "python",
+    "java",
+    "javascript",
+    "typescript",
+    "react",
+    "node.js",
+    "go",
+    "rust",
+    "c++",
+    "sql",
+    "mysql",
+    "postgresql",
+    "mongodb",
+    "linux",
+    "git",
+    "docker",
+    "kubernetes",
+    "aws",
+    "azure",
+    "gcp",
+    "terraform",
+    "devops",
+    "ci/cd",
+    "machine learning",
+    "data analysis",
+    "pandas",
+    # Cybersecurity
+    "cybersecurity",
+    "information security",
+    "network security",
+    "cloud security",
+    "application security",
+    "soc analyst",
+    "security analyst",
+    "penetration testing",
+    "pentest",
+    "vapt",
+    "ethical hacking",
+    "burp suite",
+    "nmap",
+    "wireshark",
+    "splunk",
+    "siem",
+    "incident response",
+    "malware",
+    "threat intelligence",
+    "vulnerability assessment",
+    "firewall",
+    "grc",
+    "compliance",
+    "iso 27001",
+    "gdpr",
+    "risk management",
+)
+
+
+def auto_tag_job(job_data: dict) -> dict:
+    """Derive skill ``tags`` from the title + description.
+
+    Only fills the gap when the scraper provided no tags at all — explicit
+    scraper tags always win. Keywords are matched on word boundaries so
+    short tokens (``go``, ``sql``) never hit inside unrelated words.
+    Returns the (possibly unchanged) job dict.
+    """
+    import re
+
+    existing = [str(t).strip() for t in (job_data.get("tags") or []) if str(t).strip()]
+    if existing:
+        return job_data
+    text = " ".join(
+        str(job_data.get(field) or "") for field in ("title", "description")
+    ).lower()
+    if not text.strip():
+        return job_data
+    found: list[str] = []
+    for keyword in _AUTO_TAG_KEYWORDS:
+        pattern = rf"(?<![a-z0-9]){re.escape(keyword)}(?![a-z0-9])"
+        if re.search(pattern, text):
+            found.append(keyword)
+    if found:
+        return {**job_data, "tags": found[:15]}
+    return job_data
+
 
 def classify_job_type(title: str) -> str:
     """Infer a job type from the title ("internship", "full_time", ...).
@@ -57,7 +148,10 @@ def _normalize_job_fields(job_data: dict) -> dict:
         normalized["job_type"] = classify_job_type(
             normalized.get("title", ""),
         )
-    return normalized
+    # Derive skill tags when the scraper gave none — jobs without tags
+    # score ``match_score: null`` against every resume (the "no match %"
+    # gap). This runs before the DB insert so every saved job is scoreable.
+    return auto_tag_job(normalized)
 
 
 class JobService:

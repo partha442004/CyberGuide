@@ -958,6 +958,7 @@ def main() -> None:
                 "Overview",
                 "Jobs",
                 "Applications",
+                "Watchlist",
                 "Salary Insights",
                 "Weekly Digest",
                 "Bookmarks",
@@ -981,6 +982,7 @@ def main() -> None:
         "Overview": show_overview,
         "Jobs": show_jobs,
         "Applications": show_applications,
+        "Watchlist": show_watchlist,
         "Salary Insights": show_salary_insights,
         "Weekly Digest": show_weekly_digest,
         "Bookmarks": show_bookmarks,
@@ -1385,6 +1387,120 @@ def show_applications() -> None:
                     _update_application_status(app["id"], new_status)
     else:
         st.info("No applications found. Apply to jobs from the Jobs page!")
+
+
+# ---------------------------------------------------------------------------
+# Page: Watchlist
+# ---------------------------------------------------------------------------
+
+
+def show_watchlist() -> None:
+    """Track companies and surface their active job openings.
+
+    Watched companies get a dedicated "🏢 Watched companies" section in
+    the daily email/Telegram digest, so this page is the management UI for
+    that alert feature (the API and digest integration already exist).
+    """
+    st.header("🏢 Company Watchlist")
+    st.markdown(
+        "Watch companies you're targeting — their jobs get a dedicated section "
+        "in your daily digest, and you can see every open role below."
+    )
+    user_id = _current_user_id()
+
+    # ── Add a company ──────────────────────────────────────────────────
+    with st.form("watchlist_add_form", clear_on_submit=True):
+        col1, col2, col3 = st.columns([3, 2, 1])
+        with col1:
+            company = st.text_input(
+                "Company name", placeholder="e.g. Zscaler, CrowdStrike, Google"
+            )
+        with col2:
+            notes = st.text_input(
+                "Notes (optional)", placeholder="targeting SOC roles here"
+            )
+        with col3:
+            st.write("")
+            added = st.form_submit_button("➕ Watch", use_container_width=True)
+
+    if added:
+        if not company.strip():
+            st.error("Please enter a company name.")
+        else:
+            resp = _api_raw(
+                "/watchlists",
+                method="POST",
+                json_data={
+                    "user_id": user_id,
+                    "company": company.strip(),
+                    "notes": notes.strip() or None,
+                },
+                timeout=20,
+            )
+            if resp is not None and resp.status_code == 201:
+                st.success(
+                    f"✅ Now watching **{company.strip()}** — its jobs appear in your daily digest."
+                )
+                st.rerun()
+            elif resp is not None and resp.status_code == 409:
+                st.info(f"ℹ️ **{company.strip()}** is already on your watchlist.")
+            else:
+                st.error("Could not add the company — is the API server running?")
+
+    st.divider()
+
+    # ── Current watchlist ──────────────────────────────────────────────
+    data = fetch_data(f"/watchlists?user_id={user_id}")
+    if not data or not data.get("watchlist"):
+        st.info(
+            "No companies watched yet. Add one above (e.g. **Zscaler**, **Okta**, "
+            "**Cloudflare**) — their new jobs are highlighted in your daily "
+            "email and Telegram alerts."
+        )
+        return
+
+    watchlist = data["watchlist"]
+    st.subheader(f"Your companies ({data.get('total', len(watchlist))})")
+
+    for item in watchlist:
+        company_name = escape(str(item.get("company", "Unknown")))
+        active = int(item.get("active_jobs", 0) or 0)
+        with st.container(border=True):
+            col1, col2, col3 = st.columns([3, 1, 1])
+            with col1:
+                st.markdown(
+                    f'<div class="job-title">{company_name}</div>',
+                    unsafe_allow_html=True,
+                )
+                if item.get("notes"):
+                    st.caption(f"📝 {escape(str(item['notes']))}")
+            with col2:
+                st.markdown(
+                    f'<div style="text-align:center;">'
+                    f'<div style="font-size:1.6em;font-weight:800;color:#3b82f6;">{active}</div>'
+                    f'<div style="color:#94a3b8;font-size:0.75em;">active jobs</div></div>',
+                    unsafe_allow_html=True,
+                )
+            with col3:
+                if st.button(
+                    "🗑 Remove",
+                    key=f"unwatch_{item.get('id')}",
+                    use_container_width=True,
+                ):
+                    resp = _api_raw(
+                        f"/watchlists/{item.get('id')}", method="DELETE", timeout=20
+                    )
+                    if resp is not None and resp.status_code in (200, 204):
+                        st.success(f"Removed **{company_name}** from your watchlist.")
+                        st.rerun()
+                    else:
+                        st.error("Could not remove the company.")
+
+    st.divider()
+    st.caption(
+        "💡 Watched-company jobs lead a dedicated section in your daily digest, "
+        "so you never miss a posting from your target employers."
+    )
 
 
 # ---------------------------------------------------------------------------
