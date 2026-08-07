@@ -1119,6 +1119,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- **'Find my Telegram chat ID' helper** — don't know your chat ID? Message
+  the bot once (e.g. `/start`), click the button on Settings or the signup
+  form, and the app calls Telegram to find it for you. On Settings it saves
+  straight to your account; on signup it pre-fills the field. A hint warns
+  you to be the last person to message the bot so you don't pick up a
+  teammate's chat ID.
+
 - **Welcome message on signup** — every new member (including friends who
   join via your invite link) gets a best-effort welcome message to their
   email and Telegram the moment they register: their name, chosen alert
