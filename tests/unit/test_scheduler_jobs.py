@@ -227,6 +227,41 @@ class TestBuildDailyReportMessage:
         assert "VAPT Intern" in message
         assert "SecureCo" in message
 
+    @pytest.mark.asyncio
+    async def test_follow_up_section_in_message(self):
+        """Pending applications appear as follow-up nudges in the digest."""
+        from interntrack.scheduler.jobs import build_daily_report_message
+
+        report = {
+            "summary": {"new_jobs": 0, "new_applications": 0, "total_applications": 2},
+            "new_jobs": [],
+            "follow_up": [
+                {
+                    "application_id": "app-1",
+                    "status": "applied",
+                    "job_title": "SOC Analyst",
+                    "company": "Zscaler",
+                    "applied_at": "2026-08-05T00:00:00",
+                },
+            ],
+        }
+
+        message = await build_daily_report_message(report, None)
+
+        assert "⏰ Follow up (1):" in message
+        assert "SOC Analyst" in message
+        assert "Zscaler" in message
+
+    def test_salary_txt(self):
+        from interntrack.scheduler.jobs import _salary_txt
+
+        assert _salary_txt({}) == ""
+        assert (
+            _salary_txt({"salary_min": 100000, "salary_max": 150000}) == "$100k–$150k"
+        )
+        assert _salary_txt({"salary_min": 600000, "salary_currency": "INR"}) == "₹6L"
+        assert _salary_txt({"salary_max": 25000, "salary_currency": "INR"}) == "₹25K"
+
     def test_age_badge(self):
         from interntrack.scheduler.jobs import _age_badge
 

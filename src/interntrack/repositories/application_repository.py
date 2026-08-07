@@ -121,8 +121,15 @@ class ApplicationRepository(BaseRepository[Application]):
             for row in result.all()
         ]
 
-    async def get_pending_reminders(self) -> list[Application]:
-        """Get applications that need reminders."""
+    async def get_pending_reminders(
+        self,
+        user_id: str | None = None,
+    ) -> list[Application]:
+        """Get applications that need reminders.
+
+        ``user_id`` optionally scopes to one account so multi-user digests
+        never show another user's pending applications.
+        """
         query = select(Application).where(
             and_(
                 Application.reminded.is_(False),
@@ -132,6 +139,7 @@ class ApplicationRepository(BaseRepository[Application]):
                         ApplicationStatus.INTERVIEW,
                     ],
                 ),
+                *((Application.user_id == user_id,) if user_id else ()),
             ),
         )
         result = await self.session.execute(query)

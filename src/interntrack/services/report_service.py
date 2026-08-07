@@ -2,9 +2,10 @@
 Report service for generating daily, weekly, and monthly reports.
 """
 
+import contextlib
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from interntrack.repositories.application_repository import ApplicationRepository
 from interntrack.repositories.job_repository import JobRepository
 from interntrack.utils.helpers import to_naive_utc, utcnow
+
+if TYPE_CHECKING:
+    from interntrack.domain.models import Job
 
 # Resolve the template directory relative to this module so rendering works
 # regardless of the current working directory.
@@ -166,6 +170,46 @@ class ReportService:
             return None
         return naive.isoformat()
 
+    async def _pending_follow_ups(
+        self,
+        user_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Applications needing a follow-up nudge (applied/interviewing).
+
+        Scoped to ``user_id`` when given so multi-user digests never leak
+        another account's pending applications. Each entry pairs the
+        application with its job title/company so the digest can say
+        "⏰ Follow up: Penetration Tester @ Zscaler".
+        """
+        pending = await self.app_repo.get_pending_reminders(user_id=user_id)
+        if not pending:
+            return []
+        items: list[dict[str, Any]] = []
+        # Single batched lookup of the referenced jobs (avoids N+1 queries).
+        job_by_id: dict[str, Job] = {}
+        with contextlib.suppress(Exception):
+            from sqlalchemy import select
+
+            from interntrack.domain.models import Job as JobModel
+
+            job_ids = {str(getattr(app, "job_id", "") or "") for app in pending}
+            result = await self.session.execute(
+                select(JobModel).where(JobModel.id.in_(job_ids))
+            )
+            job_by_id = {str(job.id): job for job in result.scalars().all()}
+        for app in pending:
+            job = job_by_id.get(str(getattr(app, "job_id", "") or ""))
+            items.append(
+                {
+                    "application_id": str(getattr(app, "id", "") or ""),
+                    "status": str(getattr(app, "status", "") or ""),
+                    "job_title": str(job.title or "") if job else "",
+                    "company": str(job.company or "") if job else "",
+                    "applied_at": self._fmt_dt(getattr(app, "applied_at", None)),
+                },
+            )
+        return items
+
     @staticmethod
     def _job_age_days(job) -> int:
         """Whole days since the job was posted (0 = today)."""
@@ -186,6 +230,7 @@ class ReportService:
         min_match_score: int | None = None,
         since: datetime | None = None,
         location: str | None = None,
+        user_id: str | None = None,
     ) -> dict[str, Any]:
         """Generate daily report.
 
@@ -201,6 +246,7 @@ class ReportService:
         ``since`` (naive UTC) restricts jobs to those created after the
         previous alert so the three daily sends never repeat a listing.
         ``location`` optionally filters jobs by location (e.g., "Bangalore").
+        ``user_id`` scopes the follow-up reminders to one account.
         """
         recent_jobs = await self.job_repo.get_recent_jobs(days=7)
         if since is not None:
@@ -234,6 +280,10 @@ class ReportService:
                     list(getattr(job, "tags", None) or []),
                 ),
                 "age_days": self._job_age_days(job),
+                "salary_min": getattr(job, "salary_min", None),
+                "salary_max": getattr(job, "salary_max", None),
+                "salary_currency": getattr(job, "salary_currency", None),
+                "experience_level": getattr(job, "experience_level", None),
             }
             for job in recent_jobs[:50]
         ]
@@ -266,6 +316,9 @@ class ReportService:
                 }
                 for job in await self.job_repo.get_closing_soon(days=2)
             ],
+            # Applications that have been submitted/interviewing but are still
+            # pending follow-up — the digest nudges the user to chase them.
+            "follow_up": await self._pending_follow_ups(user_id=user_id),
             "application_status": status_counts,
         }
 

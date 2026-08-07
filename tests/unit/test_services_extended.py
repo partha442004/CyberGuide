@@ -17,6 +17,7 @@ class TestJobServiceExtended:
         session = AsyncMock()
         service = JobService(session)
         service.job_repo.get_by_url = AsyncMock(return_value=None)
+        service.job_repo.find_cross_source_duplicate = AsyncMock(return_value=None)
         service.job_repo.create = AsyncMock(return_value=MagicMock(id="job-1"))
 
         result = await service.create_job(
@@ -87,6 +88,7 @@ class TestJobServiceExtended:
         session = AsyncMock()
         service = JobService(session)
         service.job_repo.get_by_url = AsyncMock(return_value=None)
+        service.job_repo.find_cross_source_duplicate = AsyncMock(return_value=None)
         service.job_repo.create = AsyncMock(return_value=MagicMock(id="new"))
 
         result = await service.save_jobs(
@@ -105,6 +107,7 @@ class TestJobServiceExtended:
         session = AsyncMock()
         service = JobService(session)
         service.job_repo.get_by_url = AsyncMock(return_value=None)
+        service.job_repo.find_cross_source_duplicate = AsyncMock(return_value=None)
 
         call_count = 0
 
