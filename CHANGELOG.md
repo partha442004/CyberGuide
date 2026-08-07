@@ -4,6 +4,16 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+### Fixed
+
+- **0.0% resume matches eliminated.** Jobs tagged only with the generic
+  word "security" (very common in scraper tag lists) scored 0.0 against a
+  resume listing "cybersecurity", because the synonym map had no
+  security-domain group. Added domain-level synonym groups
+  (security/cybersecurity/infosec, software engineering roles, data
+  science roles) so generic tags earn synonym credit — live check: IBM
+  "Security Consultant" went 0.0% → 42%.
+
 ## [1.26.0] - 2026-08-07
 
 ### Added
