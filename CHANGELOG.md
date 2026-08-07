@@ -1121,6 +1121,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **🗑 Self-service account deletion** — the My Account page has a "Delete
+  my account" danger zone (checkbox confirm). It calls the new
+  `DELETE /api/v1/users/{user_id}` endpoint, treats a 404 as
+  "already gone", logs the user out and shows a goodbye message.
+- **📈 Team growth panel** — four metrics on My Account: team size,
+  members who joined this week, your referrals, and referrals this week.
+- **🏆 Referral leaderboard** — top inviters with medals (names escaped,
+  case-insensitive grouping, self-referrals excluded).
+- New pure helpers `referral_leaderboard` / `team_growth_stats` in
+  `dashboard/invite.py` (None-safe ISO date parsing, fallback stubs so
+  older deployments can't crash).
+
+### Tests
+
+- 8 new tests (leaderboard ranking, ties, caps; growth stats incl.
+  missing dates and self-referral exclusion). Full suite **2341 passed**,
+  ruff + format clean.
+
+### Added
+
 - **🎁 Referral tracking** — the User profile now stores which friend's
   invite link brought each account in (`referred_by`). The dashboard
   register form sends it automatically from the invite URL, and the
