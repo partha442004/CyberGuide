@@ -41,6 +41,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   scrapable server-side. The reliable source set stays LinkedIn India,
   the 11 security-vendor Greenhouse boards, RSS feeds and Internshala.
 
+### Added
+
+- **ATS resume score (implemented at last).** The resume engine documented
+  in `docs/cscip/14-resume-engine.md` was never coded — the `ats_score`
+  columns existed but nothing wrote them. A new `ResumeScorer`
+  (`src/cybershield/services/resume_service.py`) scores ATS compatibility
+  from the stored resume (contact info, skills/experience/education
+  sections, job-keyword match, structure, length) with a per-criterion
+  breakdown and actionable improvement tips. Match endpoints (single and
+  batch) now return `ats_score` + `ats_feedback` per job and persist the
+  score on `ResumeMatchResult`; the dashboard Resume Match page shows the
+  ATS % and its tips next to the skill-match %.
+- **Dashboard Apply / Update-status now real.** The "📋 Apply" button
+  actually creates an application via `POST /applications/` and "Update
+  status" persists via `PATCH /applications/{id}/status` — both were
+  previously fake (toast / success text only). `_api_raw` gained PATCH
+  support.
+
+### Notes
+
+- New `src/cybershield/tests/test_resume_scorer.py` (7 tests) plus a
+  match-endpoint ATS assertion: **2297 tests pass**, ruff + format + mypy
+  clean.
+
 ## [1.26.0] - 2026-08-07
 
 ### Added
