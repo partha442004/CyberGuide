@@ -87,6 +87,12 @@ _SYNONYM_GROUPS = (
     {"reactjs", "react"},
     {"vuejs", "vue.js"},
     {"c", "c/c++"},
+    # Domain-level words: a job tagged only with the generic "security"
+    # (very common in scraper tag lists) must still match a resume that
+    # lists "cybersecurity"/"infosec", instead of flatlining at 0.0.
+    {"security", "cybersecurity", "infosec", "information security"},
+    {"software engineering", "software engineer", "software developer"},
+    {"data science", "data scientist", "data analyst"},
 )
 
 # Flatten synonym groups into a name -> frozenset(synonyms) lookup.
