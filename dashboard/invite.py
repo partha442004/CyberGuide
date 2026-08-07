@@ -112,6 +112,53 @@ def _plain(value: str) -> str:
     return "".join(ch for ch in value if ch not in _MARKDOWN_CHARS).strip()
 
 
+def count_referrals(users: list, referrer_email: str | None) -> int:
+    """How many accounts signed up through a referrer's invite link.
+
+    Matches on the lowercased ``referred_by`` field the API stores at
+    registration; ``None``/empty referrer always returns 0, and the
+    referrer's own account is never counted (no self-referrals).
+    """
+    if not referrer_email:
+        return 0
+    target = referrer_email.strip().lower()
+    return sum(
+        1
+        for u in users
+        if str(u.get("email") or "").strip().lower() != target
+        and str(u.get("referred_by") or "").lower() == target
+    )
+
+
+def team_rows(users: list, me_email: str | None = None) -> list[dict]:
+    """Shape the member directory for display (newest first, me flagged).
+
+    Each row: ``name``, ``email``, ``location``, ``domains`` (raw keys),
+    ``created_at`` (ISO), ``is_me`` and ``referred_by_me`` booleans.
+    """
+    me = (me_email or "").strip().lower()
+    rows: list[dict] = []
+    for u in users:
+        email = str(u.get("email") or "")
+        referred = str(u.get("referred_by") or "").lower()
+        rows.append(
+            {
+                "name": str(u.get("name") or ""),
+                "email": email,
+                "location": str(u.get("location") or "—"),
+                "domains": u.get("domains") or [],
+                "created_at": u.get("created_at"),
+                "is_me": bool(me and email.lower() == me),
+                "referred_by_me": bool(me and referred == me),
+            }
+        )
+    rows.sort(
+        key=lambda r: (r["created_at"] is None, str(r["created_at"] or "")),
+        reverse=True,
+    )
+    return rows
+
+
 def invite_caption(invite: dict) -> str | None:
     """One-line caption for the register tab, or None when no invite.
 

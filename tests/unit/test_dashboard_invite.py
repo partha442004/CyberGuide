@@ -10,8 +10,10 @@ from urllib.parse import parse_qs, urlparse
 from dashboard.invite import (
     KNOWN_DOMAINS,
     build_invite_link,
+    count_referrals,
     invite_caption,
     parse_invite_params,
+    team_rows,
 )
 
 
@@ -121,6 +123,72 @@ class TestInviteCaption:
     def test_empty_invite_returns_none(self):
         assert invite_caption({}) is None
         assert invite_caption({"domains": []}) is None
+
+
+class TestCountReferrals:
+    _USERS = [
+        {"email": "a@b.com", "referred_by": "me@x.com"},
+        {"email": "c@d.com", "referred_by": "ME@X.com"},  # case-insensitive
+        {"email": "e@f.com", "referred_by": "other@x.com"},
+        {"email": "g@h.com", "referred_by": None},
+    ]
+
+    def test_counts_only_own_referrals_case_insensitive(self):
+        assert count_referrals(self._USERS, "me@x.com") == 2
+        assert count_referrals(self._USERS, "ME@X.COM") == 2
+
+    def test_no_matches_returns_zero(self):
+        assert count_referrals(self._USERS, "nobody@x.com") == 0
+
+    def test_empty_referrer_returns_zero(self):
+        assert count_referrals(self._USERS, None) == 0
+        assert count_referrals(self._USERS, "") == 0
+
+    def test_own_account_never_counts_as_self_referral(self):
+        users = [
+            {"email": "me@x.com", "referred_by": None},
+            {"email": "me@x.com", "referred_by": "me@x.com"},  # self-referral
+            {"email": "friend@x.com", "referred_by": "me@x.com"},
+        ]
+        assert count_referrals(users, "me@x.com") == 1
+
+
+class TestTeamRows:
+    _USERS = [
+        {
+            "name": "Me",
+            "email": "me@x.com",
+            "location": "Bengaluru",
+            "domains": ["security"],
+            "created_at": "2026-08-01T10:00:00",
+            "referred_by": None,
+        },
+        {
+            "name": "Friend",
+            "email": "f@x.com",
+            "location": "Hyderabad",
+            "domains": ["data", "coding"],
+            "created_at": "2026-08-02T10:00:00",
+            "referred_by": "me@x.com",
+        },
+    ]
+
+    def test_flags_me_and_referrals(self):
+        rows = team_rows(self._USERS, me_email="me@x.com")
+        by_email = {r["email"]: r for r in rows}
+        assert by_email["me@x.com"]["is_me"] is True
+        assert by_email["me@x.com"]["referred_by_me"] is False
+        assert by_email["f@x.com"]["referred_by_me"] is True
+        assert by_email["f@x.com"]["is_me"] is False
+
+    def test_sorts_newest_first(self):
+        rows = team_rows(self._USERS)
+        assert [r["email"] for r in rows] == ["f@x.com", "me@x.com"]
+
+    def test_case_insensitive_me_match(self):
+        rows = team_rows(self._USERS, me_email="ME@X.COM")
+        by_email = {r["email"]: r for r in rows}
+        assert by_email["me@x.com"]["is_me"] is True
 
     def test_markdown_injection_is_stripped(self):
         caption = invite_caption({"ref": "[Click](http://evil.com) **bold**"})
