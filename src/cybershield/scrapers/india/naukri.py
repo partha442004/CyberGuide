@@ -243,7 +243,24 @@ class NaukriScraper(BaseScraper):
             for page in range(1, max_pages + 1):
                 try:
                     url = self._build_search_url(search_keyword, page, search_location)
-                    response = await self._fetch(url)
+                    # The jobapi endpoint 400s without Naukri's app identifiers
+                    # and a real browser UA. These are public client values
+                    # required by the endpoint, not credentials.
+                    response = await self._fetch(
+                        url,
+                        headers={
+                            "appid": "109",
+                            "systemid": "Naukri",
+                            "User-Agent": (
+                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                                "Chrome/126.0.0.0 Safari/537.36"
+                            ),
+                            "Accept": "application/json",
+                            "Accept-Language": "en-IN,en;q=0.9",
+                            "Referer": ("https://www.naukri.com/cyber-security-jobs"),
+                        },
+                    )
                     data = response.json()
 
                     jobs_data = data.get("jobData", [])

@@ -96,6 +96,26 @@ def skill_taxonomy():
                 "sast",
                 "dast",
                 "sbom",
+                # Web-app security: must sit before bare "sql" so a resume
+                # listing SQLi is scored as security, not data/coding.
+                "sqli",
+                "sql injection",
+                "sqlmap",
+                "xss",
+                "csrf",
+                "ssrf",
+                "idor",
+                "authentication bypass",
+                "grc",
+                "osint",
+                "dfir",
+                "cissp",
+                "ceh",
+                "ethical hacking",
+                "cybersecurity",
+                "cyber security",
+                "security operations",
+                "threat intelligence",
             ],
             "bonus": 1.3,
         },
@@ -220,6 +240,23 @@ def skill_taxonomy():
     }
 
 
+def _word_boundary_hit(skill: str, keyword: str) -> bool:
+    """True when ``skill`` and ``keyword`` overlap as whole words.
+
+    Plain substring checks are dangerously loose: the data keyword ``r``
+    matches inside "cybersecurity", and ``sql`` matches inside a security
+    resume's "sqli". Requiring word boundaries keeps those apart while
+    still letting "sql injection" (keyword) match a "sql" skill and
+    "penetration testing" match on both sides.
+    """
+    import re
+
+    return bool(
+        re.search(rf"(?<![a-z0-9]){re.escape(keyword)}(?![a-z0-9])", skill)
+        or re.search(rf"(?<![a-z0-9]){re.escape(skill)}(?![a-z0-9])", keyword)
+    )
+
+
 def match_score_v2(resume_skills, job_tags=None, job_description=""):
     """Weighted skill match scoring with domain bonuses.
 
@@ -244,11 +281,11 @@ def match_score_v2(resume_skills, job_tags=None, job_description=""):
         domain_keywords = [k.lower() for k in config["keywords"]]
         bonus = config["bonus"]
 
-        # Count direct matches
+        # Count direct matches (word-boundary aware)
         matched = []
         for skill in resume_lower:
             for keyword in domain_keywords:
-                if skill in keyword or keyword in skill:
+                if _word_boundary_hit(skill, keyword):
                     matched.append(skill)
                     break
 

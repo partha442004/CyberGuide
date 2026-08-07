@@ -10,16 +10,17 @@ import feedparser
 from interntrack.domain.enums import JobSource
 from interntrack.scrapers.base import BaseScraper, RawJob, matches_query
 
-# Popular job RSS feeds
+# Popular job RSS feeds.
+#
+# URLs may contain {query} / {location} placeholders that are substituted
+# with the discovery query/location before fetching. Only feeds that return
+# actual job postings are listed here. Dropped for being dead or bot-gated:
+# remoteok (410), Naukri RSS (404), Instahyre (Cloudflare 403), the LinkedIn
+# jobs "RSS" (login wall, returns HTML), and hnrss.org feeds (they return
+# news articles / thread shells, not job posts).
 DEFAULT_FEEDS = {
-    "remoteok": "https://remoteok.com/remote-jobs.rss",
     "weworkremotely": "https://weworkremotely.com/remote-jobs.rss",
-    "hackernews_jobs": "https://hnrss.org/newest?q=hiring",
     "remotive": "https://remotive.com/remote-jobs/feed",
-    # India-specific feeds
-    "naukri_rss": "https://www.naukri.com/jobapi/v3/rss?keyword=cybersecurity&location=Bangalore",
-    "linkedin_india": "https://www.linkedin.com/jobs/search?keywords=cybersecurity&location=Bangalore&format=rss",
-    "instahyre": "https://instahyre.com/api/jobs?location=Bangalore&domain=cybersecurity",
 }
 
 
@@ -49,6 +50,14 @@ class RSSFeedScraper(BaseScraper):
 
         for feed_name, feed_url in self.feeds.items():
             try:
+                # Substitute {query}/{location} placeholders so keyword-aware
+                # feeds actually search for what the user asked for.
+                feed_url = feed_url.replace("{query}", (query or "").replace(" ", "+"))
+                if location:
+                    feed_url = feed_url.replace(
+                        "{location}",
+                        location.replace(" ", "+"),
+                    )
                 # Always emit the enum source name ("rss_feed") so the stored
                 # value round-trips through the JobSource column; the raw feed
                 # key is only used for logging/tracking below.

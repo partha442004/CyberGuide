@@ -152,13 +152,15 @@ def get_default_registry() -> ScraperRegistry:
     # the daily discovery also covers internship sites and vendor career pages.
     try:
         from cybershield.scrapers.india.freshersworld import FreshersworldScraper
-        from cybershield.scrapers.india.internshala import InternshalaScraper
         from cybershield.scrapers.india.naukri import NaukriScraper
         from cybershield.scrapers.india.unstop import UnstopScraper
         from interntrack.scrapers.cybershield_adapter import CybershieldScraperAdapter
 
         internship_sources = {
-            "internshala": InternshalaScraper,
+            # "internshala" intentionally omitted: the direct HTML scraper
+            # registered above (InternshalaDirectScraper) is more reliable
+            # than the cybershield JSON-API adapter and would otherwise be
+            # overwritten here.
             "unstop": UnstopScraper,
             "naukri": NaukriScraper,
             "freshersworld": FreshersworldScraper,

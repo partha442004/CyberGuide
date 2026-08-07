@@ -168,6 +168,47 @@ class TestSlugify:
         assert result == "hello-world"
 
 
+class TestMatchScoreV2:
+    """Tests for match_score_v2 domain scoring."""
+
+    def test_sqli_resume_scores_security_not_coding(self):
+        """A resume listing SQLi must match the security domain, not coding.
+
+        Regression: bare "sql" lived only in the coding/data buckets, so a
+        security resume mentioning "sqli" scored as a coding candidate and
+        the alerts surfaced SQL-developer jobs.
+        """
+        from interntrack.utils.helpers import match_score_v2
+
+        result = match_score_v2(
+            resume_skills=["sqli", "xss", "burp suite", "owasp"],
+            job_tags=[],
+            job_description="web application security testing",
+        )
+        assert result["domain"] == "security"
+
+    def test_cybersecurity_keyword_scores_security(self):
+        from interntrack.utils.helpers import match_score_v2
+
+        result = match_score_v2(
+            resume_skills=["cybersecurity", "penetration testing", "vapt"],
+            job_tags=[],
+            job_description="",
+        )
+        assert result["domain"] == "security"
+
+    def test_pure_sql_resume_scores_coding(self):
+        """A genuinely SQL-focused resume still belongs to coding/data."""
+        from interntrack.utils.helpers import match_score_v2
+
+        result = match_score_v2(
+            resume_skills=["sql", "postgresql", "python"],
+            job_tags=[],
+            job_description="",
+        )
+        assert result["domain"] in ("coding", "data")
+
+
 class TestGenerateId:
     """Tests for generate_id function."""
 
