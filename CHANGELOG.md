@@ -1119,6 +1119,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+- **Welcome message on signup** — every new member (including friends who
+  join via your invite link) gets a best-effort welcome message to their
+  email and Telegram the moment they register: their name, chosen alert
+  domains, and how to open the dashboard. Errors are swallowed — signup can
+  never be blocked by a slow/offline mail or bot channel.
+- **Referral growth chart** — My Account now shows a monthly bar chart of
+  how many friends joined through your invite link (zero-filled months,
+  self-referrals excluded, time-safe across year boundaries).
+
 ### Added
 
 - **👥 Weekly email team snapshot** — the Sunday weekly digest now closes
