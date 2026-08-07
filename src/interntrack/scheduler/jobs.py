@@ -542,13 +542,16 @@ async def _score_and_group_jobs(
     session,
     domains: list | None = None,
     user_id: str | None = None,
-    user_location: str | None = None,
 ) -> list[tuple[str, list[tuple[float | None, dict]]]]:
     """Score, filter and group the report's jobs into domain sections.
 
     Returns a list of ``(domain, [(score, job), ...])`` ordered by the
     canonical domain order, jobs within each section sorted by match score.
     ``report['min_match_score']`` drops jobs below the threshold.
+
+    Location is intentionally NOT filtered here: the email and Telegram
+    builders split jobs into "Your area" vs "Other locations" themselves,
+    so dropping non-matching jobs here would starve those sections.
     """
     jobs = report.get("new_jobs") or []
     if not jobs:
@@ -561,19 +564,11 @@ async def _score_and_group_jobs(
     if not scored:
         return []
 
-    # Location filtering: only include jobs matching user's location
-    loc_lower = (user_location or "").strip().lower()
-
     grouped: dict[str, list] = {}
     for score, job in scored:
         domain = job.get("domain") or "other"
         if domains and domain not in domains:
             continue
-        # Filter by location when user has a preferred location
-        if loc_lower:
-            job_loc = (job.get("location") or "").lower()
-            if not _location_matches(job_loc, loc_lower):
-                continue
         grouped.setdefault(domain, []).append((score, job))
 
     domain_order = [
@@ -642,10 +637,20 @@ async def build_daily_report_message(
                 line += f" ({_esc(status)})"
             lines.append(line)
 
-    sections = await _score_and_group_jobs(
-        report, session, domains, user_id=user_id, user_location=user_location
-    )
+    sections = await _score_and_group_jobs(report, session, domains, user_id=user_id)
+    loc_lower = (user_location or "").strip().lower()
     for domain, items in sections:
+        if loc_lower:
+            items = [
+                (score, job)
+                for score, job in items
+                if _location_matches(
+                    (job.get("location") or "").lower(),
+                    loc_lower,
+                )
+            ]
+            if not items:
+                continue
         lines.append("")
         lines.append(f"{_DOMAIN_ICONS.get(domain, domain)} ({len(items)}):")
         for score, job in items:
@@ -685,15 +690,30 @@ async def build_alert_chunks(
     as several messages. Each chunk returns ``(text, buttons)`` where
     ``buttons`` is a list of ``(label, url)`` pairs rendered as an inline
     keyboard on Telegram.
+
+    Mirrors the email's layout when the user has a preferred location:
+    jobs are split into **📍 Your area** vs **🌍 Other locations** and a
+    compact role × location breakdown closes the digest (Telegram is sent
+    with HTML parse mode, so the breakdown renders as a real table).
     """
     title = "📅 Weekly Digest" if weekly else "📊 Daily Report"
-    sections = await _score_and_group_jobs(
-        report, session, domains, user_id=user_id, user_location=user_location
-    )
-    flat: list[tuple[str, float | None, dict]] = []
+    sections = await _score_and_group_jobs(report, session, domains, user_id=user_id)
+    loc_lower = (user_location or "").strip().lower()
+
+    # Split into "your area" vs "other locations" like the email does.
+    here_flat: list[tuple[str, float | None, dict]] = []
+    there_flat: list[tuple[str, float | None, dict]] = []
     for domain, items in sections:
         for score, job in items:
-            flat.append((domain, score, job))
+            entry = (domain, score, job)
+            if loc_lower:
+                job_loc = (job.get("location") or "").lower()
+                if _location_matches(job_loc, loc_lower):
+                    here_flat.append(entry)
+                else:
+                    there_flat.append(entry)
+            else:
+                here_flat.append(entry)
 
     # Closing-soon jobs lead the first chunk so deadlines aren't missed.
     closing_soon = report.get("closing_soon") or []
@@ -711,43 +731,123 @@ async def build_alert_chunks(
     if follow_up:
         closing_lines.append(f"⏰ Follow up ({len(follow_up)}):")
         for item in follow_up[:5]:
-            title = item.get("job_title") or "Application"
+            fu_title = item.get("job_title") or "Application"
             company = item.get("company") or ""
             status = item.get("status") or ""
-            line = f"   🔔 {_esc(title)}"
+            line = f"   🔔 {_esc(fu_title)}"
             if company:
                 line += f" @ {_esc(company)}"
             if status:
                 line += f" ({_esc(status)})"
             closing_lines.append(line)
 
-    if not flat:
+    if not here_flat and not there_flat:
         if closing_lines:
             return [
                 ("\n".join([format_daily_report(report, title)] + closing_lines), [])
             ]
         return [(format_daily_report(report, title), [])]
 
+    # Location banners for each group (kept short for Telegram).
+    here_banner = f"📍 Your area ({user_location})" if loc_lower else "📋 Jobs"
+    there_banner = f"🌍 Other locations ({len(there_flat)})"
+
+    def _chunk(
+        flat_list, banner: str, first: bool
+    ) -> list[tuple[str, list[tuple[str, str]]]]:
+        """Split one location group into Telegram-sized chunks."""
+        out: list[tuple[str, list[tuple[str, str]]]] = []
+        for start in range(0, len(flat_list), jobs_per_chunk):
+            part = flat_list[start : start + jobs_per_chunk]
+            lines = [format_daily_report(report, title)]
+            buttons: list[tuple[str, str]] = []
+            if first and start == 0 and closing_lines:
+                lines.extend(closing_lines)
+            lines.append("")
+            lines.append(banner)
+            for domain, score, job in part:
+                domain_label = _DOMAIN_ICONS.get(domain, domain)
+                if not lines or lines[-1] != domain_label:
+                    lines.append("")
+                    lines.append(domain_label)
+                lines.extend(_job_lines(score, job))
+                url = job.get("url")
+                if url:
+                    # Telegram caps button text at 64 chars.
+                    job_title = (job.get("title") or "Job").strip()[:60]
+                    buttons.append((f"✅ Apply — {job_title}", url))
+            out.append(("\n".join(lines), buttons))
+        return out
+
     chunks: list[tuple[str, list[tuple[str, str]]]] = []
-    for start in range(0, len(flat), jobs_per_chunk):
-        part = flat[start : start + jobs_per_chunk]
-        lines = [format_daily_report(report, title)]
-        buttons: list[tuple[str, str]] = []
-        if start == 0 and closing_lines:
-            lines.extend(closing_lines)
-        for domain, score, job in part:
-            domain_label = _DOMAIN_ICONS.get(domain, domain)
-            if not lines or lines[-1] != domain_label:
-                lines.append("")
-                lines.append(domain_label)
-            lines.extend(_job_lines(score, job))
-            url = job.get("url")
-            if url:
-                # Telegram caps button text at 64 chars.
-                job_title = (job.get("title") or "Job").strip()[:60]
-                buttons.append((f"✅ Apply — {job_title}", url))
-        chunks.append(("\n".join(lines), buttons))
+    chunks.extend(_chunk(here_flat, here_banner, first=True))
+    if there_flat:
+        chunks.extend(_chunk(there_flat, there_banner, first=False))
+
+    # Role × location breakdown, matching the email's closing table.
+    breakdown = _telegram_breakdown(here_flat, there_flat)
+    if breakdown:
+        chunks.append((breakdown, []))
     return chunks
+
+
+def _telegram_breakdown(
+    here_flat: list[tuple[str, float | None, dict]],
+    there_flat: list[tuple[str, float | None, dict]],
+) -> str:
+    """Compact role × location HTML table for the Telegram digest tail.
+
+    Rows are domains (security / coding / …), columns are the top job
+    locations plus a total. Rendered as a real table because Telegram sends
+    with HTML parse mode.
+    """
+    from collections import Counter
+
+    all_entries = here_flat + there_flat
+    if not all_entries:
+        return ""
+    dom_loc: dict[str, Counter] = {}
+    for _domain, _score, job in all_entries:
+        d = str(job.get("domain") or "other")
+        loc = (job.get("location") or "Remote")[:30]
+        dom_loc.setdefault(d, Counter())
+        dom_loc[d][loc] += 1
+    loc_totals: Counter[str] = Counter()
+    for c in dom_loc.values():
+        loc_totals.update(c)
+    top_locs = [loc for loc, _ in loc_totals.most_common(6)]
+    if not top_locs:
+        return ""
+    d_order = ["security", "coding", "data", "design", "finance", "marketing", "other"]
+    rows = []
+    td = "padding:4px 8px;border:1px solid #e2e8f0;text-align:center;"
+    for d in d_order:
+        if d not in dom_loc:
+            continue
+        c = dom_loc[d]
+        cells = "".join(f"<td style='{td}'>{c.get(loc, 0)}</td>" for loc in top_locs)
+        rows.append(
+            f"<tr><td style='{td}font-weight:600;'>{d.title()}</td>"
+            f"{cells}<td style='{td}font-weight:600;'>{sum(c.values())}</td></tr>"
+        )
+    tc = "".join(
+        f"<td style='{td}font-weight:700;'>"
+        f"{sum(dom_loc[d].get(loc, 0) for d in dom_loc)}</td>"
+        for loc in top_locs
+    )
+    hc = "".join(
+        f"<th style='{td}background:#f1f5f9;'>{_esc(loc)}</th>" for loc in top_locs
+    )
+    return (
+        "<b>📊 Jobs by role × location</b>"
+        "<table style='width:100%;border-collapse:collapse;font-size:12px;'>"
+        f"<tr><th style='{td}background:#f1f5f9;'>Domain</th>{hc}"
+        f"<th style='{td}background:#f1f5f9;'>Total</th></tr>"
+        + "".join(rows)
+        + f"<tr><td style='{td}font-weight:700;'>Total</td>{tc}"
+        f"<td style='{td}font-weight:700;'>{len(all_entries)}</td></tr>"
+        "</table>"
+    )
 
 
 async def _watched_company_names(session, user_id: str | None) -> set:
@@ -803,9 +903,7 @@ async def build_daily_report_html(
     location breakdown table at the bottom.  All job content is escaped
     (external scrape data). Watched-company jobs get their own section.
     """
-    sections = await _score_and_group_jobs(
-        report, session, domains, user_id=user_id, user_location=user_location
-    )
+    sections = await _score_and_group_jobs(report, session, domains, user_id=user_id)
     watched = await _watched_company_names(session, user_id)
     summary = report.get("summary") or {}
     generated = report.get("generated_at") or ""

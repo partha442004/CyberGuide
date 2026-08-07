@@ -271,6 +271,128 @@ class TestBuildDailyReportMessage:
         assert _age_badge(7) == "⚪ 7d ago"
 
 
+class TestBuildAlertChunks:
+    """Tests for the Telegram chunk builder (email-parity layout)."""
+
+    def _report(self, jobs: list[dict]) -> dict:
+        return {
+            "summary": {
+                "new_jobs": len(jobs),
+                "new_applications": 0,
+                "total_applications": 0,
+            },
+            "new_jobs": jobs,
+            "closing_soon": [],
+            "follow_up": [],
+        }
+
+    @pytest.mark.asyncio
+    async def test_location_split_puts_bangalore_first(self):
+        """With a Bangalore user, local jobs lead and others get a banner."""
+        from interntrack.scheduler.jobs import build_alert_chunks
+
+        report = self._report(
+            [
+                {
+                    "title": "SOC Analyst",
+                    "company": "SecureCo",
+                    "url": "https://a/apply",
+                    "location": "Bengaluru, Karnataka, India",
+                    "age_days": 0,
+                    "domain": "security",
+                    "is_applied": False,
+                },
+                {
+                    "title": "Security Engineer",
+                    "company": "OtherCo",
+                    "url": "https://b/apply",
+                    "location": "Hyderabad, Telangana, India",
+                    "age_days": 1,
+                    "domain": "security",
+                    "is_applied": False,
+                },
+            ],
+        )
+
+        chunks = await build_alert_chunks(
+            report,
+            None,
+            user_location="Bangalore",
+        )
+
+        joined = "\n".join(text for text, _buttons in chunks)
+        # Your area banner present and the breakdown table closes the digest.
+        assert "Your area (Bangalore)" in joined
+        assert "Other locations" in joined
+        assert "Jobs by role × location" in joined
+        # Local job has an Apply button; every job keeps its link.
+        all_buttons = [b for _t, bs in chunks for b in bs]
+        assert any("SOC Analyst" in label for label, _u in all_buttons)
+
+    @pytest.mark.asyncio
+    async def test_no_location_no_split(self):
+        """Without a user location everything is one section, no banners."""
+        from interntrack.scheduler.jobs import build_alert_chunks
+
+        report = self._report(
+            [
+                {
+                    "title": "Security Engineer",
+                    "company": "Acme",
+                    "url": "https://a/apply",
+                    "location": "Remote",
+                    "age_days": 0,
+                    "domain": "security",
+                    "is_applied": False,
+                },
+            ],
+        )
+
+        chunks = await build_alert_chunks(report, None, user_location=None)
+        joined = "\n".join(text for text, _b in chunks)
+
+        assert "Your area" not in joined
+        assert "Other locations" not in joined
+        assert "Security Engineer" in joined
+
+    @pytest.mark.asyncio
+    async def test_empty_report_single_summary_chunk(self):
+        from interntrack.scheduler.jobs import build_alert_chunks
+
+        chunks = await build_alert_chunks(self._report([]), None)
+        assert len(chunks) == 1
+        assert "New Jobs: 0" in chunks[0][0]
+
+    def test_telegram_breakdown_table(self):
+        """The breakdown renders a role × location HTML table."""
+        from interntrack.scheduler.jobs import _telegram_breakdown
+
+        here = [
+            (
+                "security",
+                80.0,
+                {"title": "A", "domain": "security", "location": "Bengaluru"},
+            ),
+            (
+                "security",
+                90.0,
+                {"title": "B", "domain": "security", "location": "Bengaluru"},
+            ),
+        ]
+        there = [
+            ("coding", 50.0, {"title": "C", "domain": "coding", "location": "Mumbai"})
+        ]
+
+        html = _telegram_breakdown(here, there)
+
+        assert "Jobs by role × location" in html
+        assert "<table" in html
+        assert "Security" in html
+        assert "Coding" in html
+        assert "Bengaluru" in html
+        assert "Mumbai" in html
+
+
 @pytest.mark.asyncio
 class TestRunJobDiscovery:
     """Tests for run_job_discovery async function."""
