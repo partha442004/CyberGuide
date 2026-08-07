@@ -442,6 +442,64 @@ class TestJobRepository:
         assert {j.title for j in active} == {"Future", "No Expiry"}
         assert "Expired" not in {j.title for j in active}
 
+    @pytest.mark.asyncio
+    async def test_backfill_job_tags_tags_tagless_jobs(self, db_session):
+        """Jobs saved before auto-tagging get skill tags from their title +
+        description so they earn match scores (the ``match_score: null`` gap)."""
+        repo = JobRepository(db_session)
+        await repo.create_many(
+            [
+                make_job(
+                    title="SOC Analyst",
+                    description="Monitor SIEM alerts in Splunk, drive "
+                    "incident response, hunt malware.",
+                    tags=[],
+                ),
+                make_job(title="Already Tagged", description="python", tags=["python"]),
+                make_job(
+                    title="General Role",
+                    description="No keywords here at all.",
+                    tags=[],
+                ),
+            ]
+        )
+
+        updated = await repo.backfill_job_tags(limit=10)
+
+        assert updated == 1  # only the SOC Analyst job gains tags
+        all_jobs = await repo.get_active_jobs(limit=10)
+        by_title = {j.title: j for j in all_jobs}
+        soc_tags = [str(t).lower() for t in (by_title["SOC Analyst"].tags or [])]
+        assert "soc analyst" in soc_tags
+        assert "siem" in soc_tags
+        assert "splunk" in soc_tags
+        # Already-tagged job untouched.
+        assert by_title["Already Tagged"].tags == ["python"]
+        # No-keyword job still empty.
+        assert not by_title["General Role"].tags
+
+    @pytest.mark.asyncio
+    async def test_backfill_job_tags_respects_limit(self, db_session):
+        """The limit caps how many jobs are backfilled per call."""
+        repo = JobRepository(db_session)
+        await repo.create_many(
+            [
+                make_job(
+                    title="SOC Analyst",
+                    description="Splunk SIEM incident response",
+                    tags=[],
+                ),
+                make_job(
+                    title="Pentester",
+                    description="burp suite nmap vapt",
+                    tags=[],
+                ),
+            ]
+        )
+
+        updated = await repo.backfill_job_tags(limit=1)
+        assert updated == 1
+
 
 class TestApplicationRepository:
     """Tests for the application repository."""
