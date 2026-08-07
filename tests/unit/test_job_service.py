@@ -168,6 +168,76 @@ class TestJobService:
         )
 
     @pytest.mark.asyncio
+    async def test_create_job_auto_tags_from_title_and_description(
+        self, service, mock_job_repo
+    ):
+        """A job with no tags gets skill tags derived from title + description,
+        so it earns real match scores instead of ``match_score: null``."""
+        await service.create_job(
+            {
+                "title": "SOC Analyst",
+                "company": "SecureCo",
+                "url": "https://example.com/soc",
+                "description": "Monitor SIEM alerts in Splunk, drive "
+                "incident response, hunt malware with EDR tools.",
+            }
+        )
+
+        created = mock_job_repo.create.call_args[0][0]
+        tags = [str(t).lower() for t in (created.tags or [])]
+        assert "soc analyst" in tags
+        assert "siem" in tags
+        assert "splunk" in tags
+        assert "incident response" in tags
+        assert "malware" in tags
+
+    @pytest.mark.asyncio
+    async def test_create_job_keeps_scraper_tags(self, service, mock_job_repo):
+        """Explicit scraper-provided tags always win over auto-tagging."""
+        await service.create_job(
+            {
+                "title": "Penetration Tester",
+                "company": "Acme",
+                "url": "https://example.com/pentest",
+                "description": "Python, AWS, Kubernetes required",
+                "tags": ["security", "vapt"],
+            }
+        )
+
+        created = mock_job_repo.create.call_args[0][0]
+        assert created.tags == ["security", "vapt"]
+
+    def test_auto_tag_job_returns_unchanged_when_no_keywords(self):
+        """No keywords in the title/description -> no tags added."""
+        from interntrack.services.job_service import auto_tag_job
+
+        result = auto_tag_job(
+            {"title": "General Role", "company": "X", "description": "Do stuff"}
+        )
+        assert "tags" not in result
+
+    def test_auto_tag_job_word_boundaries(self):
+        """Short keywords (``go``, ``sql``) never match inside bigger words."""
+        from interntrack.services.job_service import auto_tag_job
+
+        result = auto_tag_job(
+            {
+                "title": "Golang Developer",
+                "description": "Building internal tooling for teams",
+            }
+        )
+        tags = [str(t).lower() for t in (result.get("tags") or [])]
+        # "golang" contains "go" but not as a standalone word -> no false tag.
+        assert "go" not in tags
+        assert "sql" not in tags
+        # "sql injection" style phrases still match as standalone words.
+        sql_result = auto_tag_job(
+            {"title": "Web Pentester", "description": "testing for sql injection"}
+        )
+        sql_tags = [str(t).lower() for t in (sql_result.get("tags") or [])]
+        assert "sql" in sql_tags
+
+    @pytest.mark.asyncio
     async def test_get_job(self, service, mock_job_repo):
         """Test getting a job by ID."""
         mock_job_repo.get_by_id.return_value = Job(
