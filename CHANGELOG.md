@@ -4,6 +4,20 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [1.26.0] - 2026-08-07
+
+### Added
+
+- **Email-parity Telegram digest.** Telegram alerts now mirror the email
+  layout: with a preferred location set, jobs split into **📍 Your area**
+  vs **🌍 Other locations** banners, and the digest closes with a real
+  role × location HTML table (Telegram sends with HTML parse mode). Also
+  fixed the email's dead "Other locations" section — location filtering
+  was dropping those jobs before the builders could split them.
+- **4 more security-vendor Greenhouse boards** (all verified reachable):
+  Expel, Dragos, Tanium, Sumo Logic — alongside Zscaler, Okta,
+  Cloudflare, KnowBe4, Veracode, BeyondTrust, Threatlocker.
+
 ## [1.25.0] - 2026-08-07
 
 ### Added
