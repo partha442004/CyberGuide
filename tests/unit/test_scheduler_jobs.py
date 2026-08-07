@@ -271,6 +271,66 @@ class TestBuildDailyReportMessage:
         assert _age_badge(7) == "⚪ 7d ago"
 
 
+class TestTeamDigestStats:
+    """_team_digest_stats computes the weekly email team snapshot."""
+
+    class FakeUser:
+        def __init__(self, email, referred_by=None):
+            self.email = email
+            self.referred_by = referred_by
+
+    class FakeSession:
+        def __init__(self, users):
+            self._users = users
+
+        async def execute(self, *args, **kwargs):
+            class Result:
+                def __init__(self, users):
+                    self._users = users
+
+                def scalars(self):
+                    return self
+
+                def all(self):
+                    return self._users
+
+            return Result(self._users)
+
+    @pytest.mark.asyncio
+    async def test_counts_team_and_my_referrals(self):
+        from interntrack.scheduler.jobs import _team_digest_stats
+
+        session = self.FakeSession(
+            [
+                self.FakeUser("me@x.com"),
+                self.FakeUser("friend@x.com", referred_by="me@x.com"),
+                self.FakeUser("other@x.com", referred_by="someone@x.com"),
+            ]
+        )
+        stats = await _team_digest_stats(session, email="me@x.com")
+        assert stats == {"team_size": 3, "my_referrals": 1}
+
+    @pytest.mark.asyncio
+    async def test_case_insensitive_and_self_excluded(self):
+        from interntrack.scheduler.jobs import _team_digest_stats
+
+        session = self.FakeSession(
+            [
+                self.FakeUser("me@x.com", referred_by="ME@x.com"),  # self-referral
+                self.FakeUser("f@x.com", referred_by="Me@X.COM"),
+            ]
+        )
+        stats = await _team_digest_stats(session, email="me@x.com")
+        assert stats == {"team_size": 2, "my_referrals": 1}
+
+    @pytest.mark.asyncio
+    async def test_no_users_returns_none(self):
+        from interntrack.scheduler.jobs import _team_digest_stats
+
+        stats = await _team_digest_stats(self.FakeSession([]), email="me@x.com")
+        assert stats is None
+
+
 class TestBuildAlertChunks:
     """Tests for the Telegram chunk builder (email-parity layout)."""
 

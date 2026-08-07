@@ -20,6 +20,7 @@ try:
         invite_caption,
         parse_invite_params,
         referral_leaderboard,
+        team_domain_split,
         team_growth_stats,
         team_rows,
     )
@@ -64,6 +65,10 @@ except ImportError:  # pragma: no cover - older deployment without invite.py
             "my_referrals": 0,
             "referrals_recently": 0,
         }
+
+    def team_domain_split(users: list) -> list:  # noqa: ARG001
+        """No domain split on old deployments."""
+        return []
 
     def team_rows(users: list, me_email: str | None = None) -> list:  # noqa: ARG001
         """No team view on old deployments."""
@@ -1025,6 +1030,20 @@ def show_account() -> None:
                     f"{medal} {escape(row['name'])}{suffix} — "
                     f"{row['count']} referral(s)"
                 )
+
+        # Per-domain team split — which categories your team picked.
+        split = team_domain_split(members)
+        if split:
+            st.markdown("**🏷 Team by category**")
+            split_chips = "".join(
+                f'<span class="chip">{_DOMAIN_LABELS.get(r["domain"], r["domain"])}: '
+                f"{r['count']}</span>"
+                for r in split
+            )
+            st.markdown(
+                f'<div class="chip-row">{split_chips}</div>',
+                unsafe_allow_html=True,
+            )
 
         # Team directory — who is on the platform.
         st.subheader("🌍 Team directory")

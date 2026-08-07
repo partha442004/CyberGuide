@@ -279,6 +279,31 @@ class TestHtmlDigest:
         assert "Cybersecurity / VAPT / SOC" in html
 
     @pytest.mark.asyncio
+    async def test_team_section_renders_when_present(self):
+        """The weekly email's team snapshot renders only when attached."""
+        from interntrack.scheduler.jobs import build_daily_report_html
+
+        base = {"summary": {"new_jobs": 0, "new_applications": 0}}
+        # No team key -> no section.
+        html = await build_daily_report_html(base, None)
+        assert "Your team" not in html
+        # With team key -> section with size and referrals.
+        html = await build_daily_report_html(
+            {**base, "team": {"team_size": 4, "my_referrals": 2}},
+            None,
+        )
+        assert "Your team" in html
+        assert ">4<" in html
+        assert "joined through <b>your</b> invite link" in html
+        # Zero referrals -> no referral sentence.
+        html = await build_daily_report_html(
+            {**base, "team": {"team_size": 4, "my_referrals": 0}},
+            None,
+        )
+        assert "Your team" in html
+        assert "invite link" not in html
+
+    @pytest.mark.asyncio
     async def test_watched_companies_section(self):
         from interntrack.scheduler.jobs import build_daily_report_html
 

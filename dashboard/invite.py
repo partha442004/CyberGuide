@@ -195,6 +195,24 @@ def team_growth_stats(
     }
 
 
+def team_domain_split(users: list) -> list[dict]:
+    """Which categories the team picked, most popular first.
+
+    Returns ``[{domain, count}]`` restricted to known domain keys, sorted
+    desc; empty list when nobody set domains.
+    """
+    counts: dict[str, int] = {}
+    for u in users:
+        domains = u.get("domains") or []
+        for d in domains:
+            key = str(d).strip().lower()
+            if key in KNOWN_DOMAINS:
+                counts[key] = counts.get(key, 0) + 1
+    split = [{"domain": d, "count": c} for d, c in counts.items()]
+    split.sort(key=lambda r: r["count"], reverse=True)
+    return split
+
+
 def team_rows(users: list, me_email: str | None = None) -> list[dict]:
     """Shape the member directory for display (newest first, me flagged).
 
