@@ -393,6 +393,83 @@ class TestBuildAlertChunks:
         assert "Mumbai" in html
 
 
+class TestDeliverAlertLocationFallback:
+    """The digest location split falls back to the default location."""
+
+    @pytest.mark.asyncio
+    async def test_location_split_works_without_user_profile(self):
+        """Legacy user1 path (no profile) still gets the Bangalore split."""
+        from interntrack.scheduler.jobs import DEFAULT_LOCATION, _deliver_alert
+
+        report = {
+            "summary": {"new_jobs": 1, "new_applications": 0, "total_applications": 0},
+            "new_jobs": [
+                {
+                    "title": "SOC Analyst",
+                    "company": "SecureCo",
+                    "url": "https://a/apply",
+                    "location": "Bengaluru, Karnataka, India",
+                    "age_days": 0,
+                    "domain": "security",
+                    "is_applied": False,
+                },
+            ],
+            "closing_soon": [],
+            "follow_up": [],
+        }
+
+        manager = MagicMock()
+        manager.get_configured_channels.return_value = ["telegram"]
+        manager.notify = AsyncMock(return_value={"telegram": True})
+
+        with (
+            patch(
+                "interntrack.scheduler.jobs.build_alert_chunks",
+                new=AsyncMock(
+                    return_value=[("chunk-with-jobs", [("Apply", "https://a")])]
+                ),
+            ) as mock_chunks,
+        ):
+            results = await _deliver_alert(manager, ["telegram"], report, None)
+
+        assert results.get("telegram") is True
+        # The builders must receive the default location so the split renders.
+        call_kwargs = mock_chunks.call_args.kwargs
+        assert call_kwargs.get("user_location") == DEFAULT_LOCATION
+        assert call_kwargs.get("user_location") == "Bangalore"
+
+    @pytest.mark.asyncio
+    async def test_user_location_wins_over_default(self):
+        """A profile location overrides the default fallback."""
+        from interntrack.scheduler.jobs import _deliver_alert
+
+        report = {
+            "summary": {"new_jobs": 0, "new_applications": 0, "total_applications": 0},
+            "new_jobs": [],
+            "closing_soon": [],
+            "follow_up": [],
+        }
+
+        class FakeUser:
+            id = "u2"
+            email = "a@b.c"
+            telegram_chat_id = "42"
+            location = "Chennai"
+
+        manager = MagicMock()
+        manager.get_configured_channels.return_value = ["telegram"]
+        manager.notify = AsyncMock(return_value={"telegram": True})
+
+        with patch(
+            "interntrack.scheduler.jobs.build_alert_chunks",
+            new=AsyncMock(return_value=[("chunk", [])]),
+        ) as mock_chunks:
+            await _deliver_alert(manager, ["telegram"], report, None, user=FakeUser())
+
+        call_kwargs = mock_chunks.call_args.kwargs
+        assert call_kwargs.get("user_location") == "Chennai"
+
+
 @pytest.mark.asyncio
 class TestRunJobDiscovery:
     """Tests for run_job_discovery async function."""

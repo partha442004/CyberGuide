@@ -178,7 +178,11 @@ async def _deliver_alert(
             "telegram_chat_id": getattr(user, "telegram_chat_id", None),
         }
     results: dict = {}
-    user_location = getattr(user, "location", None) if user else None
+    # Preferred-location split (📍 Your area / 🌍 Other locations). Discovery
+    # already searches the default location when the user hasn't set one, so
+    # the digest must render the split with the same fallback — otherwise the
+    # default user never sees the location split at all.
+    user_location = (getattr(user, "location", None) or "").strip() or DEFAULT_LOCATION
     non_telegram = [c for c in targets if c != "telegram"]
     email_targets = [c for c in non_telegram if c == "email"]
     text_targets = [c for c in non_telegram if c != "email"]

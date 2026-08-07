@@ -370,6 +370,34 @@ class TestMatchResumeToJob:
         assert response.status_code == 404
         assert "Job not found" in response.json()["detail"]
 
+    @pytest.mark.asyncio
+    async def test_match_job_without_skills_returns_200(self, client: AsyncClient, db_session):
+        """A job with no skills/tags scores None — must NOT 500 (the live
+        ``match_score`` NOT NULL crash) and must not persist a bogus row."""
+        resume = ResumeData(
+            user_id="u-match3", file_path="a.pdf", file_hash="h2b", skills=["python"]
+        )
+        job = Job(
+            title="Security GRC Analyst",
+            company="Acme",
+            url="https://acme.com/job/grc",
+            source="test",
+            job_type="full_time",
+            required_skills=[],
+            preferred_skills=[],
+            tags=[],
+        )
+        db_session.add_all([resume, job])
+        await db_session.flush()
+
+        response = await client.post(
+            f"/api/v1/resumes/match/{job.id}", params={"user_id": "u-match3"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["match_score"] is None
+        assert data["matched_skills"] == []
+
 
 # ==================== Delete Endpoint Tests ====================
 
@@ -489,3 +517,56 @@ class TestMatchResumeBatch:
         data = response.json()
         assert data["total_jobs_matched"] == 1
         assert data["matches"][0]["job_id"] == str(job.id)
+
+    @pytest.mark.asyncio
+    async def test_batch_match_jobs_without_skills_returns_200(
+        self, client: AsyncClient, db_session
+    ):
+        """The live 500: a batch containing jobs whose tags are empty must
+        still return 200 with a None score for those jobs (previously the
+        NOT NULL ``match_score`` column made the insert fail)."""
+        resume = ResumeData(
+            user_id="u-batch4",
+            file_path="a.pdf",
+            file_hash="h7",
+            skills=["cybersecurity", "vapt"],
+        )
+        job_skills = Job(
+            title="Cyber Security Engineer",
+            company="Acme",
+            url="https://acme.com/job/e",
+            source="test",
+            job_type="full_time",
+            required_skills=[],
+            preferred_skills=[],
+            tags=["security", "cybersecurity"],
+        )
+        job_no_skills = Job(
+            title="Security GRC Analyst",
+            company="Beta",
+            url="https://beta.com/job/f",
+            source="test",
+            job_type="full_time",
+            required_skills=[],
+            preferred_skills=[],
+            tags=[],
+        )
+        db_session.add_all([resume, job_skills, job_no_skills])
+        await db_session.flush()
+
+        response = await client.post(
+            "/api/v1/resumes/match-batch",
+            params={
+                "user_id": "u-batch4",
+                "job_ids": [str(job_skills.id), str(job_no_skills.id)],
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_jobs_matched"] == 2
+        by_id = {m["job_id"]: m for m in data["matches"]}
+        # Job with tags scores; job without skills scores None (not a 500).
+        assert by_id[str(job_skills.id)]["match_score"] is not None
+        assert by_id[str(job_skills.id)]["match_score"] > 0
+        assert by_id[str(job_no_skills.id)]["match_score"] is None
+        assert data["average_score"] is not None
