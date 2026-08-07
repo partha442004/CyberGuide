@@ -1119,6 +1119,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **🎁 Referral tracking** — the User profile now stores which friend's
+  invite link brought each account in (`referred_by`). The dashboard
+  register form sends it automatically from the invite URL, and the
+  "Invite a friend" section on My Account shows a live **referral
+  counter** ("N friends signed up through your link") plus a **Team
+  directory** listing every member with their location, categories, and
+  a "via your link" badge. Team data is cached 60s.
+- **🗑 Account deletion** — new `DELETE /api/v1/users/{user_id}` removes
+  an account completely: applications + status history, company
+  watchlists, user skills, alert preferences, notification history, and
+  the shared-database resume/match records. Also used to clean up
+  throwaway test accounts.
+- New pure helpers `count_referrals` / `team_rows` in `dashboard/invite.py`
+  (self-referrals excluded, case-insensitive, None-safe sort).
+
+### Tests
+
+- 11 new tests (referrer storage + normalization, invalid-referrer
+  dropping, delete cascade for prefs/applications, referral-count edge
+  cases, team-row shaping). Full suite **2333 passed**, ruff + format +
+  mypy clean.
+
 ## [Unreleased] - Invite-a-friend + My Matches (multi-user growth)
 
 ### Added
