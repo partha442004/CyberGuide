@@ -68,6 +68,25 @@ class ApplicationListResponse(BaseModel):
     total: int
 
 
+class FollowUpItem(BaseModel):
+    """A pending follow-up application (applied/interview, not yet reminded)."""
+
+    application_id: str
+    job_id: str
+    job_title: str | None = None
+    company: str | None = None
+    job_url: str | None = None
+    status: str
+    applied_at: datetime | None = None
+    days_since: int
+
+
+class FollowUpsResponse(BaseModel):
+    """Pending follow-up applications, most urgent first."""
+
+    follow_ups: list[FollowUpItem] = []
+
+
 class ApplicationHistoryItem(BaseModel):
     """A single application status-change event."""
 
