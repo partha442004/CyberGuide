@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **📍 Per-user digest now scoped to each account's own city.** The
+  daily email/Telegram digest previously filtered by domain only — a
+  "cybersecurity + Bengaluru" user and a "frontend + Chennai" user on
+  different accounts still saw jobs from every city for their domain.
+  `_send_alert_for` now passes the account's `location` into
+  `generate_daily_report`, so **each user gets only their city's jobs
+  (no mixing)** — you: security roles in Bengaluru; your friend:
+  frontend roles in Chennai. The matcher is a new shared
+  `utils.helpers.location_matches()` (single source of truth, reused by
+  the instant alerts, digest builders and report filter) with
+  Bangalore ↔ Bengaluru, Mumbai ↔ Bombay, Delhi ↔ NCR and Hyderabad ↔
+  Secunderabad synonyms, and short aliases like "NCR" only match as
+  whole words so "Encryption Corp" can never pass a Delhi filter. The
+  legacy `user1` path (no profile) stays unfiltered. Note: Remote-only
+  postings are intentionally excluded for location-scoped users (the
+  user asked for city-only alerts). 9 new tests — 2466 total.
+
 - **🖥️ New 'Frontend / UI' alert domain.** Frontend-flavoured roles
   (Frontend/Front-End Developer, React/Angular/Vue, UI Developer)
   previously landed in the generic Coding bucket — they now classify

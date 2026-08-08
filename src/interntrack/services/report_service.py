@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.repositories.application_repository import ApplicationRepository
 from interntrack.repositories.job_repository import JobRepository
-from interntrack.utils.helpers import to_naive_utc, utcnow
+from interntrack.utils.helpers import location_matches, to_naive_utc, utcnow
 
 if TYPE_CHECKING:
     from interntrack.domain.models import Job
@@ -331,12 +331,16 @@ class ReportService:
         if domains:
             jobs = [job for job in jobs if job["domain"] in domains]
         if location:
-            # Filter by location (case-insensitive partial match)
+            # Filter by location (fuzzy, synonym-aware: a "Bengaluru"
+            # preference matches "Bangalore, Karnataka" postings too).
             location_lower = location.lower()
             jobs = [
                 job
                 for job in jobs
-                if location_lower in str(job.get("location") or "").lower()
+                if location_matches(
+                    str(job.get("location") or "").lower(),
+                    location_lower,
+                )
             ]
 
         return {
