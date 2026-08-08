@@ -109,3 +109,21 @@ class CoverLetterResponse(BaseModel):
     cover_letter: str
     match_score: Optional[float] = None
     matched_skills: List[str] = []
+
+
+class InterviewPrepQuestion(BaseModel):
+    """A single interview-prep question with its theme."""
+
+    category: str
+    question: str
+
+
+class InterviewPrepResponse(BaseModel):
+    """Generated interview-prep shortlist for a specific job."""
+
+    job_id: str
+    job_title: str
+    company: str
+    questions: List[InterviewPrepQuestion] = []
+    tips: List[str] = []
+    match_score: Optional[float] = None

@@ -15,11 +15,13 @@ from cybershield.dependencies import get_session
 from cybershield.domain.models import Job, ResumeData, ResumeMatchResult
 from cybershield.schemas.resume import (
     CoverLetterResponse,
+    InterviewPrepResponse,
     ResumeBatchMatchResponse,
     ResumeMatchResponse,
     ResumeUploadResponse,
 )
 from cybershield.services.cover_letter import build_cover_letter
+from cybershield.services.interview_prep import build_interview_prep
 from cybershield.services.resume_service import (
     SECURITY_SKILLS,
     ResumeParser,
@@ -641,4 +643,65 @@ async def generate_cover_letter(
         cover_letter=letter,
         match_score=match_response.match_score,
         matched_skills=match_response.matched_skills,
+    )
+
+
+@router.post("/interview-prep", response_model=InterviewPrepResponse)
+async def generate_interview_prep(
+    user_id: str,
+    job_id: str,
+    session: AsyncSession = Depends(get_session),
+):
+    """Generate a personalized interview-prep shortlist for a job.
+
+    Rule-based (no API key needed). Loads the parsed resume + the job's
+    skills/tags, reuses the match logic to know which skills the
+    candidate actually has (vs. what the job wants), and builds a list of
+    likely questions: role-fit, technical questions anchored to matched
+    skills, honest "be ready" prompts for missing skills, behavioral
+    questions, and company research.
+    """
+    resume_result = await session.execute(select(ResumeData).where(ResumeData.user_id == user_id))
+    resume = resume_result.scalar_one_or_none()
+    if not resume:
+        raise HTTPException(status_code=404, detail="No resume found. Upload a resume first.")
+
+    job_result = await session.execute(
+        select(
+            Job.id,
+            Job.title,
+            Job.company,
+            Job.required_skills,
+            Job.preferred_skills,
+            Job.tags,
+        ).where(Job.id == job_id)
+    )
+    row = job_result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    job = _JobMatchData(*row)
+
+    # Reuse the match logic so questions only reference skills the resume
+    # actually has (and gaps it genuinely lacks) — consistent with the
+    # match score and the cover letter.
+    resume_skills = _extract_skill_names(resume.skills)
+    match_response = _calculate_job_match(
+        resume_skills,
+        job,
+        resume_data=_resume_data_for_ats(resume),
+    )
+
+    prep = build_interview_prep(
+        job_title=job.title or "",
+        company=job.company or "",
+        matched_skills=match_response.matched_skills,
+        missing_skills=match_response.missing_skills,
+    )
+    return InterviewPrepResponse(
+        job_id=job_id,
+        job_title=job.title or "",
+        company=job.company or "",
+        questions=prep["questions"],
+        tips=prep["tips"],
+        match_score=match_response.match_score,
     )

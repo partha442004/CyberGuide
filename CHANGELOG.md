@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **🎤 Interview-prep question generator.** New `POST /resumes/interview-prep`
+  endpoint (rule-based, zero API keys) that builds a personalized shortlist
+  of likely interview questions for any saved job — grouped by theme:
+  role-fit questions anchored to the job title, technical questions anchored
+  to the skills the resume actually has, honest "be ready" prompts for the
+  job's missing skills, behavioral (STAR) questions and company-research
+  questions. Comes with actionable prep tips derived from the same inputs.
+  The generator is brace-safe (scraped tags with literal `{}` can never
+  crash it) and deterministic. My Matches cards in the dashboard gain a
+  **🎤 Interview prep** button next to the cover-letter button, showing the
+  grouped list + tips inline. 13 new tests (service edge cases + endpoint
+  404/200 paths) — 2440 total.
+
 - **✍️ AI cover-letter generator.** New `POST /resumes/cover-letter`
   endpoint (rule-based, zero API keys) that builds a tailored 3-paragraph
   letter naming the role, the company and the candidate's matched skills

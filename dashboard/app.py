@@ -1173,6 +1173,53 @@ def _cover_letter_block(job_id: str, company: str) -> None:
             )
 
 
+def _interview_prep_block(job_id: str, company: str) -> None:
+    """'Generate interview questions' button + prep list for one job.
+
+    Calls the API's ``POST /resumes/interview-prep`` (rule-based, no API
+    key) and shows the grouped question list plus prep tips. Fails
+    silently into an info note when the API is unreachable or the user
+    has no resume yet.
+    """
+    user_id = _current_user_id()
+    btn_key = f"ip_btn_{job_id}"
+    if st.button("🎤 Interview prep", key=btn_key, use_container_width=True):
+        result = _api(
+            f"/resumes/interview-prep?user_id={user_id}&job_id={job_id}",
+            method="POST",
+            timeout=30,
+        )
+        if not result or not result.get("questions"):
+            st.info(
+                "Interview prep unavailable — upload your resume on the "
+                "Resume Match page first, then try again."
+            )
+            return
+        questions = result["questions"]
+        tips = result.get("tips") or []
+        _cat_emoji = {
+            "role": "🎯",
+            "technical": "🧠",
+            "behavioral": "🗣️",
+            "gap": "📌",
+            "company": "🏢",
+        }
+        with st.expander("🎤 Your interview prep list", expanded=True):
+            for q in questions:
+                cat = q.get("category", "")
+                st.markdown(
+                    f"**{_cat_emoji.get(cat, '❓')} {escape(str(q.get('question', '')))}**"
+                )
+                if cat:
+                    st.caption(f"{cat} · {escape(company or 'job')}")
+            if tips:
+                st.markdown("**💡 Prep tips**")
+                for tip in tips:
+                    st.write(f"• {escape(tip)}")
+            if result.get("match_score") is not None:
+                st.caption(f"📊 Match score: {result['match_score']:.0f}%")
+
+
 @st.cache_data(ttl=60, show_spinner=False)
 def _team_members() -> list:
     """Registered user profiles (cached 60s so a new member shows up fast)."""
@@ -1586,6 +1633,7 @@ def show_my_matches() -> None:
             if job.get("url"):
                 st.link_button("🔗 View", job["url"], key=f"mm_{job.get('id')}")
             _cover_letter_block(str(job.get("id") or ""), company)
+            _interview_prep_block(str(job.get("id") or ""), company)
 
             st.divider()
     else:
