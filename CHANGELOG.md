@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **🔥 Job of the day in daily digests.** Every email and Telegram digest
+  now leads with the user's best match of the day — the highest
+  resume-match role with its % and an Apply link. The highlight respects
+  the user's preferred location (a Bangalore user gets a Bangalore role
+  first, falling back to the best match anywhere) and the email renders
+  it as a highlighted amber card.
+- **📥 Export Saved Jobs to CSV.** The Saved Jobs page gains an Export
+  button that downloads the currently filtered jobs (location filter
+  applied) with a match-score column — spreadsheet-friendly, no extra
+  dependencies.
+
+### Added
+
 - **One-click Save + Apply-with-status on every job card.** Cards now have
   a compact action stack: **📌 Save** toggles a real bookmark (the API
   POST/DELETE pair, duplicate-safe, session-cached so the toggle state is
