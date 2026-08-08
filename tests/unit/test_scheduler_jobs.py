@@ -529,6 +529,99 @@ class TestDeliverAlertLocationFallback:
         call_kwargs = mock_chunks.call_args.kwargs
         assert call_kwargs.get("user_location") == "Chennai"
 
+    @pytest.mark.asyncio
+    async def test_digest_skips_telegram_when_instant_alerts_on(self):
+        """Instant-alert users get one Telegram message (instant), not two."""
+        from interntrack.scheduler.jobs import _deliver_alert
+
+        report = {
+            "summary": {"new_jobs": 0, "new_applications": 0, "total_applications": 0},
+            "new_jobs": [],
+            "closing_soon": [],
+            "follow_up": [],
+        }
+
+        class FakeUser:
+            id = "u3"
+            email = "c@d.e"
+            telegram_chat_id = "99"
+            location = "Bangalore"
+
+        manager = MagicMock()
+        manager.get_configured_channels.return_value = ["telegram", "email"]
+
+        async def _fake_notify(channels, *args, **kwargs):
+            return dict.fromkeys(channels, True)
+
+        manager.notify = AsyncMock(side_effect=_fake_notify)
+
+        with patch(
+            "interntrack.scheduler.jobs._load_alert_preferences",
+            new=AsyncMock(
+                return_value={"instant_alerts": True, "domains": [], "channels": []}
+            ),
+        ):
+            results = await _deliver_alert(
+                manager,
+                ["telegram", "email"],
+                report,
+                None,
+                user=FakeUser(),
+            )
+
+        # Telegram chunks must NOT be built/sent for instant-alert users.
+        assert "telegram" not in results
+        # The email digest still delivers.
+        assert results.get("email") is True
+
+    @pytest.mark.asyncio
+    async def test_digest_keeps_telegram_when_instant_alerts_off(self):
+        """Users who turned instant alerts off still get Telegram digest chunks."""
+        from interntrack.scheduler.jobs import _deliver_alert
+
+        report = {
+            "summary": {"new_jobs": 0, "new_applications": 0, "total_applications": 0},
+            "new_jobs": [],
+            "closing_soon": [],
+            "follow_up": [],
+        }
+
+        class FakeUser:
+            id = "u4"
+            email = "e@f.g"
+            telegram_chat_id = "77"
+            location = "Bangalore"
+
+        manager = MagicMock()
+        manager.get_configured_channels.return_value = ["telegram"]
+        manager.notify = AsyncMock(return_value={"telegram": True})
+
+        with (
+            patch(
+                "interntrack.scheduler.jobs._load_alert_preferences",
+                new=AsyncMock(
+                    return_value={
+                        "instant_alerts": False,
+                        "domains": [],
+                        "channels": [],
+                    }
+                ),
+            ),
+            patch(
+                "interntrack.scheduler.jobs.build_alert_chunks",
+                new=AsyncMock(return_value=[("chunk", [])]),
+            ),
+        ):
+            results = await _deliver_alert(
+                manager,
+                ["telegram"],
+                report,
+                None,
+                user=FakeUser(),
+            )
+
+        assert results.get("telegram") is True
+
 
 @pytest.mark.asyncio
 class TestRunJobDiscovery:
@@ -710,3 +803,229 @@ class TestGenerateDailyReport:
         await deactivate_expired_jobs()
 
         mock_service.deactivate_expired.assert_called_once()
+
+
+class TestSendInstantAlerts:
+    """Tests for _send_instant_alerts async function."""
+
+    def _job(self, **overrides) -> MagicMock:
+        job = MagicMock()
+        job.id = overrides.get("id", "job-1")
+        job.title = overrides.get("title", "SOC Analyst")
+        job.company = overrides.get("company", "Cyber Corp")
+        job.location = overrides.get("location", "Bangalore")
+        job.url = overrides.get("url", "https://example.com/job")
+        job.tags = overrides.get("tags", ["security", "soc"])
+        job.required_skills = overrides.get("required_skills", [])
+        job.preferred_skills = overrides.get("preferred_skills", [])
+        return job
+
+    @patch("interntrack.scheduler.jobs._job_match_score")
+    @patch("interntrack.scheduler.jobs.NotificationManager")
+    @patch(
+        "interntrack.scheduler.jobs._latest_resume_skill_names",
+        new_callable=AsyncMock,
+    )
+    async def test_sends_telegram_ping_for_matching_job(
+        self,
+        mock_resume,
+        mock_manager_cls,
+        mock_match,
+    ):
+        from interntrack.scheduler.jobs import _send_instant_alerts
+
+        mock_resume.return_value = {"python", "linux"}
+        mock_match.return_value = 75.0
+        session = AsyncMock()
+        user = MagicMock()
+        user.id = "user-1"
+        user.telegram_chat_id = "123456"
+        user.location = "Bangalore"
+        mock_targets = [
+            {
+                "user_id": "user-1",
+                "user": user,
+                "prefs": {
+                    "instant_alerts": True,
+                    "domains": ["security"],
+                    "min_match_score": 40,
+                },
+            },
+        ]
+        mock_targets_fn = patch(
+            "interntrack.scheduler.jobs._enabled_alert_targets",
+            return_value=mock_targets,
+        )
+        mock_targets_fn.start()
+        mock_manager = AsyncMock()
+        mock_manager.notify.return_value = {"telegram": True}
+        mock_manager_cls.return_value = mock_manager
+        try:
+            sent = await _send_instant_alerts(session, [self._job()])
+        finally:
+            mock_targets_fn.stop()
+
+        assert sent == {"user-1": 1}
+        mock_manager.notify.assert_called_once()
+        call_args, call_kwargs = mock_manager.notify.call_args
+        assert call_args[0] == ["telegram"]
+        assert call_kwargs["recipient"] == {"telegram_chat_id": "123456"}
+        assert call_kwargs["buttons"]
+
+    @patch("interntrack.scheduler.jobs._job_match_score")
+    @patch("interntrack.scheduler.jobs.NotificationManager")
+    @patch(
+        "interntrack.scheduler.jobs._latest_resume_skill_names",
+        new_callable=AsyncMock,
+    )
+    async def test_skips_when_domain_does_not_match(
+        self,
+        mock_resume,
+        mock_manager_cls,
+        mock_match,
+    ):
+        from interntrack.scheduler.jobs import _send_instant_alerts
+
+        mock_resume.return_value = {"python"}
+        mock_match.return_value = 80.0
+        session = AsyncMock()
+        user = MagicMock()
+        user.id = "user-1"
+        user.telegram_chat_id = "123456"
+        user.location = "Bangalore"
+        mock_targets = [
+            {
+                "user_id": "user-1",
+                "user": user,
+                "prefs": {
+                    "instant_alerts": True,
+                    "domains": ["coding"],
+                    "min_match_score": None,
+                },
+            },
+        ]
+        mock_targets_fn = patch(
+            "interntrack.scheduler.jobs._enabled_alert_targets",
+            return_value=mock_targets,
+        )
+        mock_targets_fn.start()
+        mock_manager = AsyncMock()
+        mock_manager_cls.return_value = mock_manager
+        try:
+            sent = await _send_instant_alerts(
+                session,
+                [self._job(title="SOC Analyst", tags=["security"])],
+            )
+        finally:
+            mock_targets_fn.stop()
+
+        assert sent == {}
+        mock_manager.notify.assert_not_called()
+
+    @patch("interntrack.scheduler.jobs.NotificationManager")
+    @patch(
+        "interntrack.scheduler.jobs._latest_resume_skill_names",
+        new_callable=AsyncMock,
+    )
+    async def test_skips_user_without_chat_id(
+        self,
+        mock_resume,
+        mock_manager_cls,
+    ):
+        from interntrack.scheduler.jobs import _send_instant_alerts
+
+        mock_resume.return_value = {"python"}
+
+        session = AsyncMock()
+        user = MagicMock()
+        user.id = "user-1"
+        user.telegram_chat_id = None
+        user.location = "Bangalore"
+        mock_targets = [
+            {
+                "user_id": "user-1",
+                "user": user,
+                "prefs": {
+                    "instant_alerts": True,
+                    "domains": [],
+                    "min_match_score": None,
+                },
+            },
+        ]
+        mock_targets_fn = patch(
+            "interntrack.scheduler.jobs._enabled_alert_targets",
+            return_value=mock_targets,
+        )
+        mock_targets_fn.start()
+        mock_manager = AsyncMock()
+        mock_manager_cls.return_value = mock_manager
+        try:
+            sent = await _send_instant_alerts(session, [self._job()])
+        finally:
+            mock_targets_fn.stop()
+
+        assert sent == {}
+        mock_manager.notify.assert_not_called()
+
+    @patch("interntrack.scheduler.jobs.NotificationManager")
+    @patch(
+        "interntrack.scheduler.jobs._latest_resume_skill_names",
+        new_callable=AsyncMock,
+    )
+    async def test_no_jobs_returns_empty(
+        self,
+        mock_resume,
+        mock_manager_cls,
+    ):
+        from interntrack.scheduler.jobs import _send_instant_alerts
+
+        sent = await _send_instant_alerts(AsyncMock(), [])
+        assert sent == {}
+        mock_manager_cls.assert_not_called()
+
+    @patch("interntrack.scheduler.jobs._job_match_score")
+    @patch("interntrack.scheduler.jobs.NotificationManager")
+    @patch(
+        "interntrack.scheduler.jobs._latest_resume_skill_names",
+        new_callable=AsyncMock,
+    )
+    async def test_respects_min_match_score(
+        self,
+        mock_resume,
+        mock_manager_cls,
+        mock_match,
+    ):
+        from interntrack.scheduler.jobs import _send_instant_alerts
+
+        mock_resume.return_value = {"python"}
+        mock_match.return_value = 50.0
+        session = AsyncMock()
+        user = MagicMock()
+        user.id = "user-1"
+        user.telegram_chat_id = "123456"
+        user.location = "Bangalore"
+        mock_targets = [
+            {
+                "user_id": "user-1",
+                "user": user,
+                "prefs": {
+                    "instant_alerts": True,
+                    "domains": [],
+                    "min_match_score": 90,
+                },
+            },
+        ]
+        mock_targets_fn = patch(
+            "interntrack.scheduler.jobs._enabled_alert_targets",
+            return_value=mock_targets,
+        )
+        mock_targets_fn.start()
+        mock_manager = AsyncMock()
+        mock_manager_cls.return_value = mock_manager
+        try:
+            sent = await _send_instant_alerts(session, [self._job()])
+        finally:
+            mock_targets_fn.stop()
+
+        assert sent == {}
+        mock_manager.notify.assert_not_called()

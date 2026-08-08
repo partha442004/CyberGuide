@@ -445,6 +445,9 @@ class AlertPreferences(Base, TimestampMixin):
     slot_domains = Column(JSON, nullable=True)
     # Whether the Sunday weekly digest recap is sent.
     weekly_enabled = Column(Boolean, default=True)
+    # Whether a newly discovered high-match job pings the user on Telegram
+    # immediately instead of waiting for the next daily slot.
+    instant_alerts = Column(Boolean, default=True)
 
     @validates("last_alert_at")
     def _coerce_naive_utc(self, _key: str, value):

@@ -45,6 +45,7 @@ class TestLoadAlertPreferences:
         row.last_alert_at = None
         row.slot_domains = None
         row.weekly_enabled = True
+        row.instant_alerts = None
 
         prefs = await _load_alert_preferences(_db_with_row(row))
         assert prefs == {
@@ -55,6 +56,7 @@ class TestLoadAlertPreferences:
             "last_alert_at": None,
             "slot_domains": {},
             "weekly_enabled": True,
+            "instant_alerts": True,
         }
 
     @pytest.mark.asyncio
@@ -69,6 +71,7 @@ class TestLoadAlertPreferences:
         row.last_alert_at = None
         row.slot_domains = {"morning": ["security"]}
         row.weekly_enabled = False
+        row.instant_alerts = True
 
         prefs = await _load_alert_preferences(_db_with_row(row))
         assert prefs == {
@@ -78,6 +81,7 @@ class TestLoadAlertPreferences:
             "is_enabled": True,
             "last_alert_at": None,
             "slot_domains": {"morning": ["security"]},
+            "instant_alerts": True,
             "weekly_enabled": False,
         }
 
@@ -313,6 +317,34 @@ class TestPreferencesAPI:
 
         assert result.slot_domains == {"morning": ["security"]}
         assert result.weekly_enabled is True
+
+    @pytest.mark.asyncio
+    async def test_get_preferences_defaults_instant_alerts_on(self):
+        """instant_alerts defaults to True even when the DB row lacks it."""
+        from interntrack.api.v1.notifications import get_alert_preferences
+
+        with patch(
+            "interntrack.api.v1.notifications._load_alert_preferences",
+            new=AsyncMock(return_value={}),
+        ):
+            result = await get_alert_preferences("user1", db=AsyncMock())
+
+        assert result.instant_alerts is True
+
+    @pytest.mark.asyncio
+    async def test_update_saves_instant_alerts_flag(self):
+        """The instant Telegram ping toggle persists through the API."""
+        from interntrack.api.schemas.notification import AlertPreferencesUpdate
+        from interntrack.api.v1.notifications import update_alert_preferences
+
+        mock_db = _db_with_row(None)
+        result = await update_alert_preferences(
+            "user1",
+            AlertPreferencesUpdate(instant_alerts=False),
+            db=mock_db,
+        )
+
+        assert result.instant_alerts is False
 
     @pytest.mark.asyncio
     async def test_send_alert_filters_and_notifies_preferred_channels(self):
