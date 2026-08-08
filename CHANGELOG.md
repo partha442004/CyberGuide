@@ -4,6 +4,24 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+### Added
+
+- **Instant Telegram alerts for high-match jobs.** Users can now toggle
+  "Instant Telegram alerts" in Settings (AlertPreferences.instant_alerts,
+  auto-synced to the live DB). When job discovery saves a new job that
+  matches their domains, location, and resume match threshold, it is
+  pinged to their Telegram immediately — no waiting for the next daily
+  slot. One compact message per job with Apply buttons; unknown match
+  scores pass through exactly like the daily digest.
+- **Digest dedup on Telegram.** Users with instant alerts on get their
+  new jobs via the instant ping, so the daily digest skips Telegram
+  chunks for them (email digest stays complete) — the same job never
+  arrives twice on Telegram. A missing/errored prefs load keeps the old
+  digest behavior.
+- **8 new tests** covering the instant-alert pipeline (domain/location/
+  match filtering, per-user routing, no-jobs, digest dedup on/off, prefs
+  round-trip). Suite: 2369 tests passing.
+
 ### Fixed
 
 - **0.0% resume matches eliminated.** Jobs tagged only with the generic
