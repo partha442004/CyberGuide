@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **⏰ Follow-ups needed panel (Applications).** The daily digest already
+  nudged stale applications but the dashboard never showed them — a new
+  `GET /applications/follow-ups` endpoint returns the pending
+  applied/interview applications (not yet marked followed up, scoped per
+  user) enriched with job title/company/url and sorted by days-since
+  most-urgent-first, and the Applications page now opens with a
+  **Follow-ups needed** panel: each stale application shows how long it
+  has sat + a **✅ Mark followed up** button (`POST
+  /applications/{id}/reminded`) that stops the digests from nudging it
+  again. 6 new tests — 2450 total.
+
 - **🕘 Application status-history timeline + notes.** Every status change
   was already recorded in `application_status_history` but was invisible;
   a new `GET /applications/{id}/history` endpoint now exposes the audit

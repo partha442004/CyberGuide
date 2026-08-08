@@ -2418,9 +2418,73 @@ def _share_job_form() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _follow_ups_panel() -> None:
+    """'⏰ Follow-ups needed' panel for the Applications page.
+
+    Surfaces the same pending applications the daily digest reminds the
+    user about (applied/interview, not yet marked followed up), sorted
+    most-urgent-first, with a one-click 'Mark followed up' action that
+    stops the digest from nudging them again.
+    """
+    user_id = _current_user_id()
+    data = fetch_data(f"/applications/follow-ups?user_id={user_id}") or {}
+    follow_ups = data.get("follow_ups") or []
+
+    if not follow_ups:
+        return
+
+    st.subheader("⏰ Follow-ups needed")
+    st.caption(
+        "Applications that have been sitting for a while — a quick follow-up "
+        "email often revives them. (These also appear in your daily digest.)"
+    )
+    for item in follow_ups:
+        title = escape(str(item.get("job_title") or "Unknown role"))
+        company = escape(str(item.get("company") or ""))
+        days = int(item.get("days_since") or 0)
+        app_id = str(item.get("application_id") or "")
+        when = "today" if days == 0 else f"{days}d ago"
+        col1, col2, col3 = st.columns([4, 2, 1])
+        with col1:
+            st.markdown(f"**{title}**" + (f" · {company}" if company else ""))
+            job_url = item.get("job_url")
+            if job_url:
+                st.link_button(
+                    "🔗 View job",
+                    job_url,
+                    key=f"follow_link_{app_id}",
+                )
+        with col2:
+            st.markdown(
+                f'<span class="chip">⏳ {when}</span>',
+                unsafe_allow_html=True,
+            )
+        with col3:
+            if st.button(
+                "✅ Mark followed up",
+                key=f"follow_up_{app_id}",
+                use_container_width=True,
+            ):
+                resp = _api_raw(
+                    f"/applications/{app_id}/reminded",
+                    method="POST",
+                    timeout=15,
+                )
+                if resp is not None and resp.status_code == 200:
+                    st.rerun()
+                else:
+                    st.error(
+                        "Couldn't mark as followed up — is the API server running?"
+                    )
+        st.divider()
+
+
 def show_applications() -> None:
     """Show and manage applications."""
     st.header("📋 Applications")
+
+    # ── Follow-ups needed ─────────────────────────────────────────────
+    _follow_ups_panel()
 
     status_filter = st.selectbox(
         "Filter by status",

@@ -15,6 +15,8 @@ from interntrack.api.schemas.application import (
     ApplicationResponse,
     ApplicationStatusUpdate,
     ApplicationUpdate,
+    FollowUpItem,
+    FollowUpsResponse,
 )
 from interntrack.database.session import get_db
 from interntrack.services.application_service import ApplicationService
@@ -56,6 +58,89 @@ async def list_applications(
         apps = await service.app_repo.get_all(skip=skip, limit=limit)
 
     return ApplicationListResponse(applications=apps, total=len(apps))
+
+
+@router.get("/follow-ups", response_model=FollowUpsResponse)
+async def get_follow_ups(
+    user_id: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Applications that need a follow-up nudge, most urgent first.
+
+    These are the same applications the daily email/Telegram digest
+    reminds the user about: ``applied`` / ``interview`` applications that
+    haven't been marked as followed up yet. The dashboard surfaces them
+    so the user can act immediately instead of waiting for the next
+    digest — and can mark them followed up right there.
+
+    ``days_since`` is how long the application has been sitting (based on
+    ``applied_at``, falling back to ``created_at``) so urgency is clear
+    at a glance.
+    """
+    from interntrack.domain.models import Job
+    from interntrack.utils.helpers import utcnow
+
+    service = ApplicationService(db)
+    pending = await service.app_repo.get_pending_reminders(user_id=user_id)
+
+    items: list[FollowUpItem] = []
+    if not pending:
+        return FollowUpsResponse(follow_ups=items)
+
+    # Batch-load job titles/companies/urls for enrichment (one query).
+    job_ids = [app.job_id for app in pending]
+    job_rows = await db.execute(
+        select(Job.id, Job.title, Job.company, Job.url).where(Job.id.in_(job_ids))
+    )
+    jobs_by_id = {row[0]: row for row in job_rows.all()}
+
+    now = utcnow()
+    for app in pending:
+        row = jobs_by_id.get(app.job_id)
+        # applied_at/created_at are coerced to naive UTC by the model
+        # validators, matching utcnow() — the subtraction is safe.
+        base_time = app.applied_at or app.created_at
+        days_since = (now - base_time).days if base_time else 0
+        items.append(
+            FollowUpItem(
+                application_id=app.id,
+                job_id=app.job_id,
+                job_title=row[1] if row else None,
+                company=row[2] if row else None,
+                job_url=row[3] if row else None,
+                # Enum member -> value (native_enum=False columns).
+                status=str(getattr(app.status, "value", app.status)),
+                applied_at=app.applied_at,
+                days_since=max(0, days_since),
+            )
+        )
+    items.sort(key=lambda i: i.days_since, reverse=True)
+    return FollowUpsResponse(follow_ups=items)
+
+
+@router.post("/{application_id}/reminded", status_code=200)
+async def mark_application_reminded(
+    application_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark an application as followed up.
+
+    Stops the daily digests from nudging this application again (the
+    same mechanism the digest uses after a successful send), and removes
+    it from the dashboard's Follow-ups list.
+    """
+    from interntrack.domain.models import Application
+
+    result = await db.execute(
+        select(Application).where(Application.id == application_id)
+    )
+    application = result.scalar_one_or_none()
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    # Same flag the digest sets after a successful send — stops future nudges.
+    application.reminded = True  # type: ignore[assignment]
+    await db.flush()
+    return {"status": "ok"}
 
 
 @router.get("/{application_id}", response_model=ApplicationResponse)
