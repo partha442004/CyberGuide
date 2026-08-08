@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **🕘 Application status-history timeline + notes.** Every status change
+  was already recorded in `application_status_history` but was invisible;
+  a new `GET /applications/{id}/history` endpoint now exposes the audit
+  trail (oldest-first, with any notes attached to each change) and the
+  dashboard Applications page shows it via a **Show status history**
+  button on each application. The same page gains a **notes editor**
+  (text area + Save) so reminders about calls/deadlines stay attached to
+  the application. Statuses render with friendly labels (📌 Saved →
+  📨 Applied → 🗓 Interview …). 4 new tests — 2444 total.
+
 - **🎤 Interview-prep question generator.** New `POST /resumes/interview-prep`
   endpoint (rule-based, zero API keys) that builds a personalized shortlist
   of likely interview questions for any saved job — grouped by theme:

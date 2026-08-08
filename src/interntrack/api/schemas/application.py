@@ -68,6 +68,21 @@ class ApplicationListResponse(BaseModel):
     total: int
 
 
+class ApplicationHistoryItem(BaseModel):
+    """A single application status-change event."""
+
+    status: str
+    changed_at: datetime | None = None
+    notes: str | None = None
+
+
+class ApplicationHistoryResponse(BaseModel):
+    """Status-change history for one application."""
+
+    application_id: str
+    history: list[ApplicationHistoryItem] = []
+
+
 class ApplicationStatusUpdate(BaseModel):
     """Schema for status update."""
 

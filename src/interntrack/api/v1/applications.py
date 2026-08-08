@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.api.schemas.application import (
     ApplicationCreate,
+    ApplicationHistoryItem,
+    ApplicationHistoryResponse,
     ApplicationListResponse,
     ApplicationMetrics,
     ApplicationResponse,
@@ -144,6 +146,53 @@ async def get_metrics(
     """Get application metrics (optionally scoped to one user)."""
     service = ApplicationService(db)
     return await service.get_metrics(user_id=user_id)
+
+
+@router.get("/{application_id}/history", response_model=ApplicationHistoryResponse)
+async def get_application_history(
+    application_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get an application's status-change timeline (oldest first).
+
+    Every status change made through the API (or the dashboard's
+    Applications page) is recorded in ``application_status_history``;
+    this endpoint exposes that audit trail so users can see exactly how
+    an application progressed (saved → applied → interview → ...) and
+    when. Returns an empty list for applications that never changed
+    status.
+    """
+    from interntrack.domain.models import Application, ApplicationStatusHistory
+
+    app_result = await db.execute(
+        select(Application.id).where(Application.id == application_id)
+    )
+    if app_result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    rows = await db.execute(
+        select(
+            ApplicationStatusHistory.new_status,
+            ApplicationStatusHistory.changed_at,
+            ApplicationStatusHistory.notes,
+        )
+        .where(ApplicationStatusHistory.application_id == application_id)
+        .order_by(
+            ApplicationStatusHistory.changed_at.asc(),
+            ApplicationStatusHistory.new_status.asc(),
+        )
+    )
+    history = [
+        ApplicationHistoryItem(
+            # SQLAlchemy returns the enum member (``ApplicationStatus``) for
+            # native_enum=False columns — coerce to its string value.
+            status=str(getattr(status, "value", status)),
+            changed_at=changed_at,
+            notes=notes,
+        )
+        for status, changed_at, notes in rows.all()
+    ]
+    return ApplicationHistoryResponse(application_id=application_id, history=history)
 
 
 @router.get("/timeline/recent")

@@ -1014,6 +1014,31 @@ def _update_application_status(app_id: str, status: str) -> None:
         st.error("Could not update status — is the API server running?")
 
 
+_STATUS_LABELS = {
+    "saved": "📌 Saved",
+    "applied": "📨 Applied",
+    "assessment": "🧪 Assessment",
+    "interview": "🗓 Interview",
+    "offer": "🎉 Offer",
+    "rejected": "🚫 Rejected",
+    "joined": "🎊 Joined",
+}
+
+
+def _save_application_notes(app_id: str, notes: str) -> None:
+    """Persist application notes via the real API (PUT with ``notes``)."""
+    resp = _api_raw(
+        f"/applications/{app_id}",
+        method="PUT",
+        json_data={"notes": notes.strip()},
+        timeout=20,
+    )
+    if resp is not None and resp.status_code == 200:
+        st.success("✅ Notes saved")
+    else:
+        st.error("Could not save notes — is the API server running?")
+
+
 def _login_user(profile: dict) -> None:
     """Store a user profile in the Streamlit session."""
     st.session_state["user"] = profile
@@ -2486,6 +2511,49 @@ def show_applications() -> None:
                     "Update", key=f"update_{app['id']}", use_container_width=True
                 ):
                     _update_application_status(app["id"], new_status)
+
+                # ── Notes editor ───────────────────────────────────────
+                notes = st.text_area(
+                    "📝 Notes",
+                    value=app.get("notes") or "",
+                    placeholder=(
+                        "e.g. HR call on Friday, asked about SOC shift timings…"
+                    ),
+                    key=f"notes_{app['id']}",
+                )
+                if st.button(
+                    "💾 Save notes",
+                    key=f"save_notes_{app['id']}",
+                    use_container_width=True,
+                ):
+                    _save_application_notes(app["id"], notes)
+
+                # ── Status-change timeline ─────────────────────────────
+                if st.button(
+                    "🕘 Show status history",
+                    key=f"hist_{app['id']}",
+                    use_container_width=True,
+                ):
+                    hist = fetch_data(f"/applications/{app['id']}/history")
+                    entries = (hist or {}).get("history") or []
+                    if not entries:
+                        st.caption(
+                            "No status changes yet — every update you make "
+                            "from now on appears here."
+                        )
+                    else:
+                        for entry in entries:
+                            raw_status = str(entry.get("status", "?"))
+                            label = _STATUS_LABELS.get(
+                                raw_status, raw_status.capitalize()
+                            )
+                            when = str(entry.get("changed_at") or "")[:10]
+                            note = (entry.get("notes") or "").strip()
+                            st.markdown(
+                                f"• **{escape(label)}**"
+                                + (f" — {when}" if when else "")
+                                + (f"\n\n  📝 {escape(note)}" if note else "")
+                            )
     else:
         st.info("No applications found. Apply to jobs from the Jobs page!")
 
