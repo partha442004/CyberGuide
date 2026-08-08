@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Match breakdown + min-match filter on Saved Jobs.** Clicking "Match
+  these jobs to my resume" now shows the full skill breakdown on every
+  job card (✅ matched / 🔄 transferable / ⬜ missing chips, ATS %,
+  suggestion — same detail as the My Matches page), and a new
+  "Only show matches at least this strong" slider hides weaker matches.
+  Fully-filtered sections disappear entirely instead of leaving a stale
+  header.
+
+### Added
+
 - **Cybersecurity category keyword expansion.** The `/domains` classifier
   now recognizes web-app and offensive-security terms (SQLi, SQL injection,
   XSS, CSRF, SSRF, exploit, malware, ransomware, phishing, DevSecOps,
