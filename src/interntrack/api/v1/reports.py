@@ -124,6 +124,7 @@ async def _empty_report(report_type: str, note: str) -> dict:
 async def get_daily_report(
     db: AsyncSession = Depends(get_db),
     slot: str | None = None,
+    preview: bool = False,
 ):
     """Get daily report and send it to the configured notification channels.
 
@@ -131,7 +132,10 @@ async def get_daily_report(
     free GitHub Actions cron hits this endpoint to trigger the daily digest.
     Saved alert preferences (domains / channels / min match %) are applied;
     ``slot`` (morning / afternoon / evening) overrides the category filter
-    with that slot's saved ``slot_domains`` when configured.
+    with that slot's saved ``slot_domains`` when configured. ``preview``
+    builds the report WITHOUT sending it or advancing the no-duplicates
+    window — the dashboard uses it to show exactly what today's digest
+    contains before it's delivered.
     """
     from interntrack.scheduler.jobs import (
         DEFAULT_SLOT_DOMAINS,
@@ -162,6 +166,12 @@ async def get_daily_report(
             user_id=target["user_id"],
         )
 
+        # Preview mode builds the digest without delivering it and without
+        # advancing the no-duplicates window (so previewing never causes a
+        # job to be skipped from the real next send).
+        if preview:
+            last_report = report
+            continue
         # Advance the no-duplicates window regardless of whether anything
         # new was found, then skip the send when there are no new jobs.
         await _mark_alert_sent(db, target["user_id"])

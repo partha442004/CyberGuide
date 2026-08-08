@@ -1266,3 +1266,120 @@ class TestPauseGatesDelivery:
             sent = await _send_instant_alerts(AsyncMock(), [MagicMock()])
 
         assert sent == {}
+
+
+# ---------------------------------------------------------------------------
+# Digest preview mode
+# ---------------------------------------------------------------------------
+
+
+class TestDailyReportPreview:
+    """GET /reports/daily?preview=1 builds the digest without sending."""
+
+    @pytest.mark.asyncio
+    async def test_preview_builds_report_without_sending(self):
+        from interntrack.api.v1.reports import get_daily_report
+
+        mock_db = AsyncMock()
+        mock_service = MagicMock()
+        mock_service.generate_daily_report = AsyncMock(
+            return_value={
+                "summary": {"new_jobs": 1, "new_applications": 0},
+                "new_jobs": [{"id": "j1", "title": "Security Analyst"}],
+            }
+        )
+        send_mock = AsyncMock(return_value={"email": True})
+        mark_sent = AsyncMock()
+
+        with (
+            patch(
+                "interntrack.api.v1.reports._load_digest_targets",
+                new=AsyncMock(
+                    return_value=[
+                        {
+                            "user_id": "user1",
+                            "prefs": {
+                                "domains": ["security"],
+                                "channels": ["email"],
+                                "min_match_score": None,
+                                "is_enabled": True,
+                            },
+                            "user": None,
+                        }
+                    ]
+                ),
+            ),
+            patch(
+                "interntrack.api.v1.reports.ReportService",
+                return_value=mock_service,
+            ),
+            patch(
+                "interntrack.api.v1.reports._send_alert_digest",
+                new=send_mock,
+            ),
+            patch(
+                "interntrack.scheduler.jobs._mark_alert_sent",
+                new=mark_sent,
+            ),
+        ):
+            report = await get_daily_report(db=mock_db, preview=True)
+
+        # The report is returned...
+        assert report["summary"]["new_jobs"] == 1
+        assert report["new_jobs"][0]["title"] == "Security Analyst"
+        # ...but nothing was sent and the no-duplicates window did NOT move,
+        # so previewing never skips a job from the real digest.
+        send_mock.assert_not_awaited()
+        mark_sent.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_non_preview_still_sends(self):
+        from interntrack.api.v1.reports import get_daily_report
+
+        mock_db = AsyncMock()
+        mock_service = MagicMock()
+        mock_service.generate_daily_report = AsyncMock(
+            return_value={
+                "summary": {"new_jobs": 1, "new_applications": 0},
+                "new_jobs": [{"id": "j1", "title": "Security Analyst"}],
+            }
+        )
+        send_mock = AsyncMock(return_value={"email": True})
+        mark_sent = AsyncMock()
+
+        with (
+            patch(
+                "interntrack.api.v1.reports._load_digest_targets",
+                new=AsyncMock(
+                    return_value=[
+                        {
+                            "user_id": "user1",
+                            "prefs": {
+                                "domains": ["security"],
+                                "channels": ["email"],
+                                "min_match_score": None,
+                                "is_enabled": True,
+                            },
+                            "user": None,
+                        }
+                    ]
+                ),
+            ),
+            patch(
+                "interntrack.api.v1.reports.ReportService",
+                return_value=mock_service,
+            ),
+            patch(
+                "interntrack.api.v1.reports._send_alert_digest",
+                new=send_mock,
+            ),
+            patch(
+                "interntrack.scheduler.jobs._mark_alert_sent",
+                new=mark_sent,
+            ),
+        ):
+            report = await get_daily_report(db=mock_db, preview=False)
+
+        assert report["summary"]["new_jobs"] == 1
+        send_mock.assert_awaited_once()
+        mark_sent.assert_awaited_once()
