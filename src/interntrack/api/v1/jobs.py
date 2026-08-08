@@ -24,6 +24,35 @@ from interntrack.services.job_service import JobService
 
 router = APIRouter()
 
+# Vercel serverless functions are killed at maxDuration (60s on Hobby), so
+# discovery must stay well under that. Running every registered scraper per
+# query is too slow — the US geo-locked guest APIs (linkedin, indeed,
+# glassdoor, hired, angellist, the *_api scrapers) carry 15-30s timeouts and
+# dominate wall time. Discovery instead runs this curated set of fast /
+# India-relevant sources; users still get US/global roles via the digest's
+# RSS feeds, Greenhouse vendor boards and the share endpoint.
+_DISCOVERY_SOURCES: list[str] = [
+    "indeed_india",
+    "linkedin_india",
+    "timesjobs",
+    "naukri",
+    "glassdoor_india",
+    "internshala",
+    "google_jobs",
+    "wellfound",
+    "unstop",
+    "freshersworld",
+    "rss_feed",
+    "hackernews",
+    "company",
+]
+
+# Total wall-clock budget (seconds) for one discovery request. Kept at 40s so
+# the endpoint always returns a (possibly partial) result before Vercel's
+# 60s hard kill, even after a cold start.
+_DISCOVERY_DEADLINE_SECONDS = 40
+
+
 # Indian cities (plus common aliases) recognized inside discovery queries so
 # the right scrapers target them. e.g. "cybersecurity bangalore" resolves to
 # query="cybersecurity", location="Bangalore".
@@ -715,16 +744,21 @@ async def run_discovery_for_users(
     details = []
     total_found = total_saved = 0
     saved_all: list = []
-    # Vercel serverless functions are killed at maxDuration (60s). Each query
-    # can take ~15s against live job sites, so stop early once the budget is
-    # used up instead of letting the whole request die with a 500.
+    # Vercel serverless functions are killed at maxDuration (60s). Discovery
+    # runs only the fast/India-relevant sources and stops early once the
+    # budget is used up, so the request always returns a partial result
+    # instead of dying with FUNCTION_INVOCATION_TIMEOUT.
     import time
 
-    deadline = time.monotonic() + 50
+    deadline = time.monotonic() + _DISCOVERY_DEADLINE_SECONDS
     for query, location in unique:
         if time.monotonic() > deadline:
             break
-        jobs = await registry.fetch_all(query=query, location=location)
+        jobs = await registry.fetch_all(
+            query=query,
+            location=location,
+            sources=_DISCOVERY_SOURCES,
+        )
         saved = await service.save_jobs(jobs)
         total_found += len(jobs)
         total_saved += len(saved)
@@ -771,10 +805,11 @@ async def run_discovery(
     # "cybersecurity bangalore" -> query="cybersecurity", location="Bangalore"
     # so the India scrapers target Bangalore instead of US geo-locked APIs.
     location = _extract_location_from_query(query)
+    sources = [source] if source else _DISCOVERY_SOURCES
     jobs = await registry.fetch_all(
         query=query,
         location=location,
-        sources=[source] if source else None,
+        sources=sources,
     )
     service = JobService(db)
     saved = await service.save_jobs(jobs)

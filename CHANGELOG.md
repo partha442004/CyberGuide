@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **⚡ Fixed discovery timing out on Vercel serverless (60s cap).** A
+  live smoke test showed `POST /jobs/discovery/run-for-users` dying with
+  `FUNCTION_INVOCATION_TIMEOUT`: every query fanned out to **all ~18
+  scrapers** including the slow US geo-locked APIs (linkedin, indeed,
+  glassdoor, hired, *_api), so one pass plus cold start exceeded Vercel
+  Hobby's 60s `maxDuration`. Discovery now runs a curated set of
+  **fast / India-relevant sources** (`indeed_india`, `linkedin_india`,
+  `timesjobs`, `naukri`, `glassdoor_india`, `internshala`, `google_jobs`,
+  `wellfound`, `unstop`, `freshersworld`, `rss_feed`, `hackernews`, the
+  Greenhouse vendor boards) and enforces a **40s wall-clock deadline**,
+  so the request always returns a (possibly partial) result instead of
+  being killed — the daily GitHub cron now completes reliably. The
+  dashboard's single-query discovery button uses the same fast sources.
+  3 new/updated tests — 2477 total.
+
 - **🔎 Discovery queries expanded: cybersecurity + backend roles.** The
   per-user discovery searches that feed the daily alerts now cover more
   of what users actually look for. The **security** domain gained
