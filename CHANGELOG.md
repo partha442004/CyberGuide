@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **🔕 Vacation mode — pause ALL alerts.** Settings now has a Vacation
+  mode block: pause every alert (daily email, Telegram, weekly recap,
+  instant pings) for 1 / 2 / 3 / 7 / 14 days, with a one-click resume.
+  Backed by a new `AlertPreferences.paused_until` column and an
+  `_alerts_paused()` gate on every delivery path (daily + weekly digests,
+  the scheduler worker, and instant Telegram pings). The no-duplicates
+  window deliberately does NOT advance while paused, so resuming delivers
+  a full catch-up digest — no missed jobs. Verified live: pause sets the
+  timestamp, the daily endpoint stops sending, resume clears it.
+- **📥 Export Applications to CSV.** The Applications page gains an Export
+  button (mirrors the Saved Jobs export) with status filter applied, job
+  titles enriched from a live job lookup since the applications API
+  doesn't embed job details.
+- **🛠 One-click Maintenance on Settings.** Backfill tags, Backfill views
+  (engagement) and Archive expired now have dashboard buttons — the
+  endpoints existed but were curl-only, so the backfills are finally
+  usable from the UI.
+
+### Added
+
 - **🎯 Job of the day card on the dashboard Overview.** The page now
   opens with the same highlight the daily digest leads with — the top
   resume-match job — as a gradient amber card with its match-% chip and
