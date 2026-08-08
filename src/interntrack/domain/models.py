@@ -448,8 +448,12 @@ class AlertPreferences(Base, TimestampMixin):
     # Whether a newly discovered high-match job pings the user on Telegram
     # immediately instead of waiting for the next daily slot.
     instant_alerts = Column(Boolean, default=True)
+    # Vacation mode: when set (naive UTC), ALL alerts (daily, weekly and
+    # instant) are suppressed until this timestamp. Auto-added to existing
+    # live tables by init_db's ``_sync_missing_columns`` step.
+    paused_until = Column(DateTime, nullable=True)
 
-    @validates("last_alert_at")
+    @validates("last_alert_at", "paused_until")
     def _coerce_naive_utc(self, _key: str, value):
         """Normalize aware datetimes to naive UTC for Postgres binding."""
         return to_naive_utc(value)
