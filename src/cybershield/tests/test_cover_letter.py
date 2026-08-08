@@ -1,6 +1,7 @@
 """Tests for the cover-letter generator (service + API endpoint)."""
 
 import pytest
+from httpx import AsyncClient
 
 from cybershield.services.cover_letter import _as_skill_names, _top_skills, build_cover_letter
 
@@ -69,7 +70,7 @@ class TestBuildCoverLetter:
 
 class TestCoverLetterEndpoint:
     @pytest.mark.asyncio
-    async def test_cover_letter_requires_resume(self, client: pytest.fixture):
+    async def test_cover_letter_requires_resume(self, client: AsyncClient):
         """No resume for the user -> 404 with a helpful message."""
         response = await client.post(
             "/api/v1/resumes/cover-letter",
@@ -80,7 +81,9 @@ class TestCoverLetterEndpoint:
 
     @pytest.mark.asyncio
     async def test_cover_letter_generates_for_resume_and_job(
-        self, client: pytest.fixture, db_session: pytest.fixture
+        self,
+        client: AsyncClient,
+        db_session,
     ):
         """With a resume + job in the DB, returns a tailored letter."""
         from cybershield.domain.models import Job, ResumeData
@@ -126,9 +129,7 @@ class TestCoverLetterEndpoint:
         assert data["match_score"] is not None
 
     @pytest.mark.asyncio
-    async def test_cover_letter_missing_job_404(
-        self, client: pytest.fixture, db_session: pytest.fixture
-    ):
+    async def test_cover_letter_missing_job_404(self, client: AsyncClient, db_session):
         """Resume exists but job doesn't -> 404 'Job not found'."""
         from cybershield.domain.models import ResumeData
 
