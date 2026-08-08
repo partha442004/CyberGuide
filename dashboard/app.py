@@ -711,18 +711,21 @@ def _category_header(domain: str, count: int, total: int) -> None:
     )
 
 
-def _render_job(job: dict, match_score: Any = None) -> None:
+def _render_job(job: dict, match: Any = None) -> None:
     """One job as a clean, hoverable card with real widgets.
 
     All scraped fields (title, company, location, description, ...) are
     untrusted external content, so every value interpolated into HTML is
-    escaped before rendering with ``unsafe_allow_html``. When
-    ``match_score`` is given (from the Resume Match run), a colored
-    match chip is shown on the card.
+    escaped before rendering with ``unsafe_allow_html``. When ``match`` is
+    given (a match dict from ``/resumes/match-batch``, or a legacy plain
+    score float), a colored match chip is shown on the card; dicts also
+    render the full matched / related / missing-skill breakdown below it.
     """
     title = escape(str(job.get("title", "Untitled")))
     company = escape(str(job.get("company", "Unknown")))
     posted = job.get("posted_at")
+
+    match_score = match.get("match_score") if isinstance(match, dict) else match
 
     with st.container(border=True):
         col_l, col_r = st.columns([4, 1])
@@ -745,6 +748,8 @@ def _render_job(job: dict, match_score: Any = None) -> None:
                     f"{icon} Match: {score:.0f}%</span></div>",
                     unsafe_allow_html=True,
                 )
+                if isinstance(match, dict):
+                    _match_breakdown(match)
 
             chips = []
             if job.get("company") and str(job.get("company")) != "Unknown":
@@ -1795,20 +1800,21 @@ def _render_saved_jobs_tab(jobs: list) -> None:
         labels[d] = f"{_DOMAIN_LABELS.get(d, d)} ({len(grouped[d])})"
     selected = _category_picker(options, labels)
 
-    # Resume match % on every card — one click, cached in the session.
-    match_scores: dict = st.session_state.get("saved_job_match_scores") or {}
+    # Resume match on every card — one click, cached in the session. The
+    # full match payload is kept (not just the score) so each card renders
+    # the matched/related/missing-skill breakdown and the min-score slider
+    # below can hide weaker matches.
+    match_data: dict = st.session_state.get("saved_job_match_data") or {}
     if st.button("🎯 Match these jobs to my resume", use_container_width=True):
         with st.spinner("Matching against your resume..."):
             job_ids = [j["id"] for j in jobs if j.get("id")][:50]
             if job_ids:
                 result = _match_jobs_to_resume(jobs, _current_user_id())
                 if result and result.get("matches"):
-                    match_scores = {
-                        m.get("job_id"): m.get("match_score") for m in result["matches"]
-                    }
-                    st.session_state["saved_job_match_scores"] = match_scores
+                    match_data = {str(m.get("job_id")): m for m in result["matches"]}
+                    st.session_state["saved_job_match_data"] = match_data
                     st.success(
-                        f"✅ Matched {len(match_scores)} jobs — average "
+                        f"✅ Matched {len(match_data)} jobs — average "
                         f"{result.get('average_score')}%"
                     )
                 else:
@@ -1816,21 +1822,48 @@ def _render_saved_jobs_tab(jobs: list) -> None:
                         "No match scores — upload your resume on the Resume "
                         "Match page first."
                     )
-    elif not match_scores:
+    elif not match_data:
         st.caption(
-            "💡 Click **Match these jobs to my resume** to see your match % on "
-            "every card."
+            "💡 Click **Match these jobs to my resume** to see your match % "
+            "and skill breakdown on every card."
         )
 
-    # Render sections.
+    # Minimum-match filter: hides cards below the slider value, but only
+    # for jobs that were part of a match run (unmatched jobs stay visible).
+    min_match = 0
+    if match_data:
+        min_match = st.slider(
+            "🎯 Only show matches at least this strong",
+            min_value=0,
+            max_value=100,
+            value=0,
+            step=5,
+            help="Filters the sections below to jobs whose resume match % is "
+            "at or above this value. Jobs you haven't matched are unaffected.",
+        )
+
+    # Render sections. Filter each category by the min-match slider FIRST
+    # so a section whose every card fell below the slider disappears
+    # entirely (no stale header with zero cards), and the header count
+    # reflects what's actually shown.
     domains = domains_present if selected == "All" else [selected]
     for domain in domains:
         items = grouped.get(domain)
         if not items:
             continue
-        _category_header(domain, len(items), len(jobs))
+        visible = []
         for job in items:
-            _render_job(job, match_scores.get(job.get("id")))
+            match = match_data.get(str(job.get("id")))
+            if match is not None:
+                score = match.get("match_score")
+                if isinstance(score, (int, float)) and min_match and score < min_match:
+                    continue
+            visible.append(job)
+        if not visible:
+            continue
+        _category_header(domain, len(visible), len(jobs))
+        for job in visible:
+            _render_job(job, match_data.get(str(job.get("id"))))
 
 
 def _share_job_form() -> None:
