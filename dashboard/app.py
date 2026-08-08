@@ -2048,6 +2048,41 @@ def _render_saved_jobs_tab(jobs: list) -> None:
             "at or above this value. Jobs you haven't matched are unaffected.",
         )
 
+    # 📥 Export the currently filtered view (location filter applied) as
+    # CSV, including each job's resume match % when a match run happened.
+    import csv
+    import io
+
+    csv_cols = [
+        "title",
+        "company",
+        "location",
+        "url",
+        "source",
+        "salary_min",
+        "salary_max",
+        "salary_currency",
+        "is_remote",
+        "posted_at",
+        "match_score",
+    ]
+    csv_buf = io.StringIO()
+    csv_writer = csv.DictWriter(csv_buf, fieldnames=csv_cols, extrasaction="ignore")
+    csv_writer.writeheader()
+    for job in jobs:
+        row = dict(job)
+        m = match_data.get(str(job.get("id")))
+        row["match_score"] = m.get("match_score") if m else ""
+        csv_writer.writerow(row)
+    st.download_button(
+        "📥 Export CSV",
+        data=csv_buf.getvalue(),
+        file_name="saved_jobs.csv",
+        mime="text/csv",
+        help="Downloads the currently filtered jobs (location filter applied) "
+        "as a spreadsheet-friendly CSV.",
+    )
+
     # Render sections. Filter each category by the min-match slider FIRST
     # so a section whose every card fell below the slider disappears
     # entirely (no stale header with zero cards), and the header count
