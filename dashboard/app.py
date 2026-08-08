@@ -790,14 +790,35 @@ def _render_job(job: dict, match: Any = None) -> None:
         with col_r:
             if job.get("url"):
                 st.link_button("🔗 View", job["url"], use_container_width=True)
-            if st.button(
-                "👁 Mark viewed",
-                key=f"view_{job.get('id', title)}",
-                use_container_width=True,
-                help="Counts as a view — feeds the 🔥 Trending ranking.",
-            ):
-                _api(f"/jobs/{str(job.get('id'))}/view", method="POST", timeout=15)
-            if st.button(
+            _ic1, _ic2 = st.columns(2)
+            with _ic1:
+                if st.button(
+                    "📌 Save",
+                    key=f"save_{job.get('id', title)}",
+                    use_container_width=True,
+                    help="Bookmark this job (also boosts its 🔥 rank).",
+                ):
+                    _toggle_bookmark(job)
+            with _ic2:
+                if st.button(
+                    "👁 Seen",
+                    key=f"view_{job.get('id', title)}",
+                    use_container_width=True,
+                    help="Counts as a view — feeds the 🔥 Trending ranking.",
+                ):
+                    _api(f"/jobs/{str(job.get('id'))}/view", method="POST", timeout=15)
+            _apply_popover = getattr(st, "popover", None)
+            if _apply_popover is not None:
+                with _apply_popover("📋 Apply"):
+                    _apply_status = st.radio(
+                        "Status when applied",
+                        ["applied", "interview", "offer"],
+                        horizontal=True,
+                        key=f"apply_status_{job.get('id', title)}",
+                    )
+                    if st.button("Confirm", key=f"apply_go_{job.get('id', title)}"):
+                        _track_application(job.get("id"), title, _apply_status)
+            elif st.button(
                 "📋 Apply",
                 key=f"apply_{job.get('id', title)}",
                 use_container_width=True,
@@ -880,8 +901,13 @@ def _current_user_id() -> str:
     return user["id"] if user else "user1"
 
 
-def _track_application(job_id: Any, title: str) -> None:
-    """Create an application for the current user via the real API."""
+def _track_application(job_id: Any, title: str, status: str | None = None) -> None:
+    """Create an application for the current user via the real API.
+
+    When ``status`` is given (from the Apply popover), the application is
+    created and immediately updated to that status (applied / interview /
+    offer) so tracking is a single action.
+    """
     user_id = _current_user_id()
     resp = _api_raw(
         "/applications/",
@@ -890,14 +916,88 @@ def _track_application(job_id: Any, title: str) -> None:
         timeout=20,
     )
     if resp is not None and resp.status_code in (200, 201):
+        app_id = (resp.json() or {}).get("id")
+        status_ok = True
+        if status and app_id:
+            put_resp = _api_raw(
+                f"/applications/{app_id}",
+                method="PUT",
+                json_data={"status": status},
+                timeout=15,
+            )
+            status_ok = put_resp is not None and put_resp.status_code in (200, 201)
+        # ``title`` is already escaped by _render_job before being passed in.
         st.success(
-            f"✅ Application tracked for **{title}**! Update its status on the "
-            "Applications page."
+            f"✅ Application tracked for **{title}**"
+            + (f" as **{status}**" if status and status_ok else "")
+            + "! Update it anytime on the Applications page."
         )
     elif resp is not None and resp.status_code == 422:
         st.error("Couldn't track the application — the job may not be saved yet.")
     else:
         st.error("Applications API unreachable. Is the API server running?")
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _bookmarks_payload() -> list:
+    """Bookmark list from the API (cached 60s so toggles refresh fast).
+
+    Cached so ``_bookmarks_payload.clear()`` can invalidate it after a
+    toggle; ``_bookmarked_job_ids`` derives the save/unsave decision from
+    it.
+    """
+    data = fetch_data("/bookmarks/?limit=200") or {}
+    return list(data.get("bookmarks") or [])
+
+
+def _bookmarked_job_ids() -> dict[str, str]:
+    """Map job id -> bookmark id for ``item_type='job'`` bookmarks."""
+    return {
+        str(b.get("item_id")): str(b.get("id"))
+        for b in _bookmarks_payload()
+        if b.get("item_type") == "job"
+    }
+
+
+def _clear_bookmark_cache() -> None:
+    """Drop the cached bookmark list after a toggle."""
+    _bookmarks_payload.clear()
+
+
+def _toggle_bookmark(job: dict) -> None:
+    """Save / unsave a job via the bookmarks API (one-click toggle).
+
+    The API 409s on duplicates, so the button flips between POST (save)
+    and DELETE (unsave) based on the session-cached bookmark set. Saved
+    jobs also gain bookmark weight in the 🔥 Trending ranking.
+    """
+    job_id = str(job.get("id") or "")
+    title = str(job.get("title") or "Untitled")
+    if not job_id:
+        st.error("Cannot save — job id missing.")
+        return
+    saved = _bookmarked_job_ids()
+    if job_id in saved:
+        resp = _api_raw(f"/bookmarks/{saved[job_id]}", method="DELETE", timeout=15)
+        if resp is not None and resp.status_code in (200, 204):
+            st.success(f"Removed **{escape(title)}** from saved jobs.")
+            _clear_bookmark_cache()
+        else:
+            st.error("Couldn't unsave — bookmarks API unreachable.")
+    else:
+        resp = _api_raw(
+            "/bookmarks/",
+            method="POST",
+            json_data={"item_type": "job", "item_id": job_id},
+            timeout=15,
+        )
+        _clear_bookmark_cache()
+        if resp is not None and resp.status_code in (200, 201):
+            st.success(f"📌 Saved **{escape(title)}** — see the Bookmarks page.")
+        elif resp is not None and resp.status_code == 409:
+            st.caption("Already saved.")
+        else:
+            st.error("Couldn't save — bookmarks API unreachable.")
 
 
 def _update_application_status(app_id: str, status: str) -> None:
@@ -1645,6 +1745,50 @@ def show_overview() -> None:
                                 "🔗 Open",
                                 tj["url"],
                                 key=f"trend_open_{tj_id}",
+                                use_container_width=True,
+                            )
+            st.markdown("")
+
+        # ── ⏳ Closing soon (expiring roles) ─────────────────────────────
+        closing = fetch_data("/jobs/closing/soon") or []
+        if isinstance(closing, list) and closing:
+            st.markdown(
+                '<div class="section-title">⏳ Closing soon</div>'
+                '<div class="section-sub">Deadlines are approaching — '
+                "apply before these roles close.</div>",
+                unsafe_allow_html=True,
+            )
+            for cj in closing[:5]:
+                with st.container(border=True):
+                    ccol_l, ccol_r = st.columns([4, 1])
+                    with ccol_l:
+                        st.markdown(f"**{escape(str(cj.get('title') or 'Untitled'))}**")
+                        cchips = []
+                        if cj.get("company"):
+                            cchips.append(f"🏢 {escape(str(cj['company']))}")
+                        if cj.get("location"):
+                            cchips.append(f"📍 {escape(str(cj['location']))}")
+                        if cj.get("expires_at"):
+                            try:
+                                exp = datetime.fromisoformat(str(cj["expires_at"]))
+                                cchips.append(f"⏳ {exp:%b %d}")
+                            except ValueError:
+                                pass
+                        if cchips:
+                            st.markdown(
+                                '<div class="chip-row">'
+                                + "".join(
+                                    f'<span class="chip">{c}</span>' for c in cchips
+                                )
+                                + "</div>",
+                                unsafe_allow_html=True,
+                            )
+                    with ccol_r:
+                        if cj.get("url"):
+                            st.link_button(
+                                "🔗 Open",
+                                cj["url"],
+                                key=f"close_open_{cj.get('id')}",
                                 use_container_width=True,
                             )
             st.markdown("")
