@@ -2611,6 +2611,16 @@ def show_settings() -> None:
         "📅 Send a Sunday weekly digest (recap of the week's jobs)",
         value=bool(prefs.get("weekly_enabled", True)),
     )
+    instant_alerts = st.checkbox(
+        "⚡ Instant Telegram alert for new high-match jobs",
+        value=bool(prefs.get("instant_alerts", True)),
+        help="When a newly discovered job matches your categories, location "
+        "and match threshold, ping you on Telegram right away instead of "
+        "waiting for the next daily slot. Needs your Telegram chat ID. "
+        "With this on, the scheduled digest skips Telegram for you (so you "
+        "never get the same job twice) — your email digest still arrives "
+        "in full.",
+    )
 
     # Optional minimum resume-match threshold.
     min_score = st.slider(
@@ -2631,6 +2641,7 @@ def show_settings() -> None:
                 "is_enabled": True,
                 "slot_domains": slot_picks,
                 "weekly_enabled": weekly_enabled,
+                "instant_alerts": instant_alerts,
                 "location": location.strip() or None,
             }
             result = _api(

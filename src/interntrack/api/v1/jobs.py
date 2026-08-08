@@ -489,6 +489,7 @@ async def run_discovery_for_users(
     service = JobService(db)
     details = []
     total_found = total_saved = 0
+    saved_all: list = []
     # Vercel serverless functions are killed at maxDuration (60s). Each query
     # can take ~15s against live job sites, so stop early once the budget is
     # used up instead of letting the whole request die with a 500.
@@ -502,7 +503,17 @@ async def run_discovery_for_users(
         saved = await service.save_jobs(jobs)
         total_found += len(jobs)
         total_saved += len(saved)
+        saved_all.extend(saved)
         details.append({"query": query, "found": len(jobs), "saved": len(saved)})
+    # Ping users on Telegram the moment a high-match job lands (instead of
+    # waiting for the next daily slot). One consolidated pass after all
+    # queries so a user gets a single ping per run, not one per query.
+    # Best-effort — never blocks/breaks discovery.
+    if saved_all:
+        from interntrack.scheduler.jobs import _send_instant_alerts
+
+        with contextlib.suppress(Exception):
+            await _send_instant_alerts(db, saved_all)
     return {
         "users": len(targets),
         "queries_run": len(details),
@@ -545,6 +556,7 @@ async def run_discovery(
 
     # Notify configured channels when new jobs were saved (no-op otherwise).
     if saved:
+        from interntrack.scheduler.jobs import _send_instant_alerts
         from interntrack.services.notification_service import NotificationManager
 
         with contextlib.suppress(Exception):
@@ -558,5 +570,7 @@ async def run_discovery(
                 message,
                 subject="New Jobs Found",
             )
+            # Per-user instant Telegram pings for high-match jobs.
+            await _send_instant_alerts(db, saved)
 
     return {"discovered": len(jobs), "saved": len(saved)}

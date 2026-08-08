@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from interntrack.database.session import get_db_session
 from interntrack.services.job_service import JobService
 from interntrack.services.notification_service import NotificationManager
-from interntrack.services.report_service import ReportService
+from interntrack.services.report_service import ReportService, classify_domain
 
 
 async def run_job_discovery():
@@ -68,6 +68,7 @@ async def _load_alert_preferences(
                 else {}
             )
             weekly = getattr(pref, "weekly_enabled", None)
+            instant = getattr(pref, "instant_alerts", None)
             return {
                 "domains": list(pref.domains or []),
                 "channels": list(pref.channels or []),
@@ -76,6 +77,7 @@ async def _load_alert_preferences(
                 "last_alert_at": pref.last_alert_at,
                 "slot_domains": slot_domains,
                 "weekly_enabled": weekly if isinstance(weekly, bool) else True,
+                "instant_alerts": instant if isinstance(instant, bool) else True,
             }
     except Exception:
         return {}
@@ -223,6 +225,21 @@ async def _deliver_alert(
         )
         if team:
             report = {**report, "team": team}
+    # Users with instant Telegram alerts on get the same new jobs pinged
+    # instantly, so the digest skips Telegram for them (email still covers
+    # the full digest) — otherwise every job would arrive twice on Telegram.
+    # Only a saved prefs row with ``instant_alerts: True`` skips Telegram: a
+    # failed/absent load (empty dict) keeps the digest Telegram as before.
+    if user is not None and getattr(user, "telegram_chat_id", None):
+        try:
+            prefs = await _load_alert_preferences(
+                session,
+                user_id=getattr(user, "id", "") or "",
+            )
+            if prefs.get("instant_alerts") is True:
+                targets = [c for c in targets if c != "telegram"]
+        except Exception:  # noqa: BLE001, S110 - best-effort dedup
+            pass
     non_telegram = [c for c in targets if c != "telegram"]
     email_targets = [c for c in non_telegram if c == "email"]
     text_targets = [c for c in non_telegram if c != "email"]
@@ -283,6 +300,109 @@ async def _deliver_alert(
             telegram_ok = telegram_ok and bool(chunk_results.get("telegram", False))
         results["telegram"] = telegram_ok
     return results
+
+
+async def _send_instant_alerts(session, saved_jobs: list) -> dict:
+    """Ping users on Telegram the moment a high-match job is discovered.
+
+    For every enabled account with ``instant_alerts`` on and a Telegram chat
+    ID, each newly saved job is checked against the user's saved domains,
+    preferred location and resume match threshold. Matching jobs are sent in
+    one compact Telegram message with Apply buttons routed to that user's own
+    chat. Deliberately Telegram-only — email stays on the scheduled digest —
+    and never raises: a broken chat or DB never blocks discovery.
+
+    Returns ``{user_id: job_count}`` for matched sends (for logging).
+    """
+    if not saved_jobs:
+        return {}
+    sent: dict = {}
+    try:
+        targets = await _enabled_alert_targets(session)
+    except Exception:  # noqa: BLE001 - best-effort pings
+        return {}
+    for target in targets:
+        user_id = target.get("user_id")
+        prefs = target.get("prefs") or {}
+        user = target.get("user")
+        if not user_id or not prefs.get("instant_alerts", True):
+            continue
+        chat_id = getattr(user, "telegram_chat_id", None)
+        if not chat_id:
+            continue
+        try:
+            resume_skills = await _latest_resume_skill_names(session, user_id=user_id)
+            domains = prefs.get("domains") or []
+            min_score = prefs.get("min_match_score")
+            loc_lower = (getattr(user, "location", None) or "").strip().lower()
+            matches = []
+            for job in saved_jobs:
+                title = str(getattr(job, "title", "") or "")
+                tags = list(getattr(job, "tags", None) or [])
+                job_domain = classify_domain(title, tags)
+                if domains and job_domain not in domains:
+                    continue
+                job_loc = str(getattr(job, "location", None) or "").lower()
+                if loc_lower and not _location_matches(job_loc, loc_lower):
+                    continue
+                job_dict = {
+                    "id": str(getattr(job, "id", "") or ""),
+                    "title": title,
+                    "company": str(getattr(job, "company", "") or ""),
+                    "location": getattr(job, "location", None),
+                    "url": getattr(job, "url", None),
+                    "required_skills": list(
+                        getattr(job, "required_skills", None) or []
+                    ),
+                    "preferred_skills": list(
+                        getattr(job, "preferred_skills", None) or []
+                    ),
+                    "tags": tags,
+                }
+                score = _job_match_score(resume_skills, job_dict)
+                # Unknown match % passes (same as the digest); a known score
+                # below the threshold is dropped.
+                if min_score and score is not None and (score or 0) < min_score:
+                    continue
+                matches.append((score, job_dict))
+            if not matches:
+                continue
+            matches.sort(key=lambda item: -(item[0] or 0.0))
+            lines = [
+                (
+                    f"⚡ <b>New match for you!</b> "
+                    f"({len(matches)} job{'s' if len(matches) != 1 else ''} "
+                    f"just discovered)"
+                )
+            ]
+            buttons: list[tuple[str, str]] = []
+            for score, job in matches[:5]:
+                score_txt = f" · {score:.0f}% match" if score is not None else ""
+                location = job.get("location") or "Remote"
+                lines.append(
+                    f"🔹 <b>{_esc(job['title'])}</b> @ {_esc(job['company'])}"
+                    f" · {_esc(location)}{score_txt}"
+                )
+                url = str(job.get("url") or "")
+                if url:
+                    job_title = str(job["title"] or "Job").strip()[:60]
+                    buttons.append((f"✅ Apply — {job_title}", url))
+            if len(matches) > 5:
+                lines.append(f"…and {len(matches) - 5} more on the dashboard.")
+            message = "\n".join(lines)
+            manager = NotificationManager(session)
+            results = await manager.notify(
+                ["telegram"],
+                message,
+                subject="⚡ New job match",
+                buttons=buttons or None,
+                recipient={"telegram_chat_id": chat_id},
+            )
+            if results.get("telegram"):
+                sent[user_id] = len(matches)
+        except Exception:  # noqa: BLE001, S112 - one user must not block the rest
+            continue
+    return sent
 
 
 async def _enabled_alert_targets(session) -> list[dict]:

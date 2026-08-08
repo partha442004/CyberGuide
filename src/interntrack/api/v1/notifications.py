@@ -165,6 +165,7 @@ async def get_alert_preferences(
         last_alert_at=prefs.get("last_alert_at"),
         slot_domains=prefs.get("slot_domains") or {},
         weekly_enabled=prefs.get("weekly_enabled", True),
+        instant_alerts=prefs.get("instant_alerts", True),
     )
 
 
@@ -206,6 +207,8 @@ async def update_alert_preferences(
         pref.slot_domains = cleaned  # type: ignore[assignment]
     if update.weekly_enabled is not None:
         pref.weekly_enabled = update.weekly_enabled  # type: ignore[assignment]
+    if update.instant_alerts is not None:
+        pref.instant_alerts = update.instant_alerts  # type: ignore[assignment]
 
     await db.commit()
     await db.refresh(pref)
@@ -219,6 +222,9 @@ async def update_alert_preferences(
         slot_domains=dict(pref.slot_domains or {}),
         weekly_enabled=(
             bool(pref.weekly_enabled) if pref.weekly_enabled is not None else True
+        ),
+        instant_alerts=(
+            bool(pref.instant_alerts) if pref.instant_alerts is not None else True
         ),
     )
 

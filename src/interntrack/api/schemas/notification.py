@@ -75,6 +75,7 @@ class AlertPreferencesResponse(BaseModel):
     last_alert_at: datetime | None = None
     slot_domains: dict | None = None
     weekly_enabled: bool = True
+    instant_alerts: bool = True
 
     model_config = {"from_attributes": True}
 
@@ -88,3 +89,4 @@ class AlertPreferencesUpdate(BaseModel):
     is_enabled: bool | None = None
     slot_domains: dict | None = None
     weekly_enabled: bool | None = None
+    instant_alerts: bool | None = None
