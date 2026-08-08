@@ -2248,8 +2248,51 @@ def show_applications() -> None:
     )
     apps_data = fetch_data(endpoint)
 
-    if apps_data and apps_data.get("applications"):
-        for app in apps_data["applications"]:
+    apps = (apps_data or {}).get(
+        "applications"
+    ) or []  # 📥 Export the current (filtered) application list to CSV.
+    if apps:
+        import csv
+        import io
+
+        # The applications API doesn't embed job details, so enrich titles /
+        # companies from a fresh jobs lookup (best-effort; blank when the
+        # job list is unreachable).
+        job_rows = fetch_data("/jobs/?limit=200") or {}
+        job_lookup = {str(j.get("id")): j for j in (job_rows.get("jobs") or [])}
+        csv_cols = [
+            "id",
+            "job_id",
+            "status",
+            "created_at",
+            "updated_at",
+            "job_title",
+            "company",
+        ]
+        csv_buf = io.StringIO()
+        csv_writer = csv.DictWriter(csv_buf, fieldnames=csv_cols, extrasaction="ignore")
+        csv_writer.writeheader()
+        for app in apps:
+            job = job_lookup.get(str(app.get("job_id"))) or {}
+            csv_writer.writerow(
+                {
+                    **app,
+                    "job_title": job.get("title") if isinstance(job, dict) else "",
+                    "company": job.get("company") if isinstance(job, dict) else "",
+                }
+            )
+        st.download_button(
+            "📥 Export Applications CSV",
+            data=csv_buf.getvalue(),
+            file_name="applications.csv",
+            mime="text/csv",
+            help="Downloads the current status filter (or all applications) "
+            "as a spreadsheet-friendly CSV, with job titles from the live "
+            "job list.",
+        )
+
+    if apps:
+        for app in apps:
             with st.expander(
                 f"Application {app.get('id', '?')[:8]}... — {app.get('status', 'saved')}"
             ):
@@ -3105,6 +3148,109 @@ def show_settings() -> None:
                         )
                 else:
                     st.error("Send failed — is the API reachable and configured?")
+
+    # --------------------------------------------------------------
+    # 🔕 Vacation mode — pause ALL alerts until a chosen date
+    # --------------------------------------------------------------
+    st.markdown("---")
+    st.markdown(
+        "**🔕 Vacation mode** — pause *all* alerts (daily email, Telegram,"
+        " weekly recap, instant pings) until a date you pick. Handy for "
+        "holidays or exam weeks; discovery keeps running, delivery just "
+        "stops."
+    )
+    paused_until = prefs.get("paused_until")
+    is_paused = False
+    if paused_until:
+        with suppress(Exception):
+            parsed = datetime.fromisoformat(str(paused_until).replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=UTC)
+            is_paused = bool(parsed > datetime.now(UTC))
+    if is_paused:
+        st.info(
+            f"⏸ Alerts are paused until **{paused_until}** — no emails or "
+            "Telegram pings are being sent."
+        )
+        if st.button("▶️ Resume alerts now", use_container_width=True):
+            result = _api(
+                f"/notifications/preferences/{user_id}",
+                method="PUT",
+                json_data={"resume_alerts": True},
+                timeout=15,
+            )
+            st.success("✅ Alerts resumed — you'll get the next scheduled digest.")
+    else:
+        pause_days = st.selectbox(
+            "Pause alerts for",
+            [1, 2, 3, 7, 14],
+            format_func=lambda d: f"{d} day{'s' if d > 1 else ''}",
+        )
+        if st.button("🔕 Pause my alerts", use_container_width=True):
+            with suppress(Exception):
+                until = datetime.now(UTC) + timedelta(days=pause_days)
+                result = _api(
+                    f"/notifications/preferences/{user_id}",
+                    method="PUT",
+                    json_data={"paused_until": until.isoformat()},
+                    timeout=15,
+                )
+                if result:
+                    st.success(
+                        f"✅ Alerts paused until **{until.strftime('%d %b %Y')}** "
+                        "(UTC). Enjoy the break!"
+                    )
+                else:
+                    st.error("Couldn't pause — is the API reachable?")
+
+    # --------------------------------------------------------------
+    # 🛠 Maintenance — one-click backfills / archive
+    # --------------------------------------------------------------
+    st.markdown("---")
+    st.markdown(
+        "**🛠 Maintenance** — one-click housekeeping on the live database. "
+        "Safe to run anytime; each reports how many rows it changed."
+    )
+    mcol1, mcol2, mcol3 = st.columns(3)
+    with mcol1:
+        if st.button(
+            "🏷 Backfill tags",
+            use_container_width=True,
+            help="Derive skill tags for jobs saved before auto-tagging, so "
+            "they earn real match % and ATS scores.",
+        ):
+            result = _api("/jobs/backfill-tags", method="POST", timeout=120)
+            st.success(
+                f"✅ Tagged {result.get('updated', 0)} jobs."
+                if result
+                else "⚠️ Backfill failed — API unreachable."
+            )
+    with mcol2:
+        if st.button(
+            "👁 Backfill views",
+            use_container_width=True,
+            help="Seed view counts from real applications + bookmarks so 🔥 "
+            "Trending ranks jobs with actual activity.",
+        ):
+            result = _api("/jobs/backfill-engagement", method="POST", timeout=120)
+            st.success(
+                f"✅ Updated {result.get('updated', 0)} jobs."
+                if result
+                else "⚠️ Backfill failed — API unreachable."
+            )
+    with mcol3:
+        if st.button(
+            "🗑 Archive expired",
+            use_container_width=True,
+            help="Deactivate jobs with deadlines older than 14 days so live "
+            "listings stay fresh.",
+        ):
+            result = _api("/jobs/archive-expired?days=14", method="POST", timeout=120)
+            st.success(
+                f"✅ Archived {result.get('archived', 0)} jobs."
+                if result
+                else "⚠️ Archive failed — API unreachable."
+            )
 
     if domains:
         st.caption(

@@ -78,10 +78,30 @@ async def _load_alert_preferences(
                 "slot_domains": slot_domains,
                 "weekly_enabled": weekly if isinstance(weekly, bool) else True,
                 "instant_alerts": instant if isinstance(instant, bool) else True,
+                "paused_until": getattr(pref, "paused_until", None),
             }
     except Exception:
         return {}
     return {}
+
+
+def _alerts_paused(prefs: dict) -> bool:
+    """True when vacation mode is active (paused_until is in the future).
+
+    Gates every delivery path — daily digest, weekly digest, instant
+    Telegram pings and one-off sends — so a single Settings toggle can
+    silence everything until a chosen date. Never raises on bad input:
+    garbage or missing timestamps mean "not paused".
+    """
+    until = prefs.get("paused_until")
+    if not until:
+        return False
+    try:
+        from interntrack.utils.helpers import utcnow
+
+        return bool(until > utcnow())
+    except Exception:  # noqa: BLE001 - never break delivery over a bad date
+        return False
 
 
 async def _mark_alert_sent(
@@ -327,6 +347,8 @@ async def _send_instant_alerts(session, saved_jobs: list) -> dict:
         user = target.get("user")
         if not user_id or not prefs.get("instant_alerts", True):
             continue
+        if _alerts_paused(prefs):
+            continue
         chat_id = getattr(user, "telegram_chat_id", None)
         if not chat_id:
             continue
@@ -528,6 +550,9 @@ async def generate_daily_report():
             if prefs.get("is_enabled") is False:
                 print(f"[{datetime.now(UTC)}] Daily report skipped — alerts disabled")
                 return
+            if _alerts_paused(prefs):
+                print(f"[{datetime.now(UTC)}] Daily report skipped — alerts paused")
+                return
             await _send_alert_for(session, DEFAULT_ALERT_USER, prefs, None)
             return
 
@@ -536,6 +561,12 @@ async def generate_daily_report():
                 print(
                     f"[{datetime.now(UTC)}] Daily report skipped for "
                     f"{target['user_id']} — alerts disabled"
+                )
+                continue
+            if _alerts_paused(target["prefs"]):
+                print(
+                    f"[{datetime.now(UTC)}] Daily report skipped for "
+                    f"{target['user_id']} — alerts paused"
                 )
                 continue
             await _send_alert_for(

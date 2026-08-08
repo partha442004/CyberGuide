@@ -83,6 +83,9 @@ class AlertPreferencesResponse(BaseModel):
     slot_domains: dict | None = None
     weekly_enabled: bool = True
     instant_alerts: bool = True
+    # Vacation mode: when set (naive UTC), all alerts are suppressed until
+    # this timestamp. ``None`` means alerts are live.
+    paused_until: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -97,3 +100,9 @@ class AlertPreferencesUpdate(BaseModel):
     slot_domains: dict | None = None
     weekly_enabled: bool | None = None
     instant_alerts: bool | None = None
+    # Vacation mode timestamp (naive UTC) — set to a future time to pause
+    # all alerts until then.
+    paused_until: datetime | None = None
+    # Set True to clear the pause immediately (kept separate from
+    # ``paused_until`` because the update schema uses None = keep current).
+    resume_alerts: bool | None = None

@@ -34,13 +34,18 @@ async def _send_alert_digest(
     """
     from interntrack.scheduler.jobs import (
         DEFAULT_ALERT_USER,
+        _alerts_paused,
         _deliver_alert,
         _record_alert_history,
     )
     from interntrack.services.notification_service import NotificationManager
 
     manager = NotificationManager(db)
-    if not manager.get_configured_channels() or prefs.get("is_enabled") is False:
+    if (
+        not manager.get_configured_channels()
+        or prefs.get("is_enabled") is False
+        or _alerts_paused(prefs)
+    ):
         return {}
 
     if domains is None:
@@ -128,13 +133,17 @@ async def get_daily_report(
     ``slot`` (morning / afternoon / evening) overrides the category filter
     with that slot's saved ``slot_domains`` when configured.
     """
-    from interntrack.scheduler.jobs import DEFAULT_SLOT_DOMAINS, _mark_alert_sent
+    from interntrack.scheduler.jobs import (
+        DEFAULT_SLOT_DOMAINS,
+        _alerts_paused,
+        _mark_alert_sent,
+    )
 
     targets = await _load_digest_targets(db)
     last_report = None
     for target in targets:
         prefs = target["prefs"]
-        if prefs.get("is_enabled") is False:
+        if prefs.get("is_enabled") is False or _alerts_paused(prefs):
             continue
         domains = prefs.get("domains") or None
         if slot:
@@ -186,12 +195,14 @@ async def get_weekly_alert(
     recapped in one email/Telegram digest on Sundays. Honors saved domains,
     channels and min match %, and records its send in history.
     """
+    from interntrack.scheduler.jobs import _alerts_paused
+
     targets = await _load_digest_targets(db)
     last_report = None
     sent_any = False
     for target in targets:
         prefs = target["prefs"]
-        if prefs.get("weekly_enabled") is False:
+        if prefs.get("weekly_enabled") is False or _alerts_paused(prefs):
             continue
         domains = prefs.get("domains") or None
         service = ReportService(db)

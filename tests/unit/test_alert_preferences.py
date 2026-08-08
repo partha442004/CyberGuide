@@ -46,6 +46,7 @@ class TestLoadAlertPreferences:
         row.slot_domains = None
         row.weekly_enabled = True
         row.instant_alerts = None
+        row.paused_until = None
 
         prefs = await _load_alert_preferences(_db_with_row(row))
         assert prefs == {
@@ -57,6 +58,7 @@ class TestLoadAlertPreferences:
             "slot_domains": {},
             "weekly_enabled": True,
             "instant_alerts": True,
+            "paused_until": None,
         }
 
     @pytest.mark.asyncio
@@ -72,6 +74,7 @@ class TestLoadAlertPreferences:
         row.slot_domains = {"morning": ["security"]}
         row.weekly_enabled = False
         row.instant_alerts = True
+        row.paused_until = None
 
         prefs = await _load_alert_preferences(_db_with_row(row))
         assert prefs == {
@@ -83,6 +86,7 @@ class TestLoadAlertPreferences:
             "slot_domains": {"morning": ["security"]},
             "instant_alerts": True,
             "weekly_enabled": False,
+            "paused_until": None,
         }
 
     @pytest.mark.asyncio
@@ -1052,3 +1056,213 @@ class TestAlertChunks:
             subject="Daily Report (security)",
             buttons=[("Apply", "https://x")],
         )
+
+
+# ---------------------------------------------------------------------------
+# Vacation mode (pause all alerts)
+# ---------------------------------------------------------------------------
+
+
+class TestAlertsPaused:
+    """The ``_alerts_paused`` gate used by every delivery path."""
+
+    def test_no_pause_is_not_paused(self):
+        from interntrack.scheduler.jobs import _alerts_paused
+
+        assert _alerts_paused({}) is False
+        assert _alerts_paused({"paused_until": None}) is False
+
+    def test_future_timestamp_is_paused(self):
+        from datetime import timedelta
+
+        from interntrack.scheduler.jobs import _alerts_paused
+        from interntrack.utils.helpers import utcnow
+
+        prefs = {"paused_until": utcnow() + timedelta(days=3)}
+        assert _alerts_paused(prefs) is True
+
+    def test_past_timestamp_is_not_paused(self):
+        from datetime import timedelta
+
+        from interntrack.scheduler.jobs import _alerts_paused
+        from interntrack.utils.helpers import utcnow
+
+        prefs = {"paused_until": utcnow() - timedelta(hours=1)}
+        assert _alerts_paused(prefs) is False
+
+    def test_garbage_timestamp_never_raises(self):
+        from interntrack.scheduler.jobs import _alerts_paused
+
+        assert _alerts_paused({"paused_until": "not-a-date"}) is False
+
+
+class TestPauseAPI:
+    """Pausing / resuming through the preferences API."""
+
+    @pytest.mark.asyncio
+    async def test_update_sets_paused_until(self):
+        from datetime import timedelta
+
+        from interntrack.api.schemas.notification import AlertPreferencesUpdate
+        from interntrack.api.v1.notifications import update_alert_preferences
+        from interntrack.utils.helpers import utcnow
+
+        mock_db = _db_with_row(None)
+        until = utcnow() + timedelta(days=7)
+        result = await update_alert_preferences(
+            "user1",
+            AlertPreferencesUpdate(paused_until=until),
+            db=mock_db,
+        )
+
+        assert result.paused_until == until
+
+    @pytest.mark.asyncio
+    async def test_resume_alerts_clears_pause(self):
+        from datetime import timedelta
+
+        from interntrack.api.schemas.notification import AlertPreferencesUpdate
+        from interntrack.api.v1.notifications import update_alert_preferences
+        from interntrack.domain.models import AlertPreferences
+        from interntrack.utils.helpers import utcnow
+
+        existing = AlertPreferences(
+            user_id="user1",
+            paused_until=utcnow() + timedelta(days=3),
+        )
+        mock_db = _db_with_row(existing)
+
+        result = await update_alert_preferences(
+            "user1",
+            AlertPreferencesUpdate(resume_alerts=True),
+            db=mock_db,
+        )
+
+        assert existing.paused_until is None
+        assert result.paused_until is None
+
+    @pytest.mark.asyncio
+    async def test_get_preferences_reports_paused_until(self):
+        from interntrack.api.v1.notifications import get_alert_preferences
+
+        with patch(
+            "interntrack.api.v1.notifications._load_alert_preferences",
+            new=AsyncMock(
+                return_value={
+                    "domains": [],
+                    "channels": [],
+                    "min_match_score": None,
+                    "is_enabled": True,
+                    "paused_until": datetime(2026, 12, 31, 0, 0, 0),
+                }
+            ),
+        ):
+            result = await get_alert_preferences("user1", db=AsyncMock())
+
+        assert result.paused_until == datetime(2026, 12, 31, 0, 0, 0)
+
+
+class TestPauseGatesDelivery:
+    """Paused prefs suppress the daily digest and instant alerts."""
+
+    @pytest.mark.asyncio
+    async def test_daily_report_skipped_when_paused(self):
+        from interntrack.scheduler.jobs import generate_daily_report
+
+        mock_session = AsyncMock()
+        mock_report_service = MagicMock()
+        with (
+            patch("interntrack.scheduler.jobs.get_db_session") as mock_db,
+            patch(
+                "interntrack.scheduler.jobs._load_alert_preferences",
+                new=AsyncMock(
+                    return_value={
+                        "domains": ["security"],
+                        "channels": ["email"],
+                        "min_match_score": None,
+                        "is_enabled": True,
+                        "paused_until": datetime(2099, 1, 1, 0, 0, 0),
+                    }
+                ),
+            ),
+            patch(
+                "interntrack.scheduler.jobs._enabled_alert_targets",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "interntrack.scheduler.jobs.ReportService",
+                return_value=mock_report_service,
+            ),
+            patch(
+                "interntrack.scheduler.jobs._send_alert_for",
+                new=AsyncMock(),
+            ),
+        ):
+            mock_db.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_db.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            await generate_daily_report()
+
+        mock_report_service.generate_daily_report.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_send_alert_digest_skipped_when_paused(self):
+        """The API digest path also gates on pause (reports.py)."""
+        from interntrack.api.v1.reports import _send_alert_digest
+
+        mock_manager = MagicMock()
+        mock_manager.get_configured_channels.return_value = ["email"]
+        with (
+            patch(
+                "interntrack.services.notification_service.NotificationManager",
+                return_value=mock_manager,
+            ),
+            patch(
+                "interntrack.scheduler.jobs._deliver_alert",
+                new=AsyncMock(return_value={"email": True}),
+            ),
+            patch(
+                "interntrack.scheduler.jobs._record_alert_history",
+                new=AsyncMock(),
+            ),
+        ):
+            results = await _send_alert_digest(
+                AsyncMock(),
+                {
+                    "domains": ["security"],
+                    "channels": ["email"],
+                    "is_enabled": True,
+                    "paused_until": datetime(2099, 1, 1, 0, 0, 0),
+                },
+                {"summary": {}, "new_jobs": []},
+            )
+
+        assert results == {}
+
+    @pytest.mark.asyncio
+    async def test_instant_alerts_skipped_when_paused(self):
+        from interntrack.scheduler.jobs import _send_instant_alerts
+
+        user = MagicMock()
+        user.telegram_chat_id = "12345"
+        user.location = "Bangalore"
+        with patch(
+            "interntrack.scheduler.jobs._enabled_alert_targets",
+            new=AsyncMock(
+                return_value=[
+                    {
+                        "user_id": "user1",
+                        "prefs": {
+                            "instant_alerts": True,
+                            "domains": ["security"],
+                            "min_match_score": None,
+                            "paused_until": datetime(2099, 1, 1, 0, 0, 0),
+                        },
+                        "user": user,
+                    }
+                ]
+            ),
+        ):
+            sent = await _send_instant_alerts(AsyncMock(), [MagicMock()])
+
+        assert sent == {}
