@@ -138,3 +138,45 @@ class TestTrending:
         hit = next(t for t in body["trending"] if t["id"] == job_id)
         assert hit["views"] == 2
         assert hit["engagement_score"] == 1.0  # 2 views * 0.5
+
+
+class TestBackfillEngagement:
+    """POST /api/v1/jobs/backfill-engagement."""
+
+    def test_no_jobs_returns_zero(self, client):
+        resp = client.post("/api/v1/jobs/backfill-engagement")
+        assert resp.status_code == 200
+        assert resp.json() == {"updated": 0}
+
+    def test_seeds_views_from_applications_and_bookmarks(self, client):
+        job_id = _create_job(client, "Engaged Security Role")
+        # One application + one bookmark imply the job was viewed twice.
+        resp = client.post(
+            "/api/v1/applications/",
+            json={"job_id": job_id, "user_id": "user-engage"},
+        )
+        assert resp.status_code in (200, 201), resp.text
+        resp = client.post(
+            "/api/v1/bookmarks/",
+            json={"item_type": "job", "item_id": job_id},
+        )
+        assert resp.status_code in (200, 201), resp.text
+        # Before backfill the view count is 0.
+        detail = client.get(f"/api/v1/jobs/{job_id}").json()
+        assert detail["view_count"] == 0
+
+        updated = client.post(
+            "/api/v1/jobs/backfill-engagement", params={"limit": 100}
+        ).json()["updated"]
+        assert updated >= 1
+        detail = client.get(f"/api/v1/jobs/{job_id}").json()
+        assert detail["view_count"] == 2  # 1 application + 1 bookmark
+
+    def test_never_lowers_existing_views(self, client):
+        job_id = _create_job(client, "Already Viewed Role")
+        client.post(f"/api/v1/jobs/{job_id}/view")
+        client.post(f"/api/v1/jobs/{job_id}/view")
+        client.post(f"/api/v1/jobs/{job_id}/view")
+        client.post("/api/v1/jobs/backfill-engagement", params={"limit": 100})
+        detail = client.get(f"/api/v1/jobs/{job_id}").json()
+        assert detail["view_count"] == 3  # stays at max(current, implied)

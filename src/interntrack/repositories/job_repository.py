@@ -155,6 +155,61 @@ class JobRepository(BaseRepository[Job]):
             await self.session.flush()
         return updated
 
+    async def backfill_engagement(self, limit: int = 1000) -> int:
+        """Seed ``view_count`` from real application / bookmark activity.
+
+        Jobs saved before view tracking existed carry ``view_count = 0``
+        even when people applied to or bookmarked them, so 🔥 Trending
+        under-ranks them. Every application or bookmark implies the job was
+        at least viewed once, so this backfills
+        ``view_count = max(current, applications + bookmarks)`` for the
+        most recent rows. Returns the number of rows updated.
+        """
+        from interntrack.domain.models import Application, Bookmark
+
+        query = (
+            select(Job)
+            .where(Job.is_active.is_(True))
+            .order_by(Job.created_at.desc())
+            .limit(int(limit))
+        )
+        result = await self.session.execute(query)
+        jobs = list(result.scalars().all())
+        if not jobs:
+            return 0
+
+        job_ids = [j.id for j in jobs]
+        app_rows = (
+            await self.session.execute(
+                select(Application.job_id, func.count(Application.id))
+                .where(Application.job_id.in_(job_ids))
+                .group_by(Application.job_id)
+            )
+        ).all()
+        app_counts: dict[str, int] = {str(rid): int(cnt) for rid, cnt in app_rows}
+        bm_rows = (
+            await self.session.execute(
+                select(Bookmark.item_id, func.count(Bookmark.id))
+                .where(
+                    Bookmark.item_type == "job",
+                    Bookmark.item_id.in_(job_ids),
+                )
+                .group_by(Bookmark.item_id)
+            )
+        ).all()
+        bm_counts: dict[str, int] = {str(iid): int(cnt) for iid, cnt in bm_rows}
+
+        pending: list[tuple[str, int]] = []
+        for job in jobs:
+            implied = app_counts.get(str(job.id), 0) + bm_counts.get(str(job.id), 0)
+            if implied > (job.view_count or 0):
+                pending.append((str(job.id), implied))
+        for job_id, implied in pending:
+            await self.session.execute(
+                update(Job).where(Job.id == job_id).values(view_count=implied)
+            )
+        return len(pending)
+
     async def get_active_jobs(
         self,
         skip: int = 0,
