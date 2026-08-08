@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **🔥 Weekly top-engaged recap.** The Sunday digest now leads with the
+  most-engaged jobs of the week (3 per application + 2 per bookmark + 0.5
+  per view, last 7 days), rendered as a header + apply buttons in the email
+  and a 🔥 leading chunk on Telegram. Shown even when there are zero new
+  jobs that week, so a quiet week still surfaces real activity.
+- **🍎 iOS packaging (packaging/ios/).** A complete SwiftUI Xcode WebView
+  project (bundle `com.cyberguide.app`, iOS 15+, pull-to-refresh +
+  back/forward toolbar, ATS left fully enabled) plus a PWA install page
+  with a generated icon set (192/512/180) — the PWA path needs no Mac:
+  open the page in Safari → Share → Add to Home Screen.
+- **🪟 Single-file EXE** (`dist/CyberGuide.exe`). New
+  `cyberguide_onefile.spec` builds one self-contained ~110 MB exe; the
+  spec pulls the dashboard's runtime imports (`httpx`, `plotly`, `pandas`,
+  `numpy`) that static analysis can't see. Built and verified — boots,
+  health `ok`, page serves.
+- **🔐 Signed release APK** (`dist/CyberGuide-Android-release.apk`).
+  `assembleRelease` with a project keystore (alias `cyberguide`); the
+  keystore + `keystore.properties` are gitignored so signing secrets never
+  land in version control.
+
+
 - **🖥 Windows EXE + 📱 Android APK (packaging/).** The dashboard is now
   distributable as a real desktop app and a native mobile app:
   - **Windows EXE** (`dist/CyberGuide/CyberGuide.exe`): a PyInstaller

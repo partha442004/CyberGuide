@@ -1383,3 +1383,194 @@ class TestDailyReportPreview:
         assert report["summary"]["new_jobs"] == 1
         send_mock.assert_awaited_once()
         mark_sent.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
+# Weekly top-engaged recap
+# ---------------------------------------------------------------------------
+
+
+class TestTopEngaged:
+    """The weekly digest's most-engaged-jobs section."""
+
+    @pytest.mark.asyncio
+    async def test_helper_ranks_by_engagement(self):
+        from interntrack.api.v1.reports import _top_engaged_jobs
+
+        def _job(jid, title, views=0):
+            job = MagicMock()
+            job.id = jid
+            job.title = title
+            job.company = "Acme"
+            job.location = "Bangalore"
+            job.url = f"https://x/{jid}"
+            job.view_count = views
+            return job
+
+        jobs = [_job("a", "Hot Role", views=4), _job("b", "Quiet Role")]
+        result_mock = MagicMock()
+        result_mock.scalars.return_value.all.return_value = jobs
+        mock_db = AsyncMock()
+
+        app_result = MagicMock()
+        app_result.all.return_value = [("a", 2)]
+        bm_result = MagicMock()
+        bm_result.all.return_value = [("a", 1)]
+
+        async def fake_execute(stmt):
+            from sqlalchemy import select
+
+            if (
+                isinstance(stmt, select)
+                and str(getattr(stmt, "column_descriptions", [{}])[0].get("name", ""))
+                == "id"
+            ):
+                return result_mock
+            text = str(stmt)
+            if "applications" in text and "bookmarks" not in text:
+                return app_result
+            return bm_result
+
+        mock_db.execute = fake_execute
+        # Simpler: just return the job query and empty aggregates.
+        mock_db.execute = AsyncMock(side_effect=[result_mock, app_result, bm_result])
+
+        top = await _top_engaged_jobs(mock_db)
+        # Job a: 2 apps*3 + 1 bm*2 + 4 views*0.5 = 10.0 ; Job b: 0 -> skipped.
+        assert len(top) == 1
+        assert top[0]["title"] == "Hot Role"
+        assert top[0]["engagement_score"] == 10.0
+
+    @pytest.mark.asyncio
+    async def test_helper_never_raises(self):
+        from interntrack.api.v1.reports import _top_engaged_jobs
+
+        mock_db = AsyncMock()
+        mock_db.execute.side_effect = RuntimeError("db down")
+        assert await _top_engaged_jobs(mock_db) == []
+
+    def test_email_renders_top_engaged(self):
+        """The weekly email renders the most-engaged section."""
+        from interntrack.scheduler.jobs import build_daily_report_html
+
+        report = {
+            "summary": {"new_jobs": 1},
+            "new_jobs": [
+                {
+                    "id": "j1",
+                    "title": "Pentester",
+                    "company": "Acme",
+                    "url": "https://a",
+                    "domain": "security",
+                    "is_applied": False,
+                    "age_days": 0,
+                }
+            ],
+            "top_engaged": [
+                {
+                    "id": "j1",
+                    "title": "Pentester",
+                    "company": "Acme",
+                    "location": "Bangalore",
+                    "url": "https://a",
+                    "views": 4,
+                    "applications": 2,
+                    "bookmarks": 1,
+                    "engagement_score": 10.0,
+                }
+            ],
+        }
+        with (
+            patch(
+                "interntrack.scheduler.jobs._score_and_group_jobs",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "interntrack.scheduler.jobs._watched_company_names",
+                new=AsyncMock(return_value=set()),
+            ),
+        ):
+            html = _sync_run(build_daily_report_html(report, AsyncMock()))
+
+        assert "🔥 Most engaged this week" in html
+        assert "10.0" in html
+        assert "2 applied" in html
+
+    def test_telegram_leads_with_top_engaged_on_weekly(self):
+        from interntrack.scheduler.jobs import build_alert_chunks
+
+        report = {
+            "summary": {"new_jobs": 0},
+            "new_jobs": [],
+            "top_engaged": [
+                {
+                    "id": "j1",
+                    "title": "Pentester",
+                    "company": "Acme",
+                    "url": "https://a",
+                    "views": 3,
+                    "applications": 1,
+                    "bookmarks": 0,
+                    "engagement_score": 4.5,
+                }
+            ],
+        }
+        chunks = _sync_run(build_alert_chunks(report, AsyncMock(), weekly=True))
+        first_text = chunks[0][0]
+        assert "Most engaged this week" in first_text
+        assert "4.5" in first_text
+
+    def test_daily_digest_never_carries_top_engaged(self):
+        from interntrack.scheduler.jobs import build_alert_chunks
+
+        report = {
+            "summary": {"new_jobs": 1},
+            "new_jobs": [
+                {
+                    "id": "j1",
+                    "title": "Security Analyst",
+                    "company": "Acme",
+                    "url": "https://a",
+                    "domain": "security",
+                    "is_applied": False,
+                    "age_days": 0,
+                }
+            ],
+            "top_engaged": [
+                {
+                    "id": "j1",
+                    "title": "Security Analyst",
+                    "company": "Acme",
+                    "url": "https://a",
+                    "views": 1,
+                    "applications": 0,
+                    "bookmarks": 0,
+                    "engagement_score": 0.5,
+                }
+            ],
+        }
+        with (
+            patch(
+                "interntrack.scheduler.jobs._latest_resume_skill_names",
+                new=AsyncMock(return_value=None),
+            ),
+            patch(
+                "interntrack.scheduler.jobs._job_match_score",
+                side_effect=[None],
+            ),
+        ):
+            chunks = _sync_run(build_alert_chunks(report, AsyncMock(), weekly=False))
+
+        all_text = "\n".join(t for t, _ in chunks)
+        assert "Most engaged this week" not in all_text
+
+
+def _sync_run(awaitable):
+    """Run an async callable inside the running event loop (asyncio_mode=auto)."""
+    import asyncio
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(awaitable)
+    return asyncio.get_event_loop().run_until_complete(awaitable)

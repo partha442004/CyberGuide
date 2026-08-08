@@ -32,10 +32,20 @@ python -m PyInstaller packaging/windows/cyberguide.spec --noconfirm
 
 Output: `dist/CyberGuide/CyberGuide.exe` (one-folder build).
 
-> **Note:** the spec bundles Streamlit's static assets and package metadata
-> (both required or the frozen EXE crashes at import time), forces
+**Single-file variant** (great for sharing — one `.exe` to send):
+
+```bash
+python -m PyInstaller packaging/windows/cyberguide_onefile.spec --noconfirm
+```
+
+Output: `dist/CyberGuide.exe` (~110 MB, self-extracting).
+
+> **Note:** both specs bundle Streamlit's static assets and package metadata
+> (both required or the frozen EXE crashes at import time), force
 > `--global.developmentMode false` (frozen Streamlit would otherwise reject
-> `--server.port`), and excludes the backend packages entirely.
+> `--server.port`), and — because the dashboard `app.py` is bundled as a
+> *data* file — explicitly pull in its imports (`httpx`, `plotly`, `pandas`,
+> `numpy`) that static analysis can't see.
 
 ## 📱 Android APK
 
@@ -46,6 +56,11 @@ Output: `dist/CyberGuide/CyberGuide.exe` (one-folder build).
 DOM storage enabled, cookies persisted, progress indicator. Package
 `com.cyberguide.app`, minSdk 24 (Android 7.0+), signed with the debug key
 so it installs directly.
+
+`dist/CyberGuide-Android-release.apk` — the **Play-Store-ready release build**, signed
+with the project keystore (`packaging/android/cyberguide-release.keystore`, alias
+`cyberguide`, password `cyberguide123`). **Keep that keystore safe** — it is
+`.gitignore`d; without it you cannot update the app on the same identity.
 
 ### Installing on a phone
 
@@ -67,7 +82,39 @@ gradle assembleDebug
 Output: `packaging/android/app/build/outputs/apk/debug/app-debug.apk`.
 
 For a Play-Store-ready build, generate a signing key and use
-`gradle assembleRelease` with the keystore configured.
+`gradle assembleRelease` with the keystore configured (the repo ships
+`keystore.properties` wiring for `packaging/android/cyberguide-release.keystore`).
+
+## 🍎 iOS
+
+Building a native iOS app requires **macOS + Xcode** (no Windows/iOS toolchain
+here). Two ways to get CyberGuide on an iPhone:
+
+### Option A — PWA (works today, no Mac)
+
+`packaging/ios/PWA/` is a self-contained install page + web manifest + icons.
+Host those files on any static host, then on the iPhone:
+
+1. Open the page in **Safari**,
+2. tap **Share → Add to Home Screen** — it installs as a full-screen app
+   with the CyberGuide icon.
+
+Generate the icons (any machine):
+
+```bash
+python -m pip install pillow
+python packaging/ios/PWA/icons/generate_icons.py
+```
+
+### Option B — Xcode project
+
+`packaging/ios/CyberGuide.xcodeproj` is a complete SwiftUI WebView wrapper
+(bundle id `com.cyberguide.app`, iOS 15+, pull-to-refresh + back/forward
+toolbar). On a Mac:
+
+1. `open packaging/ios/CyberGuide.xcodeproj`
+2. set your Apple Developer team under **Signing & Capabilities**,
+3. run to your device or archive to the App Store.
 
 ## 🔁 Rebuilding after dashboard changes
 
