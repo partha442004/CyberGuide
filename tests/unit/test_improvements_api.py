@@ -204,6 +204,34 @@ class TestDiscoveryQueries:
         assert _extract_location_from_query("soc analyst bengaluru") == "Bangalore"
         assert _extract_location_from_query("devops engineer") is None
 
+    def test_strip_location_from_query(self):
+        """The city is removed from the keyword (it goes in ``location``)."""
+        from interntrack.api.v1.jobs import _strip_location_from_query
+
+        assert _strip_location_from_query("cybersecurity bangalore") == "cybersecurity"
+        assert _strip_location_from_query("soc analyst bengaluru") == "soc analyst"
+        assert (
+            _strip_location_from_query("python developer mumbai") == "python developer"
+        )
+        assert _strip_location_from_query("devops engineer") == "devops engineer"
+        assert (
+            _strip_location_from_query("security analyst india") == "security analyst"
+        )
+
+    def test_strip_removes_all_cities_and_keeps_keyword(self):
+        """Multi-location queries strip every city, keeping the role."""
+        from interntrack.api.v1.jobs import _strip_location_from_query
+
+        assert (
+            _strip_location_from_query("soc analyst bangalore chennai") == "soc analyst"
+        )
+        assert (
+            _strip_location_from_query("security technician noida pune bengaluru")
+            == "security technician"
+        )
+        # A query that is only a city keeps the keyword (non-empty guard).
+        assert _strip_location_from_query("bangalore") == "bangalore"
+
 
 class TestPerUserDiscoveryEndpoint:
     """POST /jobs/discovery/run-for-users derives queries per user."""
@@ -277,6 +305,16 @@ class TestPerUserDiscoveryEndpoint:
         assert registry.fetch_all.called
         call_kwargs = registry.fetch_all.call_args.kwargs
         assert call_kwargs.get("sources") == _DISCOVERY_SOURCES
+        # The city lives in ``location``, not inside the keyword, so
+        # vendor/RSS/HN scrapers match against role titles.
+        assert call_kwargs.get("location") == "Bangalore"
+        assert "Bangalore" not in call_kwargs.get("query", "").lower()
+        # Every fetch_all call followed the same contract (discovery loops
+        # over several queries, so check them all, not just the last).
+        for c in registry.fetch_all.call_args_list:
+            kw = c.kwargs
+            assert kw.get("location") == "Bangalore"
+            assert "Bangalore" not in kw.get("query", "").lower()
         assert len(_DISCOVERY_SOURCES) < 20  # sanity: curated, not everything
 
     @pytest.mark.asyncio

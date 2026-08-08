@@ -2,6 +2,22 @@
 
 All notable changes to the InternTrack project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- **Discovery keywords no longer carry the city** — queries like
+  "cybersecurity Bengaluru" made vendor Greenhouse boards, RSS feeds and
+  HackerNews match the literal city against role titles (US/remote roles
+  never contain "bengaluru") → those scrapers returned 0 results even
+  when healthy. The city is now stripped from the keyword and passed
+  separately via the `location` arg, in both the per-user discovery cron
+  and the dashboard's single-query "Run Discovery" button; the query is
+  never emptied (city-only queries keep the keyword). Multi-location
+  queries (e.g. "security technician noida pune bengaluru") strip every
+  city. Local yield re-verified: 95 jobs for the stripped "cybersecurity"
+  keyword (85 company + 10 LinkedIn India).
+
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
