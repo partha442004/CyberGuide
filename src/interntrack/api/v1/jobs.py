@@ -89,6 +89,27 @@ def _extract_location_from_query(query: str) -> str | None:
     return None
 
 
+def _strip_location_from_query(query: str) -> str:
+    """Remove India city words from a query keyword.
+
+    The user's city is passed to the scrapers separately via the ``location``
+    arg, so leaving "bengaluru" inside the keyword hurts scrapers that match
+    the whole string against role titles — vendor Greenhouse boards, RSS
+    feeds and HackerNews carry US/remote roles that never contain the user's
+    city, and a "cybersecurity bengaluru" keyword returns nothing from them.
+    """
+    cleaned = query
+    for alias in _INDIA_LOCATIONS:
+        cleaned = re.sub(
+            rf"\b{re.escape(alias)}\b",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+    cleaned = " ".join(cleaned.split())
+    return cleaned or query
+
+
 @router.get("/", response_model=JobListResponse)
 async def list_jobs(
     skip: int = Query(0, ge=0),
@@ -754,8 +775,11 @@ async def run_discovery_for_users(
     for query, location in unique:
         if time.monotonic() > deadline:
             break
+        # Pass the city as the separate ``location`` arg, not inside the
+        # keyword — vendor/RSS/HN scrapers match the keyword against role
+        # titles and would otherwise never see non-India postings.
         jobs = await registry.fetch_all(
-            query=query,
+            query=_strip_location_from_query(query),
             location=location,
             sources=_DISCOVERY_SOURCES,
         )
@@ -807,7 +831,7 @@ async def run_discovery(
     location = _extract_location_from_query(query)
     sources = [source] if source else _DISCOVERY_SOURCES
     jobs = await registry.fetch_all(
-        query=query,
+        query=_strip_location_from_query(query),
         location=location,
         sources=sources,
     )
