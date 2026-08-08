@@ -370,6 +370,19 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
         ),
     ),
     (
+        "frontend",
+        (
+            "frontend",
+            "front-end",
+            "front end",
+            "react",
+            "angular",
+            "vue",
+            "ui developer",
+            "ui engineer",
+        ),
+    ),
+    (
         "coding",
         (
             "software",
@@ -377,7 +390,6 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "engineer",
             "programmer",
             "backend",
-            "frontend",
             "full stack",
             "fullstack",
             "devops",
@@ -386,7 +398,6 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "javascript",
             "typescript",
             "java",
-            "react",
             "node",
             "sql",
             "data engineer",
@@ -421,6 +432,7 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
 
 _DOMAIN_LABELS = {
     "security": "🔐 Cybersecurity / VAPT / SOC",
+    "frontend": "🖥️ Frontend / UI",
     "coding": "💻 Coding / Software",
     "data": "📊 Data & Analytics",
     "design": "🎨 Design",
@@ -431,6 +443,7 @@ _DOMAIN_LABELS = {
 
 _DOMAIN_ORDER = [
     "security",
+    "frontend",
     "coding",
     "data",
     "design",
@@ -446,6 +459,11 @@ _CATEGORY_STYLE = {
         "color": "#e5484d",
         "grad": "linear-gradient(135deg,#ff6b6b,#c0392b)",
         "icon": "🔐",
+    },
+    "frontend": {
+        "color": "#06b6d4",
+        "grad": "linear-gradient(135deg,#22d3ee,#0e7490)",
+        "icon": "🖥️",
     },
     "coding": {
         "color": "#3b82f6",

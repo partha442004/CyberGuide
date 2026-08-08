@@ -289,6 +289,30 @@ class TestClassifyDomain:
         assert classify_domain("Full Stack Engineer", []) == "coding"
         assert classify_domain("Data Engineer", []) == "coding"
 
+    def test_frontend_domain(self):
+        """Frontend-flavoured roles land in the frontend bucket, not coding."""
+        from interntrack.services.report_service import classify_domain
+
+        assert classify_domain("Frontend Developer", []) == "frontend"
+        assert classify_domain("Front-End Engineer", []) == "frontend"
+        assert classify_domain("React Developer", []) == "frontend"
+        assert classify_domain("Angular Developer", []) == "frontend"
+        assert classify_domain("UI Developer", []) == "frontend"
+        # Pure backend / full-stack roles stay in coding.
+        assert classify_domain("Backend Engineer", []) == "coding"
+        assert classify_domain("Full Stack Developer", []) == "coding"
+        # Security still wins over frontend when both appear.
+        assert classify_domain("Frontend Security Engineer", []) == "security"
+
+    def test_frontend_accepted_by_alert_normalization(self):
+        """The registration / preferences path accepts the frontend domain."""
+        from interntrack.api.v1.notifications import _normalize_domains
+
+        assert _normalize_domains(["frontend", "coding", "bogus"]) == [
+            "frontend",
+            "coding",
+        ]
+
     def test_other_domains(self):
         from interntrack.services.report_service import classify_domain
 
