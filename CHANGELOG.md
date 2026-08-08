@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Cybersecurity category keyword expansion.** The `/domains` classifier
+  now recognizes web-app and offensive-security terms (SQLi, SQL injection,
+  XSS, CSRF, SSRF, exploit, malware, ransomware, phishing, DevSecOps,
+  AppSec, red/blue team, threat hunting, incident response, bug bounty,
+  CVE, WAF, encryption, zero trust, ISO 27001, GRC, OSINT, cloud/network/
+  endpoint security, digital forensics, infosec) so VAPT / SOC / SQLi jobs
+  land in the **Cybersecurity** section instead of Development. All terms
+  are multi-character because classification uses plain substring matching.
+- **Auto-archive on the cron.** `daily-refresh.yml` now POSTs
+  `/api/v1/jobs/archive-expired?days=14` after every discovery run. Vercel
+  is serverless, so the scheduler's archive functions never execute there;
+  this keeps live listings fresh and the dashboard's Expired page
+  populated without manual cleanup.
+- **Match breakdown on My Matches.** Each top match now explains its
+  percentage: color-coded chips for matched (✅), transferable (🔄) and
+  missing (⬜) skills, ATS compatibility %, and the first suggestion —
+  the data was always returned by `/resumes/match-batch`, the dashboard
+  just wasn't showing it.
+- **Domain classification tests.** `tests/unit/test_domains_classification.py`
+  (9 tests) locks in cybersecurity coverage and the development fallback.
+
+### Added
+
 - **Instant Telegram alerts for high-match jobs.** Users can now toggle
   "Instant Telegram alerts" in Settings (AlertPreferences.instant_alerts,
   auto-synced to the live DB). When job discovery saves a new job that
