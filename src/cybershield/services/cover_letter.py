@@ -38,9 +38,7 @@ def _top_skills(
     lower = {s.lower() for s in skill_names}
     if matched:
         ordered = [s for s in matched if s.lower() in lower]
-        ordered += [
-            s for s in skill_names if s.lower() not in {x.lower() for x in ordered}
-        ]
+        ordered += [s for s in skill_names if s.lower() not in {x.lower() for x in ordered}]
     else:
         # Sort for deterministic output (inputs may be sets/dicts).
         ordered = sorted(skill_names, key=str.lower)
