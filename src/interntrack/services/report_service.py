@@ -78,6 +78,19 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
         ),
     ),
     (
+        "frontend",
+        (
+            "frontend",
+            "front-end",
+            "front end",
+            "react",
+            "angular",
+            "vue",
+            "ui developer",
+            "ui engineer",
+        ),
+    ),
+    (
         "coding",
         (
             "software",
@@ -85,7 +98,6 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "engineer",
             "programmer",
             "backend",
-            "frontend",
             "full stack",
             "fullstack",
             "devops",
@@ -94,7 +106,6 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "javascript",
             "typescript",
             "java",
-            "react",
             "node",
             "sql",
             "data engineer",

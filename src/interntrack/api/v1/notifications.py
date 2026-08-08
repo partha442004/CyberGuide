@@ -30,6 +30,7 @@ router = APIRouter()
 # Domain keys supported by the alert classifier (matches report_service).
 _ALERT_DOMAINS = (
     "security",
+    "frontend",
     "coding",
     "data",
     "design",

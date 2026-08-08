@@ -663,6 +663,7 @@ def _expiry_note(job: dict) -> str:
 
 _DOMAIN_ICONS = {
     "security": "🔐 Cybersecurity / VAPT / SOC",
+    "frontend": "🖥️ Frontend / UI",
     "coding": "💻 Coding / Software",
     "data": "📊 Data & Analytics",
     "design": "🎨 Design",

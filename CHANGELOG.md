@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **🖥️ New 'Frontend / UI' alert domain.** Frontend-flavoured roles
+  (Frontend/Front-End Developer, React/Angular/Vue, UI Developer)
+  previously landed in the generic Coding bucket — they now classify
+  into their own **frontend** domain across the alert classifier, the
+  per-user preference/registration path, the dashboard category labels
+  and the digest section headers. A friend signing up with the
+  Frontend domain gets a digest filtered to frontend roles only (with
+  security still winning when both apply, e.g. "Frontend Security
+  Engineer"). 2 new tests — 2456 total.
+
 - **⭐ High-priority applications.** The `priority` field existed on the
   model/schema/repo but nothing surfaced it — a new `GET
   /applications/priority` endpoint (per-user, sorted by priority) now
