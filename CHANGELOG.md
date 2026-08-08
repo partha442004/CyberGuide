@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **🔥 Trending this week on Overview.** The Overview page now shows the
+  six most-engaged jobs from the last 14 days, ranked by a real
+  engagement score (3 per application + 2 per bookmark + 0.5 per view),
+  with a views/applied/saved caption, a "Mark viewed" button and an
+  Open link per card. Backed by new `GET /api/v1/jobs/trending` (falls
+  back to the newest jobs until engagement builds up) and
+  `POST /api/v1/jobs/{job_id}/view`; every job card across the app also
+  gained a "👁 Mark viewed" button so the ranking stays live. The unused
+  `view_count` column is now actually used.
+
+### Added
+
 - **Match breakdown + min-match filter on Saved Jobs.** Clicking "Match
   these jobs to my resume" now shows the full skill breakdown on every
   job card (✅ matched / 🔄 transferable / ⬜ missing chips, ATS %,
