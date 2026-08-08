@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **🔗 Share-a-job auto-detect now reads JSON-LD JobPosting data.** When
+  the user pastes a bare job link, the share endpoint previously only
+  read OpenGraph tags — a board like Indeed hides those from bots, so
+  auto-detection failed and asked for a title. It now falls back through
+  **JSON-LD JobPosting structured data** (title + hiring company +
+  location from schema.org blocks found on Greenhouse, Lever, Workable
+  and other career pages) → OpenGraph → the HTML `<title>` tag. The
+  saved job now uses the *hiring company* from JSON-LD instead of the
+  board's name (`og:site_name`), and pulls the **location** from the
+  page too (a user-supplied location always wins). Pure parsing helper
+  `_parse_page_meta()` is directly unit-tested. 8 new tests — 2472
+  total.
+
 - **📍 Per-user digest now scoped to each account's own city.** The
   daily email/Telegram digest previously filtered by domain only — a
   "cybersecurity + Bengaluru" user and a "frontend + Chennai" user on
