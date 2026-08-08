@@ -1029,3 +1029,118 @@ class TestSendInstantAlerts:
 
         assert sent == {}
         mock_manager.notify.assert_not_called()
+
+
+class TestJobOfDay:
+    """The '🔥 Job of the day' highlight selection and rendering."""
+
+    def test_returns_highest_score_job(self):
+        from interntrack.scheduler.jobs import _job_of_day
+
+        sections = [
+            ("coding", [(40.0, {"title": "A"}), (90.0, {"title": "B"})]),
+            ("security", [(None, {"title": "C"})]),
+        ]
+        score, job = _job_of_day(sections)
+        assert score == 90.0
+        assert job["title"] == "B"
+
+    def test_falls_back_to_first_job_when_no_scores(self):
+        from interntrack.scheduler.jobs import _job_of_day
+
+        sections = [("coding", [(None, {"title": "X"}), (None, {"title": "Y"})])]
+        score, job = _job_of_day(sections)
+        assert score is None
+        assert job["title"] == "X"
+
+    def test_none_for_empty_sections(self):
+        from interntrack.scheduler.jobs import _job_of_day
+
+        assert _job_of_day([]) is None
+
+    @pytest.mark.asyncio
+    async def test_message_includes_job_of_day(self):
+        from interntrack.scheduler.jobs import build_daily_report_message
+
+        report = {
+            "summary": {"new_jobs": 1, "new_applications": 0, "total_applications": 0},
+            "new_jobs": [
+                {
+                    "title": "SOC Analyst",
+                    "company": "Cyber Corp",
+                    "url": "https://x.com/job",
+                    "domain": "security",
+                }
+            ],
+            "closing_soon": [],
+            "follow_up": [],
+        }
+        with patch(
+            "interntrack.scheduler.jobs._score_and_group_jobs",
+            new=AsyncMock(return_value=[("security", [(72.5, report["new_jobs"][0])])]),
+        ):
+            msg = await build_daily_report_message(report, AsyncMock())
+        assert "🔥 [JOB OF THE DAY]" in msg
+        assert "72% match" in msg
+        assert "SOC Analyst" in msg
+        assert "https://x.com/job" in msg
+
+    @pytest.mark.asyncio
+    async def test_html_includes_job_of_day_card(self):
+        from interntrack.scheduler.jobs import build_daily_report_html
+
+        report = {
+            "summary": {"new_jobs": 1, "new_applications": 0},
+            "new_jobs": [
+                {
+                    "title": "Pen Tester",
+                    "company": "Acme",
+                    "url": "https://x.com/pen",
+                    "domain": "security",
+                }
+            ],
+            "closing_soon": [],
+            "follow_up": [],
+        }
+        with (
+            patch(
+                "interntrack.scheduler.jobs._score_and_group_jobs",
+                new=AsyncMock(
+                    return_value=[("security", [(61.0, report["new_jobs"][0])])]
+                ),
+            ),
+            patch(
+                "interntrack.scheduler.jobs._watched_company_names",
+                new=AsyncMock(return_value=[]),
+            ),
+        ):
+            html = await build_daily_report_html(report, AsyncMock())
+        assert "🔥 JOB OF THE DAY" in html
+        assert "MATCH 61%" in html
+        assert "Pen Tester" in html
+
+    def test_prefers_local_job_when_user_has_location(self):
+        from interntrack.scheduler.jobs import _job_of_day
+
+        sections = [
+            (
+                "security",
+                [
+                    (50.0, {"title": "Mumbai SOC", "location": "Mumbai"}),
+                    (90.0, {"title": "Bangalore VAPT", "location": "Bangalore"}),
+                ],
+            )
+        ]
+        score, job = _job_of_day(sections, user_location="Bangalore")
+        assert job["title"] == "Bangalore VAPT"
+        assert score == 90.0
+
+    def test_falls_back_to_best_anywhere_when_no_local_match(self):
+        from interntrack.scheduler.jobs import _job_of_day
+
+        sections = [
+            ("security", [(85.0, {"title": "Remote SOC", "location": "Remote"})])
+        ]
+        score, job = _job_of_day(sections, user_location="Bangalore")
+        assert job["title"] == "Remote SOC"
+        assert score == 85.0

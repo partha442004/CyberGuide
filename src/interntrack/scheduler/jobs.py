@@ -754,6 +754,48 @@ async def _score_and_group_jobs(
     return sections
 
 
+def _job_of_day(
+    sections: list[tuple[str, list[tuple[float | None, dict]]]],
+    user_location: str | None = None,
+) -> tuple[float | None, dict] | None:
+    """The day's top pick: the highest resume match across all sections.
+
+    When ``user_location`` is set, only jobs in the user's area are
+    considered first (so a Bangalore user never headlines a Mumbai role as
+    the highlight); the overall best job is the fallback when nothing local
+    matched. Without resume scores the newest/first job wins, so the
+    highlight is never empty while sections exist.
+    """
+
+    def _best_of(items: list) -> tuple[float | None, dict] | None:
+        best: tuple[float | None, dict] | None = None
+        for score, job in items:
+            if score is not None and (
+                best is None or best[0] is None or score > best[0]
+            ):
+                best = (score, job)
+        if best is not None:
+            return best
+        return items[0] if items else None
+
+    all_items = [item for _domain, items in sections for item in items]
+    if not all_items:
+        return None
+    loc_lower = (user_location or "").strip().lower()
+    if loc_lower:
+        local = [
+            item
+            for item in all_items
+            if _location_matches(
+                (item[1].get("location") or "").lower(),
+                loc_lower,
+            )
+        ]
+        if local:
+            return _best_of(local)
+    return _best_of(all_items)
+
+
 async def build_daily_report_message(
     report: dict,
     session,
@@ -771,6 +813,24 @@ async def build_daily_report_message(
     resume match % is below the threshold.
     """
     lines = [format_daily_report(report, title)]
+
+    sections = await _score_and_group_jobs(report, session, domains, user_id=user_id)
+
+    # 🔥 Job of the day — the user's best match, right at the top.
+    job_of_day = _job_of_day(sections, user_location)
+    if job_of_day is not None:
+        jotd_score, jotd_job = job_of_day
+        jotd_title = (jotd_job.get("title") or "Untitled")[:90]
+        jotd_company = (jotd_job.get("company") or "").strip()
+        jotd_url = jotd_job.get("url") or ""
+        jotd_head = f"🔥 [JOB OF THE DAY] {jotd_title}"
+        if jotd_score is not None:
+            jotd_head = f"🔥 [JOB OF THE DAY] ({jotd_score:.0f}% match) {jotd_title}"
+        if jotd_company and jotd_company.lower() != "unknown":
+            jotd_head += f" — {jotd_company}"
+        lines.append(jotd_head)
+        if jotd_url:
+            lines.append(f"   🔗 Apply: {jotd_url}")
 
     # ⏳ Closing-soon jobs (expiring within 2 days) get a priority section so
     # the user can apply before the deadline instead of discovering the
@@ -801,7 +861,6 @@ async def build_daily_report_message(
                 line += f" ({_esc(status)})"
             lines.append(line)
 
-    sections = await _score_and_group_jobs(report, session, domains, user_id=user_id)
     loc_lower = (user_location or "").strip().lower()
     for domain, items in sections:
         if loc_lower:
@@ -1108,6 +1167,50 @@ async def build_daily_report_html(
             f"New applications: <b>{summary.get('new_applications', 0)}</b></div></div>"
         ),
     ]
+
+    # 🔥 Job of the day — the user's best match, highlighted as a card.
+    job_of_day = _job_of_day(sections, user_location)
+    if job_of_day is not None:
+        jotd_score, jotd_job = job_of_day
+        jotd_title = _esc(jotd_job.get("title") or "Untitled")
+        jotd_company = _esc(str(jotd_job.get("company") or ""))
+        jotd_loc = _esc(str(jotd_job.get("location") or ""))
+        # Escaped like _job_html_card does — & becomes &amp; so hrefs stay
+        # valid in every email client.
+        jotd_url = _esc(jotd_job.get("url") or "")
+        jotd_score_txt = ""
+        if jotd_score is not None:
+            jotd_score_txt = (
+                "<span style='background:#f59e0b;color:#fff;border-radius:999px;"
+                "padding:3px 10px;font-size:12px;font-weight:700;'>"
+                f"MATCH {jotd_score:.0f}%</span>"
+            )
+        jotd_link = ""
+        if jotd_url:
+            jotd_link = (
+                "<div style='margin-top:12px;'><a href='"
+                f"{jotd_url}' style='background:#f59e0b;color:#fff;"
+                "text-decoration:none;border-radius:8px;padding:9px 18px;"
+                "font-weight:600;font-size:13px;display:inline-block;'>"
+                "🔥 Apply now</a></div>"
+            )
+        jotd_meta = " · ".join(bit for bit in (jotd_company, jotd_loc) if bit)
+        jotd_meta_html = (
+            f"<div style='color:#78350f;font-size:13px;margin-top:4px;'>"
+            f"{jotd_meta}</div>"
+            if jotd_meta
+            else ""
+        )
+        parts.append(
+            "<div style='margin-top:24px;background:linear-gradient(135deg,"
+            "#fef3c7,#fde68a);border:1px solid #f59e0b;border-radius:12px;"
+            "padding:18px 20px;'>"
+            "<div style='font-size:12px;font-weight:800;color:#92400e;"
+            "letter-spacing:.6px;'>🔥 JOB OF THE DAY</div>"
+            f"<div style='font-size:16px;font-weight:700;margin-top:6px;'>"
+            f"{jotd_title}</div>{jotd_meta_html}"
+            f"<div style='margin-top:8px;'>{jotd_score_txt}</div>{jotd_link}</div>"
+        )
 
     # ⏰ Follow-up reminders section (email).
     follow_up = report.get("follow_up") or []
