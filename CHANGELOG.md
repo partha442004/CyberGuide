@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **One-click Save + Apply-with-status on every job card.** Cards now have
+  a compact action stack: **📌 Save** toggles a real bookmark (the API
+  POST/DELETE pair, duplicate-safe, session-cached so the toggle state is
+  correct), **👁 Seen** counts a view, and **📋 Apply** opens a popover
+  where you pick the status (applied / interview / offer) in one action —
+  the application is created and its status set immediately. Saved jobs
+  now also earn bookmark weight in the 🔥 Trending ranking.
+- **⏳ Closing soon on Overview.** The Overview page now surfaces the top
+  five roles with real application deadlines (from
+  `/api/v1/jobs/closing/soon`), each with an expiry chip and Open link —
+  it appears automatically whenever any saved job has a deadline.
+
+### Added
+
 - **🔥 Trending this week on Overview.** The Overview page now shows the
   six most-engaged jobs from the last 14 days, ranked by a real
   engagement score (3 per application + 2 per bookmark + 0.5 per view),
