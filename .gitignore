@@ -100,3 +100,7 @@ packaging/android/local.properties
 packaging/android/.gradle/
 *.apk
 *.exe
+
+# Android release signing secrets (NEVER commit)
+packaging/android/cyberguide-release.keystore
+packaging/android/keystore.properties

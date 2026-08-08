@@ -996,11 +996,33 @@ async def build_alert_chunks(
             closing_lines.append(line)
 
     if not here_flat and not there_flat:
+        head_lines = [format_daily_report(report, title)]
+        top_engaged = report.get("top_engaged") or []
+        if weekly and top_engaged:
+            head_lines.append("")
+            head_lines.append("🔥 <b>Most engaged this week</b>")
+            for entry in top_engaged[:5]:
+                te_title = _esc(entry.get("title"))
+                te_company = _esc(entry.get("company"))
+                te_loc = _esc(entry.get("location"))
+                te_score = float(entry.get("engagement_score") or 0)
+                line = (
+                    f"🔥 {te_score:.1f} · {te_title}"
+                    + (f" @ {te_company}" if te_company else "")
+                    + (f" · {te_loc}" if te_loc else "")
+                )
+                head_lines.append(line)
+            buttons = []
+            for entry in top_engaged[:5]:
+                te_url = entry.get("url")
+                if te_url:
+                    buttons.append(
+                        (f"✅ Apply — {_esc(entry.get('title'))[:55]}", te_url)
+                    )
+            return [("\n".join(head_lines), buttons)]
         if closing_lines:
-            return [
-                ("\n".join([format_daily_report(report, title)] + closing_lines), [])
-            ]
-        return [(format_daily_report(report, title), [])]
+            return [("\n".join(head_lines + closing_lines), [])]
+        return [(head_lines[0], [])]
 
     # Location banners for each group (kept short for Telegram).
     here_banner = f"📍 Your area ({user_location})" if loc_lower else "📋 Jobs"
@@ -1037,6 +1059,29 @@ async def build_alert_chunks(
     chunks.extend(_chunk(here_flat, here_banner, first=True))
     if there_flat:
         chunks.extend(_chunk(there_flat, there_banner, first=False))
+
+    # 🔥 Most-engaged jobs of the week — a leading chunk on the weekly
+    # digest so the recap opens with real activity (weekly-only; the daily
+    # digest never carries ``top_engaged``).
+    top_engaged = report.get("top_engaged") or []
+    if weekly and top_engaged:
+        te_lines = ["🔥 <b>Most engaged this week</b>", ""]
+        te_buttons: list[tuple[str, str]] = []
+        for entry in top_engaged[:5]:
+            te_title = _esc(entry.get("title"))
+            te_company = _esc(entry.get("company"))
+            te_loc = _esc(entry.get("location"))
+            te_score = float(entry.get("engagement_score") or 0)
+            line = (
+                f"🔥 {te_score:.1f} · {te_title}"
+                + (f" @ {te_company}" if te_company else "")
+                + (f" · {te_loc}" if te_loc else "")
+            )
+            te_lines.append(line)
+            te_url = entry.get("url")
+            if te_url:
+                te_buttons.append((f"✅ Apply — {te_title[:55]}", te_url))
+        chunks.insert(0, ("\n".join(te_lines), te_buttons))
 
     # Role × location breakdown, matching the email's closing table.
     breakdown = _telegram_breakdown(here_flat, there_flat)
@@ -1335,6 +1380,45 @@ async def build_daily_report_html(
     # Role x location breakdown table
     if loc_lower:
         parts.append(_location_breakdown_table(location_sections, other_sections))
+
+    # 🔥 Most-engaged jobs of the week (attached by the weekly endpoint).
+    top_engaged = report.get("top_engaged") or []
+    if top_engaged:
+        parts.append(
+            "<div style='margin:26px 0 10px;padding:14px 18px;border-radius:12px;"
+            "background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);"
+            "border:1px solid #fbbf24;'>"
+            "<div style='font-weight:800;font-size:15px;'>"
+            "🔥 Most engaged this week</div>"
+            "<div style='font-size:12px;color:#92400e;margin:4px 0 10px;'>"
+            "The jobs people actually applied to / saved / opened this week."
+            "</div>"
+        )
+        for entry in top_engaged:
+            te_title = _esc(entry.get("title"))
+            te_company = _esc(entry.get("company"))
+            te_loc = _esc(entry.get("location"))
+            te_url = entry.get("url") or "#"
+            te_score = float(entry.get("engagement_score") or 0)
+            stats = (
+                f"👁 {int(entry.get('views', 0))} views · "
+                f"📋 {int(entry.get('applications', 0))} applied · "
+                f"📌 {int(entry.get('bookmarks', 0))} saved"
+            )
+            parts.append(
+                "<div style='margin:8px 0;padding:10px 12px;border-radius:8px;"
+                "background:#fff;border-left:4px solid #f59e0b;'>"
+                "<div style='font-weight:700;font-size:13px;color:#78350f;'>"
+                f"🔥 {te_score:.1f} &nbsp;{te_title}</div>"
+                "<div style='font-size:12px;color:#64748b;margin:2px 0;'>"
+                f"{te_company}{' · ' + te_loc if te_loc else ''}</div>"
+                f"<div style='font-size:12px;color:#64748b;'>{stats}</div>"
+                f"<a href='{_esc(te_url)}' style='display:inline-block;margin-top:8px;"
+                "background:#f59e0b;color:#fff;text-decoration:none;border-radius:6px;"
+                "padding:6px 14px;font-size:12px;font-weight:700;'>Apply</a>"
+                "</div>"
+            )
+        parts.append("</div>")
 
     # Team snapshot (attached by _deliver_alert on weekly sends).
     team = report.get("team")
