@@ -14,10 +14,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from cybershield.dependencies import get_session
 from cybershield.domain.models import Job, ResumeData, ResumeMatchResult
 from cybershield.schemas.resume import (
+    CoverLetterResponse,
     ResumeBatchMatchResponse,
     ResumeMatchResponse,
     ResumeUploadResponse,
 )
+from cybershield.services.cover_letter import build_cover_letter
 from cybershield.services.resume_service import (
     SECURITY_SKILLS,
     ResumeParser,
@@ -580,4 +582,63 @@ async def match_resume_batch(
         matches=matches,
         top_match=matches[0] if matches else None,
         average_score=round(sum(scores) / len(scores), 1) if scores else None,
+    )
+
+
+@router.post("/cover-letter", response_model=CoverLetterResponse)
+async def generate_cover_letter(
+    user_id: str,
+    job_id: str,
+    session: AsyncSession = Depends(get_session),
+):
+    """Generate a tailored cover letter for a job from the user's resume.
+
+    Rule-based (no API key needed). Loads the parsed resume + the job's
+    skills/tags, reuses the match logic to know which skills the candidate
+    actually has, and builds a three-paragraph letter that names the role,
+    the company and the candidate's matched skills.
+    """
+    resume_result = await session.execute(select(ResumeData).where(ResumeData.user_id == user_id))
+    resume = resume_result.scalar_one_or_none()
+    if not resume:
+        raise HTTPException(status_code=404, detail="No resume found. Upload a resume first.")
+
+    job_result = await session.execute(
+        select(
+            Job.id,
+            Job.title,
+            Job.company,
+            Job.required_skills,
+            Job.preferred_skills,
+            Job.tags,
+        ).where(Job.id == job_id)
+    )
+    row = job_result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    job = _JobMatchData(*row)
+
+    # Reuse the match logic so the letter claims the same skills the match
+    # score reports (never overstates what the resume contains).
+    resume_skills = _extract_skill_names(resume.skills)
+    match_response = _calculate_job_match(
+        resume_skills,
+        job,
+        resume_data=_resume_data_for_ats(resume),
+    )
+
+    letter = build_cover_letter(
+        resume_skills=list(resume_skills),
+        job_title=job.title or "",
+        company=job.company or "",
+        matched_skills=match_response.matched_skills,
+    )
+
+    return CoverLetterResponse(
+        job_id=job_id,
+        job_title=job.title or "",
+        company=job.company or "",
+        cover_letter=letter,
+        match_score=match_response.match_score,
+        matched_skills=match_response.matched_skills,
     )
