@@ -392,16 +392,125 @@ def _safe_fetchable(url: str) -> bool:
     return True
 
 
+def _json_ld_jobposting(soup) -> dict | None:
+    """Extract the first JobPosting from JSON-LD structured data.
+
+    Career pages and boards that embed schema.org data (Greenhouse, Lever,
+    Workable, many direct career sites) expose the real title, hiring
+    company and location as JSON-LD — more accurate than OpenGraph, whose
+    ``og:site_name`` is the job board ("Indeed"), not the hiring company.
+    Returns ``None`` when no usable JobPosting block exists; never raises.
+    """
+    import json
+
+    for script in soup.find_all("script", type="application/ld+json"):
+        raw = script.get_text().strip()
+        if not raw or len(raw) > 1_000_000:
+            continue
+        try:
+            data = json.loads(raw)
+        except Exception:  # noqa: S112 - a broken block just gets skipped
+            continue
+        items = data if isinstance(data, list) else [data]
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            types = item.get("@type")
+            norm = types if isinstance(types, list) else [types]
+            if "JobPosting" not in norm:
+                continue
+            out: dict = {}
+            title = item.get("title")
+            if isinstance(title, str) and title.strip():
+                out["title"] = title.strip()
+            org = item.get("hiringOrganization")
+            if isinstance(org, dict):
+                org_name = org.get("name")
+                if isinstance(org_name, str) and org_name.strip():
+                    out["company"] = org_name.strip()
+            elif isinstance(org, str) and org.strip():
+                out["company"] = org.strip()
+            loc = item.get("jobLocation")
+            parts: list[str] = []
+            for place in loc if isinstance(loc, list) else [loc]:
+                if not isinstance(place, dict):
+                    continue
+                address = place.get("address")
+                if isinstance(address, str):
+                    if address.strip():
+                        parts.append(address.strip())
+                    continue
+                if not isinstance(address, dict):
+                    continue
+                locality = address.get("addressLocality")
+                region = address.get("addressRegion")
+                country = address.get("addressCountry")
+                if isinstance(country, dict):
+                    country = country.get("name")
+                for bit in (locality, region):
+                    if isinstance(bit, str) and bit.strip():
+                        parts.append(bit.strip())
+                # Skip 2-letter country codes ("IN"); keep full names.
+                if (
+                    isinstance(country, str)
+                    and country.strip()
+                    and len(country.strip()) > 2
+                ):
+                    parts.append(country.strip())
+            if parts:
+                out["location"] = ", ".join(parts)
+            if out.get("title") or out.get("company"):
+                return out
+    return None
+
+
+def _parse_page_meta(html: str) -> dict:
+    """Extract shareable metadata from a fetched page (pure, testable).
+
+    Title preference: JSON-LD JobPosting title > OpenGraph ``og:title`` >
+    the HTML ``<title>`` tag. Company comes from JSON-LD
+    ``hiringOrganization`` when present (a job page's ``og:site_name`` is
+    the job board, not the hiring company); otherwise ``og:site_name``.
+    Location is only available from JSON-LD.
+    """
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    def _og(prop: str) -> str | None:
+        tag = soup.find("meta", property=prop)
+        content = tag.get("content") if tag else None
+        if content is not None:
+            if isinstance(content, list):
+                return " ".join(str(c) for c in content).strip()
+            return str(content).strip()
+        return None
+
+    job_ld = _json_ld_jobposting(soup) or {}
+    og_title = _og("og:title")
+    html_title = soup.title.get_text(strip=True) if soup.title else None
+    meta = {
+        "title": job_ld.get("title") or og_title or html_title,
+        "site_name": _og("og:site_name") or "",
+        "description": _og("og:description"),
+    }
+    if job_ld.get("company"):
+        meta["company"] = job_ld["company"]
+    if job_ld.get("location"):
+        meta["location"] = job_ld["location"]
+    return meta
+
+
 async def _fetch_page_meta(url: str) -> dict:
-    """Fetch a page and return OpenGraph meta tags for title/company.
+    """Fetch a page and return its title/company/location metadata.
 
     Used by the share endpoint so a bare link (LinkedIn post, company careers
     page, any job board) can be saved without the user typing title/company.
+    Falls back through JSON-LD JobPosting, OpenGraph and the HTML title tag.
     Returns an empty dict when the page is unreachable, unsafe to fetch
     (SSRF guard), or has no metadata.
     """
     import httpx
-    from bs4 import BeautifulSoup
 
     from interntrack.config import get_settings
 
@@ -417,28 +526,7 @@ async def _fetch_page_meta(url: str) -> dict:
             response = await client.get(url)
         if response.status_code != 200:
             return {}
-
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        def _og(prop: str) -> str | None:
-            tag = soup.find("meta", property=prop)
-            content = tag.get("content") if tag else None
-            if content is not None:
-                if isinstance(content, list):
-                    return " ".join(str(c) for c in content).strip()
-                return str(content).strip()
-            return None
-
-        title = _og("og:title") or (
-            soup.title.get_text(strip=True) if soup.title else None
-        )
-        site_name = _og("og:site_name") or ""
-        description = _og("og:description")
-        return {
-            "title": title,
-            "site_name": site_name,
-            "description": description,
-        }
+        return _parse_page_meta(response.text)
     except Exception:
         return {}
 
@@ -472,11 +560,14 @@ async def share_job(
     title = payload.title or ""
     company = payload.company or ""
     description = payload.description
+    location = payload.location
     if not title or not company:
         meta = await _fetch_page_meta(normalized_url)
         title = title or (meta.get("title") or "")
-        company = company or (meta.get("site_name") or "Unknown")
+        # Prefer the hiring company from JSON-LD; og:site_name is the board.
+        company = company or (meta.get("company") or meta.get("site_name") or "Unknown")
         description = description or meta.get("description")
+        location = location or meta.get("location")
 
     if not title:
         raise HTTPException(
@@ -493,7 +584,7 @@ async def share_job(
                 "title": title.strip(),
                 "company": company.strip() or "Unknown",
                 "url": normalized_url,
-                "location": payload.location,
+                "location": location,
                 "description": description,
                 "source": "manual",
             },

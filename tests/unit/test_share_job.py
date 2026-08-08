@@ -140,3 +140,141 @@ class TestShareJob:
         )
         assert second.status_code == 200
         assert second.json()["duplicate"] is True
+
+    @pytest.mark.asyncio
+    async def test_share_job_uses_company_and_location_from_meta(self, client):
+        """JSON-LD company + location now flow into the saved job."""
+        meta = {
+            "title": "SOC Analyst L2",
+            "company": "Acme Security",
+            "site_name": "Indeed",
+            "location": "Bengaluru, Karnataka",
+            "description": None,
+        }
+        with patch(
+            "interntrack.api.v1.jobs._fetch_page_meta",
+            new=AsyncMock(return_value=meta),
+        ):
+            resp = await client.post(
+                "/api/v1/jobs/share",
+                json={"url": "https://in.indeed.com/viewjob?jk=abc123"},
+            )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        # The hiring company (not the board's site_name) is used.
+        assert data["job"]["company"] == "Acme Security"
+        assert data["job"]["location"] == "Bengaluru, Karnataka"
+
+    @pytest.mark.asyncio
+    async def test_share_job_user_location_wins_over_meta(self, client):
+        """A user-supplied location is never overwritten by the page meta."""
+        meta = {
+            "title": "SOC Analyst",
+            "company": "Acme",
+            "site_name": "Indeed",
+            "location": "Mumbai, Maharashtra",
+            "description": None,
+        }
+        with patch(
+            "interntrack.api.v1.jobs._fetch_page_meta",
+            new=AsyncMock(return_value=meta),
+        ):
+            resp = await client.post(
+                "/api/v1/jobs/share",
+                json={
+                    "url": "https://in.indeed.com/viewjob?jk=xyz789",
+                    "title": "SOC Analyst",
+                    "company": "Acme",
+                    "location": "Bengaluru, Karnataka",
+                },
+            )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["job"]["location"] == "Bengaluru, Karnataka"
+
+    @pytest.mark.asyncio
+    async def test_share_job_company_falls_back_to_site_name(self, client):
+        """JSON-LD title without a company falls back to og:site_name."""
+        meta = {
+            "title": "Senior VAPT Engineer",
+            "site_name": "LinkedIn",
+            "description": None,
+        }
+        with patch(
+            "interntrack.api.v1.jobs._fetch_page_meta",
+            new=AsyncMock(return_value=meta),
+        ):
+            resp = await client.post(
+                "/api/v1/jobs/share",
+                json={"url": "https://www.linkedin.com/jobs/view/vapt-67890"},
+            )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["job"]["company"] == "LinkedIn"
+
+
+class TestParsePageMeta:
+    """Pure HTML metadata extraction: JSON-LD > OpenGraph > <title>."""
+
+    @staticmethod
+    def _parse(html):
+        from interntrack.api.v1.jobs import _parse_page_meta
+
+        return _parse_page_meta(html)
+
+    def test_json_ld_jobposting_wins_over_og(self):
+        html = """
+        <html><head>
+          <meta property="og:title" content="Generic Role">
+          <meta property="og:site_name" content="Indeed">
+          <script type="application/ld+json">
+          {"@type": "JobPosting", "title": "Application Security Engineer",
+           "hiringOrganization": {"@type": "Organization", "name": "Zscaler"},
+           "jobLocation": {"@type": "Place", "address": {
+             "addressLocality": "Bengaluru", "addressRegion": "Karnataka"}}}
+          </script>
+        </head></html>
+        """
+        meta = self._parse(html)
+        assert meta["title"] == "Application Security Engineer"
+        assert meta["company"] == "Zscaler"
+        assert meta["location"] == "Bengaluru, Karnataka"
+        assert meta["site_name"] == "Indeed"
+
+    def test_json_ld_in_list_with_other_types(self):
+        html = """
+        <html><head><script type="application/ld+json">[
+          {"@type": "BreadcrumbList"},
+          {"@type": "JobPosting", "title": "SOC Analyst",
+           "hiringOrganization": {"name": "SecureCo"}}
+        ]</script></head></html>
+        """
+        meta = self._parse(html)
+        assert meta["title"] == "SOC Analyst"
+        assert meta["company"] == "SecureCo"
+
+    def test_og_fallback_without_json_ld(self):
+        html = (
+            "<html><head>"
+            '<meta property="og:title" content="Penetration Tester">'
+            '<meta property="og:site_name" content="LinkedIn">'
+            '<meta property="og:description" content="VAPT for clients">'
+            "</head></html>"
+        )
+        meta = self._parse(html)
+        assert meta["title"] == "Penetration Tester"
+        assert meta["site_name"] == "LinkedIn"
+        assert meta["description"] == "VAPT for clients"
+        assert "company" not in meta
+
+    def test_html_title_fallback_when_no_meta(self):
+        html = (
+            "<html><head>"
+            "<title>Vulnerability Researcher at CyberCorp</title>"
+            "</head></html>"
+        )
+        meta = self._parse(html)
+        assert meta["title"] == "Vulnerability Researcher at CyberCorp"
+        assert "company" not in meta
+
+    def test_empty_html_returns_no_title(self):
+        meta = self._parse("<html><head></head><body></body></html>")
+        assert meta["title"] is None
