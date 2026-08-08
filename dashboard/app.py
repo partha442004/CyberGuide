@@ -948,11 +948,14 @@ def _match_jobs_to_resume(jobs: list, user_id: str) -> Any:
     )
 
 
-def _my_top_matches(user_id: str, limit: int = 8) -> list[tuple[dict, float]]:
+def _my_top_matches(user_id: str, limit: int = 8) -> list[tuple[dict, float, dict]]:
     """Best resume matches for a user against the newest jobs, score > 0.
 
-    Returns ``[(job, score)]`` sorted by score desc; empty when the user has
-    no resume yet or the API is unreachable.
+    Returns ``[(job, score, match)]`` sorted by score desc — ``match``
+    carries the breakdown the API already computes (matched / related /
+    missing skills, ATS compatibility, suggestions) so the UI can explain
+    the percentage instead of showing a bare number. Empty when the user
+    has no resume yet or the API is unreachable.
     """
     jobs = fetch_data("/jobs/?limit=50") or {}
     job_list = jobs.get("jobs") or []
@@ -960,14 +963,61 @@ def _my_top_matches(user_id: str, limit: int = 8) -> list[tuple[dict, float]]:
     if not result or not result.get("matches"):
         return []
     by_id = {str(j.get("id")): j for j in job_list}
-    scored: list[tuple[dict, float]] = []
+    scored: list[tuple[dict, float, dict]] = []
     for match in result["matches"]:
         score = match.get("match_score")
         job = by_id.get(str(match.get("job_id")))
         if job and isinstance(score, (int, float)) and score > 0:
-            scored.append((job, float(score)))
+            scored.append((job, float(score), match))
     scored.sort(key=lambda item: item[1], reverse=True)
     return scored[:limit]
+
+
+def _match_breakdown(match: dict) -> None:
+    """Render the 'why this score' breakdown for one match payload.
+
+    Color-coded chips: ✅ matched skills (green), 🔄 transferable/related
+    skills (blue), ⬜ missing skills (red), plus the ATS compatibility %
+    and the first suggestion. ``unsafe_allow_html`` is safe here because
+    every value is passed through ``escape`` before interpolation.
+    """
+    matched = [s for s in (match.get("matched_skills") or []) if s]
+    related = [s for s in (match.get("related_skills") or []) if s]
+    missing = [s for s in (match.get("missing_skills") or []) if s]
+
+    def chips(items: list, icon: str, style: str) -> str:
+        return "".join(
+            f'<span class="chip" style="{style}">{icon} {escape(str(s))}</span>'
+            for s in items[:6]
+        )
+
+    rows: list[str] = []
+    if matched:
+        rows.append(
+            '<div class="chip-row">'
+            + chips(matched, "✅", "color:#059669;border-color:rgba(5,150,105,0.35);")
+            + "</div>"
+        )
+    if related:
+        rows.append(
+            '<div class="chip-row">'
+            + chips(related, "🔄", "color:#2563eb;border-color:rgba(37,99,235,0.35);")
+            + "</div>"
+        )
+    if missing:
+        rows.append(
+            '<div class="chip-row">'
+            + chips(missing, "⬜", "color:#dc2626;border-color:rgba(220,38,38,0.35);")
+            + "</div>"
+        )
+    if rows:
+        st.markdown("".join(rows), unsafe_allow_html=True)
+    ats = match.get("ats_score")
+    if ats is not None:
+        st.caption(f"📄 ATS compatibility: {float(ats):.0f}%")
+    suggestions = [s for s in (match.get("suggestions") or []) if s]
+    if suggestions:
+        st.caption("💡 " + escape(str(suggestions[0])))
 
 
 @st.cache_data(ttl=60, show_spinner=False)
@@ -1361,7 +1411,7 @@ def show_my_matches() -> None:
     # ── Top matches ───────────────────────────────────────────────────
     st.subheader("🏆 Your best matches right now")
     if matches:
-        for job, score in matches:
+        for job, score, match in matches:
             title = str(job.get("title") or "Untitled role")
             company = str(job.get("company") or "Unknown")
             color = (
@@ -1379,6 +1429,7 @@ def show_my_matches() -> None:
                 "</div>",
                 unsafe_allow_html=True,
             )
+            _match_breakdown(match)
             if job.get("url"):
                 st.link_button("🔗 View", job["url"], key=f"mm_{job.get('id')}")
             st.divider()

@@ -34,6 +34,18 @@ jobs:
             "$API_BASE/api/v1/jobs/discovery/run-for-users" \
             || echo "per-user discovery failed or timed out"
 
+      # Vercel is serverless, so the scheduler's ``archive_old_jobs`` /
+      # ``deactivate_expired_jobs`` functions never run there. This curl
+      # does the same cleanup: jobs first seen more than 14 days ago are
+      # moved to the expired_jobs archive table, keeping the live listings
+      # fresh and the dashboard's "Expired" page populated.
+      - name: Archive expired jobs (keep listings fresh)
+        run: |
+          curl -sSf --max-time 120 -X POST \
+            "$API_BASE/api/v1/jobs/archive-expired?days=14" \
+            && echo "expired jobs archived OK" \
+            || echo "archive step failed or timed out"
+
       - name: Generate daily report (morning slot — security)
         if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *'
         run: |
