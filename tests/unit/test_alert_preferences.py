@@ -859,6 +859,7 @@ class TestAlertWindow:
             domains=["security"],
             min_match_score=None,
             since=None,
+            location=None,
         )
         mock_manager.notify_all.assert_not_called()
         mock_manager.notify.assert_not_called()

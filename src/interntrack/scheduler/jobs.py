@@ -494,11 +494,15 @@ async def _send_alert_for(session, user_id: str, prefs: dict, user=None) -> None
     the send in that user's history.
     """
     domains = prefs.get("domains") or None
+    # Each user's digest is scoped to *their* city (synonym-aware), so two
+    # accounts on the same domain never see each other's locations.
+    user_location = (getattr(user, "location", None) or "").strip() or None
     service = ReportService(session)
     report = await service.generate_daily_report(
         domains=domains,
         min_match_score=prefs.get("min_match_score"),
         since=prefs.get("last_alert_at"),
+        location=user_location,
     )
 
     await _mark_alert_sent(session, user_id)
@@ -745,9 +749,11 @@ async def _score_and_group_jobs(
     canonical domain order, jobs within each section sorted by match score.
     ``report['min_match_score']`` drops jobs below the threshold.
 
-    Location is intentionally NOT filtered here: the email and Telegram
-    builders split jobs into "Your area" vs "Other locations" themselves,
-    so dropping non-matching jobs here would starve those sections.
+    Location is NOT re-filtered here: per-user digests already arrive
+    scoped to the user's city (generate_daily_report), so splitting again
+    would only ever produce the "Your area" side. The legacy path (no
+    user location) still lets the email/Telegram builders render the
+    "Other locations" split themselves.
     """
     jobs = report.get("new_jobs") or []
     if not jobs:
@@ -1449,25 +1455,10 @@ async def build_daily_report_html(
 
 
 def _location_matches(job_loc, user_loc):
-    """Fuzzy location match with synonyms."""
-    if not job_loc or not user_loc:
-        return False
-    if user_loc in job_loc:
-        return True
-    synonyms = {
-        "bangalore": ["bengaluru", "bengalore"],
-        "bengaluru": ["bangalore", "bengalore"],
-        "mumbai": ["bombay"],
-        "bombay": ["mumbai"],
-        "delhi": ["new delhi", "ncr"],
-        "hyderabad": ["secunderabad"],
-    }
-    for canonical, alts in synonyms.items():
-        if user_loc == canonical and any(a in job_loc for a in alts):
-            return True
-        if user_loc in alts and canonical in job_loc:
-            return True
-    return False
+    """Fuzzy location match with synonyms (delegates to utils.helpers)."""
+    from interntrack.utils.helpers import location_matches
+
+    return location_matches(job_loc, user_loc)
 
 
 def _location_breakdown_table(sections, other_sections):

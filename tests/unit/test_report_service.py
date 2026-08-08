@@ -224,6 +224,66 @@ class TestGenerateDailyReport:
         assert closed["age_days"] == 0
         assert closed["is_active"] is False
 
+    @pytest.mark.asyncio
+    async def test_location_filter_keeps_only_user_city(self):
+        """A digest location keeps only that city, synonym-aware."""
+        service = ReportService(MagicMock())
+        service.job_repo = AsyncMock()
+        service.job_repo.get_recent_jobs.return_value = [
+            _MockJob(
+                title="Frontend Dev",
+                location="Bengaluru, Karnataka, India",
+                job_id="j1",
+            ),
+            _MockJob(
+                title="Frontend Dev",
+                location="Bangalore, Karnataka, India",
+                job_id="j2",
+            ),
+            _MockJob(
+                title="Frontend Dev",
+                location="Mumbai, Maharashtra, India",
+                job_id="j3",
+            ),
+            _MockJob(title="Frontend Dev", location="Remote", job_id="j4"),
+        ]
+        service.app_repo = AsyncMock()
+        service.app_repo.get_recent_applications.return_value = []
+        service.app_repo.get_status_counts.return_value = {}
+        service.app_repo.get_applied_job_ids.return_value = set()
+        service.job_repo.get_closing_soon.return_value = []
+
+        report = await service.generate_daily_report(location="Bengaluru")
+
+        locs = sorted(str(j["location"]) for j in report["new_jobs"])
+        assert locs == [
+            "Bangalore, Karnataka, India",
+            "Bengaluru, Karnataka, India",
+        ]
+        assert report["summary"]["new_jobs"] == 2
+
+    @pytest.mark.asyncio
+    async def test_location_filter_excludes_other_city(self):
+        """A Chennai digest never includes Bengaluru or Remote jobs."""
+        service = ReportService(MagicMock())
+        service.job_repo = AsyncMock()
+        service.job_repo.get_recent_jobs.return_value = [
+            _MockJob(title="Frontend Dev", location="Bengaluru, India", job_id="j1"),
+            _MockJob(title="Frontend Dev", location="Chennai, India", job_id="j2"),
+            _MockJob(title="Frontend Dev", location="Remote", job_id="j3"),
+        ]
+        service.app_repo = AsyncMock()
+        service.app_repo.get_recent_applications.return_value = []
+        service.app_repo.get_status_counts.return_value = {}
+        service.app_repo.get_applied_job_ids.return_value = set()
+        service.job_repo.get_closing_soon.return_value = []
+
+        report = await service.generate_daily_report(location="Chennai")
+
+        assert [str(j["location"]) for j in report["new_jobs"]] == [
+            "Chennai, India",
+        ]
+
 
 class TestClassifyDomain:
     """Tests for the domain classifier used in alert sections."""

@@ -294,3 +294,75 @@ class TestGenerateDailyReportMultiUser:
             await generate_daily_report()
 
         deliver.assert_not_awaited()
+
+
+class TestSendAlertForLocation:
+    """The per-user digest is scoped to each account's own city."""
+
+    @pytest.mark.asyncio
+    async def test_digest_scoped_to_user_location(self):
+        from interntrack.scheduler.jobs import _send_alert_for
+
+        fake_user = SimpleNamespace(
+            id="u1",
+            location="Chennai",
+            email="friend@example.com",
+            telegram_chat_id=None,
+        )
+        prefs = {"domains": ["frontend"], "channels": ["email"], "min_match_score": 0}
+        mock_session = AsyncMock()
+        mock_service = AsyncMock()
+        mock_service.generate_daily_report.return_value = {
+            "new_jobs": [{"title": "React Dev", "company": "Acme"}],
+        }
+
+        with (
+            patch(
+                "interntrack.scheduler.jobs.ReportService",
+                return_value=mock_service,
+            ),
+            patch("interntrack.scheduler.jobs._mark_alert_sent", new=AsyncMock()),
+            patch(
+                "interntrack.scheduler.jobs._deliver_alert", new=AsyncMock()
+            ) as deliver,
+            patch("interntrack.scheduler.jobs._record_alert_history", new=AsyncMock()),
+            patch("interntrack.scheduler.jobs.NotificationManager"),
+        ):
+            await _send_alert_for(mock_session, "u1", prefs, fake_user)
+
+        kwargs = mock_service.generate_daily_report.call_args.kwargs
+        assert kwargs.get("location") == "Chennai"
+        assert kwargs.get("domains") == ["frontend"]
+        # Delivery routes to the user's own profile.
+        assert deliver.call_args.kwargs.get("user") is fake_user
+
+    @pytest.mark.asyncio
+    async def test_no_user_no_location_filter(self):
+        """Legacy user1 path (no profile) keeps unfiltered behavior."""
+        from interntrack.scheduler.jobs import _send_alert_for
+
+        prefs = {"domains": None, "channels": None, "min_match_score": None}
+        mock_session = AsyncMock()
+        mock_service = AsyncMock()
+        mock_service.generate_daily_report.return_value = {
+            "new_jobs": [{"title": "Job", "company": "X"}],
+        }
+
+        with (
+            patch(
+                "interntrack.scheduler.jobs.ReportService",
+                return_value=mock_service,
+            ),
+            patch("interntrack.scheduler.jobs._mark_alert_sent", new=AsyncMock()),
+            patch(
+                "interntrack.scheduler.jobs._deliver_alert",
+                new=AsyncMock(return_value={"email": True}),
+            ),
+            patch("interntrack.scheduler.jobs._record_alert_history", new=AsyncMock()),
+            patch("interntrack.scheduler.jobs.NotificationManager"),
+        ):
+            await _send_alert_for(mock_session, "user1", prefs, None)
+
+        assert (
+            mock_service.generate_daily_report.call_args.kwargs.get("location") is None
+        )

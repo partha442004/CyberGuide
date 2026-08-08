@@ -19,6 +19,54 @@ def to_naive_utc(dt: datetime | None) -> datetime | None:
     return dt
 
 
+# City-name synonyms used by :func:`location_matches` so a preference like
+# "Bangalore" still matches postings written as "Bengaluru" (and vice-versa).
+# Short aliases (e.g. "ncr") are matched with word boundaries by
+# :func:`location_matches` so "Encryption Corp" never passes a Delhi filter.
+_LOCATION_SYNONYMS = {
+    "bangalore": ["bengaluru", "bengalore"],
+    "bengaluru": ["bangalore", "bengalore"],
+    "mumbai": ["bombay"],
+    "bombay": ["mumbai"],
+    "delhi": ["new delhi", "delhi ncr", "ncr"],
+    "hyderabad": ["secunderabad"],
+}
+
+
+def location_matches(job_loc: str, user_loc: str) -> bool:
+    """Fuzzy location match with synonyms (Bangalore ↔ Bengaluru, ...).
+
+    Both arguments should be lowercased. True when the user's preferred
+    city appears in the job's location string, or a known synonym does —
+    so a "Bengaluru" preference matches a "Bangalore, Karnataka" posting
+    and the same posting matches a "Hyderabad" user's filter only when it
+    actually mentions Hyderabad. This is the single source of truth shared
+    by the instant alerts, the digest builders and the report filter.
+    """
+    if not job_loc or not user_loc:
+        return False
+    if user_loc in job_loc:
+        return True
+    for canonical, alts in _LOCATION_SYNONYMS.items():
+        if user_loc == canonical and any(_alt_in(alt, job_loc) for alt in alts):
+            return True
+        if user_loc in alts and canonical in job_loc:
+            return True
+    return False
+
+
+def _alt_in(alt: str, job_loc: str) -> bool:
+    """Word-boundary match for a synonym inside a location string.
+
+    Multi-word aliases ("new delhi") match as-is; short ones like "ncr"
+    must appear as a standalone token so "Enncr[yption]"-style false
+    positives can never slip a wrong-city job past a location filter.
+    """
+    import re
+
+    return bool(re.search(rf"(?<![a-z0-9]){re.escape(alt)}(?![a-z0-9])", job_loc))
+
+
 def job_urgency(posted_at, first_seen_at=None, is_active=True):
     """Compute job urgency badge based on age.
 

@@ -234,3 +234,49 @@ class TestGenerateId:
 
         uuid_pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
         assert re.match(uuid_pattern, result)
+
+
+class TestLocationMatches:
+    """Fuzzy city matching with synonyms (Bangalore ↔ Bengaluru)."""
+
+    def test_exact_city_in_job_location(self):
+        from interntrack.utils.helpers import location_matches
+
+        assert location_matches("bangalore, karnataka, india", "bangalore")
+        assert location_matches("chennai, tamil nadu, india", "chennai")
+
+    def test_bangalore_bengaluru_synonym(self):
+        from interntrack.utils.helpers import location_matches
+
+        # A "Bengaluru" preference matches a "Bangalore" posting and
+        # vice-versa — this is what keeps per-user city digests complete.
+        assert location_matches("bangalore, karnataka, india", "bengaluru")
+        assert location_matches("bengaluru, karnataka, india", "bangalore")
+
+    def test_other_city_synonyms(self):
+        from interntrack.utils.helpers import location_matches
+
+        assert location_matches("bombay, maharashtra", "mumbai")
+        assert location_matches("new delhi, india", "delhi")
+        assert location_matches("delhi ncr, india", "delhi")
+        assert location_matches("secunderabad, telangana", "hyderabad")
+
+    def test_short_alias_needs_word_boundary(self):
+        """ "NCR" only matches as a standalone token, never inside words."""
+        from interntrack.utils.helpers import location_matches
+
+        assert location_matches("ncr, india", "delhi")
+        assert not location_matches("encryption corp, mumbai", "delhi")
+        assert not location_matches("incredible spaces, pune", "delhi")
+
+    def test_wrong_city_does_not_match(self):
+        from interntrack.utils.helpers import location_matches
+
+        assert not location_matches("mumbai, maharashtra", "chennai")
+        assert not location_matches("chennai, tamil nadu", "bangalore")
+
+    def test_empty_inputs_never_match(self):
+        from interntrack.utils.helpers import location_matches
+
+        assert not location_matches("", "bangalore")
+        assert not location_matches("bangalore", "")
