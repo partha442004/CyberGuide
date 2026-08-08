@@ -273,10 +273,12 @@ class TestJobsAPIUnit:
             )
 
         assert result["discovered"] == 1
+        from interntrack.api.v1.jobs import _DISCOVERY_SOURCES
+
         mock_registry.fetch_all.assert_awaited_once_with(
             query="data science internship",
             location=None,
-            sources=None,
+            sources=_DISCOVERY_SOURCES,
         )
 
     @pytest.mark.asyncio
@@ -304,10 +306,12 @@ class TestJobsAPIUnit:
             )
 
         assert result["discovered"] == 0
+        from interntrack.api.v1.jobs import _DISCOVERY_SOURCES
+
         mock_registry.fetch_all.assert_awaited_once_with(
             query="python developer",
             location=None,
-            sources=None,
+            sources=_DISCOVERY_SOURCES,
         )
 
 

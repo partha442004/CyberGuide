@@ -242,6 +242,44 @@ class TestPerUserDiscoveryEndpoint:
         assert result["saved"] >= 1
 
     @pytest.mark.asyncio
+    async def test_discovery_uses_curated_fast_sources(self):
+        """Discovery runs the fast/India sources, not every scraper."""
+        from interntrack.api.v1.jobs import (
+            _DISCOVERY_SOURCES,
+            run_discovery_for_users,
+        )
+
+        registry = AsyncMock()
+        registry.fetch_all.return_value = []
+
+        with (
+            patch(
+                "interntrack.scheduler.jobs._enabled_alert_targets",
+                new=AsyncMock(
+                    return_value=[
+                        {
+                            "user_id": "u1",
+                            "prefs": {"domains": ["security"]},
+                            "user": SimpleNamespace(skills=[], location="Bangalore"),
+                        }
+                    ]
+                ),
+            ),
+            patch(
+                "interntrack.scrapers.registry.get_default_registry",
+                return_value=registry,
+            ),
+            patch("interntrack.api.v1.jobs.JobService") as job_cls,
+        ):
+            job_cls.return_value.save_jobs = AsyncMock(return_value=[])
+            await run_discovery_for_users(db=AsyncMock(), limit=2)
+
+        assert registry.fetch_all.called
+        call_kwargs = registry.fetch_all.call_args.kwargs
+        assert call_kwargs.get("sources") == _DISCOVERY_SOURCES
+        assert len(_DISCOVERY_SOURCES) < 20  # sanity: curated, not everything
+
+    @pytest.mark.asyncio
     async def test_no_users_falls_back_to_fixed_queries(self):
         from interntrack.api.v1.jobs import run_discovery_for_users
 
