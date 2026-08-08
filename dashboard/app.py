@@ -1693,6 +1693,53 @@ def show_overview() -> None:
                 "linear-gradient(135deg,#43e97b 0%,#38f9d7 100%)",
             )
 
+        # ── 🎯 Job of the day (best resume match) ─────────────────────────
+        # The same highlight the daily email / Telegram digest leads with:
+        # the highest match % against the user's uploaded resume. Only shows
+        # when a resume exists (no match scores yet otherwise).
+        jotd = _my_top_matches(_current_user_id(), limit=1)
+        if jotd:
+            jotd_job, jotd_score, jotd_match = jotd[0]
+            jtitle = str(jotd_job.get("title") or "Untitled role")
+            jcompany = str(jotd_job.get("company") or "Unknown")
+            st.markdown(
+                "<div style='background:linear-gradient(135deg,#f59e0b 0%,"
+                "#ef4444 100%);border-radius:16px;padding:18px 24px;"
+                "color:white;margin:6px 0 4px 0;box-shadow:0 6px 20px "
+                "rgba(239,68,68,0.25);'>"
+                "<div style='font-size:12px;font-weight:800;"
+                "letter-spacing:1px;text-transform:uppercase;opacity:0.9;'>"
+                "🎯 Job of the day</div>"
+                f"<div style='font-size:19px;font-weight:800;margin:4px 0;'>"
+                f"{escape(jtitle)}</div>"
+                f"<div style='font-size:13px;opacity:0.95;'>"
+                f"{escape(jcompany)} · "
+                f"{escape(str(jotd_job.get('location') or 'Remote'))}"
+            )
+            st.markdown(
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            act_cols = st.columns([3, 2])
+            with act_cols[0]:
+                st.markdown(
+                    f"<span class='chip' style='color:#fff;background:rgba(255,255,255,0.2);"
+                    f"border-color:rgba(255,255,255,0.35);font-weight:700;'>"
+                    f"Match {jotd_score:.0f}%</span> "
+                    f"<span class='chip' style='color:#fff;background:rgba(255,255,255,0.2);"
+                    f"border-color:rgba(255,255,255,0.35);'>"
+                    f"Same as your daily digest highlight</span>",
+                    unsafe_allow_html=True,
+                )
+            with act_cols[1]:
+                if jotd_job.get("url"):
+                    st.link_button(
+                        "🔗 View & Apply",
+                        jotd_job["url"],
+                        key=f"jotd_{jotd_job.get('id')}",
+                        use_container_width=True,
+                    )
+
         # ── Trending this week (engagement-ranked) ────────────────────────
         trending = fetch_data("/jobs/trending?days=14&limit=6") or {}
         trend_jobs = trending.get("trending") or []

@@ -122,6 +122,24 @@ async def backfill_job_tags(
     return {"updated": updated}
 
 
+@router.post("/backfill-engagement")
+async def backfill_engagement(
+    limit: int = Query(1000, ge=1, le=5000),
+    db: AsyncSession = Depends(get_db),
+):
+    """Seed view_count from real application / bookmark activity.
+
+    Jobs saved before view tracking existed carry ``view_count = 0`` even
+    when people applied to or bookmarked them, so 🔥 Trending under-ranks
+    them. Each application or bookmark implies at least one view, so this
+    backfills ``view_count = max(current, applications + bookmarks)`` for
+    the most recent active rows.
+    """
+    repo = JobRepository(db)
+    updated = await repo.backfill_engagement(limit=limit)
+    return {"updated": updated}
+
+
 @router.post("/archive-expired")
 async def archive_expired(days: int = 30, db: AsyncSession = Depends(get_db)):
     """Archive jobs older than N days to keep the database lean."""
