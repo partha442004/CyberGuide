@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **🎯 Job of the day card on the dashboard Overview.** The page now
+  opens with the same highlight the daily digest leads with — the top
+  resume-match job — as a gradient amber card with its match-% chip and
+  a View & Apply button. It only appears when a resume has been
+  uploaded (no match scores yet otherwise), and it reuses the exact
+  match data the My Matches page shows, so the card never disagrees
+  with the digest.
+- **Engagement backfill for 🔥 Trending.** `POST /api/v1/jobs/backfill-
+  engagement` seeds `view_count` from real application + bookmark
+  activity (`max(current, applications + bookmarks)`), so jobs that
+  people actually applied to or saved stop being under-ranked by
+  Trending. Mirrors the existing `backfill-job-types` / `backfill-tags`
+  endpoints; a no-op until engagement exists, then keeps Trending honest.
+
+### Fixed
+
+- **🔥 Trending leaked engagement counts across rows.** The response loop
+  reused the scoring loop's locals, so every trending row showed the last
+  scored job's `views`/`applications`/`bookmarks` while scores were
+  computed correctly — live verification caught a job showing `views: 0`
+  with `score: 1.0` while its detail said `view_count: 2`. Each row now
+  recomputes its own counts (with a regression test that fails without
+  the fix).
+
+### Added
+
 - **🔥 Job of the day in daily digests.** Every email and Telegram digest
   now leads with the user's best match of the day — the highest
   resume-match role with its % and an Apply link. The highlight respects
