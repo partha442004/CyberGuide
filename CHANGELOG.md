@@ -21,6 +21,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **8 new tests** covering the instant-alert pipeline (domain/location/
   match filtering, per-user routing, no-jobs, digest dedup on/off, prefs
   round-trip). Suite: 2369 tests passing.
+- **"Send Test Instant Alert" button + endpoint.** Settings now has a
+  one-click "🚀 Send Test Instant Alert" that sends a sample instant-alert
+  Telegram ping (real template: header, score chip, Apply button) to the
+  user's chat so they can preview exactly what a new high-match job looks
+  like — no waiting for a real discovery hit. The button stays disabled
+  until a Telegram chat ID is saved on the profile. New
+  `POST /api/v1/notifications/instant-alert/test` never raises (no-chat-id,
+  delivery-failure and network-error paths return clean hints) + 3 new API
+  tests. Suite: 2372 tests passing.
 
 ### Fixed
 
