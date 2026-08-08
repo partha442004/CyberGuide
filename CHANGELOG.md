@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **⭐ High-priority applications.** The `priority` field existed on the
+  model/schema/repo but nothing surfaced it — a new `GET
+  /applications/priority` endpoint (per-user, sorted by priority) now
+  powers a **⭐ Priority applications** panel at the top of the
+  Applications page, and every application has a **⭐ High-priority
+  toggle** (checkbox) that pins/unpins it via `PUT /applications/{id}`.
+  Toggling reruns so the panel updates instantly. 4 new tests — 2454
+  total.
+
+- **🐛 Fixed Overview 'Job of the day' card leaking raw HTML.** The card
+  was rendered with a missing `unsafe_allow_html=True`, so the page
+  showed the literal `<div style=...>` markup as plain text instead of
+  the orange gradient card. A scan confirmed no other `st.markdown`
+  HTML calls share the bug.
+
 - **⏰ Follow-ups needed panel (Applications).** The daily digest already
   nudged stale applications but the dashboard never showed them — a new
   `GET /applications/follow-ups` endpoint returns the pending

@@ -87,6 +87,12 @@ class FollowUpsResponse(BaseModel):
     follow_ups: list[FollowUpItem] = []
 
 
+class PriorityListResponse(BaseModel):
+    """High-priority applications, most important first."""
+
+    applications: list[ApplicationResponse]
+
+
 class ApplicationHistoryItem(BaseModel):
     """A single application status-change event."""
 

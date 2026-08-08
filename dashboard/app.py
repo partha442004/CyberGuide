@@ -1039,6 +1039,22 @@ def _save_application_notes(app_id: str, notes: str) -> None:
         st.error("Could not save notes — is the API server running?")
 
 
+def _set_application_priority(app_id: str, priority: int) -> None:
+    """Persist an application's ⭐ priority via the real API (PUT)."""
+    resp = _api_raw(
+        f"/applications/{app_id}",
+        method="PUT",
+        json_data={"priority": priority},
+        timeout=20,
+    )
+    if resp is not None and resp.status_code == 200:
+        st.success("⭐ Priority updated" if priority else "⭐ Priority cleared")
+        # Rerun so the ⭐ Priority applications panel reflects the change now.
+        st.rerun()
+    else:
+        st.error("Could not update priority — is the API server running?")
+
+
 def _login_user(profile: dict) -> None:
     """Store a user profile in the Streamlit session."""
     st.session_state["user"] = profile
@@ -1850,8 +1866,12 @@ def show_overview() -> None:
                 f"{escape(jtitle)}</div>"
                 f"<div style='font-size:13px;opacity:0.95;'>"
                 f"{escape(jcompany)} · "
-                f"{escape(str(jotd_job.get('location') or 'Remote'))}"
+                f"{escape(str(jotd_job.get('location') or 'Remote'))}",
+                unsafe_allow_html=True,
             )
+            # Closing tag rendered separately (Streamlit needs the opening
+            # div rendered with unsafe_allow_html too, or the raw HTML
+            # leaks as plain text instead of a styled card).
             st.markdown(
                 "</div>",
                 unsafe_allow_html=True,
@@ -2479,12 +2499,54 @@ def _follow_ups_panel() -> None:
         st.divider()
 
 
+def _priority_panel() -> None:
+    """'⭐ Priority applications' panel for the Applications page.
+
+    Lists the applications the user pinned as high-priority (via the ⭐
+    toggle on each application), most important first, with a View link.
+    Hidden entirely when nothing is pinned.
+    """
+    user_id = _current_user_id()
+    data = fetch_data(f"/applications/priority?user_id={user_id}") or {}
+    priority_apps = data.get("applications") or []
+    if not priority_apps:
+        return
+
+    job_rows = fetch_data("/jobs/?limit=200") or {}
+    job_lookup = {str(j.get("id")): j for j in (job_rows.get("jobs") or [])}
+
+    st.subheader("⭐ Priority applications")
+    st.caption(
+        "The applications you care about most — use the ⭐ High-priority "
+        "toggle on any application to pin it here."
+    )
+    for app in priority_apps:
+        job = job_lookup.get(str(app.get("job_id"))) or {}
+        title = escape(str(job.get("title") or "Unknown role"))
+        company = escape(str(job.get("company") or ""))
+        app_id = str(app.get("id") or "")
+        raw_status = str(app.get("status") or "")
+        status_label = _STATUS_LABELS.get(raw_status, raw_status.capitalize())
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.markdown(f"⭐ **{title}**" + (f" · {company}" if company else ""))
+            st.caption(status_label)
+        with col2:
+            url = job.get("url")
+            if url:
+                st.link_button("🔗 View", url, key=f"prio_link_{app_id}")
+        st.divider()
+
+
 def show_applications() -> None:
     """Show and manage applications."""
     st.header("📋 Applications")
 
     # ── Follow-ups needed ─────────────────────────────────────────────
     _follow_ups_panel()
+
+    # ── ⭐ Priority applications ──────────────────────────────────────
+    _priority_panel()
 
     status_filter = st.selectbox(
         "Filter by status",
@@ -2575,6 +2637,16 @@ def show_applications() -> None:
                     "Update", key=f"update_{app['id']}", use_container_width=True
                 ):
                     _update_application_status(app["id"], new_status)
+
+                # ── ⭐ High-priority toggle ─────────────────────────────
+                _is_high = int(app.get("priority") or 0) >= 1
+                _toggled = st.checkbox(
+                    "⭐ High priority",
+                    value=_is_high,
+                    key=f"prio_{app['id']}",
+                )
+                if _toggled != _is_high:
+                    _set_application_priority(app["id"], 1 if _toggled else 0)
 
                 # ── Notes editor ───────────────────────────────────────
                 notes = st.text_area(
