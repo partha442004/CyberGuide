@@ -155,6 +155,120 @@ async def list_expired(limit: int = 50, db: AsyncSession = Depends(get_db)):
     }
 
 
+@router.get("/trending")
+async def trending_jobs(
+    days: int = Query(14, ge=1, le=90),
+    limit: int = Query(8, ge=1, le=20),
+    db: AsyncSession = Depends(get_db),
+):
+    """Engagement-ranked trending jobs from the last N days.
+
+    Score = 3 per application + 2 per bookmark + 0.5 per view, so the jobs
+    the team is actually applying to / saving / opening float to the top.
+    When nothing has engagement yet (fresh database), falls back to the
+    newest jobs so the section is never empty. Registered BEFORE
+    ``/{job_id}`` on purpose — ``/trending`` is a single segment and would
+    otherwise be swallowed by the detail route.
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import func, or_, select
+
+    from interntrack.domain.models import Application, Bookmark, Job
+    from interntrack.utils.helpers import utcnow
+
+    cutoff = utcnow() - timedelta(days=days)
+    # Jobs with a NULL ``first_seen_at`` (rows saved before the column
+    # existed, or scrapes that never set it) are treated as in-window too,
+    # mirroring the repository's ``get_fresh_jobs`` pattern — otherwise
+    # legacy high-engagement jobs could never trend.
+    rows = (
+        (
+            await db.execute(
+                select(Job)
+                .where(
+                    Job.is_active.is_(True),
+                    or_(
+                        Job.first_seen_at.is_(None),
+                        Job.first_seen_at >= cutoff,
+                    ),
+                )
+                .order_by(Job.first_seen_at.desc().nulls_last())
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    if not rows:
+        return {"trending": [], "window_days": days, "total": 0}
+
+    job_ids = [j.id for j in rows]
+    app_rows = (
+        await db.execute(
+            select(Application.job_id, func.count(Application.id))
+            .where(Application.job_id.in_(job_ids))
+            .group_by(Application.job_id)
+        )
+    ).all()
+    app_counts: dict[str, int] = {str(rid): int(cnt) for rid, cnt in app_rows}
+    bm_rows = (
+        await db.execute(
+            select(Bookmark.item_id, func.count(Bookmark.id))
+            .where(Bookmark.item_type == "job", Bookmark.item_id.in_(job_ids))
+            .group_by(Bookmark.item_id)
+        )
+    ).all()
+    bm_counts: dict[str, int] = {str(rid): int(cnt) for rid, cnt in bm_rows}
+
+    scored = []
+    for job in rows:
+        views = int(job.view_count or 0)
+        apps = int(app_counts.get(str(job.id), 0))
+        bms = int(bm_counts.get(str(job.id), 0))
+        scored.append((apps * 3 + bms * 2 + views * 0.5, job))
+
+    scored.sort(key=lambda item: item[0], reverse=True)
+
+    trending = []
+    for score, job in scored[:limit]:
+        trending.append(
+            {
+                "id": job.id,
+                "title": job.title,
+                "company": job.company,
+                "location": job.location,
+                "url": job.url,
+                "source": job.source.value if job.source else "unknown",
+                "salary_min": job.salary_min,
+                "salary_max": job.salary_max,
+                "salary_currency": job.salary_currency,
+                "is_remote": job.is_remote,
+                "posted_at": str(job.posted_at) if job.posted_at else None,
+                "first_seen_at": str(job.first_seen_at) if job.first_seen_at else None,
+                "views": views,
+                "applications": apps,
+                "bookmarks": bms,
+                "engagement_score": round(score, 1),
+            }
+        )
+
+    return {"trending": trending, "window_days": days, "total": len(scored)}
+
+
+@router.post("/{job_id}/view")
+async def increment_job_views(
+    job_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Record a view on a job (feeds the Trending ranking)."""
+    repo = JobRepository(db)
+    count = await repo.increment_view_count(job_id)
+    if count is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {"job_id": job_id, "view_count": count}
+
+
 @router.get("/{job_id}", response_model=JobResponse)
 async def get_job(
     job_id: str,

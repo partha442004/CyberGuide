@@ -791,6 +791,13 @@ def _render_job(job: dict, match: Any = None) -> None:
             if job.get("url"):
                 st.link_button("🔗 View", job["url"], use_container_width=True)
             if st.button(
+                "👁 Mark viewed",
+                key=f"view_{job.get('id', title)}",
+                use_container_width=True,
+                help="Counts as a view — feeds the 🔥 Trending ranking.",
+            ):
+                _api(f"/jobs/{str(job.get('id'))}/view", method="POST", timeout=15)
+            if st.button(
                 "📋 Apply",
                 key=f"apply_{job.get('id', title)}",
                 use_container_width=True,
@@ -1586,7 +1593,62 @@ def show_overview() -> None:
                 "linear-gradient(135deg,#43e97b 0%,#38f9d7 100%)",
             )
 
-        st.markdown("")
+        # ── Trending this week (engagement-ranked) ────────────────────────
+        trending = fetch_data("/jobs/trending?days=14&limit=6") or {}
+        trend_jobs = trending.get("trending") or []
+        if trend_jobs:
+            st.markdown(
+                '<div class="section-title">🔥 Trending this week</div>'
+                '<div class="section-sub">Most applied / saved / viewed jobs '
+                "from the last 14 days — use 👁 Mark viewed on any job card to "
+                "boost its rank.</div>",
+                unsafe_allow_html=True,
+            )
+            for rank, tj in enumerate(trend_jobs, start=1):
+                with st.container(border=True):
+                    tcol_l, tcol_r = st.columns([4, 1])
+                    with tcol_l:
+                        st.markdown(
+                            f"**#{rank}** · "
+                            f"{escape(str(tj.get('title') or 'Untitled'))}"
+                        )
+                        tchips = []
+                        if tj.get("company"):
+                            tchips.append(f"🏢 {escape(str(tj['company']))}")
+                        if tj.get("location"):
+                            tchips.append(f"📍 {escape(str(tj['location']))}")
+                        if tchips:
+                            st.markdown(
+                                '<div class="chip-row">'
+                                + "".join(
+                                    f'<span class="chip">{c}</span>' for c in tchips
+                                )
+                                + "</div>",
+                                unsafe_allow_html=True,
+                            )
+                        st.caption(
+                            f"👁 {int(tj.get('views', 0))} views · "
+                            f"📋 {int(tj.get('applications', 0))} applied · "
+                            f"📌 {int(tj.get('bookmarks', 0))} saved"
+                        )
+                    with tcol_r:
+                        tj_id = str(tj.get("id") or "")
+                        if st.button(
+                            "👁 Mark viewed",
+                            key=f"trend_view_{tj_id}",
+                            use_container_width=True,
+                            help="Counts this job as viewed (raises its 🔥 rank).",
+                        ):
+                            _api(f"/jobs/{tj_id}/view", method="POST", timeout=15)
+                        if tj.get("url"):
+                            st.link_button(
+                                "🔗 Open",
+                                tj["url"],
+                                key=f"trend_open_{tj_id}",
+                                use_container_width=True,
+                            )
+            st.markdown("")
+
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("Job Types")
