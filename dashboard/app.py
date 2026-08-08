@@ -1657,6 +1657,26 @@ def show_overview() -> None:
     """Show overview page."""
     st.header("📈 Overview")
 
+    # 🔕 Vacation-mode banner: when alerts are paused, surface it right at
+    # the top so it's never forgotten.
+    try:
+        _prefs_banner = (
+            fetch_data(f"/notifications/preferences/{_current_user_id()}") or {}
+        )
+        _pu = _prefs_banner.get("paused_until")
+        if _pu:
+            _parsed_pu = datetime.fromisoformat(str(_pu).replace("Z", "+00:00"))
+            if _parsed_pu.tzinfo is None:
+                _parsed_pu = _parsed_pu.replace(tzinfo=UTC)
+            if _parsed_pu > datetime.now(UTC):
+                st.warning(
+                    f"🔕 **Alerts are paused** until {_pu} — no emails or "
+                    "Telegram pings are being sent. Resume them anytime on "
+                    "the Settings page."
+                )
+    except Exception:  # noqa: BLE001, S110 - banner must never break the page
+        pass
+
     overview = fetch_data("/dashboard/overview")
 
     if overview:
@@ -3332,6 +3352,55 @@ def show_settings() -> None:
                         )
                 else:
                     st.error("One-off alert failed — is the API reachable?")
+
+    # --------------------------------------------------------------
+    # 👁 Preview today's digest — see it before it's sent (no sending,
+    # no duplicate-window advance; uses GET /reports/daily?preview=1)
+    # --------------------------------------------------------------
+    with st.expander("👁 Preview today's digest"):
+        st.markdown(
+            "See exactly what today's alert contains right now — the same "
+            "job list the email / Telegram would deliver. Previewing never "
+            "sends anything and never skips jobs from the real digest."
+        )
+        if st.button("📄 Build today's digest preview", use_container_width=True):
+            with st.spinner("Fetching today's filtered jobs..."):
+                preview = fetch_data("/reports/daily?preview=1")
+            if not preview:
+                st.error("Couldn't build the preview — is the API reachable?")
+            else:
+                jobs = preview.get("new_jobs") or []
+                total = preview.get("summary", {}).get("new_jobs", 0)
+                if not jobs:
+                    st.info(
+                        "No new jobs match your categories yet — the digest "
+                        "will be empty until discovery finds something fresh. "
+                        "Check the Jobs page to run a discovery."
+                    )
+                else:
+                    st.success(
+                        f"**{total} jobs** would be in today's digest "
+                        "(categorised below)."
+                    )
+                    _domains_groups: dict[str, list] = {}
+                    for jb in jobs:
+                        dkey = str(jb.get("domain") or "other")
+                        _domains_groups.setdefault(dkey, []).append(jb)
+                    for dkey, items in _domains_groups.items():
+                        dlabel = _DOMAIN_LABELS.get(dkey, dkey)
+                        dicon = _CATEGORY_STYLE.get(dkey, {}).get("icon", "📂")
+                        with st.expander(f"{dicon} {dlabel} ({len(items)})"):
+                            for jb in items[:8]:
+                                ptitle = escape(str(jb.get("title") or "Untitled"))
+                                pcomp = escape(str(jb.get("company") or ""))
+                                ploc = escape(str(jb.get("location") or "Remote"))
+                                st.markdown(f"**{ptitle}** · {pcomp} · 📍 {ploc}")
+                                if jb.get("url"):
+                                    st.link_button(
+                                        "🔗 View",
+                                        jb["url"],
+                                        key=f"prev_{jb.get('id')}_{dkey}",
+                                    )
 
     st.markdown("")
 

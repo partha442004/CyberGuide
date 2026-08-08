@@ -91,3 +91,12 @@ cyberguide-key.pub
 .env.local
 .vercel
 .env*
+
+# Desktop / mobile packaging build outputs
+/dist/
+/build/
+packaging/android/app/build/
+packaging/android/local.properties
+packaging/android/.gradle/
+*.apk
+*.exe
