@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **🔎 Discovery queries expanded: cybersecurity + backend roles.** The
+  per-user discovery searches that feed the daily alerts now cover more
+  of what users actually look for. The **security** domain gained
+  `security engineer`, `cyber defense`, `incident response`, `devsecops`
+  and `blue team` searches (SOC/IR/devsecops, not just VAPT); the
+  **coding** domain gained a backend focus: `backend engineer`, `java`
+  / `node.js` / `django` / `spring boot` / `microservices` / `api`
+  developer and `devops engineer` searches. Every query is still
+  location-suffixed with the user's city ("soc analyst bangalore")
+  before the limit cap. 4 new tests — 2476 total.
+
 - **🔗 Share-a-job auto-detect now reads JSON-LD JobPosting data.** When
   the user pastes a bare job link, the share endpoint previously only
   read OpenGraph tags — a board like Indeed hides those from bots, so
