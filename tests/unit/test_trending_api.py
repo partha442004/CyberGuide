@@ -139,6 +139,20 @@ class TestTrending:
         assert hit["views"] == 2
         assert hit["engagement_score"] == 1.0  # 2 views * 0.5
 
+    def test_counts_are_per_job_not_leaked(self, client):
+        # Regression: the response loop used to reuse the scoring loop's
+        # last locals, so every row showed the final job's counts.
+        hot_id = _create_job(client, "Hot Leak Role")
+        cold_id = _create_job(client, "Cold Leak Role")
+        for _ in range(3):
+            client.post(f"/api/v1/jobs/{hot_id}/view")
+        body = client.get("/api/v1/jobs/trending").json()
+        by_id = {t["id"]: t for t in body["trending"]}
+        assert by_id[hot_id]["views"] == 3
+        assert by_id[cold_id]["views"] == 0
+        assert by_id[hot_id]["engagement_score"] == 1.5  # 3 views * 0.5
+        assert by_id[cold_id]["engagement_score"] == 0.0
+
 
 class TestBackfillEngagement:
     """POST /api/v1/jobs/backfill-engagement."""

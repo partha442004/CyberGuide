@@ -250,6 +250,8 @@ async def trending_jobs(
 
     trending = []
     for score, job in scored[:limit]:
+        # Recompute per job — reusing the scoring-loop locals would leak the
+        # last-scored job's counts into every row.
         trending.append(
             {
                 "id": job.id,
@@ -264,9 +266,9 @@ async def trending_jobs(
                 "is_remote": job.is_remote,
                 "posted_at": str(job.posted_at) if job.posted_at else None,
                 "first_seen_at": str(job.first_seen_at) if job.first_seen_at else None,
-                "views": views,
-                "applications": apps,
-                "bookmarks": bms,
+                "views": int(job.view_count or 0),
+                "applications": int(app_counts.get(str(job.id), 0)),
+                "bookmarks": int(bm_counts.get(str(job.id), 0)),
                 "engagement_score": round(score, 1),
             }
         )
