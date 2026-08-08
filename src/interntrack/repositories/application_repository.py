@@ -148,12 +148,17 @@ class ApplicationRepository(BaseRepository[Application]):
     async def get_priority_applications(
         self,
         min_priority: int = 1,
+        user_id: str | None = None,
     ) -> list[Application]:
-        """Get high-priority applications."""
+        """Get high-priority applications (optionally per user)."""
+        filters = [Application.priority >= min_priority]
+        user_filter = self._user_filter(user_id)
+        if user_filter is not None:
+            filters.append(user_filter)
         query = (
             select(Application)
-            .where(Application.priority >= min_priority)
-            .order_by(Application.priority.desc())
+            .where(*filters)
+            .order_by(Application.priority.desc(), Application.created_at.desc())
         )
         result = await self.session.execute(query)
         return list(result.scalars().all())

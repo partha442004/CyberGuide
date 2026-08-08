@@ -17,6 +17,7 @@ from interntrack.api.schemas.application import (
     ApplicationUpdate,
     FollowUpItem,
     FollowUpsResponse,
+    PriorityListResponse,
 )
 from interntrack.database.session import get_db
 from interntrack.services.application_service import ApplicationService
@@ -116,6 +117,27 @@ async def get_follow_ups(
         )
     items.sort(key=lambda i: i.days_since, reverse=True)
     return FollowUpsResponse(follow_ups=items)
+
+
+@router.get("/priority", response_model=PriorityListResponse)
+async def get_priority_applications(
+    user_id: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Applications marked ⭐ high-priority, most important first.
+
+    Priority is a lightweight way to keep the applications that matter
+    most visible (set via ``PUT /applications/{id}`` with ``priority``).
+    Scoped per user when ``user_id`` is given, mirroring the other
+    per-user application endpoints. Registered before ``/{application_id}``
+    so the ``priority`` path is never captured as an application id.
+    """
+    service = ApplicationService(db)
+    apps = await service.app_repo.get_priority_applications(
+        min_priority=1,
+        user_id=user_id,
+    )
+    return PriorityListResponse(applications=apps)
 
 
 @router.post("/{application_id}/reminded", status_code=200)
