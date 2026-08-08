@@ -133,9 +133,32 @@ class TestDiscoveryQueries:
     def test_domain_queries(self):
         from interntrack.scheduler.jobs import discovery_queries_for
 
-        queries = discovery_queries_for({"domains": ["security"]})
+        # limit=30 (not the default 4) so the assertions don't silently
+        # depend on vapt/cybersecurity staying in the top-4 slots.
+        queries = discovery_queries_for({"domains": ["security"]}, limit=30)
         assert any("cybersecurity" in q for q in queries)
         assert any("vapt" in q for q in queries)
+
+    def test_security_queries_cover_modern_roles(self):
+        """Security discovery covers SOC/IR/devsecops, not just VAPT."""
+        from interntrack.scheduler.jobs import discovery_queries_for
+
+        queries = discovery_queries_for({"domains": ["security"]}, limit=30)
+        assert any("security engineer" in q for q in queries)
+        assert any("incident response" in q for q in queries)
+        assert any("devsecops" in q for q in queries)
+        assert any("cyber defense" in q for q in queries)
+
+    def test_coding_queries_cover_backend_roles(self):
+        """Coding discovery actively searches backend-focused roles."""
+        from interntrack.scheduler.jobs import discovery_queries_for
+
+        queries = discovery_queries_for({"domains": ["coding"]}, limit=30)
+        assert any("backend developer" in q for q in queries)
+        assert any("backend engineer" in q for q in queries)
+        assert any("java developer" in q for q in queries)
+        assert any("microservices" in q for q in queries)
+        assert any("api developer" in q for q in queries)
 
     def test_skills_added_as_intern_queries(self):
         from interntrack.scheduler.jobs import discovery_queries_for
