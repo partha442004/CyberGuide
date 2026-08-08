@@ -34,6 +34,13 @@ class NotificationTestRequest(BaseModel):
     message: str = "Test notification from InternTrack"
 
 
+class InstantAlertTestRequest(BaseModel):
+    """Request to send a sample instant-alert Telegram ping."""
+
+    user_id: str
+    chat_id: str | None = None
+
+
 class NotificationTestResponse(BaseModel):
     """Test notification response."""
 
