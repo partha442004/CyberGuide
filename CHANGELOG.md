@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **🖥 Windows EXE + 📱 Android APK (packaging/).** The dashboard is now
+  distributable as a real desktop app and a native mobile app:
+  - **Windows EXE** (`dist/CyberGuide/CyberGuide.exe`): a PyInstaller
+    bundle that boots the Streamlit dashboard locally against the live
+    Vercel API and opens your browser. The spec bundles Streamlit's
+    static assets + package metadata (both required for a frozen
+    streamlit) and forces `--global.developmentMode false`. Built and
+    verified — health `ok`, page serves.
+  - **Android APK** (`dist/CyberGuide-Android.apk`, 3.2 MB): a native
+    WebView wrapper around the deployed dashboard (package
+    `com.cyberguide.app`, minSdk 24, debug-signed, installable
+    directly). Gradle 8.9 + SDK 34; a kotlin-stdlib 1.8.22 constraint
+    fixes the duplicate-class conflict. Back/forward nav, JS enabled,
+    progress indicator.
+  - `packaging/README.md` documents both builds and phone install steps.
+- **🔕 Alerts-paused banner on Overview.** When vacation mode is active,
+  the Overview shows a banner up top so a paused state is never missed.
+- **👁 Preview today's digest on Settings.** New `GET /reports/daily?
+  preview=1` builds the digest WITHOUT sending it or advancing the
+  no-duplicates window (so previewing can never skip a job from the real
+  digest), and the dashboard renders it grouped by category with view
+  links.
+
+### Added
+
 - **🔕 Vacation mode — pause ALL alerts.** Settings now has a Vacation
   mode block: pause every alert (daily email, Telegram, weekly recap,
   instant pings) for 1 / 2 / 3 / 7 / 14 days, with a one-click resume.
