@@ -379,6 +379,21 @@ class JobRepository(BaseRepository[Job]):
         )
         return list(result.scalars().all())
 
+    async def increment_view_count(self, job_id: str) -> int | None:
+        """Increment a job's ``view_count``; returns the new count or None.
+
+        Feeds the ``/jobs/trending`` engagement ranking. Returns ``None``
+        when the job doesn't exist so callers can 404.
+        """
+        row = await self.session.execute(select(Job.view_count).where(Job.id == job_id))
+        value = row.scalar_one_or_none()
+        if value is None:
+            return None
+        await self.session.execute(
+            update(Job).where(Job.id == job_id).values(view_count=Job.view_count + 1)
+        )
+        return int(value) + 1
+
     async def get_fresh_jobs(self, limit: int = 100) -> list[Job]:
         """Get only fresh jobs (not expired, not stale)."""
         from datetime import timedelta

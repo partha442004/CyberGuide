@@ -70,6 +70,7 @@ class JobResponse(JobBase):
     posted_at: datetime | None = None
     expires_at: datetime | None = None
     is_active: bool = True
+    view_count: int = 0
     created_at: datetime
     updated_at: datetime
 
