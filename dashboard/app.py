@@ -2621,6 +2621,37 @@ def show_settings() -> None:
         "never get the same job twice) — your email digest still arrives "
         "in full.",
     )
+    if not saved_telegram_chat_id:
+        st.caption(
+            "🔒 Save your Telegram chat ID first (use the 📱 finder above), "
+            "then the test button unlocks."
+        )
+    if st.button(
+        "🚀 Send Test Instant Alert",
+        use_container_width=True,
+        disabled=not saved_telegram_chat_id,
+        help="Sends a sample instant-alert message to your Telegram right now "
+        "so you can see exactly what a new high-match job will look like.",
+    ):
+        with st.spinner("Sending test ping to your Telegram..."):
+            result = _api(
+                "/notifications/instant-alert/test",
+                method="POST",
+                json_data={"user_id": user_id},
+                timeout=30,
+            )
+        if result:
+            if result.get("sent"):
+                st.success(
+                    "✅ Test instant alert sent to your Telegram! It should "
+                    "have arrived just now — that's exactly what a new "
+                    "high-match job ping looks like."
+                )
+            else:
+                hint = result.get("hint") or "Delivery failed."
+                st.error(f"⚠️ {hint}")
+        else:
+            st.error("Send failed — is the API reachable?")
 
     # Optional minimum resume-match threshold.
     min_score = st.slider(

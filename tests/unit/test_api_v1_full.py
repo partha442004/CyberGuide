@@ -343,6 +343,63 @@ class TestNotificationsAPI:
         assert data["chat_id"] is None
         assert "bot was blocked" in data["hint"]
 
+    def test_instant_alert_test_no_chat_id(self, client):
+        """No profile chat ID -> helpful hint, never raises."""
+        response = client.post(
+            "/api/v1/notifications/instant-alert/test",
+            json={"user_id": "missing-user"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sent"] is False
+        assert data["chat_id"] is None
+        assert "No Telegram chat ID" in data["hint"]
+
+    def test_instant_alert_test_sends_with_buttons(self, client, monkeypatch):
+        """A supplied chat_id sends one message with an Apply button."""
+        from unittest import mock
+
+        manager = mock.MagicMock()
+        manager.notify = mock.AsyncMock(return_value={"telegram": True})
+        monkeypatch.setattr(
+            "interntrack.api.v1.notifications.NotificationManager",
+            lambda *_a, **_k: manager,
+        )
+        response = client.post(
+            "/api/v1/notifications/instant-alert/test",
+            json={"user_id": "u1", "chat_id": "123456"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sent"] is True
+        assert data["chat_id"] == "123456"
+        assert data["hint"] is None
+        # One message routed to the user's own chat with an Apply button.
+        manager.notify.assert_awaited_once()
+        _, kwargs = manager.notify.await_args
+        assert kwargs.get("recipient") == {"telegram_chat_id": "123456"}
+        assert kwargs.get("buttons")  # Apply button present
+        assert kwargs.get("subject") == "⚡ Test instant alert"
+
+    def test_instant_alert_test_delivery_failure(self, client, monkeypatch):
+        """Telegram returning False surfaces a clear hint."""
+        from unittest import mock
+
+        manager = mock.MagicMock()
+        manager.notify = mock.AsyncMock(return_value={"telegram": False})
+        monkeypatch.setattr(
+            "interntrack.api.v1.notifications.NotificationManager",
+            lambda *_a, **_k: manager,
+        )
+        response = client.post(
+            "/api/v1/notifications/instant-alert/test",
+            json={"user_id": "u1", "chat_id": "123456"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sent"] is False
+        assert "failed" in data["hint"].lower()
+
 
 # ─── Dashboard API ────────────────────────────────────────────────────────────
 

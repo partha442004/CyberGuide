@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from interntrack.api.schemas.notification import (
     AlertPreferencesResponse,
     AlertPreferencesUpdate,
+    InstantAlertTestRequest,
     NotificationChannelsResponse,
     NotificationTestRequest,
     NotificationTestResponse,
@@ -147,6 +148,70 @@ async def send_notification(
     manager = NotificationManager(db)
     results = await manager.notify(channels, message, subject)
     return {"results": results}
+
+
+@router.post("/instant-alert/test")
+async def send_test_instant_alert(
+    payload: InstantAlertTestRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Send a sample instant-alert Telegram ping to a user's chat.
+
+    Mirrors what a real high-match discovery sends (one compact message with
+    an Apply button) so users can verify their instant-alert path end-to-end
+    from the dashboard — no waiting for a real discovery hit. The chat ID is
+    taken from the request when provided, otherwise from the user's profile.
+    Never raises: returns a ``results``/``hint`` dict in every case.
+    """
+    from interntrack.scheduler.jobs import _user_profile
+
+    chat_id = (payload.chat_id or "").strip() or None
+    if not chat_id:
+        user = await _user_profile(db, payload.user_id)
+        if user is not None:
+            chat_id = (getattr(user, "telegram_chat_id", None) or "").strip() or None
+    if not chat_id:
+        return {
+            "sent": False,
+            "chat_id": None,
+            "hint": "No Telegram chat ID for this account. Use the "
+            "'Find my Telegram chat ID' helper or paste your chat ID in "
+            "My Account, then try again.",
+        }
+    try:
+        message = (
+            "⚡ <b>This is a test of your instant alerts!</b> "
+            "(1 job just discovered)\n"
+            "When a new job matches your categories, location and match "
+            "threshold, you'll get a message exactly like this one — "
+            "instantly, no waiting for the daily slots.\n"
+            "🔹 <b>Sample: SOC Analyst</b> @ Example Cyber Corp · "
+            "Bangalore · 85% match\n"
+        )
+        manager = NotificationManager(db)
+        results = await manager.notify(
+            ["telegram"],
+            message,
+            subject="⚡ Test instant alert",
+            buttons=[("✅ Apply — Sample job", "https://example.com/sample-job")],
+            recipient={"telegram_chat_id": chat_id},
+        )
+        sent = bool(results.get("telegram"))
+        return {
+            "sent": sent,
+            "chat_id": chat_id,
+            "results": results,
+            "hint": None
+            if sent
+            else "Telegram delivery failed — check the "
+            "bot token and that you messaged the bot first.",
+        }
+    except Exception as e:  # pragma: no cover - network path
+        return {
+            "sent": False,
+            "chat_id": chat_id,
+            "hint": f"Could not send: {e}",
+        }
 
 
 @router.get("/preferences/{user_id}", response_model=AlertPreferencesResponse)
