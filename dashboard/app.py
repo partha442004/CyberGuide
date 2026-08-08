@@ -1132,6 +1132,47 @@ def _match_breakdown(match: dict) -> None:
         st.caption("💡 " + escape(str(suggestions[0])))
 
 
+def _cover_letter_block(job_id: str, company: str) -> None:
+    """'Generate cover letter' button + copyable letter for one job.
+
+    Calls the API's ``POST /resumes/cover-letter`` (rule-based, no API
+    key) and shows the letter in a read-only text area with a Copy
+    button. Fails silently into an info note when the API is unreachable
+    or the user has no resume yet.
+    """
+    user_id = _current_user_id()
+    btn_key = f"cl_btn_{job_id}"
+    if st.button("✍️ Generate cover letter", key=btn_key, use_container_width=True):
+        result = _api(
+            f"/resumes/cover-letter?user_id={user_id}&job_id={job_id}",
+            method="POST",
+            timeout=30,
+        )
+        if not result or not result.get("cover_letter"):
+            st.info(
+                "Cover letter unavailable — upload your resume on the "
+                "Resume Match page first, then try again."
+            )
+            return
+        letter = result["cover_letter"]
+        with st.expander("📄 Your tailored cover letter", expanded=True):
+            st.text_area(
+                "Cover letter",
+                value=letter,
+                height=320,
+                key=f"cl_area_{job_id}",
+            )
+            st.download_button(
+                "📥 Download .txt",
+                data=letter.encode("utf-8"),
+                file_name=f"cover-letter-{company or 'job'}.txt".replace(
+                    " ", "-"
+                ).lower(),
+                mime="text/plain",
+                key=f"cl_dl_{job_id}",
+            )
+
+
 @st.cache_data(ttl=60, show_spinner=False)
 def _team_members() -> list:
     """Registered user profiles (cached 60s so a new member shows up fast)."""
@@ -1544,6 +1585,8 @@ def show_my_matches() -> None:
             _match_breakdown(match)
             if job.get("url"):
                 st.link_button("🔗 View", job["url"], key=f"mm_{job.get('id')}")
+            _cover_letter_block(str(job.get("id") or ""), company)
+
             st.divider()
     else:
         st.info(
@@ -1858,7 +1901,66 @@ def show_overview() -> None:
                                 key=f"close_open_{cj.get('id')}",
                                 use_container_width=True,
                             )
-            st.markdown("")
+
+        # ── 🗓 Upcoming interviews (countdown) ────────────────────────────
+        # Applications with an interview_at in the future, sorted by date,
+        # with a days-to-go countdown chip. Falls back silently when the
+        # user has no interviews scheduled or the API is unreachable.
+        try:
+            _uid = _current_user_id()
+            _apps_data = fetch_data(f"/applications/?user_id={_uid}&limit=100") or {}
+            # The applications API doesn't embed job details; look titles up
+            # from the jobs list so the card says "Security Analyst @ X".
+            _jobs_lookup: dict[str, dict] = {}
+            with suppress(Exception):
+                _jobs_data = fetch_data("/jobs/?limit=100") or {}
+                _jobs_lookup = {
+                    str(j.get("id")): j for j in (_jobs_data.get("jobs") or [])
+                }
+            _interviews = []
+            _now = datetime.now(UTC)
+            for _a in _apps_data.get("applications") or []:
+                _ia = _a.get("interview_at")
+                if not _ia:
+                    continue
+                try:
+                    _dt = datetime.fromisoformat(str(_ia).replace("Z", "+00:00"))
+                    if _dt.tzinfo is None:
+                        _dt = _dt.replace(tzinfo=UTC)
+                    if _dt >= _now:
+                        _interviews.append((_dt, _a))
+                except ValueError:
+                    continue
+            _interviews.sort(key=lambda pair: pair[0])
+            if _interviews:
+                st.markdown(
+                    '<div class="section-title">🗓 Upcoming interviews</div>'
+                    '<div class="section-sub">Your scheduled interviews — '
+                    "don't miss them!</div>",
+                    unsafe_allow_html=True,
+                )
+                for _dt, _a in _interviews[:6]:
+                    _days = (_dt - _now).days
+                    _countdown = "Today" if _days <= 0 else f"in {_days}d"
+                    _job = _jobs_lookup.get(str(_a.get("job_id") or ""), {}) or {}
+                    _label = str(_job.get("title") or "Interview") + (
+                        f" @ {_job.get('company')}" if _job.get("company") else ""
+                    )
+                    with st.container(border=True):
+                        _icol_l, _icol_r = st.columns([4, 1])
+                        with _icol_l:
+                            st.markdown(
+                                f"**🗓 {_dt:%a, %b %d at %H:%M}** · {escape(_label)}"
+                            )
+                        with _icol_r:
+                            st.markdown(
+                                f'<div class="chip" style="color:#7c3aed;'
+                                f"border-color:rgba(124,58,237,0.35);"
+                                f'font-weight:700;">⏱ {_countdown}</div>',
+                                unsafe_allow_html=True,
+                            )
+        except Exception:  # noqa: BLE001, S110 - interviews must never break the page
+            pass
 
         col1, col2 = st.columns(2)
         with col1:
@@ -2507,6 +2609,59 @@ def show_analytics() -> None:
         with col4:
             val = data.get("avg_max")
             st.metric("Avg Max", f"${val:,.0f}" if val else "N/A")
+
+    # ── 📊 Application funnel (saved → applied → interview → offer) ───────
+    # Built from the same status_counts the overview metric cards use, so
+    # the funnel always matches the headline numbers. Conversion % between
+    # consecutive stages shows exactly where applications stall.
+    try:
+        _funnel_uid = _current_user_id()
+        _overview = fetch_data(f"/dashboard/overview?user_id={_funnel_uid}") or {}
+        _sc = (_overview.get("applications") or {}).get("status_counts") or {}
+        if _sc:
+            _stage_order = ["saved", "applied", "interview", "offer"]
+            _stage_labels = {
+                "saved": "📌 Saved",
+                "applied": "📨 Applied",
+                "interview": "🗓 Interview",
+                "offer": "🎉 Offer",
+            }
+            _funnel = [
+                {"stage": _stage_labels.get(s, s), "count": int(_sc.get(s, 0) or 0)}
+                for s in _stage_order
+            ]
+            _funnel = [f for f in _funnel if f["count"] > 0]
+            if len(_funnel) >= 2:
+                st.subheader("📊 Application Funnel")
+                _fig = px.funnel(
+                    _funnel,
+                    x="count",
+                    y="stage",
+                    title=None,
+                )
+                _fig.update_traces(
+                    textinfo="value+percent initial",
+                    marker={
+                        "color": ["#64748b", "#3b82f6", "#8b5cf6", "#10b981"][
+                            : len(_funnel)
+                        ]
+                    },
+                )
+                st.plotly_chart(_fig, use_container_width=True)
+                # Conversion % between consecutive stages
+                _conv = []
+                for _i in range(1, len(_funnel)):
+                    _prev = _funnel[_i - 1]["count"]
+                    if _prev:
+                        _pct = _funnel[_i]["count"] / _prev * 100
+                        _conv.append(
+                            f"{_funnel[_i - 1]['stage']} → {_funnel[_i]['stage']}: "
+                            f"{_pct:.0f}%"
+                        )
+                if _conv:
+                    st.caption(" ↔ ".join(_conv))
+    except Exception:  # noqa: BLE001, S110 - funnel must never break the page
+        pass
 
 
 # ---------------------------------------------------------------------------

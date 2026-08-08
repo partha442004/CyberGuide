@@ -98,3 +98,14 @@ class ResumeBatchMatchResponse(BaseModel):
     matches: List[ResumeMatchResponse] = []
     top_match: Optional[ResumeMatchResponse] = None
     average_score: Optional[float] = None
+
+
+class CoverLetterResponse(BaseModel):
+    """Generated cover letter for a specific job."""
+
+    job_id: str
+    job_title: str
+    company: str
+    cover_letter: str
+    match_score: Optional[float] = None
+    matched_skills: List[str] = []

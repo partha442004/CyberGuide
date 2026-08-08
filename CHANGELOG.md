@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **✍️ AI cover-letter generator.** New `POST /resumes/cover-letter`
+  endpoint (rule-based, zero API keys) that builds a tailored 3-paragraph
+  letter naming the role, the company and the candidate's matched skills
+  — reusing the same match logic so the letter never claims skills the
+  resume lacks. Dashboard **My Matches** cards now have a
+  **"Generate cover letter"** button with copy + download (.txt).
+- **🗓 Upcoming interviews countdown on Overview.** Applications with a
+  future `interview_at` appear sorted by date with an "in Nd" countdown
+  chip (job titles enriched from a live lookup); hidden when none exist.
+- **📊 Application funnel on Analytics.** A plotly funnel (saved →
+  applied → interview → offer) built from the same `status_counts` as the
+  metric cards, with conversion % between consecutive stages shown below.
+
+
 - **🔥 Weekly top-engaged recap.** The Sunday digest now leads with the
   most-engaged jobs of the week (3 per application + 2 per bookmark + 0.5
   per view, last 7 days), rendered as a header + apply buttons in the email
