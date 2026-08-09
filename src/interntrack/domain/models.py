@@ -145,6 +145,7 @@ class Job(Base, TimestampMixin):
         "unstop": "unstop",
         "naukri": "naukri",
         "freshersworld": "freshersworld",
+        "apna": "apna",
         "crowdstrike": "company",
         "paloalto": "company",
         "fortinet": "company",

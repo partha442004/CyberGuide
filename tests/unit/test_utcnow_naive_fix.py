@@ -188,6 +188,35 @@ class TestJobSourceCoercion:
         )
         assert job.source == "unknown"
 
+    def test_apna_source_kept(self):
+        """Regression: the apna.co scraper emits source='apna' but JobSource
+        had no such member, so _coerce_job_source silently stored the jobs as
+        'unknown' — they then deduped by URL on the next discovery run and
+        never surfaced under their real source."""
+        from interntrack.domain.enums import JobSource
+        from interntrack.domain.models import Job
+
+        job = Job(
+            title="t",
+            company="c",
+            url="https://example.com/src-apna-1",
+            source="apna",
+        )
+        assert job.source is JobSource.APNA
+        assert job.source.value == "apna"
+
+    def test_apna_enum_member_roundtrip(self):
+        from interntrack.domain.enums import JobSource
+        from interntrack.domain.models import Job
+
+        job = Job(
+            title="t",
+            company="c",
+            url="https://example.com/src-apna-2",
+            source=JobSource.APNA,
+        )
+        assert job.source == "apna"
+
     def test_skill_category_has_general(self):
         """The skill repository writes category='general'; it must be a valid
         enum value or skill reads would crash on Postgres like Job.source did."""
