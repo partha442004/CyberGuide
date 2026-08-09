@@ -105,6 +105,7 @@ def get_default_registry() -> ScraperRegistry:
     # "Cleaning Assistant"), which polluted saved jobs. RemoteOK listings
     # still arrive via the remoteok RSS feed inside RSSFeedScraper.
     from interntrack.scrapers.angellist import AngelListScraper
+    from interntrack.scrapers.apna import ApnaScraper
     from interntrack.scrapers.glassdoor import GlassdoorScraper
     from interntrack.scrapers.glassdoor_india import GlassdoorIndiaScraper
     from interntrack.scrapers.google_jobs import GoogleJobsScraper
@@ -130,6 +131,7 @@ def get_default_registry() -> ScraperRegistry:
     registry.register(WellfoundScraper())
     registry.register(GoogleJobsScraper())
     registry.register(IndeedIndiaScraper())
+    registry.register(ApnaScraper())
     registry.register(TimesJobsScraper())
     registry.register(LinkedInIndiaScraper())
     registry.register(GlassdoorIndiaScraper())
