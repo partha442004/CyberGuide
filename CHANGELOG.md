@@ -4,6 +4,25 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Internshala scraper now saves direct internship links.** Two regressions
+  made Internshala useless: the keyword/city search URLs (`/internships/
+  keyword/...`, `/internships/{city}/{query}/`) redirect server-side to the
+  generic internships page, so saved jobs pointed at "all internships"; and
+  the card parser looked for `<h3>` titles and double-quoted `data-href`
+  attributes that the current markup doesn't use. The scraper now uses the
+  stable `{query}-internship` category page (Internshala canonicalizes
+  slugs server-side, e.g. `cybersecurity-internship` →
+  `cyber-security-internship`), follows redirects and trusts the final
+  page, reads each posting's direct `/internship/detail/...` link from the
+  card's `data-href` (single- or double-quoted), extracts the company from
+  `company-name`, and drops generic-feed entries that don't match the
+  query (reusing the same precision matcher as the other board scrapers).
+  Verified live: `cybersecurity` → Cyber Forensics @ Gateway Software
+  Solutions, Malware Analyst, Cybersecurity Mentor @ Emoolar, SOC roles,
+  all with direct detail URLs. 10 new tests.
+
 ### Added
 
 - **📝 Job descriptions now shipped in every alert digest.** The daily
