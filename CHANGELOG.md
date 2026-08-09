@@ -132,6 +132,15 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Fixed
 
+- **Apna jobs were saved as `unknown` and never surfaced (source enum).**
+  The `JobSource` enum had no `apna` member, so `Job._coerce_job_source`
+  silently mapped the apna scraper's `source="apna"` to `UNKNOWN` — the
+  jobs were stored, but the first discovery run's saves were then deduped
+  by URL on every later run (`saved: 0`), never counted under their real
+  source, and invisible in scraper-health (which groups by source). Added
+  `JobSource.APNA = "apna"` + the model alias so apna postings keep their
+  source through the DB round-trip; 2 new coercion regression tests.
+
 - **Discovery keywords no longer carry the city** — queries like
   "cybersecurity Bengaluru" made vendor Greenhouse boards, RSS feeds and
   HackerNews match the literal city against role titles (US/remote roles
