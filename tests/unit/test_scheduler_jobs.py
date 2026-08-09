@@ -56,6 +56,61 @@ class TestFormatDailyReport:
         assert "Total Applications: 0" in result
 
 
+class TestJobHtmlCard:
+    """Tests for the email digest job card (_job_html_card)."""
+
+    def test_card_includes_description_block(self):
+        from interntrack.scheduler.jobs import _job_html_card
+
+        card = _job_html_card(
+            78.0,
+            {
+                "title": "SOC Analyst",
+                "company": "Zscaler",
+                "location": "Bengaluru",
+                "url": "https://zscaler.example/apply",
+                "description": (
+                    "Monitor SIEM alerts, triage security incidents and "
+                    "escalate to the incident response team."
+                ),
+            },
+            "#e5484d",
+        )
+
+        assert "Monitor SIEM alerts" in card
+        assert "triage security incidents" in card
+        assert "background:#f8fafc" in card  # description block styling
+
+    def test_card_skips_description_when_absent(self):
+        from interntrack.scheduler.jobs import _job_html_card
+
+        card = _job_html_card(
+            None,
+            {"title": "SOC Analyst", "company": "Zscaler", "location": "Remote"},
+            "#e5484d",
+        )
+
+        assert "background:#f8fafc" not in card
+
+    def test_card_escapes_description_html(self):
+        from interntrack.scheduler.jobs import _job_html_card
+
+        card = _job_html_card(
+            None,
+            {
+                "title": "Security Engineer",
+                "company": "Acme",
+                "location": "Remote",
+                "description": "<script>alert('xss')</script>Oversee security",
+            },
+            "#e5484d",
+        )
+
+        assert "<script>" not in card
+        assert "&lt;script&gt;" in card
+        assert "Oversee security" in card
+
+
 class TestBuildDailyReportMessage:
     """Tests for the rich daily-report message (links + match %)."""
 
@@ -94,6 +149,101 @@ class TestBuildDailyReportMessage:
         assert "Apply" in message
         assert "https://acme.example/apply" in message
         assert "%" in message
+
+    @pytest.mark.asyncio
+    async def test_message_includes_description_snippet(self):
+        """The plain-text digest shows what the role expects (description)."""
+        from interntrack.scheduler.jobs import build_daily_report_message
+
+        report = {
+            "summary": {"new_jobs": 1, "new_applications": 0, "total_applications": 0},
+            "new_jobs": [
+                {
+                    "id": "job-1",
+                    "title": "Security Engineer",
+                    "company": "Acme Corp",
+                    "url": "https://acme.example/apply",
+                    "tags": ["security"],
+                    "description": (
+                        "Perform penetration testing and vulnerability "
+                        "assessments across web applications and APIs."
+                    ),
+                }
+            ],
+        }
+
+        message = await build_daily_report_message(report, None)
+
+        assert "📝" in message
+        assert "Perform penetration testing" in message
+        assert "vulnerability assessments" in message
+
+    @pytest.mark.asyncio
+    async def test_message_escapes_description_html(self):
+        """Telegram sends with HTML parse mode, so description markup must
+        be escaped or the whole digest send can fail (can't parse entities)."""
+        from interntrack.scheduler.jobs import build_daily_report_message
+
+        report = {
+            "summary": {"new_jobs": 1, "new_applications": 0, "total_applications": 0},
+            "new_jobs": [
+                {
+                    "id": "job-1",
+                    "title": "Security Engineer",
+                    "company": "Acme Corp",
+                    "tags": ["security"],
+                    "description": (
+                        "<script>alert('x')</script> & Oversee <b>security</b>"
+                    ),
+                }
+            ],
+        }
+
+        message = await build_daily_report_message(report, None)
+
+        assert "<script>" not in message
+        assert "&lt;script&gt;" in message
+        assert "&amp;" in message
+
+    @pytest.mark.asyncio
+    async def test_message_skips_description_when_absent(self):
+        """Jobs without a description render no 📝 line (no empty noise)."""
+        from interntrack.scheduler.jobs import build_daily_report_message
+
+        report = {
+            "summary": {"new_jobs": 1, "new_applications": 0, "total_applications": 0},
+            "new_jobs": [
+                {
+                    "id": "job-1",
+                    "title": "Security Engineer",
+                    "company": "Acme Corp",
+                    "tags": ["security"],
+                }
+            ],
+        }
+
+        message = await build_daily_report_message(report, None)
+
+        assert "📝" not in message
+
+    def test_job_desc_snippet_truncates_long_descriptions(self):
+        """Long multi-paragraph descriptions collapse to one clean snippet."""
+        from interntrack.scheduler.jobs import _job_desc_snippet
+
+        long = "\n\n".join(
+            ["We are looking for an enthusiastic " + "engineer " * 40] * 3
+        )
+        snippet = _job_desc_snippet({"description": long})
+
+        assert snippet.endswith("…")
+        assert "\n" not in snippet
+        assert len(snippet) <= 180
+
+    def test_job_desc_snippet_short_passthrough(self):
+        from interntrack.scheduler.jobs import _job_desc_snippet
+
+        assert _job_desc_snippet({"description": "  Simple role. "}) == "Simple role."
+        assert _job_desc_snippet({}) == ""
 
     @pytest.mark.asyncio
     async def test_no_jobs_keeps_summary_only(self):

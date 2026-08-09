@@ -410,6 +410,7 @@ async def _send_instant_alerts(session, saved_jobs: list) -> dict:
                     "company": str(getattr(job, "company", "") or ""),
                     "location": getattr(job, "location", None),
                     "url": getattr(job, "url", None),
+                    "description": getattr(job, "description", None),
                     "required_skills": list(
                         getattr(job, "required_skills", None) or []
                     ),
@@ -442,6 +443,9 @@ async def _send_instant_alerts(session, saved_jobs: list) -> dict:
                     f"🔹 <b>{_esc(job['title'])}</b> @ {_esc(job['company'])}"
                     f" · {_esc(location)}{score_txt}"
                 )
+                desc = _job_desc_snippet(job_dict)
+                if desc:
+                    lines.append(f"   📝 {_esc(desc)}")
                 url = str(job.get("url") or "")
                 if url:
                     job_title = str(job["title"] or "Job").strip()[:60]
@@ -771,12 +775,33 @@ def _job_lines(score, job: dict) -> list[str]:
     exp_level = str(job.get("experience_level") or "").strip()
     if exp_level:
         lines.append(f"   🎓 {exp_level}")
+    desc = _job_desc_snippet(job)
+    if desc:
+        # Escaped: Telegram sends with HTML parse mode and scraped
+        # descriptions routinely contain <, >, & (and leftover tags).
+        lines.append(f"   📝 {_esc(desc)}")
     if url:
         lines.append(f"   🔗 Apply: {url}")
     note = _expiry_note(job)
     if note:
         lines.append(note)
     return lines
+
+
+def _job_desc_snippet(job: dict, limit: int = 180) -> str:
+    """One-line job description snippet, or '' when the posting has none.
+
+    Whitespace is collapsed and long descriptions are cut at a word-ish
+    boundary with an ellipsis, so a multi-paragraph posting never bloats a
+    Telegram message or email card.
+    """
+    desc = str(job.get("description") or "").strip()
+    if not desc:
+        return ""
+    desc = " ".join(desc.split())
+    if len(desc) <= limit:
+        return desc
+    return desc[: limit - 1].rstrip() + "…"
 
 
 def _salary_txt(job: dict) -> str:
@@ -936,6 +961,9 @@ async def build_daily_report_message(
         if jotd_company and jotd_company.lower() != "unknown":
             jotd_head += f" — {jotd_company}"
         lines.append(jotd_head)
+        jotd_desc = _job_desc_snippet(jotd_job)
+        if jotd_desc:
+            lines.append(f"   📝 {_esc(jotd_desc)}")
         if jotd_url:
             lines.append(f"   🔗 Apply: {jotd_url}")
 
@@ -1356,6 +1384,13 @@ async def build_daily_report_html(
             if jotd_meta
             else ""
         )
+        jotd_desc = _esc(_job_desc_snippet(jotd_job, limit=220))
+        jotd_desc_html = (
+            f"<div style='margin-top:8px;color:#78350f;font-size:13px;"
+            f"line-height:1.5;'>{jotd_desc}</div>"
+            if jotd_desc
+            else ""
+        )
         parts.append(
             "<div style='margin-top:24px;background:linear-gradient(135deg,"
             "#fef3c7,#fde68a);border:1px solid #f59e0b;border-radius:12px;"
@@ -1363,7 +1398,7 @@ async def build_daily_report_html(
             "<div style='font-size:12px;font-weight:800;color:#92400e;"
             "letter-spacing:.6px;'>🔥 JOB OF THE DAY</div>"
             f"<div style='font-size:16px;font-weight:700;margin-top:6px;'>"
-            f"{jotd_title}</div>{jotd_meta_html}"
+            f"{jotd_title}</div>{jotd_meta_html}{jotd_desc_html}"
             f"<div style='margin-top:8px;'>{jotd_score_txt}</div>{jotd_link}</div>"
         )
 
@@ -1643,6 +1678,13 @@ def _job_html_card(score, job: dict, accent: str) -> str:
         "<div style='margin-top:8px;font-size:13px;color:#475569;'>"
         f"{' · '.join(meta_bits)}</div>"
     )
+    desc = _esc(_job_desc_snippet(job, limit=240))
+    if desc:
+        card += (
+            "<div style='margin-top:8px;padding:8px 10px;background:#f8fafc;"
+            "border-left:3px solid " + accent + ";border-radius:6px;"
+            "color:#475569;font-size:13px;line-height:1.45;'>" + desc + "</div>"
+        )
     if url:
         card += (
             "<div style='margin-top:10px;'>"
