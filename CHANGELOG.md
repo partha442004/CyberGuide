@@ -6,6 +6,14 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Dashboard: 🗄 Expired Jobs tab (Jobs page).** The expired-jobs archive
+  (API `GET /jobs/expired` + `POST /jobs/archive-expired`) existed but was
+  invisible in the UI. The new 4th tab on the Jobs page shows the archive
+  with per-job reason + expiry time, an "Archive stale jobs" button that
+  runs the same 30-day cleanup the scheduler performs (moves stale
+  listings out of the live feed), and a friendly empty state — so the
+  feed stays fresh and nothing is ever silently lost.
+
 - **Frontend roles now get discovered (friend's digest fix).**
   `DOMAIN_QUERIES` in the scheduler had no `frontend` key, so a
   frontend-domain user's daily discovery produced an **empty query list**
