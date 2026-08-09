@@ -1803,6 +1803,67 @@ def main() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _domain_coverage_section() -> None:
+    """Live per-category job counts so each user can see domain coverage.
+
+    Answers the recurring "will I get jobs in my domain?" question: shows
+    how many of the newest tracked jobs fall into each category (plus the
+    fresh-24h count), and nudges when the signed-in user's preferred
+    categories have nothing yet. Uses the same ``classify_domain`` the Saved
+    Jobs tab uses so numbers never drift.
+    """
+    jobs_data = fetch_data("/jobs/?limit=300")
+    job_list = jobs_data.get("jobs") or []
+    if not job_list:
+        return
+
+    counts: dict[str, int] = {}
+    fresh: dict[str, int] = {}
+    for job in job_list:
+        domain = classify_domain(job.get("title", ""))
+        counts[domain] = counts.get(domain, 0) + 1
+        if _is_fresh_24h(job.get("posted_at")):
+            fresh[domain] = fresh.get(domain, 0) + 1
+
+    st.markdown(
+        '<div class="section-title">🗂 Domain coverage</div>'
+        '<div class="section-sub">Live counts from the newest 300 tracked '
+        "jobs — see at a glance which categories are well covered and which "
+        "need a discovery run or imported links.</div>",
+        unsafe_allow_html=True,
+    )
+    user = _current_user()
+    prefs = (user or {}).get("domains") or []
+    cols = st.columns(4)
+    for i, domain in enumerate(_DOMAIN_ORDER):
+        count = counts.get(domain, 0)
+        fresh_n = fresh.get(domain, 0)
+        style = _CATEGORY_STYLE.get(domain, _CATEGORY_STYLE["other"])
+        label = _DOMAIN_LABELS.get(domain, domain)
+        is_mine = domain in prefs
+        with cols[i % 4]:
+            st.markdown(
+                f'<div class="stat-tile" style="border-top:4px solid '
+                f'{style["color"]};">'
+                f'<div class="stat-value">{count}</div>'
+                f'<div class="stat-label">{escape(label)}</div>'
+                f'<div style="font-size:0.74em;color:var(--muted);'
+                f'margin-top:4px;">🆕 {fresh_n} new · 24h'
+                + (" · 👤 your domain" if is_mine else "")
+                + "</div></div>",
+                unsafe_allow_html=True,
+            )
+
+    thin = [d for d in prefs if counts.get(d, 0) == 0]
+    if thin:
+        names = ", ".join(_DOMAIN_LABELS.get(d, d) for d in thin)
+        st.info(
+            f"💡 **{names}** has no jobs in the tracker yet — run a Discovery "
+            "search for it on the Jobs page, or paste links on the "
+            "**Jobs → Share a Job** tab to seed it."
+        )
+
+
 def show_overview() -> None:
     """Show overview page."""
     st.header("📈 Overview")
@@ -1862,6 +1923,9 @@ def show_overview() -> None:
                 "Recent (7d)",
                 "linear-gradient(135deg,#43e97b 0%,#38f9d7 100%)",
             )
+
+        # ── 🗂 Domain coverage (live per-category counts) ───────────────
+        _domain_coverage_section()
 
         # ── 🎯 Job of the day (best resume match) ─────────────────────────
         # The same highlight the daily email / Telegram digest leads with:

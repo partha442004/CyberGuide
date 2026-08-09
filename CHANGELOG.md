@@ -6,6 +6,16 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Dashboard: 🗂 Domain coverage panel (Overview page).** Answers the
+  recurring "will I get jobs in my domain?" question with live counts of
+  the newest 300 tracked jobs per category (security / frontend / coding /
+  data / design / finance / marketing / other), each showing the 🆕
+  fresh-24h count, a "👤 your domain" marker on the signed-in user's
+  preferred categories, and a nudge when a preferred category has nothing
+  in the tracker yet (→ run Discovery or paste links on the Share tab).
+  Uses the same `classify_domain` as the Saved Jobs tab so numbers never
+  drift.
+
 - **Dashboard: 🗄 Expired Jobs tab (Jobs page).** The expired-jobs archive
   (API `GET /jobs/expired` + `POST /jobs/archive-expired`) existed but was
   invisible in the UI. The new 4th tab on the Jobs page shows the archive
