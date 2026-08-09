@@ -1733,12 +1733,40 @@ def show_my_matches() -> None:
             status_icons = "".join("✅" if results.get(c) else "❌" for c in channels)
             status_icons = status_icons or "—"
             domains_txt = ", ".join(row.get("domains") or []) or "all categories"
-            st.markdown(
-                f"**{escape(str(row.get('subject') or 'Alert'))}** — "
+            sent_jobs = row.get("jobs") or []
+            with st.expander(
+                f"📬 **{escape(str(row.get('subject') or 'Alert'))}** — "
                 f"{row.get('job_count') or 0} job(s) · {_time_ago(row.get('sent_at'))}"
-            )
-            st.caption(f"🏷 {escape(domains_txt)} · channels {status_icons}")
-            st.divider()
+            ):
+                st.caption(f"🏷 {escape(domains_txt)} · channels {status_icons}")
+                if sent_jobs:
+                    for jj_i, jj in enumerate(sent_jobs):
+                        jj_title = escape(str(jj.get("title") or "Untitled role"))
+                        jj_company = escape(str(jj.get("company") or "Unknown"))
+                        jj_loc = escape(str(jj.get("location") or "Remote"))
+                        jj_score = jj.get("match_score")
+                        score_txt = (
+                            f" · 🎯 {jj_score:.0f}%"
+                            if isinstance(jj_score, (int, float))
+                            else ""
+                        )
+                        jj_line = (
+                            f"**{jj_title}**{score_txt} — {jj_company} · 📍 {jj_loc}"
+                        )
+                        st.markdown(jj_line)
+                        jj_url = jj.get("url")
+                        if jj_url:
+                            st.link_button(
+                                "🔗 View",
+                                jj_url,
+                                key=f"hist_{row.get('id')}_{jj_i}_{jj.get('title')}",
+                            )
+                        st.divider()
+                else:
+                    st.caption(
+                        "Job details weren't recorded for this send (older "
+                        "digests predate job-level history)."
+                    )
     else:
         st.caption(
             "No alert history yet — your first digest arrives at the next "
@@ -3860,6 +3888,64 @@ def show_settings() -> None:
                         )
                 else:
                     st.error("Send failed — is the API reachable and configured?")
+
+    # --------------------------------------------------------------
+    # 👀 Preview — see exactly what the next digest would contain
+    # --------------------------------------------------------------
+    st.markdown("---")
+    st.markdown(
+        "**👀 Preview my next digest** — see exactly which jobs the next "
+        "scheduled send would include (your categories, your location, your "
+        "match %). Nothing is sent; this is a pure lookahead."
+    )
+    if st.button("🔎 Show digest preview", use_container_width=True):
+        with st.spinner("Building your digest preview..."):
+            preview = _api(
+                f"/notifications/preferences/{user_id}/preview",
+                method="GET",
+                timeout=60,
+            )
+        if preview:
+            preview_jobs = preview.get("jobs") or []
+            p_loc = preview.get("location") or "any location"
+            p_doms = ", ".join(preview.get("domains") or []) or "all categories"
+            st.caption(
+                f"Scope: **{escape(str(p_doms))}** · 📍 **{escape(str(p_loc))}** "
+                f"· remote/WFH {'included' if preview.get('include_remote') else 'excluded'}"
+            )
+            if not preview_jobs:
+                st.info(
+                    "Your next digest would be empty with the current "
+                    "settings — either no new jobs since your last alert, or "
+                    "none pass your category/location/match filters. Try a "
+                    "broader category or run a Discovery search."
+                )
+            else:
+                st.success(
+                    f"📦 {len(preview_jobs)} job(s) would be sent at the next "
+                    "scheduled slot."
+                )
+                for pj_i, pj in enumerate(preview_jobs):
+                    pj_title = escape(str(pj.get("title") or "Untitled role"))
+                    pj_company = escape(str(pj.get("company") or "Unknown"))
+                    pj_loc = escape(str(pj.get("location") or "Remote"))
+                    pj_score = pj.get("match_score")
+                    pj_score_txt = (
+                        f" · 🎯 {pj_score:.0f}%"
+                        if isinstance(pj_score, (int, float))
+                        else ""
+                    )
+                    st.markdown(f"**{pj_title}**{pj_score_txt}")
+                    st.caption(f"🏢 {pj_company} · 📍 {pj_loc}")
+                    if pj.get("url"):
+                        st.link_button(
+                            "🔗 View",
+                            pj["url"],
+                            key=f"prev_{pj_i}_{pj.get('title')}",
+                        )
+                    st.divider()
+        else:
+            st.error("Preview failed — is the API reachable?")
 
     # --------------------------------------------------------------
     # 🔕 Vacation mode — pause ALL alerts until a chosen date

@@ -642,6 +642,43 @@ class TestAlertHistory:
         assert entry["sent_at"] is not None
 
     @pytest.mark.asyncio
+    async def test_history_endpoint_returns_jobs(self):
+        from datetime import datetime
+
+        from interntrack.api.v1.notifications import get_alert_history
+        from interntrack.domain.models import NotificationHistory
+
+        row = NotificationHistory(
+            user_id="user1",
+            subject="Daily Report (security)",
+            channels=["email"],
+            domains=["security"],
+            job_count=1,
+            results={"email": True},
+            jobs=[
+                {
+                    "title": "Cybersecurity Analyst",
+                    "company": "Acme",
+                    "location": "Bangalore",
+                    "url": "https://x/job",
+                    "domain": "security",
+                    "match_score": 87.0,
+                }
+            ],
+            created_at=datetime(2026, 8, 5, 7, 0, 0),
+        )
+        result_mock = MagicMock()
+        result_mock.scalars.return_value.all.return_value = [row]
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=result_mock)
+
+        data = await get_alert_history("user1", db=mock_db)
+        jobs = data["history"][0]["jobs"]
+        assert jobs[0]["title"] == "Cybersecurity Analyst"
+        assert jobs[0]["match_score"] == 87.0
+        assert jobs[0]["url"] == "https://x/job"
+
+    @pytest.mark.asyncio
     async def test_history_endpoint_empty(self):
         from interntrack.api.v1.notifications import get_alert_history
 
@@ -670,6 +707,89 @@ class TestAlertHistory:
             3,
             {"email": True},
         )
+
+    @pytest.mark.asyncio
+    async def test_record_history_stores_jobs(self):
+        from interntrack.scheduler.jobs import _record_alert_history
+
+        mock_db = AsyncMock()
+        await _record_alert_history(
+            mock_db,
+            "user1",
+            "Daily Report (security)",
+            ["email"],
+            ["security"],
+            2,
+            {"email": True},
+            jobs=[
+                {
+                    "title": "SOC Analyst",
+                    "company": "X Corp",
+                    "match_score": 92.0,
+                }
+            ],
+        )
+        added = mock_db.add.call_args[0][0]
+        assert added.jobs[0]["title"] == "SOC Analyst"
+        assert added.jobs[0]["match_score"] == 92.0
+
+    @pytest.mark.asyncio
+    async def test_preview_digest_returns_jobs_no_send(self):
+        from interntrack.api.v1.notifications import preview_digest
+
+        job = {
+            "id": "j1",
+            "title": "Cybersecurity Analyst",
+            "company": "Acme",
+            "location": "Bangalore",
+            "url": "https://x",
+            "domain": "security",
+            "posted_at": "2026-08-05 07:00:00",
+        }
+        report = {
+            "new_jobs": [job],
+            "summary": {"new_jobs": 1},
+            "min_match_score": None,
+        }
+        mock_service = AsyncMock()
+        mock_service.generate_daily_report = AsyncMock(return_value=report)
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=MagicMock())
+
+        with (
+            patch(
+                "interntrack.api.v1.notifications._load_alert_preferences",
+                new=AsyncMock(
+                    return_value={
+                        "domains": ["security"],
+                        "channels": ["email"],
+                        "min_match_score": None,
+                        "last_alert_at": None,
+                        "include_remote": True,
+                    }
+                ),
+            ),
+            patch(
+                "interntrack.api.v1.notifications.ReportService",
+                new=MagicMock(return_value=mock_service),
+            ),
+            patch(
+                "interntrack.api.v1.notifications._latest_resume_skill_names",
+                new=AsyncMock(return_value=None),
+            ),
+            patch(
+                "interntrack.api.v1.notifications._job_match_score",
+                new=lambda *_args: 87.5,
+            ),
+        ):
+            data = await preview_digest("user1", db=mock_db)
+
+        assert data["job_count"] == 1
+        assert data["jobs"][0]["title"] == "Cybersecurity Analyst"
+        assert data["jobs"][0]["match_score"] == 87.5
+        assert data["jobs"][0]["domain"] == "security"
+        # Preview must never call the delivery path.
+        mock_db.add.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

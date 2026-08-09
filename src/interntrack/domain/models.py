@@ -488,6 +488,12 @@ class NotificationHistory(Base, TimestampMixin):
     domains = Column(JSON, nullable=True)
     job_count = Column(Integer, default=0)
     results = Column(JSON, nullable=True)
+    jobs = Column(JSON, nullable=True)
+    # ``jobs``: compact list of the jobs actually sent — title, company,
+    # location, url, domain, match_score — so the dashboard can show
+    # exactly what each digest delivered (answers "did the mail match my
+    # domain/location?"). Auto-added to live tables by init_db's
+    # ``_sync_missing_columns`` step.
 
 
 class ScheduledReport(Base, TimestampMixin):

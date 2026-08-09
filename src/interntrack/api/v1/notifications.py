@@ -19,6 +19,8 @@ from interntrack.scheduler.jobs import (
 )
 from interntrack.scheduler.jobs import (
     DEFAULT_LOCATION,
+    _job_match_score,
+    _latest_resume_skill_names,
     _load_alert_preferences,
     _mark_alert_sent,
     _record_alert_history,
@@ -419,8 +421,85 @@ async def get_alert_history(
                 "domains": row.domains or [],
                 "job_count": row.job_count or 0,
                 "results": row.results or {},
+                "jobs": row.jobs or [],
             }
             for row in rows
         ],
         "total": len(rows),
+    }
+
+
+@router.get("/preferences/{user_id}/preview")
+async def preview_digest(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Preview the next daily digest for a user WITHOUT sending anything.
+
+    Runs the exact same pipeline the scheduled digest uses (same domains,
+    location scope, include-remote setting, min match %, no-duplicates
+    window) and returns the jobs that would be delivered, each with its
+    match %. Nothing is sent, no window is advanced, no history row is
+    created — purely a "what would I get?" lookahead.
+    """
+    from sqlalchemy import select
+
+    from interntrack.domain.models import User
+
+    prefs = await _load_alert_preferences(db, user_id=user_id)
+    domains = prefs.get("domains") or None
+
+    user = None
+    if user_id != "user1":
+        result = await db.execute(select(User).where(User.id == user_id))
+        candidate = result.scalar_one_or_none()
+        if isinstance(candidate, User):
+            user = candidate
+    user_location = (
+        (getattr(user, "location", None) or "").strip() or DEFAULT_LOCATION or None
+    )
+    include_remote = bool(prefs.get("include_remote", True))
+
+    service = ReportService(db)
+    report = await service.generate_daily_report(
+        domains=domains,
+        min_match_score=prefs.get("min_match_score"),
+        since=prefs.get("last_alert_at"),
+        location=user_location,
+        include_remote=include_remote,
+    )
+    jobs = report.get("new_jobs") or []
+
+    resume_skills = await _latest_resume_skill_names(db, user_id=user_id)
+    preview_jobs = []
+    min_score = report.get("min_match_score")
+    for job in jobs:
+        score = _job_match_score(resume_skills, job)
+        if min_score and score is not None and score < min_score:
+            continue
+        preview_jobs.append(
+            {
+                "title": job.get("title"),
+                "company": job.get("company"),
+                "location": job.get("location"),
+                "url": job.get("url"),
+                "domain": job.get("domain") or "other",
+                "match_score": score,
+                "source": job.get("source"),
+                "salary_min": job.get("salary_min"),
+                "salary_max": job.get("salary_max"),
+                "posted_at": job.get("posted_at"),
+            }
+        )
+    preview_jobs.sort(key=lambda j: -(j["match_score"] or 0))
+
+    return {
+        "user_id": user_id,
+        "domains": domains or [],
+        "location": user_location,
+        "include_remote": include_remote,
+        "min_match_score": report.get("min_match_score"),
+        "summary": report.get("summary", {}),
+        "jobs": preview_jobs,
+        "job_count": len(preview_jobs),
     }

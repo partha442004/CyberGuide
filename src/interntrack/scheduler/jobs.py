@@ -150,9 +150,13 @@ async def _record_alert_history(
     domains: list,
     job_count: int,
     results: dict,
+    jobs: list | None = None,
 ) -> None:
     """Persist an alert-send record for the dashboard history view.
 
+    ``jobs`` (optional) is the compact list of jobs actually sent — title,
+    company, location, url, domain and match score — so the dashboard can
+    show exactly what each digest delivered instead of just a count.
     Never raises — history must never break a digest send.
     """
     import contextlib
@@ -168,6 +172,7 @@ async def _record_alert_history(
                 domains=list(domains or []),
                 job_count=int(job_count or 0),
                 results=dict(results or {}),
+                jobs=list(jobs or []),
             )
         )
         await session.commit()
@@ -564,6 +569,28 @@ async def _send_alert_for(session, user_id: str, prefs: dict, user=None) -> None
         subject=subject,
         user=user,
     )
+    # Compact snapshot of the jobs that were actually sent (with match %), so
+    # the dashboard history shows the real digest content, not just a count.
+    # Built defensively: history must never be lost to a scoring hiccup after
+    # the mail was already delivered.
+    sent_jobs: list = []
+    try:
+        resume_skills = await _latest_resume_skill_names(session, user_id=user_id)
+        sent_jobs = [
+            {
+                "title": job.get("title"),
+                "company": job.get("company"),
+                "location": job.get("location"),
+                "url": job.get("url"),
+                "domain": job.get("domain") or "other",
+                "match_score": _job_match_score(resume_skills, job),
+                "source": job.get("source"),
+                "posted_at": job.get("posted_at"),
+            }
+            for job in (report.get("new_jobs") or [])
+        ]
+    except Exception:  # noqa: BLE001, S110 - history must never break
+        sent_jobs = []
     await _record_alert_history(
         session,
         user_id=user_id,
@@ -572,6 +599,7 @@ async def _send_alert_for(session, user_id: str, prefs: dict, user=None) -> None
         domains=domains or [],
         job_count=len(report.get("new_jobs") or []),
         results=results,
+        jobs=sent_jobs,
     )
 
 
