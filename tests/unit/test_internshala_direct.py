@@ -90,7 +90,7 @@ class TestInternshalaScraper:
         """A card without a direct detail link is dropped, never a search page."""
         s = self._scraper()
         html = _page(
-            '<div class="individual_internship" data-href=\'/internships/\'>'
+            "<div class=\"individual_internship\" data-href='/internships/'>"
             '<a class="job-title-href" href="/internships/">Generic</a></div>',
             _card("Ethical Hacker", "Emoolar", "/internship/detail/ethical-hacker-1"),
         )

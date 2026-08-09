@@ -82,9 +82,7 @@ class InternshalaDirectScraper(BaseScraper):
             if not title:
                 continue
             company_m = self._COMPANY.search(window)
-            company = (
-                company_m.group(1).strip() if company_m else "Unknown"
-            )
+            company = company_m.group(1).strip() if company_m else "Unknown"
             full = urljoin(self.BASE_URL, url)
             if full in seen:
                 continue
@@ -140,9 +138,8 @@ class InternshalaDirectScraper(BaseScraper):
                 # search page and let the relevance filter drop the junk.
                 final_path = urlparse(str(resp.url)).path.rstrip("/")
                 if final_path in ("/internships", ""):
-                    q_url = (
-                        f"{self.BASE_URL}/internships/?q="
-                        + query.strip().replace(" ", "+")
+                    q_url = f"{self.BASE_URL}/internships/?q=" + query.strip().replace(
+                        " ", "+"
                     )
                     resp = await client.get(q_url)
                     if resp.status_code != 200:
