@@ -109,6 +109,66 @@ class EmailChannel(NotificationChannel):
             raise NotificationError("email", str(e)) from e
 
 
+class SmsChannel(NotificationChannel):
+    """SMS notification channel via the Twilio Messages API.
+
+    Uses only httpx (no SDK) so it works from the async stack on Vercel
+    serverless: one POST to the Twilio REST API with HTTP basic auth and a
+    form body ``To`` / ``From`` / ``Body``. ``to_number`` may be ``None``
+    (no default recipient) — in that case ``send`` fails closed with
+    ``False`` so an owner-level broadcast without a per-user phone never
+    raises.
+    """
+
+    def __init__(
+        self,
+        account_sid: str,
+        auth_token: str,
+        from_number: str,
+        to_number: str | None = None,
+    ):
+        self.account_sid = account_sid
+        self.auth_token = auth_token
+        self.from_number = from_number
+        self.to_number = to_number
+
+    async def send(
+        self,
+        message: str,
+        subject: str | None = None,  # noqa: ARG002 (interface)
+        buttons: list[tuple[str, str]] | None = None,  # noqa: ARG002 (interface)
+    ) -> bool:
+        """Send one SMS via Twilio; fails closed when no recipient is set."""
+        if not self.to_number:
+            return False
+        try:
+            import httpx
+
+            url = (
+                f"https://api.twilio.com/2010-04-01/Accounts/"
+                f"{self.account_sid}/Messages.json"
+            )
+            # Twilio is an SMS platform — URLs would be long to type; keep
+            # the body to a single compact line of plain text.
+            body = str(message).strip()
+            if len(body) > 160:
+                body = body[:157] + "..."
+            async with httpx.AsyncClient(
+                auth=(self.account_sid, self.auth_token), timeout=15
+            ) as client:
+                response = await client.post(
+                    url,
+                    data={
+                        "To": self.to_number,
+                        "From": self.from_number,
+                        "Body": body,
+                    },
+                )
+                return response.status_code in (200, 201)
+        except Exception as e:
+            raise NotificationError("sms", str(e)) from e
+
+
 class DiscordChannel(NotificationChannel):
     """Discord webhook notification channel."""
 
@@ -196,6 +256,20 @@ class NotificationManager:
         if settings.slack_webhook_url:
             self._channels["slack"] = SlackChannel(settings.slack_webhook_url)
 
+        if (
+            settings.twilio_account_sid
+            and settings.twilio_auth_token
+            and settings.twilio_phone_number
+        ):
+            # ``to_number=None`` until a recipient is resolved per user, so
+            # an owner-level broadcast without TWILIO_DEFAULT_TO fails closed.
+            self._channels["sms"] = SmsChannel(
+                settings.twilio_account_sid,
+                settings.twilio_auth_token,
+                settings.twilio_phone_number,
+                settings.twilio_default_to,
+            )
+
     async def notify(
         self,
         channels: list[str],
@@ -209,8 +283,9 @@ class NotificationManager:
         ``buttons`` (optional ``(label, url)`` pairs) is passed to channels
         that support inline buttons (Telegram); other channels ignore it.
         ``recipient`` (optional) personalizes delivery per user: ``email``
-        overrides the email recipient and ``telegram_chat_id`` overrides the
-        Telegram chat — every registered user gets alerts on *their* devices.
+        overrides the email recipient, ``telegram_chat_id`` overrides the
+        Telegram chat and ``phone_number`` targets SMS — every registered
+        user gets alerts on *their* devices.
         Records per-channel delivery into the business metrics store.
         ``delivered=False`` covers both a real delivery failure and a channel
         that is not configured (never attempted).
@@ -250,10 +325,11 @@ class NotificationManager:
         """A channel instance pointed at a specific user's contact point.
 
         Email goes to the user's own address (the app's SMTP account stays
-        the sender) and Telegram goes to the user's own chat id. When the
-        user has no contact point for a channel, ``None`` is returned so
-        delivery fails closed — alerts never leak to the shared/owner
-        channels. Discord/Slack webhooks are shared and returned as-is.
+        the sender), Telegram goes to the user's own chat id and SMS goes
+        to the user's own phone number. When the user has no contact point
+        for a channel, ``None`` is returned so delivery fails closed —
+        alerts never leak to the shared/owner channels. Discord/Slack
+        webhooks are shared and returned as-is.
         """
         if channel_name == "email":
             email = recipient.get("email")
@@ -271,6 +347,21 @@ class NotificationManager:
             chat_id = recipient.get("telegram_chat_id")
             if settings.telegram_bot_token and chat_id:
                 return TelegramChannel(settings.telegram_bot_token, chat_id)
+            return None
+        if channel_name == "sms":
+            phone = recipient.get("phone_number")
+            if (
+                settings.twilio_account_sid
+                and settings.twilio_auth_token
+                and settings.twilio_phone_number
+                and phone
+            ):
+                return SmsChannel(
+                    settings.twilio_account_sid,
+                    settings.twilio_auth_token,
+                    settings.twilio_phone_number,
+                    phone,
+                )
             return None
         return self._channels.get(channel_name)
 

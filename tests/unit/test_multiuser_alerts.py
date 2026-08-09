@@ -138,6 +138,7 @@ class TestDeliverAlertRecipient:
         assert email_kwargs["recipient"] == {
             "email": "u@example.com",
             "telegram_chat_id": "777",
+            "phone_number": None,
         }
         assert calls[1].kwargs["recipient"]["telegram_chat_id"] == "777"
 

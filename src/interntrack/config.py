@@ -57,6 +57,14 @@ class Settings(BaseSettings):
     # Slack Notifications
     slack_webhook_url: str | None = None
 
+    # SMS Notifications (Twilio)
+    twilio_account_sid: str | None = None
+    twilio_auth_token: str | None = None
+    twilio_phone_number: str | None = None
+    # Optional default recipient (the account owner's phone, E.164) used when
+    # a message targets the shared/owner channel with no per-user recipient.
+    twilio_default_to: str | None = None
+
     # Email - SMTP
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
@@ -117,6 +125,14 @@ class Settings(BaseSettings):
     @property
     def is_email_configured(self) -> bool:
         return bool(self.smtp_user and self.smtp_password)
+
+    @property
+    def is_twilio_configured(self) -> bool:
+        return bool(
+            self.twilio_account_sid
+            and self.twilio_auth_token
+            and self.twilio_phone_number
+        )
 
     @property
     def is_ai_configured(self) -> bool:
