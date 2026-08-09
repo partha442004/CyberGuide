@@ -278,3 +278,123 @@ class TestParsePageMeta:
     def test_empty_html_returns_no_title(self):
         meta = self._parse("<html><head></head><body></body></html>")
         assert meta["title"] is None
+
+
+class TestImportLinks:
+    """Bulk /jobs/import-links — saves up to 8 pasted links in one request."""
+
+    @staticmethod
+    def _meta_by_url(urls: list[str]) -> AsyncMock:
+        """AsyncMock returning per-URL OpenGraph meta (board site_name fallback)."""
+
+        async def fake_meta(url: str):
+            idx = urls.index(url)
+            return {
+                "title": f"Imported Role {idx}",
+                "site_name": "Naukri",
+                "description": "Bulk imported role.",
+            }
+
+        return AsyncMock(side_effect=fake_meta)
+
+    @pytest.mark.asyncio
+    async def test_import_links_saves_multiple(self, client):
+        urls = [
+            "https://www.naukri.com/job-listings-role-a",
+            "https://internshala.com/job/detail/role-b",
+            "https://in.indeed.com/viewjob?jk=role-c",
+        ]
+        with patch(
+            "interntrack.api.v1.jobs._fetch_page_meta",
+            new=self._meta_by_url(urls),
+        ):
+            resp = await client.post("/api/v1/jobs/import-links", json={"urls": urls})
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["saved"] == 3
+        assert data["duplicates"] == 0
+        assert data["failed"] == 0
+        assert data["total"] == 3
+        titles = [r["job"]["title"] for r in data["results"] if not r.get("error")]
+        assert titles == ["Imported Role 0", "Imported Role 1", "Imported Role 2"]
+        # All three are now saved as manual jobs.
+        listing = await client.get("/api/v1/jobs/?limit=100")
+        listed = [j["url"] for j in listing.json()["jobs"]]
+        for u in urls:
+            assert u in listed
+
+    @pytest.mark.asyncio
+    async def test_import_links_duplicates_are_skipped(self, client):
+        url = "https://example.com/jobs/dup"
+        with patch(
+            "interntrack.api.v1.jobs._fetch_page_meta",
+            new=self._meta_by_url([url]),
+        ):
+            resp = await client.post(
+                "/api/v1/jobs/import-links", json={"urls": [url, url]}
+            )
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["saved"] == 1
+        assert data["duplicates"] == 1
+        assert data["failed"] == 0
+        assert data["results"][1]["duplicate"] is True
+
+    @pytest.mark.asyncio
+    async def test_import_links_counts_failures(self, client):
+        ok_url = "https://example.com/jobs/ok"
+        bad_url = "https://example.com/unreadable"
+        urls = [ok_url, bad_url]
+
+        async def fake_meta(url: str):
+            return {"title": "Good Role", "site_name": "Board"} if url == ok_url else {}
+
+        with patch(
+            "interntrack.api.v1.jobs._fetch_page_meta",
+            new=AsyncMock(side_effect=fake_meta),
+        ):
+            resp = await client.post("/api/v1/jobs/import-links", json={"urls": urls})
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["saved"] == 1
+        assert data["failed"] == 1
+        failed = next(r for r in data["results"] if r.get("error"))
+        assert failed["url"] == bad_url
+        assert "title" in failed["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_import_links_rejects_invalid_urls(self, client):
+        resp = await client.post(
+            "/api/v1/jobs/import-links",
+            json={"urls": ["not-a-url", "https://example.com/ok"]},
+        )
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_import_links_rejects_empty_and_oversized_batches(self, client):
+        empty = await client.post("/api/v1/jobs/import-links", json={"urls": []})
+        assert empty.status_code == 422
+
+        too_many = await client.post(
+            "/api/v1/jobs/import-links",
+            json={"urls": [f"https://example.com/jobs/{i}" for i in range(10)]},
+        )
+        assert too_many.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_import_links_never_500s_on_unreadable_pages(self, client):
+        """An unreadable page reports a per-link failure, never a 500."""
+        urls = [
+            "https://example.com/jobs/frontend-chennai",
+            "https://example.com/jobs/react-chennai",
+        ]
+        with patch(
+            "interntrack.api.v1.jobs._fetch_page_meta",
+            new=AsyncMock(return_value={}),
+        ):
+            resp = await client.post("/api/v1/jobs/import-links", json={"urls": urls})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 2
+        assert data["failed"] == 2
+        assert data["saved"] == 0

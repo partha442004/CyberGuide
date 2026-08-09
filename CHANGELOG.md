@@ -6,6 +6,30 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Frontend roles now get discovered (friend's digest fix).**
+  `DOMAIN_QUERIES` in the scheduler had no `frontend` key, so a
+  frontend-domain user's daily discovery produced an **empty query list**
+  and their email/Telegram digest never found any jobs. Added 13 frontend
+  queries (frontend developer/engineer, react, ui, angular, vue,
+  javascript, frontend internship + Chennai/Bangalore-suffixed variants so
+  a Chennai frontend user's top queries target Chennai first).
+- **Bulk link import — `POST /api/v1/jobs/import-links`.** Paste up to 8
+  job links in one request (LinkedIn, Naukri, Internshala, careers pages,
+  …); each is processed exactly like a single share — title/company
+  auto-detected, duplicates skipped. Sequential with a 9s per-link
+  deadline and a 40s batch budget (matching the discovery deadline) so
+  the request always returns before the platform's 60s kill; a timeout
+  rolls back the session so the next link starts clean. Returns per-link
+  results with `saved` / `duplicates` / `skipped` / `failed` counts. The
+  single `/jobs/share` logic was refactored into a shared
+  `_save_shared_job` helper (behavior unchanged — 400 on missing title,
+  idempotent duplicates, SSRF guard).
+- **Dashboard: "Import Multiple Links" on the Jobs → Share tab.** Paste
+  a list of links (one per line, up to 8) and they're all saved in one
+  go with a per-link ✅ saved / ℹ️ duplicate / ⏭️ skipped / ❌ failed
+  breakdown — ideal for seeding a team-mate's digest with their domain
+  (e.g. frontend/Chennai) links.
+
 - **📍 Per-user location scoping now includes remote/WFH (Bangalore +
   remote for you).** The daily email/Telegram digest for the legacy
   `user1` default previously had NO location filter at all (no profile

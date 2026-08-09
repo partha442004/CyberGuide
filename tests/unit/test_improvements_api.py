@@ -175,6 +175,34 @@ class TestDiscoveryQueries:
         assert len(queries) == 2
         assert len(set(queries)) == len(queries)
 
+    def test_frontend_domain_has_discovery_queries(self):
+        """Frontend users (e.g. Chennai) must get real search queries.
+
+        Regression guard: DOMAIN_QUERIES previously had no ``frontend`` key,
+        so a frontend-domain user's daily discovery produced an empty query
+        list and their digest never found any jobs.
+        """
+        from interntrack.scheduler.jobs import DOMAIN_QUERIES, discovery_queries_for
+
+        assert "frontend" in DOMAIN_QUERIES
+        assert len(DOMAIN_QUERIES["frontend"]) >= 5
+
+        queries = discovery_queries_for({"domains": ["frontend"]}, limit=30)
+        assert any("frontend developer" in q for q in queries)
+        assert any("react developer" in q for q in queries)
+        # Location-suffixed queries exist so a Chennai user's alerts target
+        # Chennai frontend roles first.
+        assert any("chennai" in q for q in queries)
+
+    def test_frontend_location_queries_surfaced_first(self):
+        """A Chennai user's top-4 frontend queries all target Chennai."""
+        from interntrack.scheduler.jobs import discovery_queries_for
+
+        user = SimpleNamespace(skills=[], location="Chennai")
+        queries = discovery_queries_for({"domains": ["frontend"]}, user=user, limit=4)
+        assert len(queries) == 4
+        assert all("chennai" in q.lower() for q in queries)
+
     def test_no_domains_uses_other_fallback(self):
         from interntrack.scheduler.jobs import discovery_queries_for
 
