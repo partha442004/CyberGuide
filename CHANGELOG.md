@@ -6,6 +6,29 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **🆕 Apna.co scraper — new India-first job board source.** Apna
+  (88k+ live vacancies) is server-rendered by Next.js: job cards live in a
+  double-escaped `self.__next_f.push` flight payload (no public JSON API, no
+  SSR job cards). The new `ApnaScraper` un-escapes the `jobsList` blob once
+  and pulls each posting's title, organisation, city, **INR salary** and job
+  detail URL with targeted regexes (robust to the payload's unquoted
+  `$undefined` tokens). URL scheme supports keyword (`/jobs/{slug}-jobs`)
+  and keyword+city (`...-in-bengaluru-bangalore`) pages with a city-slug
+  map covering Bangalore / Chennai / Mumbai / Delhi / Hyderabad / Pune /
+  Kolkata / Jaipur / Gurgaon / Noida / Kochi / Coimbatore / Ahmedabad.
+  Because apna only indexes a small curated set of slugs (most multi-word
+  queries render a rotating generic feed), a curated fallback map routes
+  security-family queries — `cybersecurity`, `soc analyst`, `vapt`,
+  `penetration testing`, `incident response`, … (and their `<skill> intern`
+  variants) — to the working `security` page; a guard-role reject list
+  drops physical-security titles ("Security Head Ex-Army Man", "Security
+  Manager" at guard agencies) so a VAPT/SOC user only sees real cyber
+  roles; and the candidate chain keeps fetching until ~5 real matches are
+  found (a thin first result can't suppress the richer fallback).
+  Registered as `apna` and added to the discovery fast-source set.
+  Verified live: `cybersecurity` + Bangalore → SIEM & SOAR SME, SOC
+  Analyst and more with INR salaries. 18 new tests.
+
 - **📬 Job-level alert history — see exactly what was sent.** The
   dashboard's "Your alert history" timeline used to record only counts
   (subject / channels / job count), so there was no way to answer "did the
