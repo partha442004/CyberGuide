@@ -2110,7 +2110,9 @@ def show_jobs() -> None:
     """Show jobs page with working discovery & search."""
     st.header("💼 Jobs")
 
-    tab1, tab2, tab3 = st.tabs(["🔍 Discovery", "📋 Saved Jobs", "🔗 Share a Job"])
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["🔍 Discovery", "📋 Saved Jobs", "🔗 Share a Job", "🗄 Expired"]
+    )
 
     # ------ Tab 1: Discovery ------
     with tab1:
@@ -2201,6 +2203,10 @@ def show_jobs() -> None:
         _share_job_form()
         st.divider()
         _bulk_import_form()
+
+    # ------ Tab 4: Expired / archived jobs ------
+    with tab4:
+        _expired_jobs_tab()
 
 
 def _render_saved_jobs_tab(jobs: list) -> None:
@@ -2526,6 +2532,83 @@ def _bulk_import_form() -> None:
                 "💡 Links that failed can be saved one-by-one in the form above — "
                 "just paste the title manually if auto-detection can't read the page."
             )
+
+
+def _expired_jobs_tab() -> None:
+    """Expired jobs: archived listings moved out of the live feed.
+
+    Stale jobs (older than 30 days, never re-verified) are archived into a
+    separate ``expired_jobs`` table so the live Saved Jobs feed stays fresh.
+    This tab shows the archive with a one-click "archive stale jobs" action
+    that runs the same cleanup the scheduler uses.
+    """
+    st.markdown(
+        '<div class="section-title">🗄 Expired / Archived Jobs</div>'
+        '<div class="section-sub">Roles older than 30 days are moved here so '
+        "your live feed only shows fresh, active jobs. Nothing is deleted — "
+        "the archive is just kept out of the daily alerts.</div>",
+        unsafe_allow_html=True,
+    )
+
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.caption(
+            "Run the same cleanup the scheduler performs to move stale jobs "
+            "(30+ days old) into this archive."
+        )
+    with col2:
+        if st.button(
+            "🧹 Archive stale jobs", use_container_width=True, key="archive_stale_btn"
+        ):
+            with st.spinner("Archiving stale jobs..."):
+                result = _api_raw(
+                    "/jobs/archive-expired?days=30", method="POST", timeout=30
+                )
+            if result is not None and result.status_code == 200:
+                archived = (result.json() or {}).get("archived", 0)
+                if archived:
+                    st.success(
+                        f"✅ Archived **{archived}** stale job(s) — the feed is fresh again."
+                    )
+                else:
+                    st.info("No stale jobs to archive — everything is already fresh.")
+                st.rerun()
+            else:
+                st.error("Archive API unreachable. Is the API server running?")
+
+    data = fetch_data("/jobs/expired?limit=50")
+    expired = (data or {}).get("expired_jobs") or []
+    total = (data or {}).get("total") or 0
+
+    if not expired:
+        st.info("The archive is empty — nothing has expired yet. 🎉")
+        return
+
+    _stat_tile(total, "Archived jobs")
+    st.markdown("")
+    for item in expired:
+        title = escape(str(item.get("title") or "Untitled"))
+        company = escape(str(item.get("company") or ""))
+        location = escape(str(item.get("location") or ""))
+        reason = escape(str(item.get("reason") or ""))
+        expired_when = _time_ago(item.get("expired_at"))
+        with st.container(border=True):
+            st.markdown(f"<div class='job-title'>{title}</div>", unsafe_allow_html=True)
+            chips = []
+            if company and company != "Unknown":
+                chips.append(f"🏢 {company}")
+            if location:
+                chips.append(f"📍 {location}")
+            if reason:
+                chips.append(f"🚫 {reason}")
+            if chips:
+                st.markdown(
+                    '<div class="chip-row">'
+                    + "".join(f'<span class="chip">{c}</span>' for c in chips)
+                    + "</div>",
+                    unsafe_allow_html=True,
+                )
+            st.caption(f"🗄 Expired {expired_when}")
 
 
 # ---------------------------------------------------------------------------
