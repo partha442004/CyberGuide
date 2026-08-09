@@ -6,6 +6,23 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **📱 SMS alerts via Twilio (opt-in per user).** New ``sms`` notification
+  channel: ``SmsChannel`` posts to the Twilio Messages API with httpx
+  (no SDK — works from Vercel serverless), truncates bodies to one SMS,
+  and fails closed when no recipient is set. Configured via
+  ``TWILIO_ACCOUNT_SID`` / ``TWILIO_AUTH_TOKEN`` / ``TWILIO_PHONE_NUMBER``
+  (optional ``TWILIO_DEFAULT_TO`` for owner broadcasts). Per-user delivery
+  is routed through ``recipient.phone_number`` — a registered user who
+  ticks **SMS** in Settings gets the daily digest by text too (the digest
+  already routes SMS through the plain-text message path, never the HTML
+  email body). ``User.phone_number`` (E.164) is captured at registration
+  and editable in Settings; the validator defaults a bare 10-digit number
+  to ``+91`` (India) and rejects malformed values. The channel only
+  appears when Twilio is configured and only activates for accounts with
+  a phone number — email/Telegram keep working untouched. 13 new tests
+  (send success/truncation/fail-closed/network errors, per-user wiring,
+  E.164 defaults, digest→SMS plain-text routing).
+
 - **Dashboard: 🗂 Domain coverage panel (Overview page).** Answers the
   recurring "will I get jobs in my domain?" question with live counts of
   the newest 300 tracked jobs per category (security / frontend / coding /

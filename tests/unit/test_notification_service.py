@@ -208,6 +208,9 @@ class TestNotificationManager:
         mock_settings.smtp_password = None
         mock_settings.discord_webhook_url = None
         mock_settings.slack_webhook_url = None
+        mock_settings.twilio_account_sid = None
+        mock_settings.twilio_auth_token = None
+        mock_settings.twilio_phone_number = None
 
         session = AsyncMock()
         manager = NotificationManager(session)

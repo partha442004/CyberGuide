@@ -234,6 +234,7 @@ async def _deliver_alert(
         recipient = {
             "email": getattr(user, "email", None),
             "telegram_chat_id": getattr(user, "telegram_chat_id", None),
+            "phone_number": getattr(user, "phone_number", None),
         }
     results: dict = {}
     # Preferred-location split (📍 Your area / 🌍 Other locations). Discovery

@@ -45,6 +45,8 @@ def _configured_channels() -> list[str]:
         channels.append("discord")
     if settings.is_slack_configured:
         channels.append("slack")
+    if settings.is_twilio_configured:
+        channels.append("sms")
     return channels
 
 
@@ -137,6 +139,7 @@ async def register_user(
         name=payload.name,
         email=payload.email,
         telegram_chat_id=payload.telegram_chat_id or None,
+        phone_number=payload.phone_number or None,
         location=payload.location or None,
         experience_level=experience or None,
         domains=_normalize_domains(payload.domains),
@@ -320,6 +323,8 @@ async def update_user(
         user.name = update.name.strip()  # type: ignore[assignment]
     if update.telegram_chat_id is not None:
         user.telegram_chat_id = update.telegram_chat_id or None  # type: ignore[assignment]
+    if update.phone_number is not None:
+        user.phone_number = update.phone_number or None  # type: ignore[assignment]
     if update.location is not None:
         user.location = update.location or None  # type: ignore[assignment]
     if update.experience_level is not None:

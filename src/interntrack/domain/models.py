@@ -63,6 +63,9 @@ class User(Base, TimestampMixin):
     name = Column(String(100), nullable=False)
     email = Column(String(200), nullable=False, unique=True, index=True)
     telegram_chat_id = Column(String(100), nullable=True)
+    # Phone number (E.164, e.g. +919876543210) for SMS alerts via Twilio.
+    # Auto-added to live tables by init_db's ``_sync_missing_columns`` step.
+    phone_number = Column(String(30), nullable=True)
     location = Column(String(100), nullable=True)
     experience_level = Column(String(50), nullable=True)  # fresher/intern/junior/senior
     domains = Column(JSON, nullable=True, default=list)

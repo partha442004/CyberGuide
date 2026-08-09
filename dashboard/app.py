@@ -1530,6 +1530,12 @@ def show_account() -> None:
                 "alerts then reach *your* Telegram instead of the shared chat. "
                 "Tip: use the 'Find my Telegram chat ID' button above.",
             )
+            phone_number = st.text_input(
+                "Phone number for SMS alerts (optional)",
+                placeholder="+919876543210",
+                help="Include the country code (e.g. +91 for India) — your "
+                "daily digest can also arrive by SMS.",
+            )
             default_domains = _invite.get("domains", ["security"])
             domains = _category_picker_multi("🏷 Preferred categories", default_domains)
             skills = st.text_input(
@@ -1552,6 +1558,7 @@ def show_account() -> None:
                 "location": location.strip() or None,
                 "experience_level": experience or None,
                 "telegram_chat_id": telegram_chat_id.strip() or None,
+                "phone_number": phone_number.strip() or None,
                 "domains": [] if "all" in domains else domains,
                 "skills": [s.strip() for s in skills.split(",") if s.strip()],
                 "referred_by": _invite.get("invite") or None,
@@ -3546,6 +3553,7 @@ def show_learning() -> None:
 _NOTIF_CHANNEL_LABELS = {
     "email": "📧 Email",
     "telegram": "✈️ Telegram",
+    "sms": "📱 SMS",
     "discord": "🎮 Discord",
     "slack": "💬 Slack",
 }
@@ -3641,6 +3649,41 @@ def show_settings() -> None:
         st.markdown("---")
         _telegram_finder_block(saved_telegram_chat_id, auto_save=True)
 
+    # SMS phone-number helper (only meaningful when SMS/Twilio is configured
+    # and a registered account is signed in — legacy user1 has no profile).
+    if "sms" in configured and _current_user():
+        st.markdown("---")
+        st.markdown(
+            "**📱 SMS alerts** — add your phone number (with country code) "
+            "and tick **SMS** in the delivery channels above to get your "
+            "digest by text too."
+        )
+        saved_phone = (_user_profile_settings.get("phone_number") or "").strip()
+        phone = st.text_input(
+            "Your phone number (E.164)",
+            value=saved_phone,
+            placeholder="+919876543210",
+            help="Include the country code — e.g. +91 for India.",
+        )
+        if phone.strip() and phone.strip() != saved_phone:
+            phone_resp = _api(
+                f"/users/{_current_user_id()}",
+                method="PUT",
+                json_data={"phone_number": phone.strip()},
+                timeout=15,
+            )
+            if phone_resp:
+                st.session_state["user"] = {
+                    **_current_user(),
+                    "phone_number": phone.strip(),
+                }
+                st.success(
+                    "✅ Phone number saved — SMS alerts will use it. "
+                    "Tick **SMS** in Delivery channels and Save."
+                )
+            else:
+                st.error("Couldn't save the phone number — API unreachable.")
+
     # Location
     st.markdown("---")
     st.markdown(
@@ -3656,7 +3699,7 @@ def show_settings() -> None:
     )
 
     # Channels to deliver alerts through.
-    chan_options = [c for c in ("email", "telegram") if c in configured]
+    chan_options = [c for c in ("email", "telegram", "sms") if c in configured]
     default_chans = [c for c in chan_options if c in saved_chans] or chan_options
     selected_chans = st.multiselect(
         "📤 Send alerts via",
