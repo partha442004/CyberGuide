@@ -4,7 +4,7 @@ Job API schemas.
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class JobBase(BaseModel):
@@ -44,6 +44,33 @@ class JobShareRequest(BaseModel):
     company: str | None = Field(None, min_length=1, max_length=200)
     location: str | None = Field(None, max_length=200)
     description: str | None = None
+
+
+class JobImportLinksRequest(BaseModel):
+    """Schema for bulk-importing multiple job links at once.
+
+    Accepts up to ``MAX_LINKS`` URLs (kept small so the whole batch fits
+    inside the platform's request timeout); each link is processed exactly
+    like a single ``/jobs/share`` call — title/company auto-detected from
+    the page, duplicates skipped. Results are reported per link so the UI
+    can show exactly which links saved, which were duplicates, and which
+    failed.
+    """
+
+    urls: list[str] = Field(..., min_length=1, max_length=8)
+
+    @field_validator("urls")
+    @classmethod
+    def _strip_and_validate(cls, v: list[str]) -> list[str]:
+        cleaned = [u.strip() for u in v if u and u.strip()]
+        if not cleaned:
+            raise ValueError("At least one valid URL is required.")
+        for u in cleaned:
+            if not u.startswith(("http://", "https://")):
+                raise ValueError(f"'{u[:40]}' is not a valid http(s) URL.")
+            if len(u) > 2000:
+                raise ValueError("URLs must be 2000 characters or fewer.")
+        return cleaned
 
 
 class JobUpdate(BaseModel):

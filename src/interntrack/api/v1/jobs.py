@@ -2,14 +2,17 @@
 Jobs API endpoints.
 """
 
+import asyncio
 import contextlib
 import re
+import time
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.api.schemas.job import (
     JobCreate,
+    JobImportLinksRequest,
     JobListResponse,
     JobResponse,
     JobSearchRequest,
@@ -581,24 +584,28 @@ async def _fetch_page_meta(url: str) -> dict:
         return {}
 
 
-@router.post("/share")
-async def share_job(
-    payload: JobShareRequest,
-    db: AsyncSession = Depends(get_db),
-):
-    """Save a job the user found anywhere on the web.
+async def _save_shared_job(
+    service: JobService,
+    url: str,
+    title: str | None = None,
+    company: str | None = None,
+    location: str | None = None,
+    description: str | None = None,
+) -> dict:
+    """Save one shared/imported job, auto-detecting fields from the page.
 
-    Paste any job link (LinkedIn post, careers page, job board) and it is
-    stored with ``source=manual`` so it shows up in the dashboard and in the
-    daily email/Telegram alerts like any other job. When title/company are not
-    supplied they are auto-detected from the page's OpenGraph meta tags.
+    Shared by the single ``/share`` endpoint and the bulk ``/import-links``
+    endpoint so a pasted link is always handled identically: the URL is
+    normalized (no duplicate links), title/company auto-detected from the
+    page's OpenGraph/JSON-LD meta when not supplied, and stored with
+    ``source=manual`` so it shows up in the dashboard and daily alerts like
+    any other job.
 
-    Returns ``duplicate: true`` with the existing job when the URL is already
-    saved (idempotent — safe to share the same link again).
+    Returns ``{"job", "duplicate", "message"}`` on success (``duplicate:
+    True`` when the URL was already saved — idempotent) or ``{"error"}``
+    when the title can't be detected. Never raises.
     """
-    service = JobService(db)
-
-    normalized_url = _normalize_share_url(payload.url)
+    normalized_url = _normalize_share_url(url)
     existing = await service.job_repo.get_by_url(normalized_url)
     if existing:
         return {
@@ -607,26 +614,23 @@ async def share_job(
             "message": "This job is already saved.",
         }
 
-    title = payload.title or ""
-    company = payload.company or ""
-    description = payload.description
-    location = payload.location
+    title = (title or "").strip()
+    company = (company or "").strip()
     if not title or not company:
         meta = await _fetch_page_meta(normalized_url)
-        title = title or (meta.get("title") or "")
+        title = title or (meta.get("title") or "").strip()
         # Prefer the hiring company from JSON-LD; og:site_name is the board.
         company = company or (meta.get("company") or meta.get("site_name") or "Unknown")
         description = description or meta.get("description")
         location = location or meta.get("location")
 
     if not title:
-        raise HTTPException(
-            status_code=400,
-            detail=(
+        return {
+            "error": (
                 "Couldn't auto-detect the job title from that link. "
                 "Please paste the job title as well."
             ),
-        )
+        }
 
     try:
         job = await service.create_job(
@@ -651,6 +655,91 @@ async def share_job(
         "job": job,
         "duplicate": False,
         "message": "Job saved! It will now appear in your dashboard and alerts.",
+    }
+
+
+@router.post("/share")
+async def share_job(
+    payload: JobShareRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Save a job the user found anywhere on the web.
+
+    Paste any job link (LinkedIn post, careers page, job board) and it is
+    stored with ``source=manual`` so it shows up in the dashboard and in the
+    daily email/Telegram alerts like any other job. When title/company are not
+    supplied they are auto-detected from the page's OpenGraph meta tags.
+
+    Returns ``duplicate: true`` with the existing job when the URL is already
+    saved (idempotent — safe to share the same link again).
+    """
+    service = JobService(db)
+    result = await _save_shared_job(
+        service,
+        payload.url,
+        payload.title,
+        payload.company,
+        payload.location,
+        payload.description,
+    )
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@router.post("/import-links")
+async def import_links(
+    payload: JobImportLinksRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Bulk-save up to 8 pasted job links in a single request.
+
+    Each link is processed exactly like a single ``/jobs/share`` call —
+    title/company auto-detected from the page, duplicates skipped. Links are
+    handled sequentially with a per-link deadline so one slow page can't
+    stall the whole batch inside the platform's request timeout; when the
+    overall time budget is exhausted the remaining links are reported as
+    failed and the partial results are returned.
+    """
+    service = JobService(db)
+    results: list[dict] = []
+    # Matches the discovery deadline so the whole batch stays well under the
+    # platform's 60s request kill (worst case here is budget + one 9s link).
+    started = time.monotonic()
+    for url in payload.urls:
+        if time.monotonic() - started > 40:
+            results.append(
+                {
+                    "url": url,
+                    "skipped": True,
+                    "error": "Batch time limit reached — remaining links were skipped.",
+                }
+            )
+            continue
+        try:
+            result = await asyncio.wait_for(_save_shared_job(service, url), timeout=9)
+        except TimeoutError:
+            # A cancelled write can leave the shared session with a pending
+            # transaction — roll back so the next link starts clean.
+            with contextlib.suppress(Exception):
+                await db.rollback()
+            result = {"error": "Page took too long to load — skipped."}
+        except Exception:
+            result = {"error": "Unexpected error while saving this link."}
+        result["url"] = url
+        results.append(result)
+
+    saved = sum(1 for r in results if not r.get("duplicate") and not r.get("error"))
+    duplicates = sum(1 for r in results if r.get("duplicate"))
+    skipped = sum(1 for r in results if r.get("skipped"))
+    failed = sum(1 for r in results if r.get("error") and not r.get("skipped"))
+    return {
+        "results": results,
+        "saved": saved,
+        "duplicates": duplicates,
+        "skipped": skipped,
+        "failed": failed,
+        "total": len(results),
     }
 
 

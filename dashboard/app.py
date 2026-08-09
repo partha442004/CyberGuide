@@ -2196,9 +2196,11 @@ def show_jobs() -> None:
         else:
             _render_saved_jobs_tab(jobs_data["jobs"])
 
-    # ------ Tab 3: Share a Job (paste any link) ------
+    # ------ Tab 3: Share / Import jobs (paste any link) ------
     with tab3:
         _share_job_form()
+        st.divider()
+        _bulk_import_form()
 
 
 def _render_saved_jobs_tab(jobs: list) -> None:
@@ -2449,6 +2451,81 @@ def _share_job_form() -> None:
             "💡 Tip: if auto-detection can't read a link, just paste the title "
             "and company too — that always works."
         )
+
+
+def _bulk_import_form() -> None:
+    """Bulk import: paste up to 8 job links at once; each saved like /share."""
+    st.markdown(
+        '<div class="section-title">📥 Import Multiple Links</div>'
+        '<div class="section-sub">Found a list of roles on LinkedIn, Naukri, '
+        "Internshala, a company page…? Paste up to 8 links (one per line) and "
+        "they're all saved in one go — perfect for sharing a batch with your "
+        "team or seeding a friend's digest.</div>",
+        unsafe_allow_html=True,
+    )
+    with st.form("bulk_import_form", clear_on_submit=True):
+        links_text = st.text_area(
+            "Job links (one per line, up to 8)",
+            placeholder=(
+                "https://www.linkedin.com/jobs/view/...\n"
+                "https://www.naukri.com/job-listings-...\n"
+                "https://internshala.com/job/detail/..."
+            ),
+            height=130,
+        )
+        submitted = st.form_submit_button("🚀 Import all", use_container_width=True)
+
+    if submitted:
+        urls = [
+            line.strip()
+            for line in (links_text or "").splitlines()
+            if line.strip().startswith(("http://", "https://"))
+        ]
+        if not urls:
+            st.error("Paste at least one job link (https://...) — one per line.")
+            return
+        urls = urls[:8]
+        with st.spinner(
+            f"Importing {len(urls)} link(s)... this can take up to a minute."
+        ):
+            resp = _api_raw(
+                "/jobs/import-links",
+                method="POST",
+                json_data={"urls": urls},
+                timeout=75,
+            )
+        if resp is None:
+            st.error("Import API unreachable. Is the API server running?")
+            return
+        if resp.status_code not in (200, 201):
+            st.error(
+                "Import failed — please try again or paste the links one at a time."
+            )
+            return
+        data = resp.json()
+        parts = [f"✅ **{data.get('saved', 0)} saved**"]
+        parts.append(f"ℹ️ {data.get('duplicates', 0)} duplicate(s)")
+        if data.get("skipped"):
+            parts.append(f"⏭️ {data.get('skipped', 0)} skipped (time limit)")
+        parts.append(f"❌ {data.get('failed', 0)} failed")
+        st.success(" · ".join(parts))
+        for r in data.get("results") or []:
+            job = r.get("job") or {}
+            url = str(r.get("url") or "")[:70]
+            if r.get("error"):
+                st.caption(f"❌ {escape(url)} — {escape(r['error'])}")
+            elif r.get("duplicate"):
+                st.caption(f"ℹ️ {escape(url)} — already saved")
+            else:
+                st.caption(
+                    f"✅ {escape(str(job.get('title') or 'Job'))} · "
+                    f"{escape(str(job.get('company') or 'Unknown'))}"
+                )
+        if data.get("failed"):
+            st.caption(
+                "💡 Links that failed can be saved one-by-one in the form above — "
+                "just paste the title manually if auto-detection can't read the page."
+            )
 
 
 # ---------------------------------------------------------------------------
