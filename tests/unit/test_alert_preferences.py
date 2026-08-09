@@ -46,6 +46,7 @@ class TestLoadAlertPreferences:
         row.slot_domains = None
         row.weekly_enabled = True
         row.instant_alerts = None
+        row.include_remote = None
         row.paused_until = None
 
         prefs = await _load_alert_preferences(_db_with_row(row))
@@ -58,6 +59,7 @@ class TestLoadAlertPreferences:
             "slot_domains": {},
             "weekly_enabled": True,
             "instant_alerts": True,
+            "include_remote": True,
             "paused_until": None,
         }
 
@@ -74,6 +76,7 @@ class TestLoadAlertPreferences:
         row.slot_domains = {"morning": ["security"]}
         row.weekly_enabled = False
         row.instant_alerts = True
+        row.include_remote = False
         row.paused_until = None
 
         prefs = await _load_alert_preferences(_db_with_row(row))
@@ -85,6 +88,7 @@ class TestLoadAlertPreferences:
             "last_alert_at": None,
             "slot_domains": {"morning": ["security"]},
             "instant_alerts": True,
+            "include_remote": False,
             "weekly_enabled": False,
             "paused_until": None,
         }
@@ -400,6 +404,8 @@ class TestPreferencesAPI:
             domains=["security"],
             min_match_score=None,
             since=None,
+            location="Bangalore",
+            include_remote=True,
         )
         # Preferred channels (email) used, not notify_all.
         mock_manager.notify.assert_awaited_once_with(
@@ -528,6 +534,8 @@ class TestPreferencesAPI:
             domains=["coding"],
             min_match_score=None,
             since=None,
+            location="Bangalore",
+            include_remote=True,
         )
         mock_manager.notify.assert_awaited_once_with(
             ["telegram"],
@@ -589,6 +597,8 @@ class TestPreferencesAPI:
             domains=None,
             min_match_score=85,
             since=None,
+            location="Bangalore",
+            include_remote=True,
         )
 
 
@@ -859,7 +869,8 @@ class TestAlertWindow:
             domains=["security"],
             min_match_score=None,
             since=None,
-            location=None,
+            location="Bangalore",
+            include_remote=True,
         )
         mock_manager.notify_all.assert_not_called()
         mock_manager.notify.assert_not_called()

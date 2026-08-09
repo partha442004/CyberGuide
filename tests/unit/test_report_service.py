@@ -226,7 +226,8 @@ class TestGenerateDailyReport:
 
     @pytest.mark.asyncio
     async def test_location_filter_keeps_only_user_city(self):
-        """A digest location keeps only that city, synonym-aware."""
+        """A digest location keeps only that city, synonym-aware, plus remote
+        when the user opted into remote work (include_remote default True)."""
         service = ReportService(MagicMock())
         service.job_repo = AsyncMock()
         service.job_repo.get_recent_jobs.return_value = [
@@ -253,18 +254,30 @@ class TestGenerateDailyReport:
         service.app_repo.get_applied_job_ids.return_value = set()
         service.job_repo.get_closing_soon.return_value = []
 
+        # Default: remote/WFH listings pass alongside the city.
         report = await service.generate_daily_report(location="Bengaluru")
 
         locs = sorted(str(j["location"]) for j in report["new_jobs"])
         assert locs == [
             "Bangalore, Karnataka, India",
             "Bengaluru, Karnataka, India",
+            "Remote",
         ]
-        assert report["summary"]["new_jobs"] == 2
+        assert report["summary"]["new_jobs"] == 3
+
+        # Opted out: remote jobs are dropped, only the city remains.
+        strict = await service.generate_daily_report(
+            location="Bengaluru",
+            include_remote=False,
+        )
+        assert sorted(str(j["location"]) for j in strict["new_jobs"]) == [
+            "Bangalore, Karnataka, India",
+            "Bengaluru, Karnataka, India",
+        ]
 
     @pytest.mark.asyncio
     async def test_location_filter_excludes_other_city(self):
-        """A Chennai digest never includes Bengaluru or Remote jobs."""
+        """A Chennai-only digest never includes Bengaluru or Remote jobs."""
         service = ReportService(MagicMock())
         service.job_repo = AsyncMock()
         service.job_repo.get_recent_jobs.return_value = [
@@ -278,7 +291,10 @@ class TestGenerateDailyReport:
         service.app_repo.get_applied_job_ids.return_value = set()
         service.job_repo.get_closing_soon.return_value = []
 
-        report = await service.generate_daily_report(location="Chennai")
+        report = await service.generate_daily_report(
+            location="Chennai",
+            include_remote=False,
+        )
 
         assert [str(j["location"]) for j in report["new_jobs"]] == [
             "Chennai, India",

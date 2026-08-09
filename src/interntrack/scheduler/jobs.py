@@ -78,6 +78,11 @@ async def _load_alert_preferences(
                 "slot_domains": slot_domains,
                 "weekly_enabled": weekly if isinstance(weekly, bool) else True,
                 "instant_alerts": instant if isinstance(instant, bool) else True,
+                "include_remote": (
+                    bool(getattr(pref, "include_remote", True))
+                    if getattr(pref, "include_remote", None) is not None
+                    else True
+                ),
                 "paused_until": getattr(pref, "paused_until", None),
             }
     except Exception:
@@ -236,6 +241,19 @@ async def _deliver_alert(
     # the digest must render the split with the same fallback — otherwise the
     # default user never sees the location split at all.
     user_location = (getattr(user, "location", None) or "").strip() or DEFAULT_LOCATION
+    # Remote / WFH / "anywhere" listings count as "your area" when the user
+    # opted in (include_remote default True). Loaded best-effort so a failed
+    # prefs read never breaks delivery.
+    include_remote = True
+    if user is not None:
+        try:
+            _prefs = await _load_alert_preferences(
+                session,
+                user_id=getattr(user, "id", "") or "",
+            )
+            include_remote = bool(_prefs.get("include_remote", True))
+        except Exception:  # noqa: BLE001, S110 - best-effort
+            pass
     # The weekly email closes with a team snapshot (members + your referrals).
     # A new dict (not mutation) so the caller's report stays untouched.
     if weekly:
@@ -272,6 +290,7 @@ async def _deliver_alert(
             title=title,
             user_id=user_id,
             user_location=user_location,
+            include_remote=include_remote,
         )
         if recipient:
             results.update(
@@ -283,7 +302,13 @@ async def _deliver_alert(
             results.update(await manager.notify(email_targets, html, subject=subject))
     if text_targets:
         message = await build_daily_report_message(
-            report, session, domains=domains, title=title, user_id=user_id
+            report,
+            session,
+            domains=domains,
+            title=title,
+            user_id=user_id,
+            user_location=user_location,
+            include_remote=include_remote,
         )
         if recipient:
             results.update(
@@ -301,6 +326,7 @@ async def _deliver_alert(
             weekly=weekly,
             user_id=user_id,
             user_location=user_location,
+            include_remote=include_remote,
         )
         # Every chunk must deliver for the send to count as delivered.
         telegram_ok = True
@@ -356,6 +382,7 @@ async def _send_instant_alerts(session, saved_jobs: list) -> dict:
             resume_skills = await _latest_resume_skill_names(session, user_id=user_id)
             domains = prefs.get("domains") or []
             min_score = prefs.get("min_match_score")
+            include_remote = bool(prefs.get("include_remote", True))
             loc_lower = (getattr(user, "location", None) or "").strip().lower()
             matches = []
             for job in saved_jobs:
@@ -365,7 +392,11 @@ async def _send_instant_alerts(session, saved_jobs: list) -> dict:
                 if domains and job_domain not in domains:
                     continue
                 job_loc = str(getattr(job, "location", None) or "").lower()
-                if loc_lower and not _location_matches(job_loc, loc_lower):
+                if loc_lower and not _location_allows(
+                    job_loc,
+                    loc_lower,
+                    include_remote,
+                ):
                     continue
                 job_dict = {
                     "id": str(getattr(job, "id", "") or ""),
@@ -495,14 +526,20 @@ async def _send_alert_for(session, user_id: str, prefs: dict, user=None) -> None
     """
     domains = prefs.get("domains") or None
     # Each user's digest is scoped to *their* city (synonym-aware), so two
-    # accounts on the same domain never see each other's locations.
-    user_location = (getattr(user, "location", None) or "").strip() or None
+    # accounts on the same domain never see each other's locations. The
+    # legacy default user (no profile) falls back to DEFAULT_LOCATION so
+    # their digest is city-scoped too, not every-city.
+    user_location = (
+        (getattr(user, "location", None) or "").strip() or DEFAULT_LOCATION or None
+    )
+    include_remote = bool(prefs.get("include_remote", True))
     service = ReportService(session)
     report = await service.generate_daily_report(
         domains=domains,
         min_match_score=prefs.get("min_match_score"),
         since=prefs.get("last_alert_at"),
         location=user_location,
+        include_remote=include_remote,
     )
 
     await _mark_alert_sent(session, user_id)
@@ -795,6 +832,7 @@ async def _score_and_group_jobs(
 def _job_of_day(
     sections: list[tuple[str, list[tuple[float | None, dict]]]],
     user_location: str | None = None,
+    include_remote: bool = True,
 ) -> tuple[float | None, dict] | None:
     """The day's top pick: the highest resume match across all sections.
 
@@ -824,9 +862,10 @@ def _job_of_day(
         local = [
             item
             for item in all_items
-            if _location_matches(
+            if _location_allows(
                 (item[1].get("location") or "").lower(),
                 loc_lower,
+                include_remote=include_remote,
             )
         ]
         if local:
@@ -841,6 +880,7 @@ async def build_daily_report_message(
     title: str = "📊 Daily Report",
     user_id: str | None = None,
     user_location: str | None = None,
+    include_remote: bool = True,
 ) -> str:
     """Rich daily-report notification: summary counts plus the recent jobs
     grouped by domain (security / coding / data / …), each job carrying its
@@ -855,7 +895,7 @@ async def build_daily_report_message(
     sections = await _score_and_group_jobs(report, session, domains, user_id=user_id)
 
     # 🔥 Job of the day — the user's best match, right at the top.
-    job_of_day = _job_of_day(sections, user_location)
+    job_of_day = _job_of_day(sections, user_location, include_remote=include_remote)
     if job_of_day is not None:
         jotd_score, jotd_job = job_of_day
         jotd_title = (jotd_job.get("title") or "Untitled")[:90]
@@ -905,9 +945,10 @@ async def build_daily_report_message(
             items = [
                 (score, job)
                 for score, job in items
-                if _location_matches(
+                if _location_allows(
                     (job.get("location") or "").lower(),
                     loc_lower,
+                    include_remote=include_remote,
                 )
             ]
             if not items:
@@ -944,6 +985,7 @@ async def build_alert_chunks(
     jobs_per_chunk: int = 4,
     user_id: str | None = None,
     user_location: str | None = None,
+    include_remote: bool = True,
 ) -> list[tuple[str, list[tuple[str, str]]]]:
     """Split the alert digest into Telegram-sized chunks with Apply buttons.
 
@@ -969,7 +1011,7 @@ async def build_alert_chunks(
             entry = (domain, score, job)
             if loc_lower:
                 job_loc = (job.get("location") or "").lower()
-                if _location_matches(job_loc, loc_lower):
+                if _location_allows(job_loc, loc_lower, include_remote=include_remote):
                     here_flat.append(entry)
                 else:
                     there_flat.append(entry)
@@ -1199,6 +1241,7 @@ async def build_daily_report_html(
     title: str = "📊 Daily Report",
     user_id: str | None = None,
     user_location: str | None = None,
+    include_remote: bool = True,
 ) -> str:
     """Styled HTML digest for email delivery.
 
@@ -1224,7 +1267,7 @@ async def build_daily_report_html(
             there = []
             for score, job in items:
                 job_loc = (job.get("location") or "").lower()
-                if _location_matches(job_loc, loc_lower):
+                if _location_allows(job_loc, loc_lower, include_remote=include_remote):
                     here.append((score, job))
                 else:
                     there.append((score, job))
@@ -1252,7 +1295,7 @@ async def build_daily_report_html(
     ]
 
     # 🔥 Job of the day — the user's best match, highlighted as a card.
-    job_of_day = _job_of_day(sections, user_location)
+    job_of_day = _job_of_day(sections, user_location, include_remote=include_remote)
     if job_of_day is not None:
         jotd_score, jotd_job = job_of_day
         jotd_title = _esc(jotd_job.get("title") or "Untitled")
@@ -1459,6 +1502,13 @@ def _location_matches(job_loc, user_loc):
     from interntrack.utils.helpers import location_matches
 
     return location_matches(job_loc, user_loc)
+
+
+def _location_allows(job_loc, user_loc, include_remote: bool = True):
+    """City match, plus remote/WFH when opted in (delegates to helpers)."""
+    from interntrack.utils.helpers import location_allows
+
+    return location_allows(job_loc, user_loc, include_remote=include_remote)
 
 
 def _location_breakdown_table(sections, other_sections):

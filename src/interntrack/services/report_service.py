@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.repositories.application_repository import ApplicationRepository
 from interntrack.repositories.job_repository import JobRepository
-from interntrack.utils.helpers import location_matches, to_naive_utc, utcnow
+from interntrack.utils.helpers import location_allows, to_naive_utc, utcnow
 
 if TYPE_CHECKING:
     from interntrack.domain.models import Job
@@ -271,6 +271,7 @@ class ReportService:
         min_match_score: int | None = None,
         since: datetime | None = None,
         location: str | None = None,
+        include_remote: bool = True,
         user_id: str | None = None,
     ) -> dict[str, Any]:
         """Generate daily report.
@@ -286,7 +287,9 @@ class ReportService:
         message can drop jobs whose resume match % is below the threshold.
         ``since`` (naive UTC) restricts jobs to those created after the
         previous alert so the three daily sends never repeat a listing.
-        ``location`` optionally filters jobs by location (e.g., "Bangalore").
+        ``location`` optionally filters jobs by location (e.g., "Bangalore");
+        with ``include_remote`` (default True) remote / WFH / "anywhere"
+        listings also pass, so a Bangalore user gets fully-remote roles too.
         ``user_id`` scopes the follow-up reminders to one account.
         """
         recent_jobs = await self.job_repo.get_recent_jobs(days=7)
@@ -332,14 +335,16 @@ class ReportService:
             jobs = [job for job in jobs if job["domain"] in domains]
         if location:
             # Filter by location (fuzzy, synonym-aware: a "Bengaluru"
-            # preference matches "Bangalore, Karnataka" postings too).
+            # preference matches "Bangalore, Karnataka" postings too, and
+            # remote/WFH listings pass when include_remote is on).
             location_lower = location.lower()
             jobs = [
                 job
                 for job in jobs
-                if location_matches(
+                if location_allows(
                     str(job.get("location") or "").lower(),
                     location_lower,
+                    include_remote=include_remote,
                 )
             ]
 

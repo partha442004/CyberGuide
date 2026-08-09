@@ -83,6 +83,9 @@ class AlertPreferencesResponse(BaseModel):
     slot_domains: dict | None = None
     weekly_enabled: bool = True
     instant_alerts: bool = True
+    # Whether remote / WFH / "anywhere" listings count as matching the
+    # user's preferred location (see AlertPreferences.include_remote).
+    include_remote: bool = True
     # Vacation mode: when set (naive UTC), all alerts are suppressed until
     # this timestamp. ``None`` means alerts are live.
     paused_until: datetime | None = None
@@ -100,6 +103,7 @@ class AlertPreferencesUpdate(BaseModel):
     slot_domains: dict | None = None
     weekly_enabled: bool | None = None
     instant_alerts: bool | None = None
+    include_remote: bool | None = None
     # Vacation mode timestamp (naive UTC) — set to a future time to pause
     # all alerts until then.
     paused_until: datetime | None = None
