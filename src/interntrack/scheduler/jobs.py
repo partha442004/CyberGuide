@@ -2,6 +2,7 @@
 Scheduled background jobs.
 """
 
+import re
 from datetime import UTC, datetime
 
 from interntrack.database.session import get_db_session
@@ -788,16 +789,22 @@ def _job_lines(score, job: dict) -> list[str]:
     return lines
 
 
+_HTML_TAG_RE = re.compile(r"<[^>]*>")
+
+
 def _job_desc_snippet(job: dict, limit: int = 180) -> str:
     """One-line job description snippet, or '' when the posting has none.
 
-    Whitespace is collapsed and long descriptions are cut at a word-ish
-    boundary with an ellipsis, so a multi-paragraph posting never bloats a
-    Telegram message or email card.
+    Whitespace is collapsed, leftover HTML tags from sources that keep raw
+    markup (greenhouse / notion boards, RSS) are stripped, and long
+    descriptions are cut at a word-ish boundary with an ellipsis — so a
+    multi-paragraph posting never bloats a Telegram message or email card
+    with raw ``<p>`` / ``<strong>`` noise.
     """
     desc = str(job.get("description") or "").strip()
     if not desc:
         return ""
+    desc = _HTML_TAG_RE.sub(" ", desc)
     desc = " ".join(desc.split())
     if len(desc) <= limit:
         return desc
