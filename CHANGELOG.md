@@ -6,6 +6,30 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **📬 Job-level alert history — see exactly what was sent.** The
+  dashboard's "Your alert history" timeline used to record only counts
+  (subject / channels / job count), so there was no way to answer "did the
+  mail I got match my domain and location?". ``NotificationHistory`` now
+  stores a ``jobs`` JSON column (auto-added to the live DB by the column
+  sync) with the compact job list each digest actually delivered — title,
+  company, location, apply URL, domain and per-user match % — populated by
+  ``_send_alert_for`` after delivery (built defensively: a scoring hiccup
+  can never drop the history row after the mail was already sent) and
+  exposed by ``GET /notifications/preferences/{user_id}/history``. The My
+  Matches page renders each send as an expandable entry with per-job
+  details and View buttons.
+- **👀 Digest preview — "what would I get next?" (no send).** New
+  ``GET /notifications/preferences/{user_id}/preview`` runs the exact same
+  pipeline as the scheduled digest (same domains, location scope,
+  include-remote setting, min match % and no-duplicates window) but sends
+  nothing, advances no window and records no history — it returns the
+  scored, match-sorted job list that the next email/Telegram would carry.
+  The Settings page gains a **"🔎 Show digest preview"** button rendering
+  the lookahead inline with scope caption and View links, so you can
+  verify your filters before the 08:00 / 13:00 / 19:00 IST slots fire.
+  4 new tests (history jobs round-trip, record-with-jobs, preview
+  no-send / match filtering).
+
 - **📱 SMS alerts via Twilio (opt-in per user).** New ``sms`` notification
   channel: ``SmsChannel`` posts to the Twilio Messages API with httpx
   (no SDK — works from Vercel serverless), truncates bodies to one SMS,
