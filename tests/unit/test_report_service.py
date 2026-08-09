@@ -138,6 +138,7 @@ class _MockJob:
         company="Acme",
         location="Remote",
         url="https://x",
+        description=None,
         expires_at=None,
         created_at=None,
         posted_at=None,
@@ -149,6 +150,7 @@ class _MockJob:
         self.company = company
         self.location = location
         self.url = url
+        self.description = description
         self.expires_at = expires_at
         self.created_at = created_at
         self.posted_at = posted_at
@@ -223,6 +225,30 @@ class TestGenerateDailyReport:
         assert old["posted_at"] is not None
         assert closed["age_days"] == 0
         assert closed["is_active"] is False
+
+    @pytest.mark.asyncio
+    async def test_jobs_carry_description_field(self):
+        """Each new_jobs entry exposes the posting's description so digests
+        can render what the role expects (responsibilities / requirements)."""
+        service = ReportService(MagicMock())
+        service.job_repo = AsyncMock()
+        service.job_repo.get_recent_jobs.return_value = [
+            _MockJob(
+                title="SOC Analyst",
+                description="Monitor SIEM alerts, triage incidents, ...",
+            ),
+        ]
+        service.app_repo = AsyncMock()
+        service.app_repo.get_recent_applications.return_value = []
+        service.app_repo.get_status_counts.return_value = {}
+        service.app_repo.get_applied_job_ids.return_value = set()
+        service.job_repo.get_closing_soon.return_value = []
+
+        report = await service.generate_daily_report()
+
+        assert report["new_jobs"][0]["description"] == (
+            "Monitor SIEM alerts, triage incidents, ..."
+        )
 
     @pytest.mark.asyncio
     async def test_location_filter_keeps_only_user_city(self):

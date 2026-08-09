@@ -311,6 +311,7 @@ class ReportService:
                 "company": job.company,
                 "location": job.location,
                 "url": job.url,
+                "description": getattr(job, "description", None),
                 "tags": list(getattr(job, "tags", None) or []),
                 "required_skills": list(getattr(job, "required_skills", None) or []),
                 "preferred_skills": list(getattr(job, "preferred_skills", None) or []),

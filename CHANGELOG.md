@@ -6,6 +6,20 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **📝 Job descriptions now shipped in every alert digest.** The daily
+  email and Telegram alerts previously carried title / company / salary /
+  match % / apply link but dropped what the role actually expects. The
+  report builder now carries each job's `description` through, and the
+  digests render it with proper alignment: a `📝` snippet line under the
+  headline in the plain-text / Telegram message (collapsed whitespace,
+  truncated at 180 chars with `…`), a muted highlighted block with the
+  section accent on the left in the email card, and the same treatment in
+  the 🔥 Job-of-the-day card and the instant Telegram match pings.
+  Descriptions are HTML-escaped everywhere — Telegram sends with HTML
+  parse mode, so an unescaped scraped description could fail the whole
+  send with "can't parse entities". 9 new tests cover include / skip /
+  truncation / escaping paths.
+
 - **🆕 Apna.co scraper — new India-first job board source.** Apna
   (88k+ live vacancies) is server-rendered by Next.js: job cards live in a
   double-escaped `self.__next_f.push` flight payload (no public JSON API, no
