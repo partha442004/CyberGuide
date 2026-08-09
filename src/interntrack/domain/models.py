@@ -448,6 +448,10 @@ class AlertPreferences(Base, TimestampMixin):
     # Whether a newly discovered high-match job pings the user on Telegram
     # immediately instead of waiting for the next daily slot.
     instant_alerts = Column(Boolean, default=True)
+    # Whether remote / WFH / "anywhere" listings count as matching the
+    # user's preferred location. On, a Bangalore user also gets fully-remote
+    # security roles; off means strictly the saved city only.
+    include_remote = Column(Boolean, default=True)
     # Vacation mode: when set (naive UTC), ALL alerts (daily, weekly and
     # instant) are suppressed until this timestamp. Auto-added to existing
     # live tables by init_db's ``_sync_missing_columns`` step.

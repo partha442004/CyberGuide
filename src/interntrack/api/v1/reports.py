@@ -219,6 +219,7 @@ async def get_daily_report(
     contains before it's delivered.
     """
     from interntrack.scheduler.jobs import (
+        DEFAULT_LOCATION,
         DEFAULT_SLOT_DOMAINS,
         _alerts_paused,
         _mark_alert_sent,
@@ -239,11 +240,21 @@ async def get_daily_report(
                 domains = slot_domains[slot]
             elif slot in DEFAULT_SLOT_DOMAINS:
                 domains = DEFAULT_SLOT_DOMAINS[slot]
+        # Each target's digest is scoped to *their* city (legacy default
+        # user falls back to DEFAULT_LOCATION) plus remote/WFH when they
+        # opted in — so a Bangalore user never gets every-city listings.
+        user = target.get("user")
+        user_location = (
+            (getattr(user, "location", None) or "").strip() or DEFAULT_LOCATION or None
+        )
+        include_remote = bool(prefs.get("include_remote", True))
         service = ReportService(db)
         report = await service.generate_daily_report(
             domains=domains,
             min_match_score=prefs.get("min_match_score"),
             since=prefs.get("last_alert_at"),
+            location=user_location,
+            include_remote=include_remote,
             user_id=target["user_id"],
         )
 

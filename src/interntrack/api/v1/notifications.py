@@ -18,6 +18,7 @@ from interntrack.scheduler.jobs import (
     ALERT_SLOTS as _ALERT_SLOTS,
 )
 from interntrack.scheduler.jobs import (
+    DEFAULT_LOCATION,
     _load_alert_preferences,
     _mark_alert_sent,
     _record_alert_history,
@@ -232,6 +233,7 @@ async def get_alert_preferences(
         slot_domains=prefs.get("slot_domains") or {},
         weekly_enabled=prefs.get("weekly_enabled", True),
         instant_alerts=prefs.get("instant_alerts", True),
+        include_remote=prefs.get("include_remote", True),
         paused_until=prefs.get("paused_until"),
     )
 
@@ -276,6 +278,8 @@ async def update_alert_preferences(
         pref.weekly_enabled = update.weekly_enabled  # type: ignore[assignment]
     if update.instant_alerts is not None:
         pref.instant_alerts = update.instant_alerts  # type: ignore[assignment]
+    if update.include_remote is not None:
+        pref.include_remote = update.include_remote  # type: ignore[assignment]
     if update.resume_alerts is True:
         pref.paused_until = None  # type: ignore[assignment]
     elif update.paused_until is not None:
@@ -296,6 +300,9 @@ async def update_alert_preferences(
         ),
         instant_alerts=(
             bool(pref.instant_alerts) if pref.instant_alerts is not None else True
+        ),
+        include_remote=(
+            bool(pref.include_remote) if pref.include_remote is not None else True
         ),
         paused_until=pref.paused_until,
     )
@@ -332,20 +339,26 @@ async def send_alert_now(
             )
 
     domains = prefs.get("domains") or None
+    # Route the send to the user's own email / Telegram when they have an
+    # account; the legacy path (no account) uses the shared configured channels.
+    user = await _user_profile(db, user_id)
+    user_location = (
+        (getattr(user, "location", None) or "").strip() or DEFAULT_LOCATION or None
+    )
+    include_remote = bool(prefs.get("include_remote", True))
     service = ReportService(db)
     report = await service.generate_daily_report(
         domains=domains,
         min_match_score=prefs.get("min_match_score"),
         since=prefs.get("last_alert_at"),
+        location=user_location,
+        include_remote=include_remote,
     )
     manager = NotificationManager(db)
     channels = prefs.get("channels") or None
     subject = "InternTrack Daily Alert"
     if domains:
         subject += f" ({', '.join(domains)})"
-    # Route the send to the user's own email / Telegram when they have an
-    # account; the legacy path (no account) uses the shared configured channels.
-    user = await _user_profile(db, user_id)
     results = await _deliver_alert(
         manager,
         channels,

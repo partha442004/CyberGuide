@@ -4,6 +4,26 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **📍 Per-user location scoping now includes remote/WFH (Bangalore +
+  remote for you).** The daily email/Telegram digest for the legacy
+  `user1` default previously had NO location filter at all (no profile
+  row), so the mail included security jobs from every city — only the
+  display split said "Bangalore". It now filters to the user's city
+  **plus remote/WFH/"anywhere" listings**: `_send_alert_for`,
+  `get_daily_report` and `send_alert_now` all pass
+  `location=DEFAULT_LOCATION` + `include_remote=True` into
+  `generate_daily_report`, and the digest builders / instant alerts
+  treat remote roles as "your area" so a fully-remote security job
+  lands in your digest. A Chennai-only friend (registered account,
+  `include_remote=False`) gets strictly Chennai jobs, nothing else.
+  New shared `utils.helpers.location_allows()` / `is_remote_location()`
+  (remote, work from home, wfh, anywhere, virtual, telecommute,
+  home-based, hybrid-remote markers) and an `AlertPreferences.include_remote`
+  column (auto-synced to the live DB) + GET/PUT API field. 10 new
+  tests — 2488 total.
+
 ### Fixed
 
 - **Discovery keywords no longer carry the city** — queries like

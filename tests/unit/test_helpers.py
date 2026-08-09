@@ -280,3 +280,72 @@ class TestLocationMatches:
 
         assert not location_matches("", "bangalore")
         assert not location_matches("bangalore", "")
+
+
+class TestIsRemoteLocation:
+    """Remote / WFH / "anywhere" detection for the location gate."""
+
+    def test_remote_markers_detected(self):
+        from interntrack.utils.helpers import is_remote_location
+
+        assert is_remote_location("Remote")
+        assert is_remote_location("Work from home")
+        assert is_remote_location("WFH")
+        assert is_remote_location("Anywhere in India")
+        assert is_remote_location("Virtual / Remote")
+        assert is_remote_location("Telecommute")
+        assert is_remote_location("Home-based")
+
+    def test_city_only_is_not_remote(self):
+        from interntrack.utils.helpers import is_remote_location
+
+        assert not is_remote_location("Bangalore, Karnataka, India")
+        assert not is_remote_location("Chennai, Tamil Nadu, India")
+
+    def test_plain_hybrid_is_not_remote(self):
+        """Hybrid alone still means office presence; explicit remote wins."""
+        from interntrack.utils.helpers import is_remote_location
+
+        assert not is_remote_location("Hybrid")
+        assert is_remote_location("Hybrid - Remote")
+
+    def test_empty_never_remote(self):
+        from interntrack.utils.helpers import is_remote_location
+
+        assert not is_remote_location("")
+        assert not is_remote_location(None)
+
+
+class TestLocationAllows:
+    """City match + optional remote for the per-user location gate."""
+
+    def test_city_match_passes_regardless_of_remote_flag(self):
+        from interntrack.utils.helpers import location_allows
+
+        assert location_allows("bangalore, karnataka", "bangalore")
+        assert location_allows("bangalore, karnataka", "bangalore", False)
+
+    def test_remote_passes_when_included(self):
+        from interntrack.utils.helpers import location_allows
+
+        assert location_allows("remote", "bangalore")
+        assert location_allows("work from home", "bangalore")
+
+    def test_remote_blocked_when_not_included(self):
+        """A Chennai-only user (include_remote=False) never gets remote jobs."""
+        from interntrack.utils.helpers import location_allows
+
+        assert not location_allows("remote", "chennai", False)
+        assert not location_allows("work from home", "chennai", False)
+
+    def test_wrong_city_never_passes(self):
+        from interntrack.utils.helpers import location_allows
+
+        assert not location_allows("mumbai, maharashtra", "chennai")
+        assert not location_allows("mumbai, maharashtra", "chennai", False)
+
+    def test_empty_never_passes(self):
+        from interntrack.utils.helpers import location_allows
+
+        assert not location_allows("", "bangalore")
+        assert not location_allows("bangalore", "")

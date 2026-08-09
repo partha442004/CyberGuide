@@ -338,8 +338,12 @@ class TestSendAlertForLocation:
 
     @pytest.mark.asyncio
     async def test_no_user_no_location_filter(self):
-        """Legacy user1 path (no profile) keeps unfiltered behavior."""
-        from interntrack.scheduler.jobs import _send_alert_for
+        """Legacy user1 path (no profile) falls back to DEFAULT_LOCATION.
+
+        The default user has no profile row, so their digest is scoped to
+        the shared default city (Bangalore) + remote/WFH, never every-city.
+        """
+        from interntrack.scheduler.jobs import DEFAULT_LOCATION, _send_alert_for
 
         prefs = {"domains": None, "channels": None, "min_match_score": None}
         mock_session = AsyncMock()
@@ -364,5 +368,10 @@ class TestSendAlertForLocation:
             await _send_alert_for(mock_session, "user1", prefs, None)
 
         assert (
-            mock_service.generate_daily_report.call_args.kwargs.get("location") is None
+            mock_service.generate_daily_report.call_args.kwargs.get("location")
+            == DEFAULT_LOCATION
+        )
+        assert (
+            mock_service.generate_daily_report.call_args.kwargs.get("include_remote")
+            is True
         )

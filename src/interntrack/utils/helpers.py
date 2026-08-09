@@ -67,6 +67,52 @@ def _alt_in(alt: str, job_loc: str) -> bool:
     return bool(re.search(rf"(?<![a-z0-9]){re.escape(alt)}(?![a-z0-9])", job_loc))
 
 
+# Location substrings that mean the role can be done from anywhere. Used by
+# :func:`is_remote_location` so a user who opts into remote work gets WFH /
+# fully-remote / "anywhere" listings alongside their preferred city instead
+# of them being silently dropped by the city-only filter.
+_REMOTE_MARKERS = (
+    "remote",
+    "work from home",
+    "wfh",
+    "anywhere",
+    "virtual",
+    "telecommute",
+    "home based",
+    "home-based",
+    "hybrid - remote",
+    "remote - hybrid",
+)
+
+
+def is_remote_location(job_loc: str) -> bool:
+    """True when a job's location string means remote / work-from-home work.
+
+    Case-insensitive substring match against a fixed marker list ("remote",
+    "work from home", "wfh", "anywhere", "virtual", "telecommute", ...).
+    "Hybrid" on its own is NOT remote (the employer still wants you in the
+    office some days), but explicitly "remote"-titled hybrid postings are.
+    """
+    if not job_loc:
+        return False
+    lower = job_loc.lower()
+    return any(marker in lower for marker in _REMOTE_MARKERS)
+
+
+def location_allows(job_loc: str, user_loc: str, include_remote: bool = True) -> bool:
+    """Whether a job's location fits a user's preferred city (+ optional remote).
+
+    Single source of truth for the per-user location gate shared by the
+    daily digest, the instant alerts and the report filter. ``user_loc`` is
+    the user's preferred city (lowercased); ``include_remote`` adds remote /
+    WFH / anywhere listings on top of the city match, so a Bangalore user
+    who opts in also receives fully-remote security roles.
+    """
+    if location_matches(job_loc, user_loc):
+        return True
+    return bool(include_remote and is_remote_location(job_loc))
+
+
 def job_urgency(posted_at, first_seen_at=None, is_active=True):
     """Compute job urgency badge based on age.
 
