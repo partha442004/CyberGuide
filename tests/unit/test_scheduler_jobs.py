@@ -107,8 +107,25 @@ class TestJobHtmlCard:
         )
 
         assert "<script>" not in card
-        assert "&lt;script&gt;" in card
+        assert "&lt;script&gt;" not in card  # tag stripped, not shown raw
+        assert "alert(&#x27;xss&#x27;)" in card  # quotes escaped too
         assert "Oversee security" in card
+
+    def test_snippet_strips_html_tags(self):
+        """Raw markup from greenhouse/notion/RSS sources never leaks into
+        the digest snippet."""
+        from interntrack.scheduler.jobs import _job_desc_snippet
+
+        raw = (
+            "<p><strong>Headquarters:</strong> Bengaluru</p>"
+            "<div>Monitor <b>SIEM</b> alerts</div>"
+        )
+        snippet = _job_desc_snippet({"description": raw})
+
+        assert "<" not in snippet
+        assert ">" not in snippet
+        assert "Headquarters:" in snippet
+        assert "SIEM" in snippet
 
 
 class TestBuildDailyReportMessage:
@@ -180,8 +197,9 @@ class TestBuildDailyReportMessage:
 
     @pytest.mark.asyncio
     async def test_message_escapes_description_html(self):
-        """Telegram sends with HTML parse mode, so description markup must
-        be escaped or the whole digest send can fail (can't parse entities)."""
+        """Telegram sends with HTML parse mode: leftover tags are stripped
+        and any remaining & is escaped, or the whole digest send can fail
+        (can't parse entities)."""
         from interntrack.scheduler.jobs import build_daily_report_message
 
         report = {
@@ -202,8 +220,9 @@ class TestBuildDailyReportMessage:
         message = await build_daily_report_message(report, None)
 
         assert "<script>" not in message
-        assert "&lt;script&gt;" in message
-        assert "&amp;" in message
+        assert "&lt;script&gt;" not in message  # tag stripped, not shown raw
+        assert "alert(&#x27;x&#x27;)" in message  # quotes escaped too
+        assert "&amp;" in message  # stray & still escaped
 
     @pytest.mark.asyncio
     async def test_message_skips_description_when_absent(self):
