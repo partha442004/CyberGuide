@@ -14,6 +14,15 @@ All notable changes to the InternTrack project will be documented in this file.
   `search_engine` source (auto-coerced to `JobSource.SEARCH_ENGINE`).
   Registered in the scraper registry + discovery sources; new
   `POST /api/v1/jobs/enrich` endpoint triggers the enrichment sweep.
+  **Quality gate:** the scraper now rejects board search/listing pages
+  (linkedin `/jobs/<title>-jobs-<city>`, naukri `...-jobs-in-<city>`,
+  indeed `/q-...jobs.html`, glassdoor `...SRCH_...`, internshala
+  `/internships/...`, cutshort `/companies/` + `/salary/`, wellfound
+  `/startups/l/` + `/role/l/`), marketing/help/app subdomains
+  (`help.`/`support.`/`app.`/`hire.`/`developers.`…) and bare host
+  roots; listing-shaped titles ("X jobs | Site", "N Results for …") are
+  dropped too. Per-site queries (cutshort, wellfound, foundit/timesjobs/
+  hirect) surface real postings that the generic query misses.
 - **AI skill extraction from job descriptions.** The job model now has
   `required_skills` / `preferred_skills` JSON columns (auto-added to live
   tables by the column sync). `auto_tag_job` derives both from the
