@@ -1633,6 +1633,196 @@ def show_account() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Page: Team & Users (admin onboarding — add friends with role + location)
+# ---------------------------------------------------------------------------
+
+
+def show_team() -> None:
+    """Admin page to onboard new members with their own role + city.
+
+    Every account gets personalized daily alerts: the admin picks the
+    friend's categories (role/domain) and location, the API auto-enables
+    alerts, and the access token shown once lets the friend log in. Also
+    lists the whole team with per-member alert toggles and removal.
+    """
+    st.header("👥 Team & Users")
+    st.markdown(
+        "Add a friend and they'll get **their own daily alerts** in *their* "
+        "role + city — sent to *their* email / Telegram, never mixed with yours. "
+        "You pick the categories (e.g. Frontend, Cybersecurity) and the location "
+        "(e.g. Chennai); they just log in with the token you share."
+    )
+
+    # ── Onboard a new member ─────────────────────────────────────────
+    st.subheader("➕ Add a new member")
+    with st.form("admin_add_user_form"):
+        c1, c2 = st.columns(2)
+        with c1:
+            name = st.text_input("Full name *", key="team_name")
+        with c2:
+            email = st.text_input("Email *", key="team_email")
+        c3, c4 = st.columns(2)
+        with c3:
+            location = st.text_input(
+                "Location *",
+                key="team_location",
+                placeholder="e.g. Chennai",
+                help="Their digest is scoped to this city — your alerts stay separate.",
+            )
+        with c4:
+            experience = st.selectbox(
+                "Experience level",
+                ["", "fresher", "intern", "junior", "senior"],
+                format_func=lambda v: {
+                    "": "Select...",
+                    "fresher": "🎓 Fresher",
+                    "intern": "🧪 Intern",
+                    "junior": "🚀 Junior",
+                    "senior": "💼 Senior",
+                }.get(v, v),
+                key="team_exp",
+            )
+        domains = _category_picker_multi(
+            "🏷 Their role / categories",
+            ["security"],
+        )
+        skills = st.text_input(
+            "Skills (comma-separated, optional)",
+            key="team_skills",
+            placeholder="e.g. react, redux, typescript",
+        )
+        c5, c6 = st.columns(2)
+        with c5:
+            telegram_chat_id = st.text_input(
+                "Telegram chat ID (optional)",
+                key="team_tg",
+                help="Alerts also reach their Telegram — ask them to message the "
+                "bot once and paste the chat ID here.",
+            )
+        with c6:
+            phone_number = st.text_input(
+                "Phone for SMS (optional)",
+                key="team_phone",
+                placeholder="+919876543210",
+            )
+        submitted = st.form_submit_button(
+            "🚀 Create account + turn on alerts", type="primary"
+        )
+
+    if submitted:
+        if not name.strip() or "@" not in email or not location.strip():
+            st.error("Please fill in the name, a valid email and the location.")
+        else:
+            payload = {
+                "name": name.strip(),
+                "email": email.strip(),
+                "location": location.strip(),
+                "experience_level": experience or None,
+                "telegram_chat_id": telegram_chat_id.strip() or None,
+                "phone_number": phone_number.strip() or None,
+                "domains": [] if "all" in domains else domains,
+                "skills": [s.strip() for s in skills.split(",") if s.strip()],
+                "referred_by": (_current_user() or {}).get("email"),
+            }
+            resp = _api_raw(
+                "/users/register", method="POST", json_data=payload, timeout=30
+            )
+            if resp is None:
+                st.error("Could not reach the API — is it running?")
+            elif resp.status_code in (200, 201):
+                profile = resp.json()
+                st.success(
+                    f"✅ {profile.get('name')} is on the platform — personalized "
+                    "alerts are ON."
+                )
+                st.markdown(
+                    "**🔑 Share this token with them** (they log in with it — "
+                    "it is shown only once):"
+                )
+                st.code(profile.get("access_token", ""), language=None)
+                domain_txt = ", ".join(
+                    _DOMAIN_LABELS.get(d, d) for d in profile.get("domains") or []
+                )
+                st.caption(
+                    f"📍 {profile.get('location')} · 🏷 {domain_txt or 'All categories'} · "
+                    "the daily digest goes out at 8:00 / 13:00 / 19:00 IST."
+                )
+            else:
+                try:
+                    detail = resp.json().get("detail", resp.text)
+                except Exception:
+                    detail = resp.text
+                st.error(f"Could not create the account: {detail}")
+
+    # ── Team directory with alert toggles ────────────────────────────
+    st.divider()
+    st.subheader("🗂 Team directory")
+    members = _team_members()
+    if not members:
+        st.caption("No members yet — add the first one above.")
+        return
+
+    st.caption(
+        f"**{len(members)} account(s)** · click a toggle to pause/resume that "
+        "person's daily alerts (vacation mode)."
+    )
+    for row in members:
+        uid = row.get("id")
+        domain_txt = (
+            ", ".join(_DOMAIN_LABELS.get(d, d) for d in row.get("domains") or [])
+            or "All categories"
+        )
+        is_me = uid == _current_user_id()
+        col_name, col_alerts, col_actions = st.columns([3, 1, 1])
+        with col_name:
+            label = escape(row.get("name") or "")
+            if is_me:
+                label += " (you)"
+            st.markdown(
+                f"**{label}** "
+                f"<span style='opacity:0.6'>{escape(row.get('email') or '')}</span> · "
+                f"<span style='opacity:0.6'>📍 {escape(row.get('location') or '—')}</span>",
+                unsafe_allow_html=True,
+            )
+            st.caption(f"🏷 {escape(domain_txt)}")
+        if is_me:
+            with col_alerts:
+                st.caption("—")
+            with col_actions:
+                st.caption("—")
+            continue
+        with col_alerts:
+            key = f"alerts_{uid}"
+            prefs = _api(f"/notifications/preferences/{uid}", timeout=15) or {}
+            is_enabled = bool(prefs.get("is_enabled", True))
+            toggled = st.toggle(
+                "Alerts", value=is_enabled, key=key, label_visibility="collapsed"
+            )
+            if toggled != is_enabled:
+                saved = _api(
+                    f"/notifications/preferences/{uid}",
+                    method="PUT",
+                    json_data={"is_enabled": toggled},
+                    timeout=15,
+                )
+                if saved:
+                    st.caption("✅ saved")
+                    st.session_state.pop(key, None)
+                else:
+                    st.error("Save failed")
+        with col_actions:
+            if st.button("🗑 Remove", key=f"rm_{uid}", use_container_width=True):
+                resp = _api_raw(f"/users/{uid}", method="DELETE", timeout=30)
+                if resp is not None and resp.status_code in (200, 204, 404):
+                    st.success(f"Removed {row.get('name')} and their data.")
+                    _team_members.clear()
+                    st.rerun()
+                else:
+                    st.error("Could not remove the member.")
+        st.divider()
+
+
+# ---------------------------------------------------------------------------
 # Page: My Matches (personal stats)
 # ---------------------------------------------------------------------------
 
@@ -1805,6 +1995,7 @@ def main() -> None:
                 "Learning",
                 "Settings",
                 "My Account",
+                "Team & Users",
             ],
         )
         st.divider()
@@ -1839,6 +2030,7 @@ def main() -> None:
         "Learning": show_learning,
         "Settings": show_settings,
         "My Account": show_account,
+        "Team & Users": show_team,
     }
     pages.get(page, show_overview)()
 
