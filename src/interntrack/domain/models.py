@@ -151,6 +151,8 @@ class Job(Base, TimestampMixin):
         "naukri": "naukri",
         "freshersworld": "freshersworld",
         "apna": "apna",
+        "cutshort": "cutshort",
+        "foundit": "foundit",
         "search_engine": "search_engine",
         "search": "search_engine",
         "duckduckgo": "search_engine",
