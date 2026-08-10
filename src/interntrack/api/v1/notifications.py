@@ -231,25 +231,34 @@ async def send_user_test_alert(
     they are onboarded instead of waiting for the next 8:00/13:00/19:00 IST
     slot. Never raises: returns a ``results``/``hint`` dict in every case.
     """
-    from interntrack.scheduler.jobs import _user_profile
+    from interntrack.scheduler.jobs import DEFAULT_ALERT_USER, _user_profile
 
     user = await _user_profile(db, user_id)
-    if user is None:
+    # The legacy default account (``user1``) predates registered users — it
+    # has no User row, so route its test through the shared configured
+    # channels, exactly like the daily digest does for that account.
+    if user is None and user_id != DEFAULT_ALERT_USER:
         return {
             "sent": False,
             "results": {},
             "hint": "No account found with this user ID.",
         }
 
-    recipient = {
-        "email": getattr(user, "email", None),
-        "telegram_chat_id": getattr(user, "telegram_chat_id", None),
-        "phone_number": getattr(user, "phone_number", None),
-    }
-    name = (getattr(user, "name", None) or "").strip() or "there"
-    location = (getattr(user, "location", None) or "").strip() or "your city"
-    domains = list(getattr(user, "domains", None) or [])
-    domain_txt = ", ".join(domains) if domains else "your categories"
+    if user is not None:
+        recipient = {
+            "email": getattr(user, "email", None),
+            "telegram_chat_id": getattr(user, "telegram_chat_id", None),
+            "phone_number": getattr(user, "phone_number", None),
+        }
+        name = (getattr(user, "name", None) or "").strip() or "there"
+        location = (getattr(user, "location", None) or "").strip() or "your city"
+        domains = list(getattr(user, "domains", None) or [])
+        domain_txt = ", ".join(domains) if domains else "your categories"
+    else:
+        recipient = None
+        name = "there"
+        location = "your city"
+        domain_txt = "your categories"
 
     message = (
         f"👋 <b>Hi {name} — this is a test alert!</b>\n\n"
@@ -267,7 +276,9 @@ async def send_user_test_alert(
             recipient=recipient,
         )
         sent_channels = [ch for ch, ok in results.items() if ok]
-        has_contact = bool(recipient.get("email") or recipient.get("telegram_chat_id"))
+        has_contact = bool(
+            recipient and (recipient.get("email") or recipient.get("telegram_chat_id"))
+        )
         missing = [
             ch
             for ch in ("email", "telegram")
@@ -277,6 +288,11 @@ async def send_user_test_alert(
         if sent_channels:
             hint = f"Delivered via {', '.join(sent_channels)}. " + (
                 f"Could not reach: {', '.join(missing)}." if missing else ""
+            )
+        elif recipient is None:
+            hint = (
+                "Nothing was sent — the shared email/Telegram channels are "
+                "not configured on the API."
             )
         elif not has_contact:
             hint = (

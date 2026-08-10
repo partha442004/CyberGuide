@@ -57,6 +57,15 @@ _JOB_HOSTS = (
     "workable.com",
     "bamboohr.com",
     "smartrecruiters.com",
+    # Cybersecurity-specific boards.
+    "cybersecurityjobs.com",
+    "cybersecurityjobsite.com",
+    "cybersn.com",
+    "clearedjobs.net",
+    "infosec-jobs.com",
+    "securityjobs.net",
+    "ninjajobs.com",
+    "techfetch.com",
 )
 
 # URL shapes that mean "this is a search / listing page, not a posting".
@@ -317,6 +326,14 @@ class SearchEngineScraper(BaseScraper):
             (
                 f"site:naukri.com OR site:shine.com OR site:freshersworld.com "
                 f"OR site:unstop.com {q}"
+            ),
+            (
+                f"site:cybersecurityjobs.com OR site:cybersecurityjobsite.com "
+                f"OR site:cybersn.com OR site:clearedjobs.net {q}"
+            ),
+            (
+                f"site:infosec-jobs.com OR site:securityjobs.net "
+                f"OR site:ninjajobs.com OR site:techfetch.com {q}"
             ),
         ]
         jobs: list[RawJob] = []
