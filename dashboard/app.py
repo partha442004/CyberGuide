@@ -2300,7 +2300,10 @@ def show_digest_archive() -> None:
         )
         jobs = r.get("jobs") or []
         if not jobs:
-            st.caption("No new jobs in that slot (already sent before).")
+            st.caption(
+                "No new jobs in that slot (already sent before — older digests "
+                "predate job-detail recording)."
+            )
         for j in jobs[:10]:
             j_title = escape(str(j.get("title") or "Untitled role"))
             j_company = escape(str(j.get("company") or "Unknown"))
@@ -2411,17 +2414,19 @@ def show_ai_tools() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _domain_coverage_section() -> None:
+def _domain_coverage_section(job_list: list | None = None) -> None:
     """Live per-category job counts so each user can see domain coverage.
 
     Answers the recurring "will I get jobs in my domain?" question: shows
     how many of the newest tracked jobs fall into each category (plus the
     fresh-24h count), and nudges when the signed-in user's preferred
     categories have nothing yet. Uses the same ``classify_domain`` the Saved
-    Jobs tab uses so numbers never drift.
+    Jobs tab uses so numbers never drift. ``job_list`` is reused from the
+    caller (the Overview page) so the page fetches the jobs list once.
     """
-    jobs_data = fetch_data("/jobs/?limit=300") or {}
-    job_list = jobs_data.get("jobs") or []
+    if job_list is None:
+        jobs_data = fetch_data("/jobs/?limit=300") or {}
+        job_list = jobs_data.get("jobs") or []
     if not job_list:
         return
 
@@ -2533,17 +2538,16 @@ def show_overview() -> None:
             )
 
         # ── 🗂 Domain coverage (live per-category counts) ───────────────
-        _domain_coverage_section()
+        _fresh_all = (fetch_data("/jobs/?limit=300") or {}).get("jobs") or []
+        _domain_coverage_section(_fresh_all)
 
         # ── 🆕 Fresh for you (last 24h, your categories) ────────────────
         try:
-            _fresh_data = fetch_data("/jobs/?limit=300") or {}
-            _fresh_list = _fresh_data.get("jobs") or []
             _fresh_user = _current_user()
             _fresh_doms = set((_fresh_user or {}).get("domains") or [])
             _fresh_mine = [
-                _fj
-                for _fj in _fresh_list
+                (_fj, classify_domain(str(_fj.get("title") or "")))
+                for _fj in _fresh_all
                 if _is_fresh_24h(_fj.get("posted_at"))
                 and (
                     not _fresh_doms
@@ -2558,8 +2562,7 @@ def show_overview() -> None:
                     "digest pulls from this pool.</div>",
                     unsafe_allow_html=True,
                 )
-                for _fj in _fresh_mine:
-                    _f_dom = classify_domain(str(_fj.get("title") or ""))
+                for _fj, _f_dom in _fresh_mine:
                     st.markdown(
                         f"**{escape(str(_fj.get('title') or 'Untitled role'))}** "
                         f"<span style='opacity:0.65'>· "
