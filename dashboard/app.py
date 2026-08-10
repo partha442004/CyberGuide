@@ -614,8 +614,13 @@ def _telegram_finder_block(chat_id: str | None = None, auto_save: bool = False) 
 
 
 def fetch_data(endpoint: str) -> Any:
-    """GET from the API — returns None when unreachable."""
-    return _api(endpoint, method="GET")
+    """GET from the API — returns {} when unreachable.
+
+    An empty dict (instead of None) keeps every ``.get()`` call site safe:
+    a transient API failure must never crash a dashboard section with
+    ``AttributeError: 'NoneType' object has no attribute 'get'``.
+    """
+    return _api(endpoint, method="GET") or {}
 
 
 @st.cache_data(ttl=60, show_spinner=False)
@@ -2222,7 +2227,7 @@ def _domain_coverage_section() -> None:
     categories have nothing yet. Uses the same ``classify_domain`` the Saved
     Jobs tab uses so numbers never drift.
     """
-    jobs_data = fetch_data("/jobs/?limit=300")
+    jobs_data = fetch_data("/jobs/?limit=300") or {}
     job_list = jobs_data.get("jobs") or []
     if not job_list:
         return
