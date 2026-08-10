@@ -267,21 +267,26 @@ async def send_user_test_alert(
             recipient=recipient,
         )
         sent_channels = [ch for ch, ok in results.items() if ok]
+        has_contact = bool(recipient.get("email") or recipient.get("telegram_chat_id"))
         missing = [
             ch
             for ch in ("email", "telegram")
-            if ch not in sent_channels
-            and (recipient.get("email") or recipient.get("telegram_chat_id"))
+            if ch not in sent_channels and has_contact
         ]
         hint = None
         if sent_channels:
             hint = f"Delivered via {', '.join(sent_channels)}. " + (
                 f"Could not reach: {', '.join(missing)}." if missing else ""
             )
-        else:
+        elif not has_contact:
             hint = (
                 "Nothing was sent — this account has no email and no Telegram "
-                "chat ID on file, or the channels are not configured on the API."
+                "chat ID on file."
+            )
+        else:
+            hint = (
+                "Nothing was sent — delivery failed or the email/Telegram "
+                "channels are not configured on the API."
             )
         return {"sent": bool(sent_channels), "results": results, "hint": hint}
     except Exception as e:  # pragma: no cover - network path

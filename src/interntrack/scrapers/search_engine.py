@@ -306,7 +306,8 @@ class SearchEngineScraper(BaseScraper):
         # queries catch postings on smaller boards (infosec-career.com etc)
         # and career pages; per-site queries surface postings on boards
         # whose listing pages dominate the generic results (cutshort,
-        # wellfound, foundit/timesjobs/hirect).
+        # wellfound, foundit/timesjobs/hirect, naukri/shine/freshersworld/
+        # unstop).
         queries = [
             f"{q} job OR vacancy OR opening",
             f"{q} internship OR fresher OR career",
