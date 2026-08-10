@@ -46,6 +46,19 @@ jobs:
             && echo "expired jobs archived OK" \
             || echo "archive step failed or timed out"
 
+      # Same serverless story as above: the scheduler's closing-soon sweep
+      # only runs inside APScheduler, which never executes on Vercel. This
+      # curl fires the identical sweep through the public API (morning +
+      # evening, matching the scheduler's 04:30/12:30 UTC triggers) so
+      # "🚨 Closing soon" digests reach users on the live deployment.
+      - name: Closing-soon alerts sweep
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *' || github.event.schedule == '30 13 * * *'
+        run: |
+          curl -sSf --max-time 120 -X POST \
+            "$API_BASE/api/v1/notifications/closing-soon" \
+            && echo "closing-soon sweep ran OK" \
+            || echo "closing-soon sweep failed or timed out"
+
       - name: Generate daily report (morning slot — security)
         if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *'
         run: |

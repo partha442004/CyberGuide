@@ -14,14 +14,16 @@ All notable changes to the InternTrack project will be documented in this file.
   an estimate.
 - **🚨 'Closing soon' alerts — one digest per user for jobs expiring
   within 48h.** New `_send_closing_soon_sweep` runs on the daily
-  scheduler and pings each enabled account with the up-to-5 roles
+  scheduler AND a new `POST /notifications/closing-soon` API endpoint
+  (the GitHub cron fires it twice a day, since Vercel never runs
+  scheduler code) and pings each enabled account with the up-to-5 roles
   closing in the next 2 days that match their saved domains + city
   (with the remote opt-in), each with a closing date and Apply button.
   Each job is flagged once per user — sent ids are kept in a new
   `AlertPreferences.closing_soon_sent` column (auto-added to the live
-  DB by the column sync) and pruned once the job closes, so a
-  Thursday-noon expiry never re-nags. Never raises; returns
-  `{user_id: job_count}` for logs. 3 new tests.
+  DB by the column sync), pruned once the job closes so the list never
+  grows stale, and the vacation-mode pause gate is respected. Never
+  raises; returns `{user_id: job_count}` for logs. 6 new tests.
 
 ### Fixed
 
