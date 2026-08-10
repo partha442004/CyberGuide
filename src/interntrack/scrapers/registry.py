@@ -106,6 +106,8 @@ def get_default_registry() -> ScraperRegistry:
     # still arrive via the remoteok RSS feed inside RSSFeedScraper.
     from interntrack.scrapers.angellist import AngelListScraper
     from interntrack.scrapers.apna import ApnaScraper
+    from interntrack.scrapers.cutshort import CutshortScraper
+    from interntrack.scrapers.foundit import FounditScraper
     from interntrack.scrapers.glassdoor import GlassdoorScraper
     from interntrack.scrapers.glassdoor_india import GlassdoorIndiaScraper
     from interntrack.scrapers.google_jobs import GoogleJobsScraper
@@ -134,6 +136,10 @@ def get_default_registry() -> ScraperRegistry:
     registry.register(IndeedIndiaScraper())
     registry.register(ApnaScraper())
     registry.register(TimesJobsScraper())
+    registry.register(CutshortScraper())
+    # Foundit direct is bot-gated from datacenter IPs (returns [] there);
+    # its posting URLs still arrive via SearchEngineScraper's Bing path.
+    registry.register(FounditScraper())
     registry.register(SearchEngineScraper())
     registry.register(LinkedInIndiaScraper())
     registry.register(GlassdoorIndiaScraper())

@@ -46,6 +46,8 @@ _DISCOVERY_SOURCES: list[str] = [
     "wellfound",
     "unstop",
     "freshersworld",
+    "cutshort",
+    "foundit",
     "rss_feed",
     "hackernews",
     "company",

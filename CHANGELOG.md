@@ -6,6 +6,21 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Cutshort + Foundit direct scrapers (India startup/portal boards).**
+  New `CutshortScraper` parses cutshort.io's server-rendered popular-jobs
+  list (the query filter is client-side, so it mirrors the site's own
+  keyword behaviour — any query word in the title keeps a card) and
+  recovers the company name from the posting slug
+  (`{Title}-{Location}-{Company}-{code}`). New `FounditScraper` parses
+  foundit.in search pages; Foundit 403s datacenter IPs, so it degrades to
+  zero quietly and its posting URLs keep arriving via the search-engine
+  Bing path. Both are registered in the scraper registry and added to
+  `_DISCOVERY_SOURCES` for the 3× daily discovery.
+- **Team & Users admin page (dashboard).** New sidebar page that onboards
+  friends with their own role/categories + city (the API auto-enables
+  their personalized daily alerts and returns the one-time access token
+  to share), lists the whole team with per-member alert on/off toggles
+  (vacation mode) and account removal.
 - **Search-engine discovery scraper (DuckDuckGo, no API key).** New
   `SearchEngineScraper` builds `site:`-scoped queries for sources that
   block direct scraping (Naukri, Indeed, Glassdoor, Freshersworld…) and
