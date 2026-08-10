@@ -2144,6 +2144,10 @@ def show_alerts() -> None:
         "how many jobs were in them, and whether each channel (email / "
         "Telegram / SMS) actually delivered."
     )
+    st.caption(
+        "Totals include manual test sends (e.g. Send Test Alert Now) alongside "
+        "the scheduled 8:00 / 13:00 / 19:00 IST digests."
+    )
     stats = fetch_data("/notifications/stats?days=30") or {}
     if not stats.get("total_sends"):
         st.info(

@@ -36,7 +36,7 @@ class Base(DeclarativeBase):
 class TimestampMixin:
     """Mixin for timestamp fields."""
 
-    created_at = Column(DateTime, default=utcnow, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False, index=True)
     updated_at = Column(
         DateTime,
         default=utcnow,
