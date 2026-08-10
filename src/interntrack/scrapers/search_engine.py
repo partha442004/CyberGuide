@@ -225,10 +225,10 @@ class SearchEngineScraper(BaseScraper):
 
         if engine == "bing":
             url = _BING_URL.format(query=urllib.parse.quote_plus(query))
-            resp = await self._get(url, timeout=12)
+            resp = await self._get(url, timeout=10)
             return self._bing_links(resp.text)
         url = _SEARCH_URL.format(query=urllib.parse.quote_plus(query))
-        resp = await self._get(url, timeout=12)
+        resp = await self._get(url, timeout=10)
         return self._result_links(resp.text)
 
     @staticmethod
@@ -320,32 +320,35 @@ class SearchEngineScraper(BaseScraper):
             for search in queries:
                 # DuckDuckGo first; Bing covers the datacenter-IP cases
                 # where DDG serves an anomaly page with no result links.
-                links: list[str] = []
                 for engine in ("duckduckgo", "bing"):
+                    before = len(jobs)
                     try:
                         found = await self._search_links(engine, search)
                     except Exception as e:  # noqa: BLE001
                         logger.warning("%s search failed for %r: %s", engine, q, e)
                         continue
-                    links.extend(found)
-                    if any(self._is_job_url(link) for link in found):
+                    for link in found:
+                        if not self._is_job_url(link) or link in seen:
+                            continue
+                        seen.add(link)
+                        if len(jobs) >= limit:
+                            break
+                        try:
+                            page = await self._get(link, timeout=10)
+                        except Exception as e:  # noqa: BLE001
+                            logger.debug("fetch %s failed: %s", link, e)
+                            continue
+                        if page.status_code != 200:
+                            continue
+                        job = self._parse_page(link, page.text)
+                        if job:
+                            jobs.append(job)
+                    # Only move on to the next query when this engine
+                    # actually produced jobs — otherwise try the other
+                    # engine for the same query (DDG's shaped-but-unparseable
+                    # links must not starve Bing).
+                    if len(jobs) > before or len(jobs) >= limit:
                         break
-                for link in links:
-                    if not self._is_job_url(link) or link in seen:
-                        continue
-                    seen.add(link)
-                    if len(jobs) >= limit:
-                        break
-                    try:
-                        page = await self._get(link, timeout=12)
-                    except Exception as e:  # noqa: BLE001
-                        logger.debug("fetch %s failed: %s", link, e)
-                        continue
-                    if page.status_code != 200:
-                        continue
-                    job = self._parse_page(link, page.text)
-                    if job:
-                        jobs.append(job)
                 if len(jobs) >= limit:
                     break
         except Exception as e:  # noqa: BLE001 - one source must not break discovery
