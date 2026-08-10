@@ -86,7 +86,62 @@ _AUTO_TAG_KEYWORDS: tuple[str, ...] = (
     "iso 27001",
     "gdpr",
     "risk management",
+    # Expanded: scripting / cloud / tooling / soft skills commonly listed in
+    # descriptions but missing from scraper tags — more signal for match %.
+    "powershell",
+    "bash",
+    "networking",
+    "tcp/ip",
+    "owasp",
+    "cissp",
+    "ceh",
+    "osint",
+    "dfir",
+    "zero trust",
+    "iam",
+    "api",
+    "rest api",
+    "postman",
+    "jira",
+    "agile",
+    "scrum",
+    "excel",
+    "tableau",
+    "power bi",
+    "etl",
+    "airflow",
+    "spark",
+    "kafka",
+    "django",
+    "flask",
+    "fastapi",
+    "spring",
+    "flutter",
+    "html",
+    "css",
+    "figma",
 )
+
+
+def _derive_required_skills(job_data: dict) -> list[str]:
+    """Skills mentioned in the description, for match scoring.
+
+    Scans the same keyword dictionary as :func:`auto_tag_job` over the
+    title + description and returns the matched keywords — these become
+    ``required_skills`` so resume match % is computed from real signals
+    even when the source board never structured them.
+    """
+    import re
+
+    text = " ".join(
+        str(job_data.get(field) or "") for field in ("title", "description")
+    ).lower()
+    found: list[str] = []
+    for keyword in _AUTO_TAG_KEYWORDS:
+        pattern = rf"(?<![a-z0-9]){re.escape(keyword)}(?![a-z0-9])"
+        if re.search(pattern, text):
+            found.append(keyword)
+    return found[:20]
 
 
 def auto_tag_job(job_data: dict) -> dict:
@@ -151,7 +206,14 @@ def _normalize_job_fields(job_data: dict) -> dict:
     # Derive skill tags when the scraper gave none — jobs without tags
     # score ``match_score: null`` against every resume (the "no match %"
     # gap). This runs before the DB insert so every saved job is scoreable.
-    return auto_tag_job(normalized)
+    normalized = auto_tag_job(normalized)
+    # Derive required_skills from the description when the source left them
+    # empty, so match % is computed from real description signals.
+    if not [s for s in (normalized.get("required_skills") or []) if str(s).strip()]:
+        derived = _derive_required_skills(normalized)
+        if derived:
+            normalized["required_skills"] = derived
+    return normalized
 
 
 class JobService:

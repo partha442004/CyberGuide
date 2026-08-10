@@ -2,6 +2,8 @@
 Salary Insights API — salary statistics per domain, location, experience level.
 """
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +12,74 @@ from interntrack.database.session import get_db
 from interntrack.domain.models import Job
 
 router = APIRouter()
+
+
+@router.get("/benchmarks")
+async def salary_benchmarks(
+    db: AsyncSession = Depends(get_db),
+):
+    """Role × city salary benchmark from real stored postings.
+
+    Groups active jobs that carry a salary by (domain, city) and returns
+    median / average / min / max / count per bucket, plus the overall top
+    cities — so a user can answer "what does a SOC Analyst in Bangalore
+    actually pay?" from live data.
+    """
+    from statistics import median
+
+    from sqlalchemy import select
+
+    query = select(Job).where(Job.is_active == True)  # noqa: E712
+    result = await db.execute(query)
+    jobs = result.scalars().all()
+
+    buckets: dict[tuple[str, str], list[int]] = {}
+    for job in jobs:
+        lo = job.salary_min
+        hi = job.salary_max
+        value = None
+        if lo and hi:
+            value = int((lo + hi) / 2)
+        elif lo:
+            value = int(lo)
+        elif hi:
+            value = int(hi)
+        if not value or value <= 0:
+            continue
+        title = str(job.title or "")
+        desc = str(job.description or "")
+        domain = _classify_domain(title, desc)
+        loc = str(job.location or "Remote").strip()
+        # Collapse long location strings to the leading city token.
+        city = loc.split(",")[0].strip()[:40] or "Remote"
+        buckets.setdefault((domain, city), []).append(value)
+
+    rows: list[dict[str, Any]] = []
+    for (domain, city), values in buckets.items():
+        rows.append(
+            {
+                "domain": domain,
+                "city": city,
+                "count": len(values),
+                "median": int(median(values)),
+                "average": int(sum(values) / len(values)),
+                "min": min(values),
+                "max": max(values),
+                "currency": "INR" if max(values) >= 100000 else "USD",
+            }
+        )
+    rows.sort(key=lambda r: (-r["count"], r["domain"], r["city"]))
+
+    from collections import Counter
+
+    city_counts = Counter(r["city"] for r in rows)
+    return {
+        "rows": rows[:120],
+        "total_buckets": len(rows),
+        "top_cities": [
+            {"city": c, "buckets": n} for c, n in city_counts.most_common(8)
+        ],
+    }
 
 
 def _classify_domain(title: str, description: str | None) -> str:

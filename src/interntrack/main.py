@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy import text
 
 from interntrack.api.router import api_router
+from interntrack.api.v1.pwa import router as pwa_router
 from interntrack.config import get_settings
 from interntrack.database.session import close_db, init_db
 from interntrack.domain.exceptions import AppException
@@ -78,6 +79,9 @@ app.add_middleware(
 
 # Include API router
 app.include_router(api_router, prefix="/api")
+
+# PWA install shell (root-level /app routes, outside the /api prefix).
+app.include_router(pwa_router)
 
 
 @app.exception_handler(AppException)

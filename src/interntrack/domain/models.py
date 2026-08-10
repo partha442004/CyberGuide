@@ -130,6 +130,11 @@ class Job(Base, TimestampMixin):
     expires_at = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True)
     tags = Column(JSON, nullable=True, default=list)
+    # AI skill extraction: derived skills the role expects, kept separate from
+    # ``tags`` so the resume matcher can compare against explicit requirements.
+    # Auto-added to pre-existing tables by the startup column-sync hook.
+    required_skills = Column(JSON, nullable=True, default=list)
+    preferred_skills = Column(JSON, nullable=True, default=list)
     raw_data = Column(JSON, nullable=True)
 
     # Raw names emitted by some scrapers, mapped to canonical enum values so
@@ -146,6 +151,9 @@ class Job(Base, TimestampMixin):
         "naukri": "naukri",
         "freshersworld": "freshersworld",
         "apna": "apna",
+        "search_engine": "search_engine",
+        "search": "search_engine",
+        "duckduckgo": "search_engine",
         "crowdstrike": "company",
         "paloalto": "company",
         "fortinet": "company",

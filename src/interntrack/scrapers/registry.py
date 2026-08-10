@@ -119,6 +119,7 @@ def get_default_registry() -> ScraperRegistry:
     from interntrack.scrapers.linkedin_india import LinkedInIndiaScraper
     from interntrack.scrapers.linkedin_jobs_api import LinkedInJobsAPIScraper
     from interntrack.scrapers.rss_feeds import RSSFeedScraper
+    from interntrack.scrapers.search_engine import SearchEngineScraper
     from interntrack.scrapers.timesjobs import TimesJobsScraper
     from interntrack.scrapers.wellfound import WellfoundScraper
 
@@ -133,6 +134,7 @@ def get_default_registry() -> ScraperRegistry:
     registry.register(IndeedIndiaScraper())
     registry.register(ApnaScraper())
     registry.register(TimesJobsScraper())
+    registry.register(SearchEngineScraper())
     registry.register(LinkedInIndiaScraper())
     registry.register(GlassdoorIndiaScraper())
     registry.register(HiredScraper())

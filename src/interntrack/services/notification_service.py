@@ -169,6 +169,103 @@ class SmsChannel(NotificationChannel):
             raise NotificationError("sms", str(e)) from e
 
 
+class WhatsAppChannel(NotificationChannel):
+    """WhatsApp notification channel via the Twilio Messages API.
+
+    Identical to :class:`SmsChannel` except the ``To`` / ``From`` numbers
+    carry the ``whatsapp:`` prefix (Twilio's WhatsApp API requires it). The
+    sender is the sandbox number (``whatsapp:+14155238886``) or a verified
+    business number. Fails closed when no recipient is set.
+    """
+
+    def __init__(
+        self,
+        account_sid: str,
+        auth_token: str,
+        from_number: str,
+        to_number: str | None = None,
+    ):
+        self.account_sid = account_sid
+        self.auth_token = auth_token
+        self.from_number = from_number
+        self.to_number = to_number
+
+    async def send(
+        self,
+        message: str,
+        subject: str | None = None,  # noqa: ARG002 (interface)
+        buttons: list[tuple[str, str]] | None = None,  # noqa: ARG002 (interface)
+    ) -> bool:
+        """Send one WhatsApp message via Twilio; fails closed without a number."""
+        if not self.to_number:
+            return False
+        try:
+            import httpx
+
+            url = (
+                f"https://api.twilio.com/2010-04-01/Accounts/"
+                f"{self.account_sid}/Messages.json"
+            )
+            body = str(message).strip()
+            if len(body) > 1600:
+                body = body[:1597] + "..."
+            async with httpx.AsyncClient(
+                auth=(self.account_sid, self.auth_token), timeout=15
+            ) as client:
+                response = await client.post(
+                    url,
+                    data={
+                        "To": f"whatsapp:{self.to_number}",
+                        "From": self.from_number,
+                        "Body": body,
+                    },
+                )
+                return response.status_code in (200, 201)
+        except Exception as e:
+            raise NotificationError("whatsapp", str(e)) from e
+
+
+class ResendEmailChannel(NotificationChannel):
+    """Email via the Resend HTTP API (better deliverability than raw SMTP).
+
+    One POST to https://api.resend.com/emails with the API key — no SMTP
+    credentials or long-lived connection, so it works cleanly from Vercel
+    serverless. Used in preference to SMTP when ``RESEND_API_KEY`` is set.
+    """
+
+    def __init__(self, api_key: str, from_email: str, to_email: str | None = None):
+        self.api_key = api_key
+        self.from_email = from_email
+        self.to_email = to_email
+
+    async def send(
+        self,
+        message: str,
+        subject: str | None = None,
+        buttons: list[tuple[str, str]] | None = None,  # noqa: ARG002 (interface)
+    ) -> bool:
+        """Send an HTML email through Resend."""
+        if not self.to_email:
+            return False
+        try:
+            import httpx
+
+            async with httpx.AsyncClient(timeout=15) as client:
+                response = await client.post(
+                    "https://api.resend.com/emails",
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    json={
+                        "from": self.from_email,
+                        "to": [self.to_email],
+                        "subject": subject or "InternTrack",
+                        "html": message,
+                    },
+                )
+                return response.status_code in (200, 201)
+        except Exception as e:
+            raise NotificationError("email", str(e)) from e
+
+
 class DiscordChannel(NotificationChannel):
     """Discord webhook notification channel."""
 
@@ -270,6 +367,22 @@ class NotificationManager:
                 settings.twilio_default_to,
             )
 
+        if settings.is_whatsapp_configured:
+            # Same SID/token as SMS; the whatsapp: prefix is applied on send.
+            sid = settings.twilio_account_sid
+            token = settings.twilio_auth_token
+            number = settings.twilio_whatsapp_number
+            if sid and token and number:
+                self._channels["whatsapp"] = WhatsAppChannel(sid, token, number)
+
+        # Resend HTTP API beats SMTP for deliverability when configured.
+        api_key = settings.resend_api_key
+        if api_key:
+            self._channels["email"] = ResendEmailChannel(
+                api_key,
+                settings.resend_from or settings.email_from,
+            )
+
     async def notify(
         self,
         channels: list[str],
@@ -333,7 +446,16 @@ class NotificationManager:
         """
         if channel_name == "email":
             email = recipient.get("email")
-            if email and settings.smtp_user and settings.smtp_password:
+            if not email:
+                return None
+            api_key = settings.resend_api_key
+            if api_key:
+                return ResendEmailChannel(
+                    api_key,
+                    settings.resend_from or settings.email_from,
+                    to_email=email,
+                )
+            if settings.smtp_user and settings.smtp_password:
                 return EmailChannel(
                     settings.smtp_host,
                     settings.smtp_port,
@@ -362,6 +484,15 @@ class NotificationManager:
                     settings.twilio_phone_number,
                     phone,
                 )
+            return None
+        if channel_name == "whatsapp":
+            phone = recipient.get("phone_number")
+            if settings.is_whatsapp_configured and phone:
+                sid = settings.twilio_account_sid
+                token = settings.twilio_auth_token
+                number = settings.twilio_whatsapp_number
+                if sid and token and number:
+                    return WhatsAppChannel(sid, token, number, phone)
             return None
         return self._channels.get(channel_name)
 

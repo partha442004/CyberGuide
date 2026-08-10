@@ -49,6 +49,7 @@ _DISCOVERY_SOURCES: list[str] = [
     "rss_feed",
     "hackernews",
     "company",
+    "search_engine",
 ]
 
 # Total wall-clock budget (seconds) for one discovery request. Kept at 40s so
@@ -192,6 +193,23 @@ async def backfill_engagement(
     repo = JobRepository(db)
     updated = await repo.backfill_engagement(limit=limit)
     return {"updated": updated}
+
+
+@router.post("/enrich/run")
+async def run_skill_enrichment(
+    limit: int = Query(200, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db),
+):
+    """Backfill tags/required_skills from job descriptions.
+
+    Jobs saved without structured skills score ``match_score: null`` against
+    every resume. This sweep derives skills from the description text so
+    those jobs become matchable. Returns how many jobs were enriched.
+    """
+    from interntrack.scheduler.jobs import enrich_jobs_for_match
+
+    updated = await enrich_jobs_for_match(db, limit=limit)
+    return {"enriched": updated}
 
 
 @router.post("/archive-expired")
