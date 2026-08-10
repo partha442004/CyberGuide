@@ -6,6 +6,16 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **📦 Digest Archive page.** New dashboard page that reviews every digest
+  sent to the account — timestamp, channels that delivered, and the jobs
+  it contained (title/company/location/match %/Apply link). Read-only;
+  powered by the existing notification-history rows (which now carry the
+  actual job list since the jobs-JSON column).
+- **🆕 Fresh for you section on Overview.** Last-24h postings filtered to
+  the signed-in user's categories (or all categories when none set),
+  newest first, with domain chip + posted-ago label + Apply link — so the
+  "only latest jobs for me" answer is one glance away.
+
 - **📬 Alerts page + delivery stats API.** New `GET /notifications/stats`
   aggregates the notification-history table across all users (total sends,
   jobs sent, per-channel delivered/failed, per-user breakdown, daily
