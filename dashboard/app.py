@@ -674,6 +674,24 @@ def _is_fresh_24h(iso_str: Any) -> bool:
         return False
 
 
+def _hours_ago(iso_str: Any) -> str:
+    """Human '3h ago' / '2d ago' label for a timestamp, or '—'."""
+    if not iso_str:
+        return "—"
+    try:
+        dt = datetime.fromisoformat(str(iso_str).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        secs = max(0, int((datetime.now(UTC) - dt).total_seconds()))
+        if secs < 3600:
+            return f"{max(1, secs // 60)}m ago"
+        if secs < 86400:
+            return f"{secs // 3600}h ago"
+        return f"{secs // 86400}d ago"
+    except (ValueError, TypeError):
+        return "—"
+
+
 # India / Kolkata is UTC+5:30 with no DST — a fixed offset avoids needing the
 # IANA tz database (tzdata) which is not bundled with Windows Python.
 _IST = timezone(timedelta(hours=5, minutes=30))
@@ -2084,6 +2102,7 @@ def main() -> None:
                 "Expired Jobs",
                 "Analytics",
                 "Alerts",
+                "Digest Archive",
                 "Resume Match",
                 "My Matches",
                 "AI Tools",
@@ -2120,6 +2139,7 @@ def main() -> None:
         "Expired Jobs": show_expired,
         "Analytics": show_analytics,
         "Alerts": show_alerts,
+        "Digest Archive": show_digest_archive,
         "Resume Match": show_resume_match,
         "My Matches": show_my_matches,
         "AI Tools": show_ai_tools,
@@ -2230,6 +2250,76 @@ def show_alerts() -> None:
                 f"❌ {u.get('failed', 0)} · last: "
                 f"{(u.get('last_sent') or '—')[:16]}"
             )
+
+
+# ---------------------------------------------------------------------------
+# Page: Digest Archive (what was sent to me)
+# ---------------------------------------------------------------------------
+
+
+def show_digest_archive() -> None:
+    """Review every digest email / Telegram message sent to this account."""
+    st.header("📦 Digest Archive")
+    st.markdown(
+        "Every digest sent to your account — when it went out, which channels "
+        "delivered, and the jobs it contained (with your match %). "
+        "Read-only history: nothing is re-sent from here."
+    )
+    user_id = _current_user_id()
+    history = fetch_data(f"/notifications/preferences/{user_id}/history?limit=50") or {}
+    rows = history.get("history") or []
+    if not rows:
+        st.info(
+            "No digest sends recorded yet — the daily digests run at "
+            "8:00 / 13:00 / 19:00 IST, or use 'Send Test Alert Now' on "
+            "the Settings page."
+        )
+        return
+
+    total_jobs = sum(int(r.get("job_count") or 0) for r in rows)
+    delivered_rows = sum(1 for r in rows if any((r.get("results") or {}).values()))
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("📤 Digests sent", len(rows))
+    with c2:
+        st.metric("💼 Jobs across all", total_jobs)
+    with c3:
+        st.metric("✅ With delivery", delivered_rows)
+    st.divider()
+
+    for r in rows:
+        sent_at = (r.get("sent_at") or "")[:16]
+        subject = str(r.get("subject") or "Digest")
+        results = r.get("results") or {}
+        ok_channels = [ch for ch, v in results.items() if v]
+        ch_txt = ", ".join(ok_channels) if ok_channels else "no delivery"
+        st.markdown(
+            f"**{escape(subject)}** · `{sent_at}` · "
+            f"<span style='opacity:0.6'>{escape(ch_txt)}</span>",
+            unsafe_allow_html=True,
+        )
+        jobs = r.get("jobs") or []
+        if not jobs:
+            st.caption("No new jobs in that slot (already sent before).")
+        for j in jobs[:10]:
+            j_title = escape(str(j.get("title") or "Untitled role"))
+            j_company = escape(str(j.get("company") or "Unknown"))
+            j_loc = escape(str(j.get("location") or "Remote"))
+            j_score = j.get("match_score")
+            score_txt = (
+                f" · 🎯 {j_score:.0f}%" if isinstance(j_score, (int, float)) else ""
+            )
+            j_url = str(j.get("url") or "")
+            link = (
+                f" <a href='{escape(j_url)}' target='_blank'>🔗 Apply</a>"
+                if j_url
+                else ""
+            )
+            st.markdown(
+                f"• **{j_title}** — {j_company} · {j_loc}{score_txt}{link}",
+                unsafe_allow_html=True,
+            )
+        st.divider()
 
 
 # ---------------------------------------------------------------------------
@@ -2444,6 +2534,55 @@ def show_overview() -> None:
 
         # ── 🗂 Domain coverage (live per-category counts) ───────────────
         _domain_coverage_section()
+
+        # ── 🆕 Fresh for you (last 24h, your categories) ────────────────
+        try:
+            _fresh_data = fetch_data("/jobs/?limit=300") or {}
+            _fresh_list = _fresh_data.get("jobs") or []
+            _fresh_user = _current_user()
+            _fresh_doms = set((_fresh_user or {}).get("domains") or [])
+            _fresh_mine = [
+                _fj
+                for _fj in _fresh_list
+                if _is_fresh_24h(_fj.get("posted_at"))
+                and (
+                    not _fresh_doms
+                    or classify_domain(str(_fj.get("title") or "")) in _fresh_doms
+                )
+            ][:8]
+            if _fresh_mine:
+                st.markdown(
+                    '<div class="section-title">🆕 Fresh for you (last 24h)</div>'
+                    '<div class="section-sub">Newest postings in your '
+                    "categories, posted within the last day — your daily "
+                    "digest pulls from this pool.</div>",
+                    unsafe_allow_html=True,
+                )
+                for _fj in _fresh_mine:
+                    _f_dom = classify_domain(str(_fj.get("title") or ""))
+                    st.markdown(
+                        f"**{escape(str(_fj.get('title') or 'Untitled role'))}** "
+                        f"<span style='opacity:0.65'>· "
+                        f"{escape(str(_fj.get('company') or 'Unknown'))} · "
+                        f"{escape(str(_fj.get('location') or 'Remote'))}</span>",
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        '<div class="chip-row">'
+                        f'<span class="chip">🏷 {_DOMAIN_LABELS.get(_f_dom, _f_dom)}</span>'
+                        f'<span class="chip">🕒 {_hours_ago(_fj.get("posted_at"))}</span>'
+                        "</div>",
+                        unsafe_allow_html=True,
+                    )
+                    if _fj.get("url"):
+                        st.link_button(
+                            "🔗 View",
+                            _fj["url"],
+                            key=f"fresh_{_fj.get('id')}",
+                        )
+                    st.divider()
+        except Exception:  # noqa: BLE001, S110 - section must never break the page
+            pass
 
         # ── 🎯 Job of the day (best resume match) ─────────────────────────
         # The same highlight the daily email / Telegram digest leads with:
