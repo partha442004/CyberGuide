@@ -313,6 +313,10 @@ class SearchEngineScraper(BaseScraper):
             f"site:cutshort.io {q}",
             f"site:wellfound.com {q}",
             f"site:foundit.in OR site:timesjobs.com OR site:hirect.in {q}",
+            (
+                f"site:naukri.com OR site:shine.com OR site:freshersworld.com "
+                f"OR site:unstop.com {q}"
+            ),
         ]
         jobs: list[RawJob] = []
         seen: set[str] = set()

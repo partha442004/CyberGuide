@@ -6,6 +6,18 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Per-user test-alert endpoint + Team page upgrades.** New
+  `POST /notifications/user/{user_id}/test` routes a sample digest message
+  to ONE user's own email + Telegram (mirroring the real daily digest), so
+  an onboarded friend can verify their delivery path instantly instead of
+  waiting for the next 8:00/13:00/19:00 IST slot. The Team & Users page
+  gains an optional **resume upload** when onboarding a member (parsed
+  right after registration so their match % is live from day one) and a
+  per-member **🔔 Test alert** button wired to the new endpoint.
+- **Search-engine discovery covers more India boards.** A new `site:`
+  query targets Naukri / Shine / Freshersworld / Unstop — these hosts were
+  already in `_JOB_HOSTS` but never queried explicitly, so their postings
+  were only found incidentally. Unit tests now lock the board coverage.
 - **Cutshort + Foundit direct scrapers (India startup/portal boards).**
   New `CutshortScraper` parses cutshort.io's server-rendered popular-jobs
   list (the query filter is client-side, so it mirrors the site's own

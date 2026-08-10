@@ -1705,6 +1705,13 @@ def show_team() -> None:
                 key="team_phone",
                 placeholder="+919876543210",
             )
+        resume_file = st.file_uploader(
+            "Upload their resume (PDF) — optional, turns on match % instantly",
+            type=["pdf"],
+            key="team_resume",
+            help="Parsed right after the account is created, so their job "
+            "match % works from day one.",
+        )
         submitted = st.form_submit_button(
             "🚀 Create account + turn on alerts", type="primary"
         )
@@ -1747,6 +1754,29 @@ def show_team() -> None:
                     f"📍 {profile.get('location')} · 🏷 {domain_txt or 'All categories'} · "
                     "the daily digest goes out at 8:00 / 13:00 / 19:00 IST."
                 )
+                if resume_file is not None:
+                    with st.spinner("Parsing their resume..."):
+                        files = {
+                            "file": (
+                                resume_file.name,
+                                resume_file.getvalue(),
+                                "application/pdf",
+                            )
+                        }
+                        up = _api(
+                            f"/resumes/upload?user_id={profile.get('id')}",
+                            method="POST",
+                            files=files,
+                            timeout=30,
+                        )
+                        if up:
+                            st.success("📄 Resume parsed — their match % is live.")
+                        else:
+                            st.warning(
+                                "Account created, but the resume could not be "
+                                "parsed — they can upload it later on the "
+                                "Resume Match page."
+                            )
             else:
                 try:
                     detail = resp.json().get("detail", resp.text)
@@ -1811,6 +1841,31 @@ def show_team() -> None:
                 else:
                     st.error("Save failed")
         with col_actions:
+            if st.button(
+                "🔔 Test alert",
+                key=f"tst_{uid}",
+                use_container_width=True,
+                help="Send a test alert to this member's own email/Telegram "
+                "right now — no waiting for the next digest slot.",
+            ):
+                with st.spinner("Sending test alert..."):
+                    resp = _api_raw(
+                        f"/notifications/user/{uid}/test",
+                        method="POST",
+                        json_data={},
+                        timeout=30,
+                    )
+                if resp is None:
+                    st.error("Could not reach the API — is it running?")
+                else:
+                    try:
+                        data = resp.json()
+                    except Exception:
+                        data = {}
+                    if data.get("sent"):
+                        st.success(f"✅ {data.get('hint') or 'Test alert sent.'}")
+                    else:
+                        st.warning(f"{data.get('hint') or 'Nothing was sent.'}")
             if st.button("🗑 Remove", key=f"rm_{uid}", use_container_width=True):
                 resp = _api_raw(f"/users/{uid}", method="DELETE", timeout=30)
                 if resp is not None and resp.status_code in (200, 204, 404):
