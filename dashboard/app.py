@@ -1331,6 +1331,40 @@ def show_account() -> None:
         else:
             st.caption("No skills saved yet — upload your resume to extract them.")
 
+        # ── Test delivery right now ────────────────────────────────────
+        c_test, c_hint = st.columns([1, 3])
+        with c_test:
+            if st.button(
+                "🔔 Test my alerts",
+                use_container_width=True,
+                help="Send a test alert to YOUR email/Telegram right now — "
+                "no waiting for the daily slots.",
+            ):
+                with st.spinner("Sending test alert..."):
+                    resp = _api_raw(
+                        f"/notifications/user/{_current_user_id()}/test",
+                        method="POST",
+                        json_data={},
+                        timeout=30,
+                    )
+                if resp is None:
+                    st.error("Could not reach the API — is it running?")
+                else:
+                    try:
+                        data = resp.json()
+                    except Exception:
+                        data = {}
+                    if data.get("sent"):
+                        st.success(f"✅ {data.get('hint') or 'Test alert sent.'}")
+                    else:
+                        st.warning(f"{data.get('hint') or 'Nothing was sent.'}")
+        with c_hint:
+            st.caption(
+                "Verifies your email + Telegram delivery path with one tap. "
+                "For a full lookahead, use *Send Test Alert Now* and *Preview "
+                "my next digest* on the Settings page."
+            )
+
         # ── Invite a friend (multi-user growth) ────────────────────────
         st.divider()
         st.subheader("🤝 Invite a friend")
