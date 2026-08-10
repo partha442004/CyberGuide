@@ -475,6 +475,28 @@ class TestNotificationsAPI:
         assert data["sent"] is False
         assert "no email" in data["hint"].lower()
 
+    def test_user_test_alert_legacy_default_uses_shared_channels(
+        self, client, monkeypatch
+    ):
+        """The legacy user1 (no User row) tests via shared channels."""
+        from unittest import mock
+
+        manager = mock.MagicMock()
+        manager.notify = mock.AsyncMock(return_value={"email": True})
+        monkeypatch.setattr(
+            "interntrack.api.v1.notifications.NotificationManager",
+            lambda *_a, **_k: manager,
+        )
+        response = client.post("/api/v1/notifications/user/user1/test")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sent"] is True
+        # Shared delivery: NO recipient is passed (per-user contacts absent).
+        manager.notify.assert_awaited_once()
+        args, kwargs = manager.notify.await_args
+        assert kwargs.get("recipient") is None
+        assert list(args[0]) == ["email", "telegram"]
+
     def test_user_test_alert_malformed(self, client, monkeypatch):
         """A mangled profile still yields a structured response."""
         from types import SimpleNamespace

@@ -6,6 +6,17 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Cybersecurity-specific job boards in search discovery.** `_JOB_HOSTS`
+  gains CyberSecJobs (cybersecurityjobs.com), CyberSecurityJobsite,
+  CyberSN, ClearedJobs, Infosec Jobs, SecurityJobs, NinjaJobs and
+  TechFetch, plus two new `site:` queries targeting them — niche security
+  postings now surface instead of only general/India boards.
+- **Legacy `user1` test-alert support + Resume Match shortcut.** The
+  per-user test endpoint now falls back to the shared configured channels
+  for the legacy `user1` account (which has no User row), and the Resume
+  Match page gains a **🔔 Test my alerts** button that verifies delivery
+  to the logged-in account or the default user on demand.
+
 - **Per-user test-alert endpoint + Team page upgrades.** New
   `POST /notifications/user/{user_id}/test` routes a sample digest message
   to ONE user's own email + Telegram (mirroring the real daily digest), so

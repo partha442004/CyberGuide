@@ -41,6 +41,15 @@ class TestSearchEngineQueries:
             "site:foundit.in",
             "site:timesjobs.com",
             "site:hirect.in",
+            # Cybersecurity-specific boards.
+            "site:cybersecurityjobs.com",
+            "site:cybersecurityjobsite.com",
+            "site:cybersn.com",
+            "site:clearedjobs.net",
+            "site:infosec-jobs.com",
+            "site:securityjobs.net",
+            "site:ninjajobs.com",
+            "site:techfetch.com",
         ):
             assert host in joined, f"missing {host} in search queries"
 

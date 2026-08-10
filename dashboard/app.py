@@ -3559,6 +3559,35 @@ def show_resume_match() -> None:
             "*My Account* page to get your own personalized matching."
         )
 
+    # Test-alert shortcut: verify delivery to your own email/Telegram right
+    # now (works for the logged-in account AND the legacy user1 default).
+    c_test, _ = st.columns([1, 3])
+    with c_test:
+        if st.button(
+            "🔔 Test my alerts",
+            use_container_width=True,
+            help="Send a test alert to your own email/Telegram right now — "
+            "no waiting for the daily slots.",
+        ):
+            with st.spinner("Sending test alert..."):
+                resp = _api_raw(
+                    f"/notifications/user/{user_id}/test",
+                    method="POST",
+                    json_data={},
+                    timeout=30,
+                )
+            if resp is None:
+                st.error("Could not reach the API — is it running?")
+            else:
+                try:
+                    data = resp.json()
+                except Exception:
+                    data = {}
+                if data.get("sent"):
+                    st.success(f"✅ {data.get('hint') or 'Test alert sent.'}")
+                else:
+                    st.warning(f"{data.get('hint') or 'Nothing was sent.'}")
+
     # Upload
     uploaded_file = st.file_uploader("Upload your resume (PDF)", type=["pdf"])
 
