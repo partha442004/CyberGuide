@@ -309,6 +309,100 @@ async def send_user_test_alert(
         return {"sent": False, "results": {}, "hint": f"Could not send: {e}"}
 
 
+@router.get("/stats")
+async def get_notification_stats(
+    days: int = 30,
+    db: AsyncSession = Depends(get_db),
+):
+    """Aggregated alert-delivery stats across all users.
+
+    Powers the dashboard Alerts page: total sends, jobs delivered,
+    per-channel delivered/failed totals, a per-user breakdown and a daily
+    trend for the last N days. Pure read — never raises.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import select
+
+    from interntrack.domain.models import NotificationHistory
+
+    window = max(1, min(int(days), 90))
+    since = datetime.now(UTC) - timedelta(days=window)
+    result = await db.execute(
+        select(NotificationHistory)
+        .where(NotificationHistory.created_at >= since)
+        .order_by(NotificationHistory.created_at.asc())
+    )
+    rows = result.scalars().all()
+
+    per_channel: dict[str, dict[str, int]] = {}
+    per_user: dict[str, dict] = {}
+    trend: dict[str, dict[str, int]] = {}
+    total_sends = len(rows)
+    total_jobs = 0
+
+    for row in rows:
+        created = row.created_at
+        job_count = int(row.job_count or 0)
+        total_jobs += job_count
+
+        uid = str(row.user_id or "user1")
+        u = per_user.setdefault(
+            uid,
+            {
+                "sends": 0,
+                "jobs": 0,
+                "delivered": 0,
+                "failed": 0,
+                "last_sent_at": None,
+            },
+        )
+        u["sends"] += 1
+        u["jobs"] += job_count
+
+        day = (created or since).strftime("%Y-%m-%d")
+        t = trend.setdefault(day, {"sends": 0, "jobs": 0})
+        t["sends"] += 1
+        t["jobs"] += job_count
+
+        for ch, ok in (row.results or {}).items():
+            bucket = per_channel.setdefault(str(ch), {"delivered": 0, "failed": 0})
+            if ok:
+                bucket["delivered"] += 1
+                u["delivered"] += 1
+            else:
+                bucket["failed"] += 1
+                u["failed"] += 1
+        if created is not None and (
+            u["last_sent_at"] is None or created > u["last_sent_at"]
+        ):
+            u["last_sent_at"] = created
+
+    # Flatten the per-user rows for JSON (keep datetime comparison above).
+    for u in per_user.values():
+        if u["last_sent_at"] is not None:
+            u["last_sent"] = u["last_sent_at"].isoformat()
+        else:
+            u["last_sent"] = None
+        u.pop("last_sent_at", None)
+
+    delivered = sum(v["delivered"] for v in per_channel.values())
+    failed = sum(v["failed"] for v in per_channel.values())
+    return {
+        "days": window,
+        "total_sends": total_sends,
+        "total_jobs_sent": total_jobs,
+        "delivered": delivered,
+        "failed": failed,
+        "delivery_rate": round(delivered / (delivered + failed) * 100, 1)
+        if (delivered + failed)
+        else None,
+        "per_channel": per_channel,
+        "per_user": per_user,
+        "trend": [{"date": d, **v} for d, v in sorted(trend.items())],
+    }
+
+
 @router.get("/preferences/{user_id}", response_model=AlertPreferencesResponse)
 async def get_alert_preferences(
     user_id: str,
