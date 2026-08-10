@@ -24,6 +24,65 @@ async def run_job_discovery():
         print(f"[{datetime.now(UTC)}] Discovery: {len(jobs)} found, {len(saved)} saved")
 
 
+async def enrich_jobs_for_match(session, limit: int = 200) -> int:
+    """Backfill skill tags / required_skills on jobs that carry a description.
+
+    Many sources save descriptions without structured skills, so those jobs
+    score ``match_score: null`` against every resume. This sweep derives
+    tags + required_skills from the description text (same keyword engine
+    as ``auto_tag_job``) and persists them, so previously-matchless jobs
+    become scoreable. Best-effort: a failure never breaks the daily digest.
+    """
+    try:
+        from sqlalchemy import select
+
+        from interntrack.domain.models import Job
+        from interntrack.services.job_service import (
+            _derive_required_skills,
+            auto_tag_job,
+        )
+
+        result = await session.execute(
+            select(Job)
+            .where(Job.description.isnot(None))
+            .where(Job.description != "")
+            .order_by(Job.created_at.desc())
+            .limit(limit)
+        )
+        jobs = list(result.scalars().all())
+        updated = 0
+        for job in jobs:
+            changed = False
+            tags = [str(t) for t in (getattr(job, "tags", None) or []) if str(t)]
+            required = [
+                s for s in (getattr(job, "required_skills", None) or []) if str(s)
+            ]
+            data = {
+                "title": str(job.title or ""),
+                "description": str(job.description or ""),
+                "tags": tags,
+                "required_skills": required,
+            }
+            normalized = auto_tag_job(data)
+            new_tags = [t for t in (normalized.get("tags") or []) if t not in tags]
+            if new_tags:
+                job.tags = (tags + new_tags)[:15]
+                changed = True
+            if not required:
+                derived = _derive_required_skills(data)
+                if derived:
+                    job.required_skills = derived
+                    changed = True
+            if changed:
+                updated += 1
+        if updated:
+            await session.commit()
+        return updated
+    except Exception as e:  # noqa: BLE001 - enrichment must never break anything
+        print(f"[{datetime.now(UTC)}] Skill enrichment failed: {e}")
+        return 0
+
+
 # Default user whose alert preferences apply to the scheduled digest.
 DEFAULT_ALERT_USER = "user1"
 DEFAULT_DOMAINS = ["security"]  # Default alert domain when no user prefs
@@ -714,6 +773,21 @@ def _job_match_score(resume_skills: set | None, job: dict) -> float | None:
         return None
 
 
+def _calendar_link(title: str, company: str = "") -> str:
+    """Google Calendar 'add event' template URL for an interview."""
+    from urllib.parse import quote
+
+    text = f"Interview: {title} {company}".strip()
+    details = (
+        f"Interview with {company} for {title} — "
+        "open the job listing and update this slot with the actual time."
+    ).strip()
+    return (
+        "https://calendar.google.com/calendar/render?action=TEMPLATE"
+        f"&text={quote(text)}&details={quote(details)}"
+    )
+
+
 def _expiry_note(job: dict) -> str:
     """Expiry/status line for a job, or "" when it never expires."""
     if not job.get("is_active", True):
@@ -1003,6 +1077,24 @@ async def build_daily_report_message(
                 line += f" ({_esc(status)})"
             lines.append(line)
 
+    # 🗓️ Interview-stage applications with a Google Calendar add-link.
+    interviews = report.get("upcoming_interviews") or []
+    if interviews:
+        lines.append("")
+        lines.append(f"🗓️ Interviews upcoming ({len(interviews)}):")
+        for item in interviews[:5]:
+            title = item.get("job_title") or "Interview"
+            company = item.get("company") or ""
+            status = item.get("status") or ""
+            line = f"   🔔 {_esc(title)}"
+            if company:
+                line += f" @ {_esc(company)}"
+            if status:
+                line += f" ({_esc(status)})"
+            lines.append(line)
+            cal = _calendar_link(title, company)
+            lines.append(f"   📅 Add to calendar: {cal}")
+
     loc_lower = (user_location or "").strip().lower()
     for domain, items in sections:
         if loc_lower:
@@ -1107,6 +1199,23 @@ async def build_alert_chunks(
             if status:
                 line += f" ({_esc(status)})"
             closing_lines.append(line)
+
+    # 🗓️ Interview-stage applications with a calendar add-link.
+    interviews = report.get("upcoming_interviews") or []
+    if interviews:
+        closing_lines.append(f"🗓️ Interviews upcoming ({len(interviews)}):")
+        for item in interviews[:5]:
+            iv_title = item.get("job_title") or "Interview"
+            company = item.get("company") or ""
+            status = item.get("status") or ""
+            line = f"   🔔 {_esc(iv_title)}"
+            if company:
+                line += f" @ {_esc(company)}"
+            if status:
+                line += f" ({_esc(status)})"
+            closing_lines.append(line)
+            cal = _calendar_link(iv_title, company)
+            closing_lines.append(f"   📅 Add to calendar: {cal}")
 
     if not here_flat and not there_flat:
         head_lines = [format_daily_report(report, title)]
@@ -1407,6 +1516,34 @@ async def build_daily_report_html(
             f"<div style='font-size:16px;font-weight:700;margin-top:6px;'>"
             f"{jotd_title}</div>{jotd_meta_html}{jotd_desc_html}"
             f"<div style='margin-top:8px;'>{jotd_score_txt}</div>{jotd_link}</div>"
+        )
+
+    # 🗓️ Interview-stage applications section (email) with calendar links.
+    interviews = report.get("upcoming_interviews") or []
+    if interviews:
+        iv_rows = []
+        for item in interviews[:5]:
+            title = _esc(item.get("job_title") or "Interview")
+            company = _esc(item.get("company") or "")
+            status = _esc(item.get("status") or "")
+            cal = _esc(_calendar_link(title, company))
+            iv_rows.append(
+                "<div style='display:flex;justify-content:space-between;"
+                "align-items:center;border-bottom:1px dashed #e2e8f0;"
+                "padding:10px 0;'>"
+                f"<div><b style='font-size:14px;'>{title}</b>"
+                f"<div style='color:#64748b;font-size:13px;'>"
+                f"{company} · {status}</div></div>"
+                f"<a href='{cal}' style='background:#10b981;color:#fff;"
+                "text-decoration:none;border-radius:6px;padding:7px 14px;"
+                "font-size:12px;font-weight:700;'>📅 Add to calendar</a></div>"
+            )
+        parts.append(
+            "<div style='margin-top:24px;background:#ecfdf5;"
+            "border:1px solid #a7f3d0;border-radius:12px;padding:16px 18px;'>"
+            f"<div style='font-size:14px;font-weight:800;color:#047857;'>"
+            f"🗓️ Interviews upcoming ({len(interviews)})</div>"
+            f"{''.join(iv_rows)}</div>"
         )
 
     # ⏰ Follow-up reminders section (email).

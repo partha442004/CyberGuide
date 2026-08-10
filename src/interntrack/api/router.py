@@ -14,6 +14,7 @@ from interntrack.api.v1 import (
     users,
     watchlists,
 )
+from interntrack.api.v1.ai_tools import router as ai_tools_router
 from interntrack.api.v1.applications_v2 import router as applications_v2_router
 from interntrack.api.v1.bookmarks import router as bookmarks_router
 from interntrack.api.v1.domains import router as domains_router
@@ -66,3 +67,4 @@ api_router.include_router(
     weekly_digest_router, prefix="/v1/digest", tags=["Weekly Digest"]
 )
 api_router.include_router(bookmarks_router, prefix="/v1/bookmarks", tags=["Bookmarks"])
+api_router.include_router(ai_tools_router, prefix="/v1/ai", tags=["AI Tools"])

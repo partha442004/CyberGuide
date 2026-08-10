@@ -211,6 +211,11 @@ class TestNotificationManager:
         mock_settings.twilio_account_sid = None
         mock_settings.twilio_auth_token = None
         mock_settings.twilio_phone_number = None
+        mock_settings.is_whatsapp_configured = False
+        mock_settings.twilio_whatsapp_number = None
+        mock_settings.is_resend_configured = False
+        mock_settings.resend_api_key = None
+        mock_settings.resend_from = None
 
         session = AsyncMock()
         manager = NotificationManager(session)
@@ -269,6 +274,11 @@ class TestNotificationManager:
         mock_settings.smtp_password = None
         mock_settings.discord_webhook_url = None
         mock_settings.slack_webhook_url = None
+        mock_settings.resend_api_key = None
+        mock_settings.twilio_account_sid = None
+        mock_settings.twilio_auth_token = None
+        mock_settings.twilio_phone_number = None
+        mock_settings.twilio_whatsapp_number = None
 
         session = AsyncMock()
         manager = NotificationManager(session)
@@ -288,6 +298,11 @@ class TestNotificationManager:
         mock_settings.smtp_password = None
         mock_settings.discord_webhook_url = None
         mock_settings.slack_webhook_url = None
+        mock_settings.resend_api_key = None
+        mock_settings.twilio_account_sid = None
+        mock_settings.twilio_auth_token = None
+        mock_settings.twilio_phone_number = None
+        mock_settings.twilio_whatsapp_number = None
 
         session = AsyncMock()
         manager = NotificationManager(session)
@@ -301,3 +316,100 @@ class TestNotificationManager:
 
         assert "telegram" in results
         assert results["telegram"] is True
+
+
+class TestWhatsAppChannel:
+    """WhatsApp channel sends through Twilio with the whatsapp: prefix."""
+
+    @pytest.mark.asyncio
+    async def test_send_uses_whatsapp_prefix(self):
+        from interntrack.services.notification_service import WhatsAppChannel
+
+        channel = WhatsAppChannel(
+            "sid", "tok", "whatsapp:+14155238886", "+919876543210"
+        )
+
+        captured: dict = {}
+
+        class FakeResp:
+            status_code = 201
+
+        class FakeClient:
+            def __init__(self, *args, **kwargs):
+                captured["kwargs"] = kwargs
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return None
+
+            async def post(self, url, data, **kwargs):
+                captured["url"] = url
+                captured["data"] = data
+                return FakeResp()
+
+        with patch("httpx.AsyncClient", return_value=FakeClient()):
+            ok = await channel.send("New job alert")
+
+        assert ok is True
+        assert captured["data"]["To"] == "whatsapp:+919876543210"
+        assert captured["data"]["From"] == "whatsapp:+14155238886"
+        assert captured["data"]["Body"] == "New job alert"
+
+    @pytest.mark.asyncio
+    async def test_send_fails_closed_without_recipient(self):
+        from interntrack.services.notification_service import WhatsAppChannel
+
+        channel = WhatsAppChannel("sid", "tok", "whatsapp:+14155238886", None)
+        assert await channel.send("hi") is False
+
+
+class TestResendEmailChannel:
+    """Resend email channel posts HTML via the Resend HTTP API."""
+
+    @pytest.mark.asyncio
+    async def test_send_posts_to_resend(self):
+        from interntrack.services.notification_service import ResendEmailChannel
+
+        channel = ResendEmailChannel(
+            "re_key", "InternTrack <alerts@example.com>", "user@example.com"
+        )
+
+        captured: dict = {}
+
+        class FakeResp:
+            status_code = 200
+
+        class FakeClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return None
+
+            async def post(self, url, headers, json, **kwargs):
+                captured["url"] = url
+                captured["headers"] = headers
+                captured["json"] = json
+                return FakeResp()
+
+        with patch("httpx.AsyncClient", return_value=FakeClient()):
+            ok = await channel.send("<h1>Digest</h1>", subject="Daily Report")
+
+        assert ok is True
+        assert captured["url"] == "https://api.resend.com/emails"
+        assert captured["headers"]["Authorization"] == "Bearer re_key"
+        assert captured["json"]["to"] == ["user@example.com"]
+        assert captured["json"]["subject"] == "Daily Report"
+        assert captured["json"]["html"] == "<h1>Digest</h1>"
+
+    @pytest.mark.asyncio
+    async def test_send_fails_closed_without_recipient(self):
+        from interntrack.services.notification_service import ResendEmailChannel
+
+        channel = ResendEmailChannel("re_key", "a@b.com", None)
+        assert await channel.send("hi") is False

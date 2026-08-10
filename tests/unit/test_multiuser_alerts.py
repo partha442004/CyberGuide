@@ -189,6 +189,9 @@ class TestNotifyRecipientChannels:
             settings.email_from = "noreply@x.com"
             settings.telegram_bot_token = "bot-token"
             settings.telegram_chat_id = "shared-chat"
+            # Keep Resend out so the patched EmailChannel handles the send.
+            settings.resend_api_key = None
+            settings.is_whatsapp_configured = False
             email_cls.return_value.send = AsyncMock(return_value=True)
             tg_cls.return_value.send = AsyncMock(return_value=True)
 

@@ -4,8 +4,55 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Search-engine discovery scraper (DuckDuckGo, no API key).** New
+  `SearchEngineScraper` builds `site:`-scoped queries for sources that
+  block direct scraping (Naukri, Indeed, Glassdoor, Freshersworld…) and
+  for board-less job postings, extracts result links, fetches each detail
+  page for title/company/description, and saves them under the new
+  `search_engine` source (auto-coerced to `JobSource.SEARCH_ENGINE`).
+  Registered in the scraper registry + discovery sources; new
+  `POST /api/v1/jobs/enrich` endpoint triggers the enrichment sweep.
+- **AI skill extraction from job descriptions.** The job model now has
+  `required_skills` / `preferred_skills` JSON columns (auto-added to live
+  tables by the column sync). `auto_tag_job` derives both from the
+  description via an expanded keyword dictionary; a scheduled enrichment
+  sweep backfills skills + match scores on jobs that lack them, and the
+  resume-match engine consumes them for sharper match %.
+- **AI tools router (`/api/v1/ai`): cover letters, interview questions,
+  why-I-match.** One call per job generates a tailored cover letter from
+  the resume + job description, 5 likely interview questions, and a
+  "why you match" explainer with the match %. New dashboard page
+  "AI Tools" with job picker + generated copy.
+- **Resend email channel + WhatsApp channel in the notification manager.**
+  `ResendEmailChannel` (HTTP API, beats SMTP deliverability) and
+  `WhatsAppChannel` (Twilio WhatsApp sandbox, `whatsapp:` prefix). The
+  manager prefers Resend for `email` when `RESEND_API_KEY` is set, and
+  per-user recipient resolution supports phone numbers for both SMS and
+  WhatsApp. Config gained `RESEND_API_KEY`, `RESEND_FROM`,
+  `TWILIO_WHATSAPP_NUMBER` (+ `is_*_configured` helpers).
+- **Salary benchmarks by role × city.** `GET /api/v1/salary-insights/
+  benchmarks` aggregates stored salary_min/max into per-role-per-city
+  median/spread; the dashboard salary page renders the benchmark table.
+- **Interview calendar reminders in digests.** The report service now
+  includes `upcoming_interviews` (applications with interview status),
+  each with a Google Calendar link + countdown; daily digest HTML/Telegram
+  render them in their own section.
+- **PWA installable dashboard.** `/manifest.webmanifest` +
+  `/sw.js` served by the API (`/api/v1/pwa`); the dashboard head links
+  the manifest so mobile users can "Add to Home Screen".
+
 ### Fixed
 
+- **Notification manager tests account for the new Resend/WhatsApp
+  channels.** The Resend channel is registered under `email` when
+  `RESEND_API_KEY` is set, which made settings-mocking tests that didn't
+  disable it fail; they now explicitly null `resend_api_key` and disable
+  `is_whatsapp_configured`.
+- **Report service typing.** `_upcoming_interviews` / `_pending_follow_ups`
+  job lookups annotate the comprehension with an `isinstance` guard so
+  mypy resolves the row type correctly.
 - **Internshala scraper now saves direct internship links.** Two regressions
   made Internshala useless: the keyword/city search URLs (`/internships/
   keyword/...`, `/internships/{city}/{query}/`) redirect server-side to the

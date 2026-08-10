@@ -64,6 +64,15 @@ class Settings(BaseSettings):
     # Optional default recipient (the account owner's phone, E.164) used when
     # a message targets the shared/owner channel with no per-user recipient.
     twilio_default_to: str | None = None
+    # Twilio WhatsApp sender (e.g. "whatsapp:+14155238886" — the sandbox or a
+    # verified business number). Same SID/token as SMS; messages go out with
+    # the whatsapp: prefix on both From and To.
+    twilio_whatsapp_number: str | None = None
+
+    # Email - Resend (HTTP API; preferred over SMTP when configured)
+    resend_api_key: str | None = None
+    # Sender for Resend; falls back to ``email_from`` when unset.
+    resend_from: str | None = None
 
     # Email - SMTP
     smtp_host: str = "smtp.gmail.com"
@@ -133,6 +142,18 @@ class Settings(BaseSettings):
             and self.twilio_auth_token
             and self.twilio_phone_number
         )
+
+    @property
+    def is_whatsapp_configured(self) -> bool:
+        return bool(
+            self.twilio_account_sid
+            and self.twilio_auth_token
+            and self.twilio_whatsapp_number
+        )
+
+    @property
+    def is_resend_configured(self) -> bool:
+        return bool(self.resend_api_key)
 
     @property
     def is_ai_configured(self) -> bool:

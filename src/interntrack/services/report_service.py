@@ -211,6 +211,61 @@ class ReportService:
             return None
         return naive.isoformat()
 
+    async def _upcoming_interviews(
+        self,
+        user_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Applications at interview/assessment stage, with job links.
+
+        Scoped to ``user_id`` when given. The digest renders these with a
+        Google Calendar add-link so the user can schedule the interview.
+        """
+        try:
+            from sqlalchemy import select
+
+            from interntrack.domain.enums import ApplicationStatus
+            from interntrack.domain.models import Application
+            from interntrack.domain.models import Job as JobModel
+
+            statuses = [
+                ApplicationStatus.INTERVIEW.value,
+                ApplicationStatus.ASSESSMENT.value,
+            ]
+            query = (
+                select(Application)
+                .where(Application.status.in_(statuses))
+                .order_by(Application.updated_at.desc())
+                .limit(10)
+            )
+            if user_id:
+                query = query.where(Application.user_id == user_id)
+            result = await self.session.execute(query)
+            apps = list(result.scalars().all())
+            if not apps:
+                return []
+            job_by_id: dict[str, JobModel] = {}
+            job_ids = {str(getattr(a, "job_id", "") or "") for a in apps}
+            result = await self.session.execute(
+                select(JobModel).where(JobModel.id.in_(job_ids))
+            )
+            rows = list(result.scalars().all())
+            job_by_id = {str(job.id): job for job in rows if isinstance(job, JobModel)}
+            items: list[dict[str, Any]] = []
+            for app in apps:
+                job = job_by_id.get(str(getattr(app, "job_id", "") or ""))
+                items.append(
+                    {
+                        "job_title": str(job.title or "") if job else "Interview",
+                        "company": str(job.company or "") if job else "",
+                        "status": str(getattr(app, "status", "") or ""),
+                        "url": str(job.url or "") if job else "",
+                        "applied_at": self._fmt_dt(getattr(app, "applied_at", None)),
+                    },
+                )
+            return items
+        except Exception:  # noqa: BLE001 - interviews must never break the digest
+            return []
+
     async def _pending_follow_ups(
         self,
         user_id: str | None = None,
@@ -237,7 +292,8 @@ class ReportService:
             result = await self.session.execute(
                 select(JobModel).where(JobModel.id.in_(job_ids))
             )
-            job_by_id = {str(job.id): job for job in result.scalars().all()}
+            rows = list(result.scalars().all())
+            job_by_id = {str(job.id): job for job in rows if isinstance(job, JobModel)}
         for app in pending:
             job = job_by_id.get(str(getattr(app, "job_id", "") or ""))
             items.append(
@@ -370,6 +426,7 @@ class ReportService:
             # Applications that have been submitted/interviewing but are still
             # pending follow-up — the digest nudges the user to chase them.
             "follow_up": await self._pending_follow_ups(user_id=user_id),
+            "upcoming_interviews": await self._upcoming_interviews(user_id=user_id),
             "application_status": status_counts,
         }
 

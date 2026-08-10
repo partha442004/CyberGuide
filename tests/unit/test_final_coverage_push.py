@@ -26,6 +26,8 @@ class TestNotificationServiceExtended:
             mock_settings.twilio_account_sid = None
             mock_settings.twilio_auth_token = None
             mock_settings.twilio_phone_number = None
+            mock_settings.resend_api_key = None
+            mock_settings.is_whatsapp_configured = False
             manager = NotificationManager(session)
         assert manager.get_configured_channels() == []
 
@@ -42,6 +44,8 @@ class TestNotificationServiceExtended:
             mock_settings.smtp_password = None
             mock_settings.discord_webhook_url = "https://discord.com/webhook"
             mock_settings.slack_webhook_url = None
+            mock_settings.resend_api_key = None
+            mock_settings.is_whatsapp_configured = False
             manager = NotificationManager(session)
         channels = manager.get_configured_channels()
         assert "telegram" in channels
@@ -61,6 +65,8 @@ class TestNotificationServiceExtended:
             mock_settings.smtp_password = None
             mock_settings.discord_webhook_url = None
             mock_settings.slack_webhook_url = None
+            mock_settings.resend_api_key = None
+            mock_settings.is_whatsapp_configured = False
             manager = NotificationManager(session)
         results = await manager.notify(["email"], "test message")
         assert results["email"] is False

@@ -74,6 +74,7 @@ class JobSource(str, Enum):
     NAUKRI = "naukri"
     FRESHERWORLD = "freshersworld"
     APNA = "apna"
+    SEARCH_ENGINE = "search_engine"
     COMPANY = "company"
     MANUAL = "manual"
     UNKNOWN = "unknown"

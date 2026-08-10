@@ -234,6 +234,11 @@ class TestNotificationManager:
             mock_settings.twilio_account_sid = None
             mock_settings.twilio_auth_token = None
             mock_settings.twilio_phone_number = None
+            mock_settings.is_whatsapp_configured = False
+            mock_settings.twilio_whatsapp_number = None
+            mock_settings.is_resend_configured = False
+            mock_settings.resend_api_key = None
+            mock_settings.resend_from = None
             return NotificationManager(mock_session)
 
     def test_init_no_channels(self, manager):
