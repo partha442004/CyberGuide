@@ -16,6 +16,33 @@ from interntrack.services.report_service import ReportService
 router = APIRouter()
 
 
+def _resolve_slot_domains(prefs: dict, slot: str | None) -> list[str] | None:
+    """Resolve which domains a scheduled (slot) send should use.
+
+    Precedence: the user's per-slot override, then the user's saved
+    general domain preference, then the slot default. Returning ``None``
+    means "leave the caller's domain choice untouched" (no slot given, or
+    nothing configured).
+
+    The middle tier matters: without it, a user who explicitly chose
+    ``["frontend"]`` was silently swapped to the slot default
+    (e.g. ``["coding"]``) on every cron send, so their digest never
+    contained their chosen domain's jobs.
+    """
+    if not slot:
+        return None
+    slot_domains = prefs.get("slot_domains") or {}
+    if slot in slot_domains and slot_domains[slot]:
+        return list(slot_domains[slot])
+    if prefs.get("domains"):
+        return list(prefs["domains"])
+    from interntrack.scheduler.jobs import DEFAULT_SLOT_DOMAINS
+
+    if slot in DEFAULT_SLOT_DOMAINS:
+        return list(DEFAULT_SLOT_DOMAINS[slot])
+    return None
+
+
 async def _send_alert_digest(
     db,
     prefs: dict,
@@ -220,7 +247,6 @@ async def get_daily_report(
     """
     from interntrack.scheduler.jobs import (
         DEFAULT_LOCATION,
-        DEFAULT_SLOT_DOMAINS,
         _alerts_paused,
         _mark_alert_sent,
     )
@@ -233,13 +259,13 @@ async def get_daily_report(
             continue
         domains = prefs.get("domains") or None
         if slot:
-            # A configured slot wins; otherwise fall back to the slot
-            # default so the three cron sends get distinct categories.
-            slot_domains = prefs.get("slot_domains") or {}
-            if slot in slot_domains and slot_domains[slot]:
-                domains = slot_domains[slot]
-            elif slot in DEFAULT_SLOT_DOMAINS:
-                domains = DEFAULT_SLOT_DOMAINS[slot]
+            # A per-slot override wins, then the user's own saved domains
+            # (never silently swapped for the slot default), then the slot
+            # default so the three cron sends get distinct categories for
+            # users who haven't chosen anything.
+            resolved = _resolve_slot_domains(prefs, slot)
+            if resolved is not None:
+                domains = resolved
         # Each target's digest is scoped to *their* city (legacy default
         # user falls back to DEFAULT_LOCATION) plus remote/WFH when they
         # opted in — so a Bangalore user never gets every-city listings.

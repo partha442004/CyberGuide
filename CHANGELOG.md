@@ -54,6 +54,13 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Fixed
 
+- **User domain preferences no longer lost on scheduled (slot) sends.**
+  The daily-digest endpoint resolved slot categories as "per-slot override,
+  else slot default" — so a user who explicitly chose `["frontend"]` was
+  silently switched to the slot default (e.g. `["coding"]`) on every cron
+  send, and their digest was always empty. `_resolve_slot_domains` now
+  prefers the user's saved `domains` over the slot default (per-slot
+  override still wins), with a dedicated regression test suite.
 - **Notification manager tests account for the new Resend/WhatsApp
   channels.** The Resend channel is registered under `email` when
   `RESEND_API_KEY` is set, which made settings-mocking tests that didn't
