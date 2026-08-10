@@ -110,7 +110,13 @@ class InternshalaDirectScraper(BaseScraper):
     ) -> list[RawJob]:
         import httpx
 
-        search_url = self._search_url(query, location)
+        # City-suffixed category pages only exist for the big metros; when a
+        # city page yields nothing (or the metro slug doesn't exist) fall back
+        # to the plain category page — the digests filter by user location
+        # downstream anyway.
+        candidates = [self._search_url(query, location)]
+        if location:
+            candidates.append(self._search_url(query, None))
         jobs: list[RawJob] = []
         try:
             async with httpx.AsyncClient(
@@ -123,40 +129,48 @@ class InternshalaDirectScraper(BaseScraper):
                     "Accept": "text/html,application/xhtml+xml",
                 },
             ) as client:
-                resp = await client.get(search_url)
-                if resp.status_code != 200:
-                    logger.warning(
-                        "Internshala returned %d for %s", resp.status_code, search_url
-                    )
-                    return jobs
-
-                html = resp.text
-                # Internshala canonicalizes slugs server-side (e.g.
-                # ``cybersecurity-internship`` -> ``cyber-security-internship``),
-                # so the final URL is trusted. Only an unknown slug redirects to
-                # the bare /internships/ page — then retry with the keyword
-                # search page and let the relevance filter drop the junk.
-                final_path = urlparse(str(resp.url)).path.rstrip("/")
-                if final_path in ("/internships", ""):
-                    q_url = f"{self.BASE_URL}/internships/?q=" + query.strip().replace(
-                        " ", "+"
-                    )
-                    resp = await client.get(q_url)
+                cards: list[dict] = []
+                for search_url in candidates:
+                    resp = await client.get(search_url)
                     if resp.status_code != 200:
-                        return jobs
-                    html = resp.text
+                        logger.warning(
+                            "Internshala returned %d for %s",
+                            resp.status_code,
+                            search_url,
+                        )
+                        continue
 
-                cards = self._extract_cards(html)
-                if not cards:
-                    cards = self._extract_detail_anchors(html)
-                # The generic feed only appears for unknown slugs; keep entries
-                # that actually match the query (same precision helper the other
-                # board scrapers use).
-                cards = [
-                    card
-                    for card in cards
-                    if matches_query(card["title"], query, title=card["title"])
-                ]
+                    html = resp.text
+                    # Internshala canonicalizes slugs server-side (e.g.
+                    # ``cybersecurity-internship`` -> ``cyber-security-internship``),
+                    # so the final URL is trusted. Only an unknown slug redirects
+                    # to the bare /internships/ page — then retry with the keyword
+                    # search page and let the relevance filter drop the junk.
+                    final_path = urlparse(str(resp.url)).path.rstrip("/")
+                    if final_path in ("/internships", ""):
+                        q_url = (
+                            f"{self.BASE_URL}/internships/?q="
+                            + query.strip().replace(" ", "+")
+                        )
+                        resp = await client.get(q_url)
+                        if resp.status_code != 200:
+                            continue
+                        html = resp.text
+
+                    cards = self._extract_cards(html)
+                    if not cards:
+                        cards = self._extract_detail_anchors(html)
+                    # The generic feed only appears for unknown slugs / cities;
+                    # keep entries that actually match the query (same precision
+                    # helper the other board scrapers use) and only stop once a
+                    # candidate yields relevant cards.
+                    cards = [
+                        card
+                        for card in cards
+                        if matches_query(card["title"], query, title=card["title"])
+                    ]
+                    if cards:
+                        break
                 for card in cards[:limit]:
                     jobs.append(
                         RawJob(
