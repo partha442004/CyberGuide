@@ -470,6 +470,10 @@ class AlertPreferences(Base, TimestampMixin):
     # instant) are suppressed until this timestamp. Auto-added to existing
     # live tables by init_db's ``_sync_missing_columns`` step.
     paused_until = Column(DateTime, nullable=True)
+    # Job ids already flagged in a "Closing soon" alert, so each expiring
+    # posting nudges the user exactly once (pruned after the job closes).
+    # Auto-added to existing live tables by ``_sync_missing_columns``.
+    closing_soon_sent = Column(JSON, nullable=True)
 
     @validates("last_alert_at", "paused_until")
     def _coerce_naive_utc(self, _key: str, value):

@@ -1313,3 +1313,187 @@ class TestJobOfDay:
         score, job = _job_of_day(sections, user_location="Bangalore")
         assert job["title"] == "Remote SOC"
         assert score == 85.0
+
+
+class TestClosingSoonSweep:
+    """Tests for the closing-soon alert sweep."""
+
+    @pytest.mark.asyncio
+    async def test_sends_matching_closing_jobs_once(self, monkeypatch):
+        """A matching expiring job alerts the user with an Apply button."""
+        from types import SimpleNamespace
+
+        from interntrack.scheduler.jobs import _send_closing_soon_sweep
+
+        class FakeJob:
+            id = "j1"
+            title = "SOC Analyst"
+            company = "CyberCorp"
+            location = "Bengaluru"
+            url = "https://apply/j1"
+            expires_at = None
+            tags = ["soc", "security"]
+
+        target = {
+            "user_id": "u1",
+            "prefs": {"domains": ["security"], "channels": ["email"]},
+            "user": SimpleNamespace(
+                email="u@x.com",
+                telegram_chat_id="7",
+                phone_number=None,
+                location="Bangalore",
+            ),
+        }
+        manager = MagicMock()
+        manager.get_configured_channels.return_value = ["email"]
+        manager.notify = AsyncMock(return_value={"email": True})
+        pref = SimpleNamespace(closing_soon_sent=None)
+        pref_row = MagicMock()
+        pref_row.scalar_one_or_none.return_value = pref
+
+        session = AsyncMock()
+        session.execute.return_value = pref_row
+        session.commit = AsyncMock()
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._enabled_alert_targets",
+            AsyncMock(return_value=[target]),
+        )
+        monkeypatch.setattr(
+            "interntrack.repositories.job_repository.JobRepository",
+            MagicMock(
+                return_value=MagicMock(
+                    get_closing_soon=AsyncMock(return_value=[FakeJob()])
+                )
+            ),
+        )
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._record_alert_history", AsyncMock()
+        )
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs.NotificationManager",
+            lambda *_a, **_k: manager,
+        )
+
+        sent = await _send_closing_soon_sweep(session)
+
+        assert sent == {"u1": 1}
+        manager.notify.assert_awaited_once()
+        _, kwargs = manager.notify.await_args
+        assert kwargs["recipient"]["email"] == "u@x.com"
+        assert kwargs["buttons"]  # Apply button present
+        # Dedup bookkeeping persisted.
+        assert pref.closing_soon_sent == ["j1"]
+
+    @pytest.mark.asyncio
+    async def test_skips_already_alerted_jobs(self, monkeypatch):
+        """A job already flagged in a previous sweep is not re-sent."""
+        from types import SimpleNamespace
+
+        from interntrack.scheduler.jobs import _send_closing_soon_sweep
+
+        class FakeJob:
+            id = "j1"
+            title = "SOC Analyst"
+            company = "CyberCorp"
+            location = "Bengaluru"
+            url = "https://apply/j1"
+            expires_at = None
+            tags = ["soc", "security"]
+
+        target = {
+            "user_id": "u1",
+            "prefs": {"domains": ["security"], "channels": ["email"]},
+            "user": SimpleNamespace(
+                email="u@x.com",
+                telegram_chat_id=None,
+                phone_number=None,
+                location="Bangalore",
+            ),
+        }
+        manager = MagicMock()
+        manager.notify = AsyncMock(return_value={"email": True})
+        pref = SimpleNamespace(closing_soon_sent=["j1"])
+        pref_row = MagicMock()
+        pref_row.scalar_one_or_none.return_value = pref
+
+        session = AsyncMock()
+        session.execute.return_value = pref_row
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._enabled_alert_targets",
+            AsyncMock(return_value=[target]),
+        )
+        monkeypatch.setattr(
+            "interntrack.repositories.job_repository.JobRepository",
+            MagicMock(
+                return_value=MagicMock(
+                    get_closing_soon=AsyncMock(return_value=[FakeJob()])
+                )
+            ),
+        )
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs.NotificationManager",
+            lambda *_a, **_k: manager,
+        )
+
+        sent = await _send_closing_soon_sweep(session)
+
+        assert sent == {}
+        manager.notify.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_domain_mismatch_skips_user(self, monkeypatch):
+        """A closing job outside the user's domains is ignored."""
+        from types import SimpleNamespace
+
+        from interntrack.scheduler.jobs import _send_closing_soon_sweep
+
+        class FakeJob:
+            id = "j1"
+            title = "React Developer"
+            company = "WebCo"
+            location = "Bangalore"
+            url = "https://apply/j1"
+            expires_at = None
+            tags = ["react"]
+
+        target = {
+            "user_id": "u1",
+            "prefs": {"domains": ["security"], "channels": ["email"]},
+            "user": SimpleNamespace(
+                email="u@x.com",
+                telegram_chat_id=None,
+                phone_number=None,
+                location="Bangalore",
+            ),
+        }
+        manager = MagicMock()
+        manager.notify = AsyncMock(return_value={"email": True})
+        pref_row = MagicMock()
+        pref_row.scalar_one_or_none.return_value = None
+
+        session = AsyncMock()
+        session.execute.return_value = pref_row
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._enabled_alert_targets",
+            AsyncMock(return_value=[target]),
+        )
+        monkeypatch.setattr(
+            "interntrack.repositories.job_repository.JobRepository",
+            MagicMock(
+                return_value=MagicMock(
+                    get_closing_soon=AsyncMock(return_value=[FakeJob()])
+                )
+            ),
+        )
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs.NotificationManager",
+            lambda *_a, **_k: manager,
+        )
+
+        sent = await _send_closing_soon_sweep(session)
+
+        assert sent == {}
+        manager.notify.assert_not_awaited()

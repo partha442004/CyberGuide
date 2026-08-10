@@ -11,6 +11,7 @@ from interntrack.scheduler.jobs import (
     deactivate_expired_jobs,
     generate_daily_report,
     run_job_discovery,
+    send_closing_soon_alerts,
     verify_job_links,
 )
 
@@ -54,6 +55,23 @@ def setup_scheduler():
         CronTrigger(hour=2, minute=0),
         id="link_verification",
         name="Link Verification",
+        replace_existing=True,
+    )
+
+    # Closing-soon alerts twice a day (UTC): once in the morning, once in
+    # the evening — jobs expiring within 48h nudge each matching user once.
+    scheduler.add_job(
+        send_closing_soon_alerts,
+        CronTrigger(hour=4, minute=30),
+        id="closing_soon_alerts_morning",
+        name="Closing Soon Alerts (morning)",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        send_closing_soon_alerts,
+        CronTrigger(hour=12, minute=30),
+        id="closing_soon_alerts_evening",
+        name="Closing Soon Alerts (evening)",
         replace_existing=True,
     )
 
