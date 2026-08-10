@@ -678,8 +678,13 @@ class TestReportsAPIUnit:
         assert result["report_type"] == "daily"
 
     @pytest.mark.asyncio
-    async def test_daily_report_unconfigured_slot_uses_default(self):
-        """A slot with no saved categories falls back to its default bucket."""
+    async def test_daily_report_unconfigured_slot_keeps_saved_domains(self):
+        """A saved domain preference wins over the slot default bucket.
+
+        Regression: a user who chose ``["coding"]`` must not be silently
+        switched to the slot default (e.g. ``["security"]``) on scheduled
+        sends — their digest would always contain the wrong domain.
+        """
         from interntrack.api.v1.reports import get_daily_report
 
         mock_service = MagicMock()
@@ -724,9 +729,10 @@ class TestReportsAPIUnit:
         ):
             result = await get_daily_report(db=AsyncMock(), slot="morning")
 
-        # No slot_domains saved -> DEFAULT_SLOT_DOMAINS["morning"] = security.
+        # No per-slot override saved, but the user DID choose domains —
+        # their preference wins over DEFAULT_SLOT_DOMAINS["morning"].
         mock_service.generate_daily_report.assert_called_once_with(
-            domains=["security"],
+            domains=["coding"],
             min_match_score=None,
             since=None,
             location="Bangalore",
