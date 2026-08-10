@@ -674,6 +674,48 @@ def _is_fresh_24h(iso_str: Any) -> bool:
         return False
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def _salary_benchmark_map() -> dict:
+    """(domain, city-lower) -> benchmark row, from live salary data (cached 1h)."""
+    data = fetch_data("/salary/benchmarks") or {}
+    out: dict = {}
+    for row in data.get("rows") or []:
+        key = (
+            str(row.get("domain") or "").lower(),
+            str(row.get("city") or "").lower(),
+        )
+        out[key] = row
+    return out
+
+
+def _salary_estimate_html(job: dict) -> str:
+    """'💰 est ₹X–₹Y' chip from live benchmarks when the posting hides salary.
+
+    Returns '' when the job lists its own salary (the card shows that
+    instead) or when no benchmark exists for the job's domain+city.
+    """
+    if job.get("salary_min") or job.get("salary_max"):
+        return ""
+    domain = classify_domain(str(job.get("title") or ""))
+    loc = str(job.get("location") or "Remote")
+    city = loc.split(",")[0].strip().lower()
+    bm = _salary_benchmark_map().get((domain.lower(), city))
+    med = int(bm.get("median") or 0) if bm else 0
+    if not med:
+        return ""
+    low = int(med * 0.75)
+    high = int(med * 1.25)
+    if med >= 100000:  # INR scale: 1.5M -> 15L
+        low_s, high_s = f"{low / 100000:.1f}L", f"{high / 100000:.1f}L"
+        symbol = "₹"
+    else:  # USD scale
+        low_s, high_s = f"{low // 1000}k", f"{high // 1000}k"
+        symbol = "$"
+    return (
+        f'<span class="chip chip-salary">💰 est {symbol}{low_s}–{symbol}{high_s}</span>'
+    )
+
+
 def _hours_ago(iso_str: Any) -> str:
     """Human '3h ago' / '2d ago' label for a timestamp, or '—'."""
     if not iso_str:
@@ -816,6 +858,13 @@ def _render_job(job: dict, match: Any = None) -> None:
                     f"{sal_a} – {sal_b}</span></div>",
                     unsafe_allow_html=True,
                 )
+            else:
+                _est = _salary_estimate_html(job)
+                if _est:
+                    st.markdown(
+                        f'<div class="chip-row">{_est}</div>',
+                        unsafe_allow_html=True,
+                    )
 
             if job.get("description"):
                 desc = str(job["description"]).strip()

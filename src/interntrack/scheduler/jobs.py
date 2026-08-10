@@ -528,6 +528,144 @@ async def _send_instant_alerts(session, saved_jobs: list) -> dict:
     return sent
 
 
+async def _send_closing_soon_sweep(session) -> dict:
+    """One '🚨 Closing soon' alert per user for jobs expiring within 48h.
+
+    Matches each enabled account's saved domains (and preferred location,
+    with the remote opt-in) against jobs closing in the next 2 days and
+    sends ONE digest-style message per user with Apply buttons. Each job is
+    flagged exactly once per user — sent job ids are kept in
+    ``AlertPreferences.closing_soon_sent`` (auto-added to live tables by
+    ``_sync_missing_columns``) and pruned once the job has closed. Never
+    raises; returns ``{user_id: job_count}`` for logging.
+    """
+    sent: dict = {}
+    try:
+        from sqlalchemy import select
+
+        from interntrack.domain.models import AlertPreferences
+        from interntrack.repositories.job_repository import JobRepository
+        from interntrack.utils.helpers import location_allows
+
+        targets = await _enabled_alert_targets(session)
+        if not targets:
+            return {}
+        closing = await JobRepository(session).get_closing_soon(days=2)
+        if not closing:
+            return {}
+        closing_list: list[dict] = [
+            {
+                "id": str(j.id),
+                "title": str(j.title or "Untitled"),
+                "company": str(j.company or "Unknown"),
+                "location": str(j.location or "Remote"),
+                "url": str(j.url or ""),
+                "expires_at": j.expires_at.isoformat() if j.expires_at else None,
+                "domain": classify_domain(
+                    str(j.title or ""),
+                    tags=list(getattr(j, "tags", None) or []),
+                ),
+            }
+            for j in closing
+        ]
+        for target in targets:
+            user_id = target.get("user_id")
+            prefs = target.get("prefs") or {}
+            user = target.get("user")
+            if not user_id:
+                continue
+            domains = prefs.get("domains") or []
+            include_remote = bool(prefs.get("include_remote", True))
+            user_loc = (
+                (getattr(user, "location", None) or "").strip().lower() if user else ""
+            )
+
+            result = await session.execute(
+                select(AlertPreferences).where(AlertPreferences.user_id == user_id)
+            )
+            pref = result.scalar_one_or_none()
+            already = {
+                str(x)
+                for x in (getattr(pref, "closing_soon_sent", None) or [])
+                if pref is not None
+            }
+            matches = [
+                cj
+                for cj in closing_list
+                if str(cj["id"]) not in already
+                and (not domains or cj["domain"] in domains)
+                and (
+                    not user_loc
+                    or location_allows(
+                        str(cj["location"] or "").lower(), user_loc, include_remote
+                    )
+                )
+            ]
+            if not matches:
+                continue
+
+            lines = ["🚨 <b>Closing soon — apply now!</b>", ""]
+            buttons: list[tuple[str, str]] = []
+            for cj in matches[:5]:
+                closes = (cj["expires_at"] or "")[:10]
+                lines.append(
+                    f"🔹 <b>{cj['title']}</b> @ {cj['company']} · "
+                    f"{cj['location']} · closes {closes}"
+                )
+                if cj["url"]:
+                    buttons.append((f"✅ Apply — {cj['title'][:40]}", cj["url"]))
+            manager = NotificationManager(session)
+            channel_list = (
+                prefs.get("channels")
+                or manager.get_configured_channels()
+                or ["email", "telegram"]
+            )
+            recipient = None
+            if user is not None:
+                recipient = {
+                    "email": getattr(user, "email", None),
+                    "telegram_chat_id": getattr(user, "telegram_chat_id", None),
+                    "phone_number": getattr(user, "phone_number", None),
+                }
+            results = await manager.notify(
+                channel_list,
+                "\n".join(lines),
+                subject="🚨 Closing soon — apply now!",
+                buttons=buttons or None,
+                recipient=recipient,
+            )
+            await _record_alert_history(
+                session,
+                user_id=user_id,
+                subject="🚨 Closing soon",
+                channels=list(results.keys()),
+                domains=domains or [],
+                job_count=len(matches),
+                results=results,
+            )
+            new_ids = [str(cj["id"]) for cj in matches]
+            if pref is None:
+                session.add(
+                    AlertPreferences(
+                        user_id=user_id, is_enabled=True, closing_soon_sent=new_ids
+                    )
+                )
+            else:
+                merged = list(dict.fromkeys(already | set(new_ids)))[-50:]
+                pref.closing_soon_sent = merged
+            await session.commit()
+            sent[user_id] = len(matches)
+    except Exception as e:  # noqa: BLE001 - sweep must never break the app
+        print(f"[{datetime.now(UTC)}] Closing-soon sweep failed: {e}")
+    return sent
+
+
+async def send_closing_soon_alerts() -> dict:
+    """Scheduled wrapper: run the closing-soon sweep on its own session."""
+    async with get_db_session() as session:
+        return await _send_closing_soon_sweep(session)
+
+
 async def _enabled_alert_targets(session) -> list[dict]:
     """Every account with alerts enabled, as ``{user_id, prefs, user}``.
 

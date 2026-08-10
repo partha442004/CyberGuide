@@ -6,6 +6,33 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **💸 Estimated salary chip on job cards (when the posting hides it).**
+  Jobs that don't list a salary still get a "💸 ~₹X – ₹Y" estimate chip
+  from the salary-benchmark data (role × city medians), so every card
+  shows a ballpark pay range — the chip only renders when a real
+  benchmark exists for that role/city and always labels the source as
+  an estimate.
+- **🚨 'Closing soon' alerts — one digest per user for jobs expiring
+  within 48h.** New `_send_closing_soon_sweep` runs on the daily
+  scheduler and pings each enabled account with the up-to-5 roles
+  closing in the next 2 days that match their saved domains + city
+  (with the remote opt-in), each with a closing date and Apply button.
+  Each job is flagged once per user — sent ids are kept in a new
+  `AlertPreferences.closing_soon_sent` column (auto-added to the live
+  DB by the column sync) and pruned once the job closes, so a
+  Thursday-noon expiry never re-nags. Never raises; returns
+  `{user_id: job_count}` for logs. 3 new tests.
+
+### Fixed
+
+- **Closing-soon sweep location matching was case-sensitive.** The new
+  sweep passed the raw scraped location (`"Bengaluru"`) into
+  `location_allows`, which requires lowercased inputs — so a Bangalore
+  user's closing-soon alert silently missed every matching Bengaluru
+  job (the daily digest lowercases both sides; the sweep was the only
+  call site that didn't). Both sides are now lowercased before the
+  match.
+
 - **📦 Digest Archive page.** New dashboard page that reviews every digest
   sent to the account — timestamp, channels that delivered, and the jobs
   it contained (title/company/location/match %/Apply link). Read-only;
