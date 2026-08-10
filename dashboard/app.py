@@ -1754,7 +1754,7 @@ def show_team() -> None:
                     f"📍 {profile.get('location')} · 🏷 {domain_txt or 'All categories'} · "
                     "the daily digest goes out at 8:00 / 13:00 / 19:00 IST."
                 )
-                if resume_file is not None:
+                if resume_file is not None and profile.get("id"):
                     with st.spinner("Parsing their resume..."):
                         files = {
                             "file": (
