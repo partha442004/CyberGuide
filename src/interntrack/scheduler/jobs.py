@@ -574,6 +574,8 @@ async def _send_closing_soon_sweep(session) -> dict:
             user = target.get("user")
             if not user_id:
                 continue
+            if _alerts_paused(prefs):
+                continue
             domains = prefs.get("domains") or []
             include_remote = bool(prefs.get("include_remote", True))
             user_loc = (
@@ -603,6 +605,9 @@ async def _send_closing_soon_sweep(session) -> dict:
             ]
             if not matches:
                 continue
+            # Keep the history + dedup bookkeeping aligned with what is
+            # actually rendered (the message caps at 5 jobs).
+            matches = matches[:5]
 
             lines = ["🚨 <b>Closing soon — apply now!</b>", ""]
             buttons: list[tuple[str, str]] = []
@@ -651,7 +656,13 @@ async def _send_closing_soon_sweep(session) -> dict:
                     )
                 )
             else:
-                merged = list(dict.fromkeys(already | set(new_ids)))[-50:]
+                # Prune ids whose job has since closed (or vanished) so the
+                # list never grows stale — only ids that are STILL closing
+                # (or were just sent) are kept, newest last, capped at 50.
+                closing_ids = {str(cj["id"]) for cj in closing_list}
+                merged = list(dict.fromkeys((already & closing_ids) | set(new_ids)))[
+                    -50:
+                ]
                 pref.closing_soon_sent = merged
             await session.commit()
             sent[user_id] = len(matches)

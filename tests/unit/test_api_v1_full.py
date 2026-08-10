@@ -592,6 +592,40 @@ class TestNotificationsAPI:
         assert data["sent"] is False
         assert "Could not send" in data["hint"]
 
+    def test_closing_soon_empty(self, client):
+        """Empty DB -> zero alerts, never raises."""
+        response = client.post("/api/v1/notifications/closing-soon")
+        assert response.status_code == 200
+        data = response.json()
+        assert data == {"sent": {}, "users_alerted": 0}
+
+    def test_closing_soon_returns_per_user_counts(self, client, monkeypatch):
+        """Sweep results surface as {user_id: job_count} + total."""
+        from unittest import mock
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs.send_closing_soon_alerts",
+            mock.AsyncMock(return_value={"u1": 2, "u2": 1}),
+        )
+        response = client.post("/api/v1/notifications/closing-soon")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sent"] == {"u1": 2, "u2": 1}
+        assert data["users_alerted"] == 2
+
+    def test_closing_soon_never_raises(self, client, monkeypatch):
+        """A failing sweep still returns a clean empty result."""
+        from unittest import mock
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs.send_closing_soon_alerts",
+            mock.AsyncMock(side_effect=RuntimeError("boom")),  # noqa: TRY003
+        )
+        response = client.post("/api/v1/notifications/closing-soon")
+        # The endpoint itself is thin; the sweep never raises internally, so
+        # this only guards against surprises bubbling up as 500s.
+        assert response.status_code == 200
+
 
 # ─── Dashboard API ────────────────────────────────────────────────────────────
 

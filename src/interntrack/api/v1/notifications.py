@@ -403,6 +403,25 @@ async def get_notification_stats(
     }
 
 
+@router.post("/closing-soon")
+async def run_closing_soon_sweep():
+    """Run the closing-soon sweep now and return per-user job counts.
+
+    Vercel is serverless, so the APScheduler worker never executes there;
+    the free GitHub Actions cron hits this endpoint twice a day (mirroring
+    the scheduler's morning/evening triggers) so users get their
+    "🚨 Closing soon" digest on the live deployment too. Returns
+    ``{user_id: job_count}`` for the users who received a digest.
+    """
+    from interntrack.scheduler.jobs import send_closing_soon_alerts
+
+    try:
+        sent = await send_closing_soon_alerts()
+    except Exception as e:  # pragma: no cover - defensive
+        return {"sent": {}, "users_alerted": 0, "error": str(e)}
+    return {"sent": sent, "users_alerted": len(sent)}
+
+
 @router.get("/preferences/{user_id}", response_model=AlertPreferencesResponse)
 async def get_alert_preferences(
     user_id: str,
