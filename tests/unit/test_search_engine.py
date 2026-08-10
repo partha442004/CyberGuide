@@ -145,3 +145,28 @@ class TestSearchEngineScraper:
             s._parse_page("https://example.com/x", "<html><body>hi</body></html>")
             is None
         )
+
+    def test_decode_bing_redirect(self):
+        import base64
+
+        s = self._scraper()
+        target = "https://wellfound.com/jobs/4562736-investigations-engineer"
+        encoded = "a1" + base64.urlsafe_b64encode(target.encode()).decode()
+        redirect = f"https://www.bing.com/ck/a?!&&p=xx&u={encoded}&ntb=1"
+        assert s._decode_bing_redirect(redirect) == target
+        assert s._decode_bing_redirect("https://naukri.com/x") == "https://naukri.com/x"
+
+    def test_bing_links_extracts_and_decodes(self):
+        import base64
+
+        s = self._scraper()
+        target = "https://cutshort.io/job/Cyber-Security-CloudSEK-0mKJLkaY"
+        encoded = "a1" + base64.urlsafe_b64encode(target.encode()).decode()
+        html = (
+            '<h2><a href="https://www.bing.com/ck/a?!&&p=1'
+            f'&amp;u={encoded}">Cyber Security</a></h2>'
+            '<h2><a href="https://direct.example.com/job/2">Direct</a></h2>'
+        )
+        links = s._bing_links(html)
+        assert links[0] == target
+        assert links[1] == "https://direct.example.com/job/2"
