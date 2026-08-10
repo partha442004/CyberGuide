@@ -2083,6 +2083,7 @@ def main() -> None:
                 "Bookmarks",
                 "Expired Jobs",
                 "Analytics",
+                "Alerts",
                 "Resume Match",
                 "My Matches",
                 "AI Tools",
@@ -2118,6 +2119,7 @@ def main() -> None:
         "Bookmarks": show_bookmarks,
         "Expired Jobs": show_expired,
         "Analytics": show_analytics,
+        "Alerts": show_alerts,
         "Resume Match": show_resume_match,
         "My Matches": show_my_matches,
         "AI Tools": show_ai_tools,
@@ -2127,6 +2129,103 @@ def main() -> None:
         "Team & Users": show_team,
     }
     pages.get(page, show_overview)()
+
+
+# ---------------------------------------------------------------------------
+# Page: Alerts (delivery stats)
+# ---------------------------------------------------------------------------
+
+
+def show_alerts() -> None:
+    """Alert delivery statistics — sends, jobs, channels, per user."""
+    st.header("📬 Alerts")
+    st.markdown(
+        "Delivery stats for the daily digests — how many alerts went out, "
+        "how many jobs were in them, and whether each channel (email / "
+        "Telegram / SMS) actually delivered."
+    )
+    stats = fetch_data("/notifications/stats?days=30") or {}
+    if not stats.get("total_sends"):
+        st.info(
+            "No alert sends recorded in the last 30 days yet — the daily "
+            "digests run at 8:00 / 13:00 / 19:00 IST, or use 'Send Test "
+            "Alert Now' on the Settings page."
+        )
+
+    # ── Top-line metrics ─────────────────────────────────────────────
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.metric("📤 Total sends", stats.get("total_sends", 0))
+    with c2:
+        st.metric("💼 Jobs sent", stats.get("total_jobs_sent", 0))
+    with c3:
+        rate = stats.get("delivery_rate")
+        st.metric("✅ Delivery rate", f"{rate:.0f}%" if rate is not None else "—")
+    with c4:
+        st.metric("❌ Failed deliveries", stats.get("failed", 0))
+
+    # ── Trend (last 14 days) ─────────────────────────────────────────
+    trend = stats.get("trend") or []
+    if trend:
+        st.subheader("📈 Sends over time")
+        try:
+            import pandas as pd
+            import plotly.express as px
+
+            df = pd.DataFrame(trend[-14:])
+            fig = px.bar(
+                df,
+                x="date",
+                y="sends",
+                title=None,
+                labels={"date": "Date", "sends": "Alerts sent"},
+                color_discrete_sequence=["#667eea"],
+            )
+            fig.update_layout(height=260, margin={"l": 10, "r": 10, "t": 10, "b": 10})
+            st.plotly_chart(fig, use_container_width=True)
+        except Exception:  # noqa: BLE001, S110 - chart is optional
+            for t in trend[-7:]:
+                st.caption(
+                    f"{t.get('date')}: {t.get('sends', 0)} alert(s) · {t.get('jobs', 0)} job(s)"
+                )
+
+    # ── Per-channel ──────────────────────────────────────────────────
+    per_channel = stats.get("per_channel") or {}
+    if per_channel:
+        st.subheader("🔌 By channel")
+        _ch_labels = {
+            "email": "📧 Email",
+            "telegram": "✈️ Telegram",
+            "sms": "📱 SMS",
+            "whatsapp": "💬 WhatsApp",
+            "discord": "🎮 Discord",
+            "slack": "🔔 Slack",
+        }
+        ch_cols = st.columns(len(per_channel))
+        for i, (ch, v) in enumerate(per_channel.items()):
+            with ch_cols[i % len(per_channel)]:
+                st.metric(
+                    _ch_labels.get(str(ch), str(ch)),
+                    f"{v.get('delivered', 0)} ✅ / {v.get('failed', 0)} ❌",
+                )
+
+    # ── Per-user ─────────────────────────────────────────────────────
+    per_user = stats.get("per_user") or {}
+    if per_user:
+        st.subheader("👥 Per user")
+        members = _team_members()
+        email_by_id = {
+            str(m.get("id")): str(m.get("email") or m.get("name") or "?")
+            for m in members
+        }
+        for uid, u in per_user.items():
+            who = email_by_id.get(str(uid), str(uid))
+            st.markdown(
+                f"**{escape(who)}** — {u.get('sends', 0)} send(s) · "
+                f"{u.get('jobs', 0)} job(s) · ✅ {u.get('delivered', 0)} / "
+                f"❌ {u.get('failed', 0)} · last: "
+                f"{(u.get('last_sent') or '—')[:16]}"
+            )
 
 
 # ---------------------------------------------------------------------------

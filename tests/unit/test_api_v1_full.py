@@ -497,6 +497,69 @@ class TestNotificationsAPI:
         assert kwargs.get("recipient") is None
         assert list(args[0]) == ["email", "telegram"]
 
+    def test_stats_empty_database(self, client):
+        """Stats return a zero-filled shape with no history rows."""
+        response = client.get("/api/v1/notifications/stats?days=30")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_sends"] == 0
+        assert data["total_jobs_sent"] == 0
+        assert data["delivered"] == 0
+        assert data["failed"] == 0
+        assert data["delivery_rate"] is None
+        assert data["per_channel"] == {}
+        assert data["per_user"] == {}
+        assert data["trend"] == []
+
+    def test_stats_aggregates_history_rows(self, client):
+        """History rows roll up into sends/jobs/channel/user totals."""
+        from datetime import UTC, datetime, timedelta
+
+        from sqlalchemy import insert
+
+        from interntrack.domain.models import NotificationHistory
+
+        async def seed() -> None:
+            import interntrack.database.session as session_module
+
+            async with session_module.async_session_factory() as s:
+                now = datetime.now(UTC)
+                for i, (uid, ok) in enumerate(
+                    [("u1", True), ("u1", False), ("u2", True)]
+                ):
+                    await s.execute(
+                        insert(NotificationHistory).values(
+                            id=f"h{i}",
+                            user_id=uid,
+                            subject="Daily Report",
+                            channels=["email", "telegram"],
+                            domains=["security"],
+                            job_count=2 if ok else 0,
+                            results={"email": ok, "telegram": ok},
+                            created_at=now - timedelta(hours=i),
+                        )
+                    )
+                await s.commit()
+
+        import asyncio
+
+        asyncio.run(seed())
+        response = client.get("/api/v1/notifications/stats?days=7")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_sends"] == 3
+        assert data["total_jobs_sent"] == 4  # 2 + 0 + 2
+        assert data["delivered"] == 4  # email+telegram true twice
+        assert data["failed"] == 2  # u1's second row: both channels false
+        assert data["per_user"]["u1"]["sends"] == 2
+        assert data["per_user"]["u2"]["sends"] == 1
+        assert data["per_channel"]["email"]["delivered"] == 2
+        assert data["per_channel"]["email"]["failed"] == 1
+        # All 3 rows fall within the same 2-hour window (1-2 distinct days
+        # depending on when the test runs relative to midnight).
+        assert 1 <= len(data["trend"]) <= 2
+        assert sum(t["sends"] for t in data["trend"]) == 3
+
     def test_user_test_alert_malformed(self, client, monkeypatch):
         """A mangled profile still yields a structured response."""
         from types import SimpleNamespace

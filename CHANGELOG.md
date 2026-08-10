@@ -6,6 +6,12 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **📬 Alerts page + delivery stats API.** New `GET /notifications/stats`
+  aggregates the notification-history table across all users (total sends,
+  jobs sent, per-channel delivered/failed, per-user breakdown, daily
+  trend) and a new dashboard page renders it with metrics, a 14-day bar
+  chart and per-user/per-channel tables.
+
 - **Cybersecurity-specific job boards in search discovery.** `_JOB_HOSTS`
   gains CyberSecJobs (cybersecurityjobs.com), CyberSecurityJobsite,
   CyberSN, ClearedJobs, Infosec Jobs, SecurityJobs, NinjaJobs and
