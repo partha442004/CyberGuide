@@ -287,12 +287,12 @@ async def send_user_test_alert(
         hint = None
         if sent_channels:
             hint = f"Delivered via {', '.join(sent_channels)}. " + (
-                f"Could not reach: {', '.join(missing)}." if missing else ""
+                f"Not set up: {', '.join(missing)}." if missing else ""
             )
         elif recipient is None:
             hint = (
                 "Nothing was sent — the shared email/Telegram channels are "
-                "not configured on the API."
+                "not configured on the API or delivery failed."
             )
         elif not has_contact:
             hint = (
