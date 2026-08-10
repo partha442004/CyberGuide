@@ -35,6 +35,85 @@ class TestSearchEngineScraper:
         assert not s._is_job_url("https://en.wikipedia.org/wiki/Cybersecurity")
         assert not s._is_job_url("https://www.youtube.com/watch?v=abc")
 
+    def test_is_job_url_rejects_listing_pages(self):
+        """Board search pages are listings, not postings — rejected."""
+        s = self._scraper()
+        listings = [
+            "https://in.linkedin.com/jobs/cyber-security-intern-jobs-bengaluru",
+            "https://www.naukri.com/cybersecurity-internship-jobs-in-bangalore",
+            "https://in.indeed.com/q-cyber-security,-internship-l-bangalore-jobs.html",
+            (
+                "https://www.glassdoor.co.in/Job/bengaluru-cybersecurity-jobs-"
+                "SRCH_IL.0,9_IC2940587.htm"
+            ),
+            (
+                "https://internshala.com/internships/cyber-security-internship-"
+                "in-bangalore/stipend-6000/"
+            ),
+            "https://www.dice.com/jobs/q-SOC+Analyst-jobs",
+            "https://www.roberthalf.com/us/en/jobs/all/soc-analyst",
+            "https://www.apna.co/jobs/jobs-in-bengaluru",
+            "https://internshala.com/jobs/jobs-in-bangalore/",
+            "https://www.jobhai.com/jobs-in-bangalore-cty",
+            "https://www.linkedin.com/posts/deltawaresolution-private-limited_hiring",
+            "https://internshala.com/registration/student",
+            "https://wellfound.com/startups/l/bangalore/cyber-security",
+            "https://wellfound.com/role/l/cybersecurity/bangalore",
+            "https://help.wellfound.com/article/777-setting-up-a-search",
+            "https://support.greenhouse.io/hc/en-us/articles/1",
+            "https://recruiter.foundit.in/edge/user-management/planDashboard/",
+            "https://www.lever.co/alternative/lever-vs-greenhouse",
+            "https://cutshort.io/companies/saas-companies-in-chennai",
+        ]
+        for url in listings:
+            assert not s._is_job_url(url), url
+
+    def test_is_job_url_accepts_real_postings(self):
+        """Individual postings keep working across boards."""
+        s = self._scraper()
+        postings = [
+            "https://in.indeed.com/viewjob?jk=e0b3e4ceeba09e4e",
+            (
+                "https://internshala.com/internship/detail/work-from-home-cyber-"
+                "security-internship-at-x-1785310553"
+            ),
+            "https://wellfound.com/jobs/4562736-investigations-engineer-nyc",
+            "https://cutshort.io/job/Cyber-Security-Bengaluru-Bangalore-CloudSEK-0mKJLkaY",
+            (
+                "https://cutshort.io/job/Fullstack-Developer-Mumbai-"
+                "Cutshort-Lightning-hm7QSYFD"
+            ),
+            "https://www.timesjobs.com/job/soc-analyst-bengaluru-jobid-12345",
+            (
+                "https://www.naukri.com/job-listings-soc-analyst-rooman-"
+                "bengaluru-0-to-4-years-050826503196"
+            ),
+            "https://www.linkedin.com/jobs/view/soc-analyst-4000000000",
+            (
+                "https://infosec-career.com/job/cybersecurity-internship-"
+                "vapt-web-network"
+            ),
+        ]
+        for url in postings:
+            assert s._is_job_url(url), url
+
+    def test_parse_page_rejects_listing_titles(self):
+        """A fetched page whose title is a search page is dropped."""
+        s = self._scraper()
+        listing_titles = [
+            "SOC Analyst jobs | Dice.com",
+            "384 Results for Soc Analyst Jobs",
+            "Job Search | Naukri",
+            "Cyber Security Internships in Bangalore | Internshala",
+        ]
+        for title in listing_titles:
+            html = (
+                "<html><head>"
+                f'<meta property="og:title" content="{title}" />'
+                "</head></html>"
+            )
+            assert s._parse_page("https://example.com/jobs/1", html) is None, title
+
     def test_parse_page_extracts_meta(self):
         s = self._scraper()
         html = (

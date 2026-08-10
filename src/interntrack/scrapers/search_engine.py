@@ -2,10 +2,11 @@
 Search-engine discovery — finds job postings via DuckDuckGo HTML search.
 
 Boards like Naukri / LinkedIn / Indeed block direct scraping from server
-IPs, but their *listing URLs still show up in search results*. This scraper
+IPs, but their *posting URLs still show up in search results*. This scraper
 queries DuckDuckGo's no-JS HTML endpoint (no API key needed), decodes the
-redirect links, keeps job-board / careers-page URLs, fetches each page and
-extracts title + company + description from OpenGraph/meta tags.
+redirect links, keeps URLs that look like individual postings (not board
+search/listing pages), fetches each page and extracts title + company +
+description from OpenGraph/meta tags.
 
 It's a discovery net, not a full board scraper: results are deduped against
 already-saved URLs downstream, and each run is capped small so the search
@@ -23,8 +24,8 @@ logger = logging.getLogger(__name__)
 # Query sent to DuckDuckGo per keyword (HTML endpoint, no key).
 _SEARCH_URL = "https://html.duckduckgo.com/html/?q={query}"
 
-# Hosts known to be job postings — a result whose URL belongs to one of
-# these (or carries a job-ish path) is worth fetching.
+# Hosts known to carry job postings — a result whose URL belongs to one of
+# these is worth fetching *unless* it is a board listing/search page.
 _JOB_HOSTS = (
     "linkedin.com",
     "in.linkedin.com",
@@ -52,17 +53,65 @@ _JOB_HOSTS = (
     "bamboohr.com",
     "smartrecruiters.com",
 )
-_JOB_PATH_MARKERS = (
-    "/jobs/",
-    "/job/",
-    "/careers/",
-    "/career/",
-    "/positions",
-    "/opportunities/",
-    "/openings",
-    "/apply/",
-    "/career-page/",
+
+# URL shapes that mean "this is a search / listing page, not a posting".
+# E.g. linkedin.com/jobs/cyber-security-intern-jobs-bengaluru,
+# naukri.com/...-jobs-in-bangalore, indeed /q-cyber-security...jobs.html,
+# glassdoor ...-jobs-SRCH_..., internshala /internships/...-internship/.
+# Note: bare /jobs/ is NOT a listing marker because some boards post under
+# it (wellfound.com/jobs/4562736-slug) — listing shapes are matched by
+# their more specific forms instead.
+_LISTING_MARKERS = (
+    "-jobs",
+    "jobs-in-",
+    "vacancies-in-",
+    "/job-search",
+    "/jobsearch",
+    "/jobs/q-",
+    "/jobs/all/",
+    "/jobs/search",
+    "/search",
+    "/results",
+    "/browse",
+    "/q-",
+    "SRCH_",
+    "jobsearch",
+    "?q=",
+    "&q=",
+    "/internships/",
+    "/posts/",
+    "/registration/",
+    "/startups/l/",
+    "/role/l/",
+    "/companies/",
+    "/salary/",
+    "/blog/",
+    "/article/",
+    "/alternative/",
+    "/hc/",
 )
+
+# URL shapes that are (almost) always individual postings.
+_POSTING_MARKERS = (
+    "viewjob",
+    "vjk=",
+    "/jobs/view/",
+    "/job-listings",
+    "/job-listing",
+    "/job-details/",
+    "/internship/detail/",
+    "/job/",
+    "/position/",
+    "/positions",
+    "/requisition",
+    "/jobid=",
+    "jobId=",
+    "/career-page/",
+    "/openings/",
+    "/opportunities/",
+    "/apply/",
+)
+
 _SKIP_HOSTS = (
     "wikipedia.org",
     "youtube.com",
@@ -77,6 +126,27 @@ _SKIP_HOSTS = (
     "medium.com",
     "amazon.",
     "flipkart.",
+    # Docs / help / marketing / app subdomains, not postings.
+    "help.",
+    "support.",
+    "recruiter.",
+    "reach.",
+    "app.",
+    "hire.",
+    "learn.",
+    "developers.",
+    "developer.",
+    "career.wellfound.com",
+)
+
+# Titles that are search pages, e.g. "SOC Analyst jobs | Dice.com",
+# "384 Results for Soc Analyst Jobs", "Job Search | Naukri",
+# "Jobs in Bangalore: ... Vacancies in August | Internshala".
+_LISTING_TITLE_RE = re.compile(
+    r"^\d+\s+(results?|jobs?|internships?|vacancies?)\s+for\b"
+    r"|\b(job search|search jobs|find jobs)\b"
+    r"|\b(jobs?|internships?|vacancies|openings)\b.*\|\s*[a-z0-9.\-]+\s*$",
+    re.IGNORECASE,
 )
 
 # Salary hint inside a page title/description (INR or USD).
@@ -117,14 +187,30 @@ class SearchEngineScraper(BaseScraper):
 
     @staticmethod
     def _is_job_url(url: str) -> bool:
-        """True when a search result is plausibly a job posting URL."""
-        host = urlparse(url).netloc.lower()
-        path = urlparse(url).path.lower()
+        """True when a search result is plausibly an individual posting.
+
+        Board search pages (linkedin ``/jobs/<title>-jobs-<city>``, naukri
+        ``...-jobs-in-<city>``, indeed ``/q-...jobs.html``, glassdoor
+        ``/Job/...SRCH_...``, internshala ``/internships/...``) are
+        rejected — they are listings, not postings, and their pages have
+        no single job title to save. Listing shapes always win, even when
+        the URL also looks posting-ish (glassdoor ``/Job/`` paths).
+        """
+        parsed = urlparse(url)
+        host = parsed.netloc.lower()
+        path = parsed.path.lower()
+        full = url.lower()
         if any(skip in host for skip in _SKIP_HOSTS):
+            return False
+        if any(marker in full for marker in _LISTING_MARKERS):
+            return False
+        # A bare host root (jobs.lever.co/, app landing, board homepage) is
+        # never an individual posting.
+        if path in ("", "/", "/index.html", "/index.htm"):
             return False
         if any(h in host for h in _JOB_HOSTS):
             return True
-        return any(marker in path for marker in _JOB_PATH_MARKERS)
+        return any(marker in path for marker in _POSTING_MARKERS)
 
     def _parse_page(self, url: str, html: str) -> RawJob | None:
         """Extract title/company/description from a fetched job page."""
@@ -138,6 +224,8 @@ class SearchEngineScraper(BaseScraper):
             m = re.search(r"<title[^>]*>([^<]+)</title>", html, re.IGNORECASE)
             if m:
                 title = m.group(1).strip()
+        if not title or _LISTING_TITLE_RE.search(title):
+            return None
         m = re.search(
             r"<meta[^>]*property=\"og:site_name\"[^>]*content=\"([^\"]+)\"", html
         )
@@ -153,8 +241,6 @@ class SearchEngineScraper(BaseScraper):
         )
         if m:
             description = m.group(1).strip()
-        if not title:
-            return None
         return RawJob(
             title=title[:500],
             company=company[:200],
@@ -169,15 +255,18 @@ class SearchEngineScraper(BaseScraper):
         q = query.strip()
         if location:
             q = f"{q} {location}"
-        # Two search flavours: targeted board search + plain query. The
-        # board search finds direct listings; the plain query catches
-        # career pages and smaller boards.
+        # Unquoted queries: DDG's HTML endpoint silently returns nothing for
+        # heavily-qualified strings, so keep each flavour short. The plain
+        # queries catch postings on smaller boards (infosec-career.com etc)
+        # and career pages; per-site queries surface postings on boards
+        # whose listing pages dominate the generic results (cutshort,
+        # wellfound, foundit/timesjobs/hirect).
         queries = [
-            f'"{q}" job OR vacancy OR opening',
-            (
-                f"{q} internship OR job site:in.linkedin.com OR site:naukri.com "
-                f"OR site:internshala.com OR site:wellfound.com"
-            ),
+            f"{q} job OR vacancy OR opening",
+            f"{q} internship OR fresher OR career",
+            f"site:cutshort.io {q}",
+            f"site:wellfound.com {q}",
+            f"site:foundit.in OR site:timesjobs.com OR site:hirect.in {q}",
         ]
         jobs: list[RawJob] = []
         seen: set[str] = set()
@@ -194,7 +283,6 @@ class SearchEngineScraper(BaseScraper):
                 if resp.status_code != 200:
                     continue
                 links = self._result_links(resp.text)
-                kept = 0
                 for link in links:
                     if not self._is_job_url(link) or link in seen:
                         continue
@@ -211,7 +299,6 @@ class SearchEngineScraper(BaseScraper):
                     job = self._parse_page(link, page.text)
                     if job:
                         jobs.append(job)
-                        kept += 1
                 if len(jobs) >= limit:
                     break
         except Exception as e:  # noqa: BLE001 - one source must not break discovery
