@@ -257,3 +257,58 @@ class TestInternshalaScraper:
         assert len(jobs) == 1
         assert jobs[0].title == "Cyber Security"
         assert jobs[0].company == "Optimasys"
+
+    @pytest.mark.asyncio
+    async def test_fetch_location_falls_back_to_category_page(self):
+        """A city page whose cards don't match the query falls back to the
+        plain category page instead of returning nothing."""
+        from interntrack.scrapers.internshala_direct import InternshalaDirectScraper
+
+        s = InternshalaDirectScraper()
+        city_junk = _page(
+            _card(
+                "Sales and Marketing",
+                "Some Co",
+                "/internship/detail/sales-marketing-1",
+            ),
+        )
+        real = _page(
+            _card(
+                "Cyber Security",
+                "Optimasys",
+                "/internship/detail/cyber-security-at-optimasys-2",
+            ),
+        )
+
+        class CityResponse:
+            status_code = 200
+            text = city_junk
+            url = (
+                "https://internshala.com/internships/cybersecurity-internship-"
+                "in-bangalore/"
+            )
+
+        class PlainResponse:
+            status_code = 200
+            text = real
+            url = "https://internshala.com/internships/cyber-security-internship/"
+
+        class FakeClient:
+            def __init__(self):
+                self.responses = [CityResponse(), PlainResponse()]
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                return None
+
+            async def get(self, *args, **kwargs):
+                return self.responses.pop(0)
+
+        with patch("httpx.AsyncClient", return_value=FakeClient()):
+            jobs = await s.fetch("cybersecurity", location="Bangalore")
+
+        assert len(jobs) == 1
+        assert jobs[0].title == "Cyber Security"
+        assert jobs[0].company == "Optimasys"
