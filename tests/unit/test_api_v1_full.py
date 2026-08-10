@@ -400,6 +400,113 @@ class TestNotificationsAPI:
         assert data["sent"] is False
         assert "failed" in data["hint"].lower()
 
+    def test_user_test_alert_missing_user(self, client):
+        """Unknown user -> helpful hint, never raises."""
+        response = client.post(
+            "/api/v1/notifications/user/no-such-user/test",
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sent"] is False
+        assert "No account found" in data["hint"]
+
+    def test_user_test_alert_uses_real_profile(self, client, monkeypatch):
+        """A real account routes the test to their own email + Telegram."""
+        from unittest import mock
+
+        reg = client.post(
+            "/api/v1/users/register",
+            json={
+                "name": "Tester",
+                "email": "tester@example.com",
+                "location": "Chennai",
+                "domains": ["frontend"],
+            },
+        )
+        assert reg.status_code in (200, 201)
+        uid = reg.json()["id"]
+
+        manager = mock.MagicMock()
+        manager.notify = mock.AsyncMock(return_value={"email": True, "telegram": False})
+        monkeypatch.setattr(
+            "interntrack.api.v1.notifications.NotificationManager",
+            lambda *_a, **_k: manager,
+        )
+        response = client.post(f"/api/v1/notifications/user/{uid}/test")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sent"] is True
+        assert data["results"] == {"email": True, "telegram": False}
+        # Routed to the user's OWN email, not the shared mailbox.
+        manager.notify.assert_awaited_once()
+        args, kwargs = manager.notify.await_args
+        assert kwargs["recipient"]["email"] == "tester@example.com"
+        assert list(args[0]) == ["email", "telegram"]
+
+    def test_user_test_alert_nothing_sent(self, client, monkeypatch):
+        """No contact points -> clear hint, never raises."""
+        from types import SimpleNamespace
+        from unittest import mock
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._user_profile",
+            mock.AsyncMock(
+                return_value=SimpleNamespace(
+                    email=None,
+                    telegram_chat_id=None,
+                    phone_number=None,
+                    name="Ghost",
+                    location="",
+                    domains=[],
+                )
+            ),
+        )
+        manager = mock.MagicMock()
+        manager.notify = mock.AsyncMock(
+            return_value={"email": False, "telegram": False}
+        )
+        monkeypatch.setattr(
+            "interntrack.api.v1.notifications.NotificationManager",
+            lambda *_a, **_k: manager,
+        )
+        response = client.post("/api/v1/notifications/user/u1/test")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sent"] is False
+        assert "no email" in data["hint"].lower()
+
+    def test_user_test_alert_malformed(self, client, monkeypatch):
+        """A mangled profile still yields a structured response."""
+        from types import SimpleNamespace
+        from unittest import mock
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._user_profile",
+            mock.AsyncMock(
+                return_value=SimpleNamespace(
+                    email="x@y.z",
+                    telegram_chat_id="77",
+                    phone_number=None,
+                    name="X",
+                    location="Pune",
+                    domains=["security"],
+                )
+            ),
+        )
+        manager = mock.MagicMock()
+        manager.notify = mock.AsyncMock(
+            side_effect=RuntimeError("boom")  # noqa: TRY003 - test-only
+        )
+        monkeypatch.setattr(
+            "interntrack.api.v1.notifications.NotificationManager",
+            lambda *_a, **_k: manager,
+        )
+        response = client.post("/api/v1/notifications/user/u1/test")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sent"] is False
+        assert "Could not send" in data["hint"]
+
 
 # ─── Dashboard API ────────────────────────────────────────────────────────────
 

@@ -218,6 +218,76 @@ async def send_test_instant_alert(
         }
 
 
+@router.post("/user/{user_id}/test")
+async def send_user_test_alert(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Send a test alert to ONE user's own email + Telegram.
+
+    Mirrors how the real daily digest is routed: the message goes to the
+    user's own email address (not the shared/owner mailbox) and their own
+    Telegram chat, so a friend can verify their delivery path the moment
+    they are onboarded instead of waiting for the next 8:00/13:00/19:00 IST
+    slot. Never raises: returns a ``results``/``hint`` dict in every case.
+    """
+    from interntrack.scheduler.jobs import _user_profile
+
+    user = await _user_profile(db, user_id)
+    if user is None:
+        return {
+            "sent": False,
+            "results": {},
+            "hint": "No account found with this user ID.",
+        }
+
+    recipient = {
+        "email": getattr(user, "email", None),
+        "telegram_chat_id": getattr(user, "telegram_chat_id", None),
+        "phone_number": getattr(user, "phone_number", None),
+    }
+    name = (getattr(user, "name", None) or "").strip() or "there"
+    location = (getattr(user, "location", None) or "").strip() or "your city"
+    domains = list(getattr(user, "domains", None) or [])
+    domain_txt = ", ".join(domains) if domains else "your categories"
+
+    message = (
+        f"👋 <b>Hi {name} — this is a test alert!</b>\n\n"
+        "Your personalized InternTrack digest is working. When new jobs match "
+        f"<b>{domain_txt}</b> in <b>{location}</b>, they will land right "
+        "here with an Apply button, at 8:00 / 13:00 / 19:00 IST.\n\n"
+        "No action needed — you are all set. ✅"
+    )
+    try:
+        manager = NotificationManager(db)
+        results = await manager.notify(
+            ["email", "telegram"],
+            message,
+            subject="🔔 Test alert — InternTrack",
+            recipient=recipient,
+        )
+        sent_channels = [ch for ch, ok in results.items() if ok]
+        missing = [
+            ch
+            for ch in ("email", "telegram")
+            if ch not in sent_channels
+            and (recipient.get("email") or recipient.get("telegram_chat_id"))
+        ]
+        hint = None
+        if sent_channels:
+            hint = f"Delivered via {', '.join(sent_channels)}. " + (
+                f"Could not reach: {', '.join(missing)}." if missing else ""
+            )
+        else:
+            hint = (
+                "Nothing was sent — this account has no email and no Telegram "
+                "chat ID on file, or the channels are not configured on the API."
+            )
+        return {"sent": bool(sent_channels), "results": results, "hint": hint}
+    except Exception as e:  # pragma: no cover - network path
+        return {"sent": False, "results": {}, "hint": f"Could not send: {e}"}
+
+
 @router.get("/preferences/{user_id}", response_model=AlertPreferencesResponse)
 async def get_alert_preferences(
     user_id: str,
