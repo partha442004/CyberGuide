@@ -474,6 +474,11 @@ class AlertPreferences(Base, TimestampMixin):
     # posting nudges the user exactly once (pruned after the job closes).
     # Auto-added to existing live tables by ``_sync_missing_columns``.
     closing_soon_sent = Column(JSON, nullable=True)
+    # Whether to send the compact "📭 No new jobs today" email on days when
+    # the digest found nothing new. Off means the account only ever gets
+    # emails that actually contain job alerts. Auto-added to existing live
+    # tables by ``_sync_missing_columns``.
+    quiet_day_emails = Column(Boolean, default=True)
 
     @validates("last_alert_at", "paused_until")
     def _coerce_naive_utc(self, _key: str, value):

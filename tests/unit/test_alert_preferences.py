@@ -60,6 +60,7 @@ class TestLoadAlertPreferences:
             "weekly_enabled": True,
             "instant_alerts": True,
             "include_remote": True,
+            "quiet_day_emails": True,
             "paused_until": None,
         }
 
@@ -89,6 +90,7 @@ class TestLoadAlertPreferences:
             "slot_domains": {"morning": ["security"]},
             "instant_alerts": True,
             "include_remote": False,
+            "quiet_day_emails": True,
             "weekly_enabled": False,
             "paused_until": None,
         }
@@ -1788,6 +1790,97 @@ class TestQuietDayDigest:
             )
 
         assert results == {}
+
+    @pytest.mark.asyncio
+    async def test_quiet_day_skipped_when_pref_off(self):
+        """Accounts with quiet_day_emails off only get real job-alert emails."""
+        from interntrack.api.v1.reports import get_daily_report
+
+        mock_db = AsyncMock()
+        mock_service = MagicMock()
+        mock_service.generate_daily_report = AsyncMock(
+            return_value={
+                "summary": {"new_jobs": 0, "new_applications": 0},
+                "new_jobs": [],
+            }
+        )
+        quiet_mock = AsyncMock()
+        mark_sent = AsyncMock()
+
+        with (
+            patch(
+                "interntrack.api.v1.reports._load_digest_targets",
+                new=AsyncMock(
+                    return_value=[
+                        {
+                            "user_id": "friend",
+                            "prefs": {
+                                "domains": ["frontend"],
+                                "channels": ["email"],
+                                "min_match_score": None,
+                                "is_enabled": True,
+                                "quiet_day_emails": False,
+                            },
+                            "user": None,
+                        }
+                    ]
+                ),
+            ),
+            patch(
+                "interntrack.api.v1.reports.ReportService",
+                return_value=mock_service,
+            ),
+            patch(
+                "interntrack.api.v1.reports._send_quiet_day_digest",
+                new=quiet_mock,
+            ),
+            patch(
+                "interntrack.scheduler.jobs._mark_alert_sent",
+                new=mark_sent,
+            ),
+        ):
+            await get_daily_report(db=mock_db, preview=False, slot="morning")
+
+        # No new jobs + pref off -> nothing emailed at all.
+        quiet_mock.assert_not_awaited()
+        mark_sent.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_quiet_day_pref_defaults_on(self):
+        """quiet_day_emails defaults to True when the row lacks the column."""
+        from interntrack.scheduler.jobs import _load_alert_preferences
+
+        row = MagicMock()
+        row.is_enabled = True
+        row.domains = ["security"]
+        row.channels = ["email"]
+        row.min_match_score = None
+        row.last_alert_at = None
+        row.slot_domains = None
+        row.weekly_enabled = True
+        row.instant_alerts = None
+        row.include_remote = None
+        row.paused_until = None
+        # No quiet_day_emails attribute (pre-column rows) -> defaults True.
+        del row.quiet_day_emails
+
+        prefs = await _load_alert_preferences(_db_with_row(row))
+        assert prefs["quiet_day_emails"] is True
+
+    @pytest.mark.asyncio
+    async def test_update_preferences_saves_quiet_day_toggle(self):
+        """The PUT endpoint persists quiet_day_emails."""
+        from interntrack.api.schemas.notification import AlertPreferencesUpdate
+        from interntrack.api.v1.notifications import update_alert_preferences
+
+        mock_db = _db_with_row(None)
+        result = await update_alert_preferences(
+            "friend",
+            AlertPreferencesUpdate(quiet_day_emails=False),
+            db=mock_db,
+        )
+
+        assert result.quiet_day_emails is False
 
 
 # ---------------------------------------------------------------------------

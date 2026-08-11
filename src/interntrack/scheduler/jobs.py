@@ -143,6 +143,11 @@ async def _load_alert_preferences(
                     if getattr(pref, "include_remote", None) is not None
                     else True
                 ),
+                "quiet_day_emails": (
+                    bool(getattr(pref, "quiet_day_emails", True))
+                    if getattr(pref, "quiet_day_emails", None) is not None
+                    else True
+                ),
                 "paused_until": getattr(pref, "paused_until", None),
             }
     except Exception:
