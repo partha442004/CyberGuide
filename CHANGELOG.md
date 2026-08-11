@@ -6,6 +6,16 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **👥 Team page: fresher-only + remote onboarding, per-member toggles.**
+  The Team & Users page's add-member form gains a "🎓 Freshers-only
+  alerts" checkbox (entry/junior filter set on the new account right
+  after registration) and a "🏠 Include remote/WFH jobs" opt-in, and the
+  location field now guides comma-separated multi-city values (e.g.
+  "Bangalore, Hyderabad"). The team directory shows each member's alert
+  config (role, experience filter, channels, remote opt-in) at a glance
+  and gains a per-member 🎓 Freshers toggle to flip the filter without
+  touching anything else.
+
 - **🎓 Per-user experience filter (fresher-only alerts).**
   Alert preferences gain `experience_levels` (auto-synced to live
   tables). When set, explicitly mid/senior/lead/executive postings are

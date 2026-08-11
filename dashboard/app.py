@@ -1792,8 +1792,11 @@ def show_team() -> None:
             location = st.text_input(
                 "Location *",
                 key="team_location",
-                placeholder="e.g. Chennai",
-                help="Their digest is scoped to this city — your alerts stay separate.",
+                placeholder="e.g. Bangalore, Hyderabad",
+                help="Their digest is scoped to these cities — comma-separate "
+                "multiple (e.g. 'Bangalore, Hyderabad') so jobs from either "
+                "city match. Remote/WFH roles can be added with the checkbox "
+                "below.",
             )
         with c4:
             experience = st.selectbox(
@@ -1817,6 +1820,22 @@ def show_team() -> None:
             key="team_skills",
             placeholder="e.g. react, redux, typescript",
         )
+        pref_col1, pref_col2 = st.columns(2)
+        with pref_col1:
+            fresher_only_alerts = st.checkbox(
+                "🎓 Freshers-only alerts",
+                value=True,
+                help="Only entry/junior roles (0–2 yrs) plus listings without "
+                "a stated level — explicitly mid/senior/lead/executive "
+                "jobs are skipped from their alerts.",
+            )
+        with pref_col2:
+            include_remote_opt = st.checkbox(
+                "🏠 Include remote / work-from-home jobs",
+                value=True,
+                help="Also send fully-remote / WFH / 'anywhere' listings on "
+                "top of their city matches.",
+            )
         c5, c6 = st.columns(2)
         with c5:
             telegram_chat_id = st.text_input(
@@ -1880,6 +1899,21 @@ def show_team() -> None:
                     f"📍 {profile.get('location')} · 🏷 {domain_txt or 'All categories'} · "
                     "the daily digest goes out at 8:00 / 13:00 / 19:00 IST."
                 )
+                # Apply the fresher-only + remote/WFH alert scoping the
+                # admin just picked (register only sets domains/channels).
+                if profile.get("id"):
+                    _api(
+                        f"/notifications/preferences/{profile.get('id')}",
+                        method="PUT",
+                        json_data={
+                            "experience_levels": ["entry", "junior"]
+                            if fresher_only_alerts
+                            else [],
+                            "include_remote": include_remote_opt,
+                        },
+                        timeout=15,
+                    )
+                _team_members.clear()
                 if resume_file is not None and profile.get("id"):
                     with st.spinner("Parsing their resume..."):
                         files = {
@@ -1929,7 +1963,15 @@ def show_team() -> None:
             or "All categories"
         )
         is_me = uid == _current_user_id()
-        col_name, col_alerts, col_actions = st.columns([3, 1, 1])
+        prefs = _api(f"/notifications/preferences/{uid}", timeout=15) or {}
+        exp_txt = (
+            "🎓 Freshers only" if prefs.get("experience_levels") else "🎓 All levels"
+        )
+        chan_txt = ", ".join(prefs.get("channels") or []) or "—"
+        remote_txt = (
+            "🏠 remote on" if prefs.get("include_remote", True) else "city only"
+        )
+        col_name, col_alerts, col_actions = st.columns([3, 1.2, 1])
         with col_name:
             label = escape(row.get("name") or "")
             if is_me:
@@ -1940,7 +1982,10 @@ def show_team() -> None:
                 f"<span style='opacity:0.6'>📍 {escape(row.get('location') or '—')}</span>",
                 unsafe_allow_html=True,
             )
-            st.caption(f"🏷 {escape(domain_txt)}")
+            st.caption(
+                f"🏷 {escape(domain_txt)} · {exp_txt} · 📡 {escape(chan_txt)} · "
+                f"{remote_txt}"
+            )
         if is_me:
             with col_alerts:
                 st.caption("—")
@@ -1949,7 +1994,6 @@ def show_team() -> None:
             continue
         with col_alerts:
             key = f"alerts_{uid}"
-            prefs = _api(f"/notifications/preferences/{uid}", timeout=15) or {}
             is_enabled = bool(prefs.get("is_enabled", True))
             toggled = st.toggle(
                 "Alerts", value=is_enabled, key=key, label_visibility="collapsed"
@@ -1964,6 +2008,34 @@ def show_team() -> None:
                 if saved:
                     st.caption("✅ saved")
                     st.session_state.pop(key, None)
+                else:
+                    st.error("Save failed")
+            # Per-member fresher-only toggle: flips the experience filter
+            # without touching anything else on the account.
+            fresher_key = f"fr_{uid}"
+            fresher_on = bool(prefs.get("experience_levels"))
+            fresher_toggled = st.toggle(
+                "🎓 Freshers",
+                value=fresher_on,
+                key=fresher_key,
+                label_visibility="collapsed",
+                help="Freshers-only alerts (entry/junior roles) — off = all "
+                "experience levels.",
+            )
+            if fresher_toggled != fresher_on:
+                saved = _api(
+                    f"/notifications/preferences/{uid}",
+                    method="PUT",
+                    json_data={
+                        "experience_levels": ["entry", "junior"]
+                        if fresher_toggled
+                        else []
+                    },
+                    timeout=15,
+                )
+                if saved:
+                    st.caption("✅ saved")
+                    st.session_state.pop(fresher_key, None)
                 else:
                     st.error("Save failed")
         with col_actions:
