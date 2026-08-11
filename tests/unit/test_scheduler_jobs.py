@@ -1,5 +1,6 @@
 """Unit tests for scheduler/jobs.py."""
 
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -1571,3 +1572,275 @@ class TestClosingSoonSweep:
 
         assert sent == {}
         manager.notify.assert_not_awaited()
+
+
+class TestWeeklyDigest:
+    """The scheduler's weekly digest: 7-day window + top-engaged + toggle."""
+
+    @pytest.mark.asyncio
+    async def test_generate_daily_report_weekly_passes_flag_and_skips_disabled(
+        self,
+        monkeypatch,
+    ):
+        """weekly=True sends via _send_alert_for(weekly=True), skipping
+        accounts that turned weekly_enabled off."""
+        from interntrack.scheduler.jobs import generate_daily_report
+
+        session = AsyncMock()
+        sent_calls: list = []
+
+        async def _fake_send(*args, **kwargs):
+            sent_calls.append((args, kwargs))
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs.get_db_session",
+            lambda: AsyncMock(
+                __aenter__=AsyncMock(return_value=session),
+                __aexit__=AsyncMock(return_value=False),
+            ),
+        )
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._enabled_alert_targets",
+            AsyncMock(
+                return_value=[
+                    {
+                        "user_id": "u-on",
+                        "prefs": {
+                            "is_enabled": True,
+                            "weekly_enabled": True,
+                            "domains": ["security"],
+                            "channels": ["email"],
+                            "min_match_score": None,
+                            "last_alert_at": None,
+                        },
+                        "user": None,
+                    },
+                    {
+                        "user_id": "u-off",
+                        "prefs": {
+                            "is_enabled": True,
+                            "weekly_enabled": False,
+                            "domains": ["security"],
+                            "channels": ["email"],
+                            "min_match_score": None,
+                            "last_alert_at": None,
+                        },
+                        "user": None,
+                    },
+                ]
+            ),
+        )
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._send_alert_for",
+            _fake_send,
+        )
+
+        await generate_daily_report(weekly=True)
+
+        # Only the user with weekly_enabled=True got a weekly send.
+        assert [c[0][1] for c in sent_calls] == ["u-on"]
+        assert sent_calls[0][1].get("weekly") is True  # weekly kwarg
+
+    @pytest.mark.asyncio
+    async def test_weekly_send_uses_7day_window_and_attaches_top_engaged(
+        self,
+        monkeypatch,
+    ):
+        """_send_alert_for(weekly=True) spans 7 days and attaches
+        top_engaged before delivery."""
+        from interntrack.scheduler.jobs import _send_alert_for
+
+        session = AsyncMock()
+
+        class _FakeReportService:
+            def __init__(self, session):
+                pass
+
+            async def generate_daily_report(self, **kwargs):
+                return {
+                    "summary": {
+                        "new_jobs": 1,
+                        "new_applications": 0,
+                        "total_applications": 0,
+                    },
+                    "new_jobs": [
+                        {"title": "SOC Analyst", "company": "X", "url": "https://x"}
+                    ],
+                    "closing_soon": [],
+                    "follow_up": [],
+                }
+
+        manager = MagicMock()
+        manager.notify = AsyncMock(return_value={"email": True})
+
+        deliver_kwargs: dict = {}
+
+        async def _fake_deliver(*args, **kwargs):
+            deliver_kwargs.update(kwargs)
+            return {"email": True}
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs.ReportService",
+            _FakeReportService,
+        )
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs.NotificationManager",
+            lambda *_a, **_k: manager,
+        )
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._mark_alert_sent",
+            AsyncMock(),
+        )
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._record_alert_history",
+            AsyncMock(),
+        )
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._weekly_top_engaged",
+            AsyncMock(return_value=[{"title": "Hot Job", "engagement_score": 5.0}]),
+        )
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._deliver_alert",
+            _fake_deliver,
+        )
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._latest_resume_skill_names",
+            AsyncMock(return_value=None),
+        )
+
+        await _send_alert_for(
+            session,
+            "u-on",
+            {
+                "domains": ["security"],
+                "channels": ["email"],
+                "min_match_score": None,
+                "last_alert_at": None,
+            },
+            None,
+            weekly=True,
+        )
+
+        assert deliver_kwargs.get("weekly") is True
+        assert deliver_kwargs.get("subject", "").startswith("Weekly Digest")
+
+    @pytest.mark.asyncio
+    async def test_weekly_top_engaged_formula(
+        self,
+        monkeypatch,
+    ):
+        """Engagement = 3*apps + 2*bookmarks + 0.5*views, sorted desc."""
+        from interntrack.scheduler.jobs import _weekly_top_engaged
+
+        session = AsyncMock()
+
+        class _Job:
+            def __init__(self, jid, views, created):
+                self.id = jid
+                self.title = f"Job {jid}"
+                self.company = "Co"
+                self.location = "BLR"
+                self.url = "https://x"
+                self.view_count = views
+                self.is_active = True
+                self.created_at = created
+
+        jobs = [_Job("a", 10, 1), _Job("b", 0, 1)]
+        app_rows = [("a", 2)]  # job a: 2 applications
+        bm_rows = [("a", 1)]  # job a: 1 bookmark
+
+        async def _fake_execute(stmt):
+            s = str(stmt).lower()
+
+            class _R:
+                def scalars(self):
+                    return self
+
+                def all(self):
+                    return jobs
+
+            class _R2:
+                def __init__(self, rows):
+                    self.rows = rows
+
+                def all(self):
+                    return self.rows
+
+            if "bookmark" in s:
+                return _R2(bm_rows)
+            if "application" in s:
+                return _R2(app_rows)
+            return _R()
+
+        session.execute = _fake_execute
+        monkeypatch.setattr(
+            "interntrack.utils.helpers.utcnow",
+            lambda: datetime(2026, 8, 10),
+        )
+
+        top = await _weekly_top_engaged(session)
+
+        # a: 2*3 + 1*2 + 10*0.5 = 13.0 ; b: 0 -> excluded.
+        assert len(top) == 1
+        assert top[0]["id"] == "a"
+        assert top[0]["engagement_score"] == 13.0
+
+
+class TestDigestFooter:
+    """Email / Telegram footer links to the public dashboard."""
+
+    def test_footer_html_renders_links_when_dashboard_url_set(
+        self,
+        monkeypatch,
+    ):
+        from interntrack.scheduler.jobs import _digest_footer_html
+
+        class _Settings:
+            dashboard_url = "https://dash.example.com"
+
+        monkeypatch.setattr(
+            "interntrack.config.get_settings",
+            lambda: _Settings(),
+        )
+        html = _digest_footer_html()
+        assert "Open full dashboard" in html
+        assert "Manage alert settings" in html
+        assert "https://dash.example.com" in html
+
+    def test_footer_html_empty_when_no_url(self, monkeypatch):
+        from interntrack.scheduler.jobs import _digest_footer_html
+
+        class _Settings:
+            dashboard_url = None
+
+        monkeypatch.setattr(
+            "interntrack.config.get_settings",
+            lambda: _Settings(),
+        )
+        assert _digest_footer_html() == ""
+
+    def test_footer_text_renders_when_dashboard_url_set(self, monkeypatch):
+        from interntrack.scheduler.jobs import _digest_footer_text
+
+        class _Settings:
+            dashboard_url = "https://dash.example.com"
+
+        monkeypatch.setattr(
+            "interntrack.config.get_settings",
+            lambda: _Settings(),
+        )
+        txt = _digest_footer_text()
+        assert "Open full dashboard" in txt
+        assert "https://dash.example.com" in txt
+
+    def test_footer_text_empty_when_no_url(self, monkeypatch):
+        from interntrack.scheduler.jobs import _digest_footer_text
+
+        class _Settings:
+            dashboard_url = ""
+
+        monkeypatch.setattr(
+            "interntrack.config.get_settings",
+            lambda: _Settings(),
+        )
+        assert _digest_footer_text() == ""
