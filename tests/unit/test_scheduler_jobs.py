@@ -1804,7 +1804,7 @@ class TestDigestFooter:
         )
         html = _digest_footer_html()
         assert "Open full dashboard" in html
-        assert "Manage alert settings" in html
+        assert "Settings page" in html
         assert "https://dash.example.com" in html
 
     def test_footer_html_empty_when_no_url(self, monkeypatch):

@@ -210,6 +210,85 @@ class JobRepository(BaseRepository[Job]):
             )
         return len(pending)
 
+    async def get_most_engaged(
+        self,
+        days: int = 7,
+        limit: int = 5,
+    ) -> list[dict]:
+        """Most-engaged jobs of the last N days, for the weekly recap.
+
+        Ranks jobs by the same engagement formula as 🔥 Trending (3 per
+        application + 2 per bookmark + 0.5 per view) so the weekly digest
+        can lead with what people actually applied to / saved / opened.
+        Returns plain dicts (title / company / url / location / counts /
+        score); never raises — a failure returns [] so the weekly digest
+        is never broken by a stats hiccup.
+        """
+        try:
+            from interntrack.domain.models import Application, Bookmark
+
+            cutoff = utcnow() - timedelta(days=days)
+            rows = (
+                (
+                    await self.session.execute(
+                        select(Job).where(
+                            Job.is_active.is_(True),
+                            Job.created_at >= cutoff,
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            if not rows:
+                return []
+            job_ids = [j.id for j in rows]
+            app_rows = (
+                await self.session.execute(
+                    select(Application.job_id, func.count(Application.id))
+                    .where(Application.job_id.in_(job_ids))
+                    .group_by(Application.job_id)
+                )
+            ).all()
+            app_counts: dict[str, int] = {str(rid): int(cnt) for rid, cnt in app_rows}
+            bm_rows = (
+                await self.session.execute(
+                    select(Bookmark.item_id, func.count(Bookmark.id))
+                    .where(
+                        Bookmark.item_type == "job",
+                        Bookmark.item_id.in_(job_ids),
+                    )
+                    .group_by(Bookmark.item_id)
+                )
+            ).all()
+            bm_counts: dict[str, int] = {str(iid): int(cnt) for iid, cnt in bm_rows}
+
+            scored: list[dict] = []
+            for job in rows:
+                views = int(job.view_count or 0)
+                apps = int(app_counts.get(str(job.id), 0))
+                bms = int(bm_counts.get(str(job.id), 0))
+                score = apps * 3 + bms * 2 + views * 0.5
+                if score <= 0:
+                    continue
+                scored.append(
+                    {
+                        "id": str(job.id),
+                        "title": job.title,
+                        "company": job.company,
+                        "location": job.location,
+                        "url": job.url,
+                        "views": views,
+                        "applications": apps,
+                        "bookmarks": bms,
+                        "engagement_score": round(score, 1),
+                    }
+                )
+            scored.sort(key=lambda item: item["engagement_score"], reverse=True)
+            return scored[: int(limit)]
+        except Exception:  # noqa: BLE001 - never break the weekly digest
+            return []
+
     async def get_active_jobs(
         self,
         skip: int = 0,
