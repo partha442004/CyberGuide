@@ -45,6 +45,8 @@ def aggregate_skills_gap(
     considered = 0
 
     for _job, score, match in matches:
+        if not isinstance(match, dict):
+            continue
         try:
             score = float(score)
         except (TypeError, ValueError):

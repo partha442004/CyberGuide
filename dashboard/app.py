@@ -2069,15 +2069,7 @@ def show_my_matches() -> None:
         )
 
     # ── Skills gap ────────────────────────────────────────────────────
-    gap = (
-        aggregate_skills_gap(matches)
-        if matches
-        else {
-            "missing": [],
-            "matched": [],
-            "considered": 0,
-        }
-    )
+    gap = aggregate_skills_gap(matches)
     if gap.get("missing"):
         st.subheader("🛠 Skills gap — what to learn next")
         st.caption(
