@@ -2526,6 +2526,114 @@ def _domain_coverage_section(job_list: list | None = None) -> None:
         )
 
 
+_SOURCE_LABELS = {
+    "search_engine": "🔎 Search engine",
+    "linkedin": "🔗 LinkedIn",
+    "rss_feeds": "📰 RSS feeds",
+    "hackernews": "🐍 HackerNews",
+    "internshala_direct": "🎓 Internshala",
+    "cutshort": "⚡ Cutshort",
+    "wellfound": "🚀 Wellfound",
+    "foundit": "🏢 Foundit",
+    "naukri": "💼 Naukri",
+    "apna": "🤝 Apna",
+    "indeed": "🌐 Indeed",
+    "glassdoor": "🏫 Glassdoor",
+    "remoteok": "🏝 RemoteOK",
+    "manual": "📥 Shared links",
+}
+
+_STATUS_STYLE = {
+    "healthy": ("🟢 healthy", "#059669", "rgba(5,150,105,0.12)"),
+    "degraded": ("🟡 degraded", "#d97706", "rgba(217,119,6,0.12)"),
+    "stale": ("🔴 stale", "#dc2626", "rgba(220,38,38,0.12)"),
+    "unknown": ("⚪ unknown", "#64748b", "rgba(100,116,139,0.12)"),
+}
+
+
+def _source_health_section() -> None:
+    """Live scraper-health panel — which job boards are actually feeding data.
+
+    Renders the ``/observability/scraper-health`` payload as color-coded
+    source tiles: green = jobs in the last 24h, amber = 7d, red = stale,
+    grey = unknown. Shows the 24h/7d counts so a user can see at a glance
+    whether their favourite board (LinkedIn, Naukri...) is fresh or blocked
+    (many boards auth-wall datacenter IPs — the search-engine fallback
+    keeps those flowing). Never raises when the API is unreachable.
+    """
+    data = fetch_data("/observability/scraper-health") or {}
+    sources = data.get("sources") or []
+    if not sources:
+        return
+    summary = data.get("summary") or {}
+
+    st.markdown(
+        '<div class="section-title">🗄 Job source health</div>'
+        '<div class="section-sub">Which boards are feeding fresh jobs right '
+        "now (24h) vs older ones (7d) — boards that auth-wall datacenter IPs "
+        "(LinkedIn, Naukri, Indeed...) are kept fresh by the search-engine "
+        "fallback.</div>",
+        unsafe_allow_html=True,
+    )
+
+    # Summary strip: overall health % + counts.
+    hpct = summary.get("health_pct")
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        _stat_tile(
+            f"{hpct:.0f}%" if isinstance(hpct, (int, float)) else "—",
+            "Sources healthy",
+        )
+    with c2:
+        _stat_tile(summary.get("healthy", 0), "🟢 Fresh (24h)")
+    with c3:
+        _stat_tile(summary.get("degraded", 0), "🟡 Slowing (7d)")
+    with c4:
+        _stat_tile(summary.get("stale", 0), "🔴 Stale (no new)")
+
+    # Per-source tiles: name, status chip, 24h + 7d counts.
+    # The API returns source as an enum string (``JobSource.LINKEDIN``) —
+    # normalize to the bare name so the friendly labels always match.
+    cols = st.columns(4)
+    for i, s in enumerate(sources):
+        src = str(s.get("source") or "unknown")
+        if "." in src:
+            src = src.rsplit(".", 1)[-1]
+        src = src.lower()
+        status = s.get("status") or "unknown"
+        label, color, bg = _STATUS_STYLE.get(status, _STATUS_STYLE["unknown"])
+        name = _SOURCE_LABELS.get(src, f"🗂 {src}")
+        n24 = s.get("jobs_24h", 0)
+        n7d = s.get("jobs_7d", 0)
+        with cols[i % 4]:
+            st.markdown(
+                f'<div class="stat-tile" style="border-top:4px solid {color};">'
+                f'<div class="stat-label" style="text-transform:none;'
+                f'font-size:0.9em;">{escape(name)}</div>'
+                f'<div style="font-size:0.78em;font-weight:700;color:{color};'
+                f'margin:6px 0 2px;">{label}</div>'
+                f'<div style="font-size:0.74em;color:var(--muted);">'
+                f"🆕 {n24} · 24h &nbsp; 📅 {n7d} · 7d</div></div>",
+                unsafe_allow_html=True,
+            )
+
+    # Flag sources the user might expect that have gone stale.
+    stale_names = [
+        _SOURCE_LABELS.get(str(s.get("source")), str(s.get("source")))
+        for s in sources
+        if s.get("status") in ("stale", "degraded")
+    ]
+    if stale_names:
+        st.caption(
+            "ℹ️ "
+            + ", ".join(stale_names)
+            + " — these boards block automated scraping from cloud servers. "
+            "The search-engine source still finds their postings; add a "
+            "**Discovery** run or paste links on **Jobs → Share a Job** to "
+            "pull them in."
+        )
+
+
 def show_overview() -> None:
     """Show overview page."""
     st.header("📈 Overview")
@@ -2589,6 +2697,9 @@ def show_overview() -> None:
         # ── 🗂 Domain coverage (live per-category counts) ───────────────
         _fresh_all = (fetch_data("/jobs/?limit=300") or {}).get("jobs") or []
         _domain_coverage_section(_fresh_all)
+
+        # ── 🗄 Job source health (which boards are feeding fresh jobs) ──
+        _source_health_section()
 
         # ── 🆕 Fresh for you (last 24h, your categories) ────────────────
         try:

@@ -320,6 +320,11 @@ class SearchEngineScraper(BaseScraper):
         queries = [
             f"{q} job OR vacancy OR opening",
             f"{q} internship OR fresher OR career",
+            # LinkedIn is the single biggest source but its guest jobs API
+            # auth-walls datacenter IPs, so the direct scraper returns 0.
+            # The posting URLs are still indexed — surface them through the
+            # search engines (and the India mirror) to keep LinkedIn fresh.
+            f"site:linkedin.com/jobs OR site:in.linkedin.com/jobs {q}",
             f"site:cutshort.io {q}",
             f"site:wellfound.com {q}",
             f"site:foundit.in OR site:timesjobs.com OR site:hirect.in {q}",

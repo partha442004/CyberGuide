@@ -84,3 +84,25 @@ class TestSearchEngineQueries:
 
         assert seen
         assert "job or vacancy or opening" in seen[0].lower()
+
+    @pytest.mark.asyncio
+    async def test_linkedin_surface_queries(self):
+        """LinkedIn is auth-walled from datacenter IPs — the search engine
+        must carry explicit ``site:linkedin.com/jobs`` queries so posting
+        URLs still surface and the biggest source stays fresh."""
+        scraper = SearchEngineScraper()
+        seen: list[str] = []
+
+        async def fake_search(engine: str, query: str) -> list[str]:
+            seen.append(query)
+            return []
+
+        scraper._search_links = fake_search  # type: ignore[method-assign]
+        await scraper.fetch("security", "Bangalore", limit=8)
+
+        assert seen
+        joined = " ".join(seen)
+        assert "site:linkedin.com/jobs" in joined
+        assert "site:in.linkedin.com/jobs" in joined
+        # The query still carries the domain + location context.
+        assert any("security" in q.lower() and "bangalore" in q.lower() for q in seen)
