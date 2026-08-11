@@ -6,6 +6,19 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **🧠 Smarter fresher detection.** Jobs whose experience level was never
+  parsed no longer sail past the fresher filter: `job_experience_ok` now
+  scans the title for senior/fresher role markers (Senior/Lead/Manager/
+  Principal -> dropped in fresher mode; Intern/Fresher/Entry level ->
+  kept) and the description for years requirements ("8-13 years" /
+  "5+ years" -> senior, "0-2 years" -> entry). Parsed levels stay
+  authoritative (a fresher-classified job is never dropped for merely
+  mentioning a manager), markers are word-bounded ("internal" never
+  reads as "intern"), and role words are only matched in the title so a
+  fresher description that mentions a senior colleague can't cause a
+  false drop. 10 new tests; full unit suite 1622 passed; ruff + mypy
+  clean.
+
 - **👥 Team page: fresher-only + remote onboarding, per-member toggles.**
   The Team & Users page's add-member form gains a "🎓 Freshers-only
   alerts" checkbox (entry/junior filter set on the new account right

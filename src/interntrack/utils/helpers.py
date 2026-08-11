@@ -124,6 +124,73 @@ def location_allows(job_loc: str, user_loc: str, include_remote: bool = True) ->
     return bool(include_remote and is_remote_location(job_loc))
 
 
+# Title/description markers that reveal seniority when a job's experience
+# level was never parsed (AI classification unavailable). Matched as whole
+# words so "internal" never reads as "intern" and "staffing" never as
+# "staff". Used only to catch obvious senior postings in fresher mode.
+_SENIOR_LEVEL_MARKERS = (
+    "senior",
+    "sr",
+    "lead",
+    "principal",
+    "architect",
+    "director",
+    "manager",
+    "head of",
+    "staff",
+    "vp",
+    "vice president",
+    "executive",
+)
+_FRESHER_LEVEL_MARKERS = (
+    "fresher",
+    "entry level",
+    "entry-level",
+    "intern",
+    "trainee",
+    "apprentice",
+    "graduate trainee",
+)
+
+
+def _detect_level_from_text(job) -> str | None:
+    """Best-effort seniority guess for jobs with no parsed experience level.
+
+    Senior/fresher role markers are applied to the TITLE only — a fresher
+    description routinely mentions managers / senior engineers ("under the
+    Security Manager"), so scanning it for role words would wrongly drop
+    fresher jobs. The description is used only for years requirements
+    ("8-13 years" / "5+ years" -> senior, 3 -> mid, 0-2 -> entry).
+    Returns None when nothing is detected so the caller keeps the
+    permissive default. Never raises.
+    """
+    try:
+        if isinstance(job, dict):
+            title = str(job.get("title") or "").lower()
+            desc = str(job.get("description") or "")[:1000].lower()
+        else:
+            title = str(getattr(job, "title", None) or "").lower()
+            desc = str(getattr(job, "description", None) or "")[:1000].lower()
+        if any(_alt_in(m, title) for m in _SENIOR_LEVEL_MARKERS):
+            return "senior"
+        if any(_alt_in(m, title) for m in _FRESHER_LEVEL_MARKERS):
+            return "entry"
+        # Years requirements: "5-8 years", "8 to 13 years", "2+ years", ...
+        m = re.search(r"(\d{1,2})\s*(?:-|–|to)\s*\d{1,2}\s*(?:years?|yrs)", desc)
+        if not m:
+            m = re.search(r"(\d{1,2})\s*\+?\s*(?:years?|yrs)", desc)
+        if m:
+            years = int(m.group(1))
+            if years >= 4:
+                return "senior"
+            if years >= 3:
+                return "mid"
+            return "entry"
+        return None
+    except Exception:  # noqa: BLE001 - a bad text must never break a digest
+        return None
+
+
 def job_experience_ok(job, allowed_levels: list | None) -> bool:
     """Whether a job's experience level fits a user's allowed set.
 
@@ -131,10 +198,11 @@ def job_experience_ok(job, allowed_levels: list | None) -> bool:
     daily digest, the instant alerts, the report filter and the closing-
     soon sweep. ``allowed_levels`` is a list of ExperienceLevel values
     (entry, junior, mid, senior, ...); an empty list / None means every
-    level passes. Jobs with no parsed level (or unknown / fresher / intern
-    tags) always pass — an unspecified posting may still be fresher-
-    friendly, so only explicitly mid / senior / lead / executive roles are
-    dropped in fresher mode. Never raises.
+    level passes. Jobs whose level is parsed and out of scope are dropped.
+    Jobs with no parsed level default to passing (an unspecified posting
+    may still be fresher-friendly) unless the title/description clearly
+    marks the role as senior/mid ("Senior Manager", "8-13 years"), in
+    which case they are dropped in fresher mode too. Never raises.
     """
     if not allowed_levels:
         return True
@@ -146,7 +214,16 @@ def job_experience_ok(job, allowed_levels: list | None) -> bool:
             level = str(job.get("experience_level") or "").strip().lower()
         else:
             level = str(getattr(job, "experience_level", None) or "").strip().lower()
-        if not level or level in ("unknown", "fresher", "intern"):
+        if not level or level == "unknown":
+            # Unparsed listing: keep by default, but catch obvious senior /
+            # mid postings so fresher users never see them.
+            detected = _detect_level_from_text(job)
+            if detected in ("senior", "mid"):
+                return detected in allowed
+            return True
+        # A parsed fresher/intern level is authoritative — it always passes
+        # (a fresher description may still mention managers/senior roles).
+        if level in ("fresher", "intern"):
             return True
         return level in allowed
     except Exception:  # noqa: BLE001 - a bad level must never break a digest
