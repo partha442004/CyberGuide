@@ -9,7 +9,8 @@ All notable changes to the InternTrack project will be documented in this file.
 - **📈 Match % progress tracking.** The platform now snapshots each
   user's average resume-match % across recent active jobs once a day
   (23:30 UTC, new `match_snapshots` table, upserted per user/day, scoped
-  to the user's domains). The My Matches page shows the trend as a
+  to the user's domains and city like the digest). The My Matches page
+  shows the trend as a
   Plotly line chart with the overall ▲/▼ delta, and the new
   `GET /reports/match-trend` endpoint (with pure `_match_trend_points` /
   `_match_trend_delta` helpers) feeds it. Watch your match % climb as
