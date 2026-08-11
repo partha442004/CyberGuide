@@ -13,6 +13,15 @@ import plotly.express as px
 import streamlit as st
 
 try:
+    from dashboard.components.skills_gap import aggregate_skills_gap
+except ImportError:  # pragma: no cover - very old deployment
+
+    def aggregate_skills_gap(matches, min_score=30.0) -> dict:  # type: ignore[no-untyped-def] # noqa: ARG001
+        """Fallback: no aggregated gap on old deployments."""
+        return {"missing": [], "matched": [], "considered": 0}
+
+
+try:
     from dashboard.invite import (
         DEFAULT_DASHBOARD_URL,
         build_invite_link,
@@ -2058,6 +2067,37 @@ def show_my_matches() -> None:
             "No match scores yet — upload your resume on the **Resume Match** "
             "page, then come back here for your personal top picks."
         )
+
+    # ── Skills gap ────────────────────────────────────────────────────
+    gap = (
+        aggregate_skills_gap(matches)
+        if matches
+        else {
+            "missing": [],
+            "matched": [],
+            "considered": 0,
+        }
+    )
+    if gap.get("missing"):
+        st.subheader("🛠 Skills gap — what to learn next")
+        st.caption(
+            "These skills are expected across your top "
+            f"**{int(gap.get('considered') or 0)}** matches but missing "
+            "from your resume — ranked by how many matches want them."
+        )
+        gap_chips = "".join(
+            '<span class="chip" style="color:#dc2626;'
+            'border-color:rgba(220,38,38,0.35);">'
+            f"⬜ {escape(str(m['skill']))} · {int(m['count'])} match(es)</span>"
+            for m in gap["missing"]
+        )
+        st.markdown(
+            f'<div class="chip-row">{gap_chips}</div>',
+            unsafe_allow_html=True,
+        )
+        top_matched = [escape(str(m["skill"])) for m in (gap.get("matched") or [])]
+        if top_matched:
+            st.caption("✅ Already on your resume: " + ", ".join(top_matched[:8]))
 
     # ── Application pipeline ──────────────────────────────────────────
     st.subheader("📋 Your application pipeline")

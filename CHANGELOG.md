@@ -6,6 +6,16 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **🛠 Skills-gap panel on the My Matches page.** Ranks the skills your
+  top resume matches expect but your resume lacks — sorted by how many
+  of those matches want them, with a "already on your resume" line — so
+  you know exactly what to learn next to unlock more matches. Pure
+  aggregation helper in `dashboard/components/skills_gap.py` (streamlit-
+  free, 9 unit tests) rendered in `show_my_matches`; low-scoring matches
+  are excluded and lists are capped.
+
+### Added
+
 - **🛠 Job alerts now show the skills each role expects.** The Telegram
   job lines and the email job cards list the role's expected skills
   ("what they expect for that role") via a new `_skills_txt` helper —
