@@ -684,6 +684,185 @@ async def send_closing_soon_alerts() -> dict:
         return await _send_closing_soon_sweep(session)
 
 
+async def _interview_reminders_for(
+    session,
+    user_id: str,
+    hours: int = 36,
+) -> list[dict]:
+    """Applications with an interview in the next ``hours``, not yet reminded.
+
+    Returns compact dicts (title / company / job url / interview time /
+    expected skills) joined from the application + its job, sorted soonest
+    first. A reminder is only due once per application
+    (``interview_reminder_sent_at`` is NULL). Never raises; ``[]`` on any
+    problem.
+    """
+    try:
+        from sqlalchemy import select
+
+        from interntrack.domain.models import Application, Job
+
+        now = datetime.now(UTC).replace(tzinfo=None)
+        horizon = now + timedelta(hours=hours)
+        result = await session.execute(
+            select(Application, Job)
+            .join(Job, Application.job_id == Job.id)
+            .where(
+                Application.user_id == user_id,
+                Application.status == "interview",
+                Application.interview_at.isnot(None),
+                Application.interview_at > now,
+                Application.interview_at <= horizon,
+                Application.interview_reminder_sent_at.is_(None),
+            )
+        )
+        items: list[dict] = []
+        for app, job in result.all():
+            items.append(
+                {
+                    "application_id": str(getattr(app, "id", "") or ""),
+                    "job_id": str(getattr(app, "job_id", "") or ""),
+                    "job_title": getattr(job, "title", None) or "Interview",
+                    "company": getattr(job, "company", None) or "Unknown",
+                    "job_url": getattr(job, "url", None) or "",
+                    "interview_at": getattr(app, "interview_at", None),
+                    "location": getattr(job, "location", None) or "",
+                    "skills": list(getattr(job, "required_skills", None) or [])[:5],
+                }
+            )
+        items.sort(key=lambda x: (x["interview_at"] is None, x["interview_at"]))
+        return items
+    except Exception:  # noqa: BLE001 - reminders must never break the scheduler
+        return []
+
+
+def _interview_reminder_text(item: dict) -> tuple[str, list[tuple[str, str]]]:
+    """Message + buttons for one interview reminder (pure, testable)."""
+    when = item.get("interview_at")
+    when_txt = ""
+    if when:
+        try:
+            when_txt = when.strftime("%a %d %b · %I:%M %p")
+        except Exception:  # noqa: BLE001 - best-effort time formatting
+            when_txt = str(when)[:16]
+    title = str(item.get("job_title") or "Interview")
+    company = str(item.get("company") or "Unknown")
+    lines = [f"🗓️ <b>Interview soon:</b> {title} @ {company}"]
+    if when_txt:
+        lines.append(f"⏰ {when_txt}")
+    loc = str(item.get("location") or "")
+    if loc and loc.lower() != "remote":
+        lines.append(f"📍 {loc}")
+    skills = item.get("skills") or []
+    if skills:
+        lines.append("🧠 They expect: " + ", ".join(str(s) for s in skills[:5]))
+    lines.append("")
+    lines.append("Good luck! Mark the interview done on your dashboard.")
+    buttons: list[tuple[str, str]] = []
+    if item.get("job_url"):
+        buttons.append(("🔗 View job", str(item["job_url"])))
+    cal = _calendar_link(title, company)
+    if cal:
+        buttons.append(("📅 Add to calendar", cal))
+    return "\n".join(lines), buttons
+
+
+async def _send_interview_reminders_for_user(
+    session,
+    user_id: str,
+    prefs: dict,
+    user,
+    sent: dict,
+) -> None:
+    """Send '🗓️ Interview soon' pushes for one user's due interviews."""
+    if not user_id or _alerts_paused(prefs):
+        return
+    items = await _interview_reminders_for(session, user_id)
+    if not items:
+        return
+    manager = NotificationManager(session)
+    channel_list = (
+        prefs.get("channels")
+        or manager.get_configured_channels()
+        or ["email", "telegram"]
+    )
+    recipient = None
+    if user is not None:
+        recipient = {
+            "email": getattr(user, "email", None),
+            "telegram_chat_id": getattr(user, "telegram_chat_id", None),
+            "phone_number": getattr(user, "phone_number", None),
+        }
+    from sqlalchemy import update
+
+    from interntrack.domain.models import Application
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+    for item in items[:3]:
+        text, buttons = _interview_reminder_text(item)
+        results = await manager.notify(
+            channel_list,
+            text,
+            subject="🗓️ Interview soon",
+            buttons=buttons or None,
+            recipient=recipient,
+        )
+        await _record_alert_history(
+            session,
+            user_id=user_id,
+            subject="🗓️ Interview soon",
+            channels=list(results.keys()),
+            domains=prefs.get("domains") or [],
+            job_count=1,
+            results=results,
+        )
+        # Mark reminded even if delivery hiccuped — never spam every run.
+        await session.execute(
+            update(Application)
+            .where(Application.id == item["application_id"])
+            .values(interview_reminder_sent_at=now)
+        )
+    await session.commit()
+    sent[user_id] = len(items)
+
+
+async def _send_interview_reminders(session) -> dict:
+    """One '🗓️ Interview soon' push per due interview for every user.
+
+    Interviews scheduled within the next 36 hours get a short notification
+    through the user's saved channels (View job + Add to calendar buttons)
+    exactly once. Never raises; returns ``{user_id: count}`` for logging.
+    """
+    sent: dict = {}
+    try:
+        targets = await _enabled_alert_targets(session)
+        if not targets:
+            # Legacy single-user path before accounts exist.
+            prefs = await _load_alert_preferences(session)
+            if prefs.get("is_enabled") is not False:
+                await _send_interview_reminders_for_user(
+                    session, DEFAULT_ALERT_USER, prefs, None, sent
+                )
+            return sent
+        for target in targets:
+            await _send_interview_reminders_for_user(
+                session,
+                target.get("user_id") or "",
+                target.get("prefs") or {},
+                target.get("user"),
+                sent,
+            )
+    except Exception as e:  # noqa: BLE001 - sweep must never break the app
+        print(f"[{datetime.now(UTC)}] Interview reminders failed: {e}")
+    return sent
+
+
+async def send_interview_reminders() -> dict:
+    """Scheduled wrapper: run the interview-reminder sweep on its own session."""
+    async with get_db_session() as session:
+        return await _send_interview_reminders(session)
+
+
 async def _enabled_alert_targets(session) -> list[dict]:
     """Every account with alerts enabled, as ``{user_id, prefs, user}``.
 

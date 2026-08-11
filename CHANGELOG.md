@@ -6,6 +6,18 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **🗓️ Interview reminders.** Interviews scheduled within the next 36
+  hours now trigger a dedicated push through the user's saved channels —
+  "🗓️ Interview soon: SOC Analyst @ Acme — Wed 12 Aug · 02:30 PM · 🧠
+  They expect: Splunk, SIEM, Linux" — with **View job** + **Add to
+  calendar** buttons. The new `send_interview_reminders` scheduler job
+  (every 6 hours) nudges each application exactly once via the new
+  `interview_reminder_sent_at` column (auto-synced to live tables),
+  honors the vacation pause, and never raises. 8 new tests; full unit
+  suite 1583 passed; ruff + mypy clean.
+
+### Added
+
 - **📈 Match % progress tracking.** The platform now snapshots each
   user's average resume-match % across recent active jobs once a day
   (23:30 UTC, new `match_snapshots` table, upserted per user/day, scoped
