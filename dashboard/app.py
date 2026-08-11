@@ -2601,7 +2601,7 @@ def _source_health_section() -> None:
             src = src.rsplit(".", 1)[-1]
         src = src.lower()
         status = s.get("status") or "unknown"
-        label, color, bg = _STATUS_STYLE.get(status, _STATUS_STYLE["unknown"])
+        label, color = _STATUS_STYLE.get(status, _STATUS_STYLE["unknown"])[:2]
         name = _SOURCE_LABELS.get(src, f"🗂 {src}")
         n24 = s.get("jobs_24h", 0)
         n7d = s.get("jobs_7d", 0)
@@ -2617,9 +2617,11 @@ def _source_health_section() -> None:
                 unsafe_allow_html=True,
             )
 
-    # Flag sources the user might expect that have gone stale.
+    # Flag sources the user might expect that have gone stale. Source names
+    # come from the DB (a fixed enum today), but escape everything rendered
+    # into HTML per the dashboard's convention.
     stale_names = [
-        _SOURCE_LABELS.get(str(s.get("source")), str(s.get("source")))
+        escape(_SOURCE_LABELS.get(str(s.get("source")), str(s.get("source"))))
         for s in sources
         if s.get("status") in ("stale", "degraded")
     ]
