@@ -13,6 +13,7 @@ from interntrack.scheduler.jobs import (
     record_match_snapshots,
     run_job_discovery,
     send_closing_soon_alerts,
+    send_interview_reminders,
     verify_job_links,
 )
 
@@ -97,6 +98,16 @@ def setup_scheduler():
         CronTrigger(hour=23, minute=30),
         id="match_snapshots",
         name="Match % Snapshots",
+        replace_existing=True,
+    )
+
+    # Interview reminders every 6 hours — nudges each enabled user 24-36h
+    # before every scheduled interview, once per application.
+    scheduler.add_job(
+        send_interview_reminders,
+        IntervalTrigger(hours=6),
+        id="interview_reminders",
+        name="Interview Reminders",
         replace_existing=True,
     )
 

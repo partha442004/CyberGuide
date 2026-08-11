@@ -268,6 +268,10 @@ class Application(Base, TimestampMixin):
     cover_letter = Column(Text, nullable=True)
     priority = Column(Integer, default=0)
     reminded = Column(Boolean, default=False)
+    # When the "🗓️ Interview soon" reminder was last sent for this
+    # application (NULL = never) so a scheduled interview is nudged at
+    # most once. Auto-added to live tables by ``_sync_missing_columns``.
+    interview_reminder_sent_at = Column(DateTime, nullable=True)
 
     @validates("applied_at", "interview_at")
     def _coerce_naive_utc(self, _key: str, value):
