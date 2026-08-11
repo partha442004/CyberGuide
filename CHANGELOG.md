@@ -27,6 +27,12 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **📭 Per-user quiet-day email toggle.** New `AlertPreferences.quiet_day_emails`
+  column (auto-synced to the live DB), exposed through the preferences API
+  and a Settings checkbox. When off, the account **only ever receives emails
+  that actually contain job alerts** — the compact "no new jobs today" mail
+  is skipped for them (default is on, so existing behavior is unchanged).
+  5 new tests.
 - **💸 Estimated salary chip on job cards (when the posting hides it).**
   Jobs that don't list a salary still get a "💸 ~₹X – ₹Y" estimate chip
   from the salary-benchmark data (role × city medians), so every card
