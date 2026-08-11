@@ -68,12 +68,14 @@ async def _send_quiet_day_digest(
 
     try:
         manager = NotificationManager(db)
-        channels = prefs.get("channels") or manager.get_configured_channels() or []
         if (
-            "email" not in channels
+            not manager.get_configured_channels()
             or prefs.get("is_enabled") is False
             or _alerts_paused(prefs)
         ):
+            return {}
+        channels = prefs.get("channels") or manager.get_configured_channels() or []
+        if "email" not in channels:
             return {}
         if domains is None:
             domains = prefs.get("domains") or []
@@ -387,9 +389,12 @@ async def get_daily_report(
                     user_id=target["user_id"],
                     user=target["user"],
                 )
-        elif not preview:
+        elif not preview and (slot is None or slot == "morning"):
             # Quiet day: still send a compact email so the user knows the
             # system checked in and didn't break (no Telegram/SMS spam).
+            # Only the morning slot (and manual triggers) sends it — the
+            # afternoon/evening cron slots stay silent on empty days so a
+            # user never gets 3 'no new jobs' mails per day.
             with contextlib.suppress(Exception):
                 await _send_quiet_day_digest(
                     db,
