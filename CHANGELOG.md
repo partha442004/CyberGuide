@@ -6,6 +6,15 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **🛠 Job alerts now show the skills each role expects.** The Telegram
+  job lines and the email job cards list the role's expected skills
+  ("what they expect for that role") via a new `_skills_txt` helper —
+  pulled from backfilled `required_skills`, falling back to `tags`,
+  deduped case-insensitively and capped (6 skills in text, 5 in email)
+  so a multi-skill posting stays compact. 6 new tests.
+
+### Added
+
 - **🚫 Search-engine content filter — articles are never saved as jobs.**
   A live quality check found the search-engine source had saved *"15 Best
   Chess Opening Moves That You Absolutely Must Know"* — LinkedIn
