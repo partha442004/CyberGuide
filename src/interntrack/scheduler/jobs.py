@@ -362,6 +362,7 @@ async def _deliver_alert(
             user_id=user_id,
             user_location=user_location,
             include_remote=include_remote,
+            weekly=weekly,
         )
         if recipient:
             results.update(
@@ -380,6 +381,7 @@ async def _deliver_alert(
             user_id=user_id,
             user_location=user_location,
             include_remote=include_remote,
+            weekly=weekly,
         )
         if recipient:
             results.update(
@@ -855,6 +857,32 @@ async def _weekly_top_engaged(session, days: int = 7, limit: int = 5) -> list[di
         return []
 
 
+async def _weekly_skill_gap(
+    session,
+    sections,
+    user_id: str | None = None,
+    limit: int = 5,
+) -> list[dict]:
+    """Skills the weekly digest's jobs expect but the resume lacks, ranked.
+
+    Flattens the scored ``(domain, [(score, job), ...])`` sections (the
+    same jobs shown in the digest), compares each job's expected skills
+    against the user's latest resume skills, and returns the missing ones
+    ranked by how many jobs want them — the digest counterpart of the My
+    Matches skills-gap panel. Never raises.
+    """
+    try:
+        if not sections:
+            return []
+        resume_skills = await _latest_resume_skill_names(session, user_id=user_id)
+        if not resume_skills:
+            return []
+        jobs = [job for _domain, items in sections for _score, job in items]
+        return _skill_gap_counts(resume_skills, jobs, limit=limit)
+    except Exception:  # noqa: BLE001 - the digest must never break
+        return []
+
+
 async def generate_daily_report(weekly: bool = False):
     """Generate and send daily (or weekly) reports for every enabled user.
 
@@ -1183,6 +1211,40 @@ def _skills_txt(job: dict, limit: int = 6) -> str:
     return ", ".join(out)
 
 
+def _skill_gap_counts(resume_skills, jobs: list[dict], limit: int = 5) -> list[dict]:
+    """Skills the digest's jobs expect but the resume lacks, ranked.
+
+    Compares each job's expected skills (``required_skills``, ``tags``
+    fallback) against the resume's skill names, counts how many jobs want
+    each missing skill, and returns ``[{"skill", "count"}]`` sorted by
+    count desc then alphabetically and capped at ``limit``. Non-skill
+    noise is filtered with the same ``_SKILL_NOISE`` list the skills line
+    uses, matching is case-insensitive, and a job is only counted once
+    per skill.
+    """
+    if not resume_skills:
+        return []
+    have = {str(s).strip().lower() for s in resume_skills if str(s).strip()}
+    if not have:
+        return []
+    counts: dict[str, int] = {}
+    display: dict[str, str] = {}
+    for job in jobs:
+        seen_in_job: set[str] = set()
+        for raw in (job.get("required_skills") or []) + (job.get("tags") or []):
+            skill = str(raw or "").strip()
+            if not skill or _SKILL_NOISE.search(skill):
+                continue
+            key = skill.lower()
+            if key in have or key in seen_in_job:
+                continue
+            seen_in_job.add(key)
+            display.setdefault(key, skill)
+            counts[key] = counts.get(key, 0) + 1
+    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    return [{"skill": display[k], "count": c} for k, c in ranked[:limit]]
+
+
 def _salary_txt(job: dict) -> str:
     """Compact salary line ("₹10L–₹15L" / "$80k–$100k") or "" when unknown."""
     lo = job.get("salary_min")
@@ -1314,6 +1376,7 @@ async def build_daily_report_message(
     user_id: str | None = None,
     user_location: str | None = None,
     include_remote: bool = True,
+    weekly: bool = False,
 ) -> str:
     """Rich daily-report notification: summary counts plus the recent jobs
     grouped by domain (security / coding / data / …), each job carrying its
@@ -1428,6 +1491,15 @@ async def build_daily_report_message(
         )
         if domains:
             lines.append(f"🔔 Filtered to: {', '.join(domains)} only")
+    if weekly:
+        gap = await _weekly_skill_gap(session, sections, user_id=user_id)
+        if gap:
+            lines.append("")
+            lines.append("🛠 Skills to learn next (from this week's matches):")
+            for g in gap:
+                lines.append(
+                    f"   ⬜ {_esc(g['skill'])} — wanted by {int(g['count'])} job(s)"
+                )
     return "\n".join(lines)
 
 
@@ -1607,6 +1679,19 @@ async def build_alert_chunks(
     breakdown = _telegram_breakdown(here_flat, there_flat)
     if breakdown:
         chunks.append((breakdown, []))
+
+    # 🛠 Skills to learn next — the weekly digest's learning hint, mirroring
+    # the email card and the My Matches panel (weekly-only).
+    if weekly:
+        gap = await _weekly_skill_gap(session, sections, user_id=user_id)
+        if gap:
+            gap_lines = ["🛠 <b>Skills to learn next</b>", ""]
+            for g in gap:
+                gap_lines.append(
+                    f"⬜ {_esc(g['skill'])} — wanted by {int(g['count'])} job(s)"
+                )
+            chunks.append(("\n".join(gap_lines), []))
+
     footer_txt = _digest_footer_text()
     if footer_txt:
         chunks.append((footer_txt, []))
@@ -1733,6 +1818,7 @@ async def build_daily_report_html(
     user_id: str | None = None,
     user_location: str | None = None,
     include_remote: bool = True,
+    weekly: bool = False,
 ) -> str:
     """Styled HTML digest for email delivery.
 
@@ -2014,6 +2100,28 @@ async def build_daily_report_html(
             )
             + "</div></div>"
         )
+
+    if weekly:
+        gap = await _weekly_skill_gap(session, sections, user_id=user_id)
+        if gap:
+            chips = "".join(
+                "<span style='display:inline-block;margin:4px 6px 0 0;"
+                "padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;"
+                "color:#dc2626;border:1px solid rgba(220,38,38,0.35);"
+                "background:rgba(220,38,38,0.06);'>"
+                f"⬜ {_esc(g['skill'])} · {int(g['count'])} job(s)</span>"
+                for g in gap
+            )
+            parts.append(
+                "<div style='background:#fff7ed;border-radius:12px;padding:14px 18px;"
+                "margin:18px 0;font-size:13px;'>"
+                "<div style='font-weight:800;font-size:14px;'>"
+                "🛠 Skills to learn next</div>"
+                "<div style='margin-top:6px;color:#475569;'>Expected by this week's "
+                "matches but missing from your resume — learn these to unlock more "
+                "matches.</div>"
+                f"<div style='margin-top:8px;'>{chips}</div></div>"
+            )
 
     parts.append(
         "<p style='color:#64748b;font-size:12px;margin-top:22px;'>"

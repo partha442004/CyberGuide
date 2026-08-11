@@ -6,6 +6,17 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **🛠 Weekly digest now ends with "Skills to learn next".** The Monday
+  digest's email card, text/SMS message, and Telegram chunks each close
+  with the top 5 skills this week's matched jobs expect but the resume
+  lacks (ranked by how many jobs want them, same noise-filtered logic as
+  the skills line). Purely additive: daily digests are unchanged, and
+  users without a resume get no gap block. New `_skill_gap_counts` /
+  `_weekly_skill_gap` helpers + `weekly` flag threaded into both digest
+  builders; 6 new tests.
+
+### Added
+
 - **🛠 Skills-gap panel on the My Matches page.** Ranks the skills your
   top resume matches expect but your resume lacks — sorted by how many
   of those matches want them, with a "already on your resume" line — so

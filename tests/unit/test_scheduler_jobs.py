@@ -1932,3 +1932,134 @@ class TestJobSkillsLine:
         html = _job_html_card(82, job, "#2563eb")
         assert "🛠 Skills: C++, R&amp;D" in html
         assert "<script>" not in html
+
+
+class TestWeeklySkillGap:
+    """The weekly digest's 'skills to learn next' block."""
+
+    def test_skill_gap_counts_empty_without_resume(self):
+        from interntrack.scheduler.jobs import _skill_gap_counts
+
+        assert _skill_gap_counts(None, [{}]) == []
+        assert _skill_gap_counts(set(), [{}]) == []
+
+    def test_skill_gap_counts_ranks_and_caps(self):
+        from interntrack.scheduler.jobs import _skill_gap_counts
+
+        jobs = [
+            {"required_skills": ["Splunk", "SIEM", "Linux"]},
+            {"required_skills": ["Splunk", "SIEM"]},
+            {"required_skills": ["Splunk", "AWS"]},
+        ]
+        gap = _skill_gap_counts({"python"}, jobs, limit=2)
+        assert gap == [
+            {"skill": "Splunk", "count": 3},
+            {"skill": "SIEM", "count": 2},
+        ]
+
+    def test_skill_gap_counts_matches_resume_and_filters_noise(self):
+        from interntrack.scheduler.jobs import _skill_gap_counts
+
+        jobs = [
+            {"required_skills": ["Splunk", "python", "Bengaluru", "Full-time"]},
+            {"required_skills": ["splunk", "SIEM"]},
+        ]
+        gap = _skill_gap_counts({"python"}, jobs)
+        # python already on the resume; Splunk counted once per job; noise dropped.
+        assert gap == [
+            {"skill": "Splunk", "count": 2},
+            {"skill": "SIEM", "count": 1},
+        ]
+
+    def _report(self, jobs):
+        return {
+            "summary": {
+                "new_jobs": len(jobs),
+                "new_applications": 0,
+                "total_applications": 0,
+            },
+            "new_jobs": jobs,
+        }
+
+    def _soc_jobs(self):
+        return [
+            {
+                "id": "job-1",
+                "title": "SOC Analyst",
+                "company": "Acme Corp",
+                "url": "https://acme.example/apply",
+                "location": "Bengaluru",
+                "required_skills": ["Splunk", "SIEM", "Python"],
+                "tags": ["soc"],
+                "age_days": 1,
+            },
+            {
+                "id": "job-2",
+                "title": "Security Engineer",
+                "company": "Beta Inc",
+                "url": "https://beta.example/apply",
+                "location": "Bengaluru",
+                "required_skills": ["Splunk", "AWS"],
+                "tags": ["security"],
+                "age_days": 2,
+            },
+        ]
+
+    class FakeResume:
+        skills = [{"name": "Python", "category": "scripting"}]
+
+    class FakeResult:
+        def scalar_one_or_none(self):
+            return TestWeeklySkillGap.FakeResume()
+
+    class FakeSession:
+        async def execute(self, *args, **kwargs):
+            return TestWeeklySkillGap.FakeResult()
+
+    @pytest.mark.asyncio
+    async def test_weekly_message_lists_gap_but_daily_does_not(self):
+        from interntrack.scheduler.jobs import build_daily_report_message
+
+        report = self._report(self._soc_jobs())
+        weekly = await build_daily_report_message(
+            report, self.FakeSession(), weekly=True
+        )
+        assert "🛠 Skills to learn next" in weekly
+        assert "Splunk — wanted by 2 job(s)" in weekly
+        assert "SIEM — wanted by 1 job(s)" in weekly
+
+        daily = await build_daily_report_message(
+            report, self.FakeSession(), weekly=False
+        )
+        assert "Skills to learn next" not in daily
+
+    @pytest.mark.asyncio
+    async def test_weekly_html_card_lists_gap_but_daily_does_not(self):
+        from interntrack.scheduler.jobs import build_daily_report_html
+
+        report = self._report(self._soc_jobs())
+        weekly = await build_daily_report_html(report, self.FakeSession(), weekly=True)
+        assert "🛠 Skills to learn next" in weekly
+        assert "Splunk" in weekly
+        assert "wanted" not in weekly  # email uses chips, not the text wording
+
+        daily = await build_daily_report_html(report, self.FakeSession(), weekly=False)
+        assert "Skills to learn next" not in daily
+
+    @pytest.mark.asyncio
+    async def test_weekly_telegram_chunks_include_gap(self):
+        from interntrack.scheduler.jobs import build_alert_chunks
+
+        report = self._report(self._soc_jobs())
+        chunks = await build_alert_chunks(
+            report, self.FakeSession(), weekly=True, user_id="u1"
+        )
+        texts = [text for text, _buttons in chunks]
+        assert any("Skills to learn next" in t for t in texts)
+        assert any("Splunk — wanted by 2 job(s)" in t for t in texts)
+
+        daily_chunks = await build_alert_chunks(
+            report, self.FakeSession(), weekly=False, user_id="u1"
+        )
+        daily_texts = [text for text, _buttons in daily_chunks]
+        assert not any("Skills to learn next" in t for t in daily_texts)
