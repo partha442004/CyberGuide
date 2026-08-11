@@ -1863,7 +1863,8 @@ class TestJobSkillsLine:
             "required_skills": ["Splunk", "Splunk", "SIEM", "  ", "Incident Response"],
             "tags": ["python", "soc"],
         }
-        assert _skills_txt(job) == "Splunk, SIEM, Incident Response"
+        # required_skills first, tags top up to the cap.
+        assert _skills_txt(job) == "Splunk, SIEM, Incident Response, python, soc"
 
     def test_skills_txt_falls_back_to_tags_and_caps(self):
         from interntrack.scheduler.jobs import _skills_txt
@@ -1904,3 +1905,30 @@ class TestJobSkillsLine:
         job = {"title": "Job", "url": "https://example.com/job/1", "age_days": 1}
         html = _job_html_card(82, job, "#2563eb")
         assert "🛠 Skills:" not in html
+
+    def test_skills_txt_filters_non_skill_noise(self):
+        from interntrack.scheduler.jobs import _skills_txt
+
+        job = {"tags": ["Bengaluru", "Full-time", "Hybrid", "Python", "Splunk"]}
+        assert _skills_txt(job) == "Python, Splunk"
+
+    def test_skills_txt_empty_required_skills_does_not_suppress_tags(self):
+        from interntrack.scheduler.jobs import _skills_txt
+
+        job = {"required_skills": ["", None], "tags": ["Splunk", "SIEM"]}
+        assert _skills_txt(job) == "Splunk, SIEM"
+
+    def test_skills_line_escapes_special_chars(self):
+        from interntrack.scheduler.jobs import _job_html_card, _job_lines
+
+        job = {
+            "title": "Dev",
+            "url": "https://example.com/job/1",
+            "age_days": 1,
+            "required_skills": ["C++", "R&D"],
+        }
+        lines = _job_lines(82, job)
+        assert any("🛠 Skills: C++, R&amp;D" in line for line in lines)
+        html = _job_html_card(82, job, "#2563eb")
+        assert "🛠 Skills: C++, R&amp;D" in html
+        assert "<script>" not in html
