@@ -281,6 +281,23 @@ class TestLocationMatches:
         assert not location_matches("", "bangalore")
         assert not location_matches("bangalore", "")
 
+    def test_multi_city_user_matches_any_listed_city(self):
+        from interntrack.utils.helpers import location_matches
+
+        # A user who wants "bangalore, hyderabad" gets jobs from either
+        # city (comma or slash separated, synonyms included).
+        assert location_matches("bangalore, karnataka", "bangalore, hyderabad")
+        assert location_matches("hyderabad, telangana", "bangalore, hyderabad")
+        assert location_matches("bengaluru, karnataka", "bangalore, hyderabad")
+        assert location_matches("secunderabad, telangana", "bangalore, hyderabad")
+        assert location_matches("hyderabad", "bangalore/hyderabad")
+
+    def test_multi_city_user_rejects_other_cities(self):
+        from interntrack.utils.helpers import location_matches
+
+        assert not location_matches("chennai, tamil nadu", "bangalore, hyderabad")
+        assert not location_matches("pune, maharashtra", "bangalore/hyderabad")
+
 
 class TestIsRemoteLocation:
     """Remote / WFH / "anywhere" detection for the location gate."""
