@@ -2224,3 +2224,49 @@ class TestWeeklySalaryInsight:
         )
         texts = [text for text, _buttons in chunks]
         assert any("Median security pay in Bangalore" in t for t in texts)
+
+    @pytest.mark.asyncio
+    async def test_weekly_salary_insight_formats_usd(self, monkeypatch):
+        from interntrack.scheduler.jobs import _weekly_salary_insight
+
+        async def _fake_benchmark(session, domain, city):
+            return {
+                "domain": "security",
+                "city": "Remote",
+                "count": 4,
+                "median": 90_000,
+                "currency": "USD",
+            }
+
+        monkeypatch.setattr(
+            "interntrack.api.v1.salary_insights.salary_benchmark_for",
+            _fake_benchmark,
+        )
+        line = await _weekly_salary_insight(AsyncMock(), ["security"], "")
+        assert line == (
+            "💰 Median security pay in Remote: $67k–$112k (from 4 live postings)"
+        )
+
+    @pytest.mark.asyncio
+    async def test_weekly_salary_insight_prefers_security_domain(self, monkeypatch):
+        from interntrack.scheduler.jobs import _weekly_salary_insight
+
+        seen: list[str] = []
+
+        async def _fake_benchmark(session, domain, city):
+            seen.append(domain)
+            return {
+                "domain": domain,
+                "city": "Remote",
+                "count": 1,
+                "median": 800_000,
+                "currency": "INR",
+            }
+
+        monkeypatch.setattr(
+            "interntrack.api.v1.salary_insights.salary_benchmark_for",
+            _fake_benchmark,
+        )
+        await _weekly_salary_insight(AsyncMock(), ["coding", "security"], "Bangalore")
+        # security is tried first even when it is second in the pref list.
+        assert seen[0] == "security"
