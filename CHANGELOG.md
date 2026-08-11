@@ -413,6 +413,19 @@ All notable changes to the InternTrack project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Added
+- **Weekly Digest actually fires** — the Monday 08:00 cron now sends the
+  real weekly digest (7-day window, 🔥 most-engaged jobs of the week, team
+  snapshot) instead of silently re-sending a daily report; honors each
+  user's `weekly_enabled` toggle
+- **Dashboard + settings links in digest footers** — when `DASHBOARD_URL`
+  is configured, daily/weekly emails and Telegram digests close with
+  "Open full dashboard" / "Manage alert settings" links
+- `_weekly_top_engaged()` scheduler helper (same engagement formula as the
+  weekly API endpoint) + 7 new tests
+
 ### Added
 
 - **⚡ Fixed discovery timing out on Vercel serverless (60s cap).** A

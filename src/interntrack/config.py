@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     api_port: int = 8000
     api_key_header: str = "X-API-Key"
 
+    # Public dashboard base URL, linked from digest email footers so
+    # recipients can open the full dashboard and manage their alerts.
+    dashboard_url: str | None = None
+
     # Database
     database_url: str = "sqlite+aiosqlite:///./data/interntrack.db"
 

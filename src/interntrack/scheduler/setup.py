@@ -40,10 +40,14 @@ def setup_scheduler():
         replace_existing=True,
     )
 
-    # Weekly report on Monday at 8 AM
+    # Weekly report on Monday at 8 AM — the real weekly digest: a 7-day
+    # recap with most-engaged jobs + team snapshot, honoring the per-user
+    # weekly_enabled toggle (unlike the old no-op that re-sent a daily
+    # digest on Mondays).
     scheduler.add_job(
         generate_daily_report,
         CronTrigger(day_of_week="mon", hour=8, minute=0),
+        kwargs={"weekly": True},
         id="weekly_report",
         name="Weekly Report",
         replace_existing=True,

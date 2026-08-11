@@ -3,7 +3,7 @@ Scheduled background jobs.
 """
 
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from interntrack.database.session import get_db_session
 from interntrack.services.job_service import JobService
@@ -741,12 +741,19 @@ async def _user_profile(session, user_id: str):
     return None
 
 
-async def _send_alert_for(session, user_id: str, prefs: dict, user=None) -> None:
-    """Build and deliver one user's daily digest (per-user resume + window).
+async def _send_alert_for(
+    session,
+    user_id: str,
+    prefs: dict,
+    user=None,
+    weekly: bool = False,
+) -> None:
+    """Build and deliver one user's daily or weekly digest.
 
     Honors the saved domains / channels / min match %, advances that user's
-    no-duplicates window, delivers to the user's own channels and records
-    the send in that user's history.
+    no-duplicates window (daily) or recaps the whole week (weekly),
+    delivers to the user's own channels and records the send in that user's
+    history.
     """
     domains = prefs.get("domains") or None
     # Each user's digest is scoped to *their* city (synonym-aware), so two
@@ -758,24 +765,35 @@ async def _send_alert_for(session, user_id: str, prefs: dict, user=None) -> None
     )
     include_remote = bool(prefs.get("include_remote", True))
     service = ReportService(session)
+    if weekly:
+        # Whole-week recap: span 7 days so every listing of the week is
+        # recapped on Mondays, regardless of the daily no-duplicates window.
+        since: datetime | None = datetime.now(UTC).replace(tzinfo=None) - timedelta(
+            days=7
+        )
+    else:
+        since = prefs.get("last_alert_at")
     report = await service.generate_daily_report(
         domains=domains,
         min_match_score=prefs.get("min_match_score"),
-        since=prefs.get("last_alert_at"),
+        since=since,
         location=user_location,
         include_remote=include_remote,
     )
+    if weekly:
+        report["report_type"] = "weekly"
+        # The week's most-engaged jobs (apps + bookmarks + views) lead the
+        # recap. Defensive: a stats failure must never break the digest.
+        report["top_engaged"] = await _weekly_top_engaged(session)
 
     await _mark_alert_sent(session, user_id)
     if not (report.get("new_jobs") or []):
-        print(
-            f"[{datetime.now(UTC)}] Daily report for {user_id}: "
-            "no new jobs since last alert"
-        )
+        kind = "Weekly digest" if weekly else "Daily report"
+        print(f"[{datetime.now(UTC)}] {kind} for {user_id}: no new jobs in window")
         return
 
     manager = NotificationManager(session)
-    subject = "Daily Report"
+    subject = "Weekly Digest" if weekly else "Daily Report"
     if domains:
         subject += f" ({', '.join(domains)})"
     results = await _deliver_alert(
@@ -785,6 +803,7 @@ async def _send_alert_for(session, user_id: str, prefs: dict, user=None) -> None
         session,
         domains=domains,
         subject=subject,
+        weekly=weekly,
         user=user,
     )
     # Compact snapshot of the jobs that were actually sent (with match %), so
@@ -821,39 +840,135 @@ async def _send_alert_for(session, user_id: str, prefs: dict, user=None) -> None
     )
 
 
-async def generate_daily_report():
-    """Generate and send daily reports for every user with alerts enabled.
+async def _weekly_top_engaged(
+    session,
+    days: int = 7,
+    limit: int = 5,
+) -> list[dict]:
+    """Most-engaged jobs of the last N days, for the weekly digest.
+
+    Ranks jobs by the same engagement formula as 🔥 Trending (3 per
+    application + 2 per bookmark + 0.5 per view) so the Monday recap can
+    lead with what people actually applied to / saved / opened. Returns
+    plain dicts; never raises — a stats failure returns [] so the weekly
+    digest is never broken by an engagement query hiccup.
+    """
+    try:
+        from sqlalchemy import func, select
+
+        from interntrack.domain.models import Application, Bookmark, Job
+        from interntrack.utils.helpers import utcnow
+
+        cutoff = utcnow() - timedelta(days=days)
+        rows = (
+            (
+                await session.execute(
+                    select(Job).where(Job.is_active.is_(True), Job.created_at >= cutoff)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if not rows:
+            return []
+        job_ids = [j.id for j in rows]
+        app_rows = (
+            await session.execute(
+                select(Application.job_id, func.count(Application.id))
+                .where(Application.job_id.in_(job_ids))
+                .group_by(Application.job_id)
+            )
+        ).all()
+        app_counts: dict[str, int] = {str(rid): int(cnt) for rid, cnt in app_rows}
+        bm_rows = (
+            await session.execute(
+                select(Bookmark.item_id, func.count(Bookmark.id))
+                .where(Bookmark.item_type == "job", Bookmark.item_id.in_(job_ids))
+                .group_by(Bookmark.item_id)
+            )
+        ).all()
+        bm_counts: dict[str, int] = {str(iid): int(cnt) for iid, cnt in bm_rows}
+
+        scored = []
+        for job in rows:
+            views = int(job.view_count or 0)
+            apps = int(app_counts.get(str(job.id), 0))
+            bms = int(bm_counts.get(str(job.id), 0))
+            score = apps * 3 + bms * 2 + views * 0.5
+            if score <= 0:
+                continue
+            scored.append(
+                {
+                    "id": str(job.id),
+                    "title": job.title,
+                    "company": job.company,
+                    "location": job.location,
+                    "url": job.url,
+                    "views": views,
+                    "applications": apps,
+                    "bookmarks": bms,
+                    "engagement_score": round(score, 1),
+                }
+            )
+        scored.sort(key=lambda item: item["engagement_score"], reverse=True)
+        return scored[:limit]
+    except Exception:  # noqa: BLE001 - never break the weekly digest
+        return []
+
+
+async def generate_daily_report(weekly: bool = False):
+    """Generate and send daily (or weekly) reports for every enabled user.
 
     Each registered account gets a personalized digest: their own domains,
     their own resume match %, their own no-duplicates window, delivered to
     their own email / Telegram and recorded in their own history. When no
     accounts exist yet, the legacy single-user path (``user1``) is used so
     pre-account deployments behave exactly as before.
+
+    ``weekly=True`` (the Monday cron) sends the weekly digest instead: a
+    7-day window, the week's most-engaged jobs, the team snapshot, and
+    skips accounts that disabled ``weekly_enabled``.
     """
     async with get_db_session() as session:
+        kind = "Weekly digest" if weekly else "Daily report"
         targets = await _enabled_alert_targets(session)
         if not targets:
             # Legacy single-user fallback (no registered accounts yet).
             prefs = await _load_alert_preferences(session)
             if prefs.get("is_enabled") is False:
-                print(f"[{datetime.now(UTC)}] Daily report skipped — alerts disabled")
+                print(f"[{datetime.now(UTC)}] {kind} skipped — alerts disabled")
+                return
+            if weekly and prefs.get("weekly_enabled") is False:
+                print(f"[{datetime.now(UTC)}] {kind} skipped — weekly digest disabled")
                 return
             if _alerts_paused(prefs):
-                print(f"[{datetime.now(UTC)}] Daily report skipped — alerts paused")
+                print(f"[{datetime.now(UTC)}] {kind} skipped — alerts paused")
                 return
-            await _send_alert_for(session, DEFAULT_ALERT_USER, prefs, None)
+            await _send_alert_for(
+                session,
+                DEFAULT_ALERT_USER,
+                prefs,
+                None,
+                weekly=weekly,
+            )
             return
 
         for target in targets:
             if target["prefs"].get("is_enabled") is False:
                 print(
-                    f"[{datetime.now(UTC)}] Daily report skipped for "
+                    f"[{datetime.now(UTC)}] {kind} skipped for "
                     f"{target['user_id']} — alerts disabled"
+                )
+                continue
+            if weekly and target["prefs"].get("weekly_enabled") is False:
+                print(
+                    f"[{datetime.now(UTC)}] {kind} skipped for "
+                    f"{target['user_id']} — weekly digest disabled"
                 )
                 continue
             if _alerts_paused(target["prefs"]):
                 print(
-                    f"[{datetime.now(UTC)}] Daily report skipped for "
+                    f"[{datetime.now(UTC)}] {kind} skipped for "
                     f"{target['user_id']} — alerts paused"
                 )
                 continue
@@ -862,6 +977,7 @@ async def generate_daily_report():
                 target["user_id"],
                 target["prefs"],
                 target["user"],
+                weekly=weekly,
             )
 
 
@@ -1509,7 +1625,25 @@ async def build_alert_chunks(
     breakdown = _telegram_breakdown(here_flat, there_flat)
     if breakdown:
         chunks.append((breakdown, []))
+    footer_txt = _digest_footer_text()
+    if footer_txt:
+        chunks.append((footer_txt, []))
     return chunks
+
+
+def _digest_footer_text() -> str:
+    """Dashboard link line for Telegram/text digests, or '' when unset."""
+    try:
+        from interntrack.config import get_settings
+
+        base = (get_settings().dashboard_url or "").strip().rstrip("/")
+    except Exception:  # noqa: BLE001, S110 - footer must never break digest
+        return ""
+    if not base:
+        return ""
+    return (
+        "—\n📊 Open full dashboard: " + _esc(base) + "\n⚙️ Manage alerts: settings page"
+    )
 
 
 def _telegram_breakdown(
@@ -1900,9 +2034,44 @@ async def build_daily_report_html(
     parts.append(
         "<p style='color:#64748b;font-size:12px;margin-top:22px;'>"
         "Match % = how well your uploaded resume fits each job · "
-        "✅/⬜ = applied / not applied.</p></div>"
+        "✅/⬜ = applied / not applied.</p>"
     )
+    footer = _digest_footer_html()
+    if footer:
+        parts.append(footer)
+    parts.append("</div>")
     return "".join(parts)
+
+
+def _digest_footer_html() -> str:
+    """Dashboard + settings links for the email footer, or '' when no URL.
+
+    Reads ``settings.dashboard_url``; when unset (dev / no public dashboard)
+    the footer is omitted entirely. Both links are plain-text escaped — the
+    URL comes from an env var, but ``_esc`` keeps it defensive.
+    """
+    try:
+        from interntrack.config import get_settings
+
+        base = (get_settings().dashboard_url or "").strip().rstrip("/")
+    except Exception:  # noqa: BLE001, S110 - footer must never break email
+        return ""
+    if not base:
+        return ""
+    dash = _esc(base)
+    settings = _esc(base + "/")
+    return (
+        "<div style='margin-top:24px;padding-top:16px;border-top:1px solid "
+        "#e2e8f0;font-size:13px;color:#475569;'>"
+        f"<a href='{dash}' style='color:#667eea;text-decoration:none;"
+        "font-weight:600;'>📊 Open full dashboard</a>"
+        "&nbsp;·&nbsp;"
+        f"<a href='{settings}' style='color:#667eea;text-decoration:none;"
+        "font-weight:600;'>⚙️ Manage alert settings</a>"
+        "<div style='margin-top:6px;color:#94a3b8;font-size:12px;'>"
+        "You get these because your alerts are enabled on InternTrack — "
+        "turn them off anytime from the Settings page.</div></div>"
+    )
 
 
 def _location_matches(job_loc, user_loc):
