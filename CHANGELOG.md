@@ -6,6 +6,24 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **🗂 Source chips in every digest alert.** The daily email card and the
+  Telegram/text job lines now show which board each job came from
+  (🔗 LinkedIn, 🎓 Internshala, 💼 Naukri, 🏢 Company careers, 🔎 Search
+  engine, 📰 RSS feeds, 📥 Shared link, …) via a new `_source_label`
+  helper that also normalizes enum strings (`JobSource.LINKEDIN` →
+  LinkedIn). After a discovery run found 222 jobs but saved 0 (all
+  duplicates), it was impossible to tell which sources actually feed the
+  alerts — now every job answers that itself. 6 new tests.
+- **Search-engine discovery now gives every board a fair share.** The
+  generic "job OR vacancy" query previously ate the whole per-run limit,
+  so the LinkedIn / Naukri / cyber-board `site:` queries that surface
+  fresh postings never actually ran — the auth-walled LinkedIn source
+  stayed at 3 jobs. Each of the 8 queries now gets its own budget slice
+  (`limit // len(queries)`) before the loop moves on, so board-specific
+  postings flow in every run. 1 new regression test.
+
+### Added
+
 - **🗄 Job source health panel on the Overview page.** The scraper-health
   API existed but had no UI, so there was no way to see which boards were
   actually feeding fresh jobs (LinkedIn was carrying 376 jobs but zero in
