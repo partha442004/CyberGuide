@@ -57,8 +57,10 @@ _DISCOVERY_SOURCES: list[str] = [
 # Total wall-clock budget (seconds) for one discovery request. Kept at 40s so
 # the endpoint always returns a (possibly partial) result before Vercel's
 # 60s hard kill, even after a cold start.
-# Vercel Hobby maxDuration is 60s; keep a 5s tail for save + response.
-_DISCOVERY_DEADLINE_SECONDS = 55
+# Vercel Hobby maxDuration is 60s and cold starts eat ~3-6s of that, so
+# keep a comfortable tail: the loop stops at 48s so save + response always
+# finish before the serverless kill.
+_DISCOVERY_DEADLINE_SECONDS = 48
 
 
 # Indian cities (plus common aliases) recognized inside discovery queries so
