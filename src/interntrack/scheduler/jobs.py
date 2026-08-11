@@ -883,6 +883,63 @@ async def _weekly_skill_gap(
         return []
 
 
+# Digest domain -> salary-benchmark domain (the benchmarks use coarser
+# buckets: development / devops / design / security / data).
+_DIGEST_SALARY_DOMAINS = {
+    "security": "security",
+    "data": "data",
+    "frontend": "development",
+    "coding": "development",
+    "design": "design",
+}
+
+
+async def _weekly_salary_insight(session, domains, user_location) -> str | None:
+    """One-line median-pay insight for the weekly digest, or ``None``.
+
+    Looks up the live (domain, city) benchmark via the shared
+    ``salary_benchmark_for`` helper (same numbers as the dashboard's
+    salary chips) and formats a compact ``💰 Median … `` line. Never
+    raises.
+    """
+    try:
+        from interntrack.api.v1.salary_insights import salary_benchmark_for
+
+        city = ""
+        if user_location:
+            city = str(user_location).split(",")[0].strip()
+        for domain in domains or []:
+            mapped = _DIGEST_SALARY_DOMAINS.get(domain)
+            if not mapped:
+                continue
+            row = await salary_benchmark_for(session, mapped, city)
+            if not row:
+                continue
+            med = int(row.get("median") or 0)
+            if not med:
+                continue
+            low = int(med * 0.75)
+            high = int(med * 1.25)
+            if med >= 100000:  # INR scale: 8.0M -> 8.0L
+                low_s, high_s = f"{low / 100000:.1f}L", f"{high / 100000:.1f}L"
+                symbol = "₹"
+            else:  # USD scale
+                low_s, high_s = f"{low // 1000}k", f"{high // 1000}k"
+                symbol = "$"
+            count = int(row.get("count") or 0)
+            city_name = row.get("city") or city or "India"
+            line = (
+                f"💰 Median {mapped} pay in {city_name}: "
+                f"{symbol}{low_s}–{symbol}{high_s}"
+            )
+            if count:
+                line += f" (from {count} live postings)"
+            return line
+    except Exception:  # noqa: BLE001 - salary insight must never break the digest
+        return None
+    return None
+
+
 async def generate_daily_report(weekly: bool = False):
     """Generate and send daily (or weekly) reports for every enabled user.
 
@@ -1562,6 +1619,10 @@ async def build_daily_report_message(
         if domains:
             lines.append(f"🔔 Filtered to: {', '.join(domains)} only")
     if weekly:
+        salary_line = await _weekly_salary_insight(session, domains, user_location)
+        if salary_line:
+            lines.append("")
+            lines.append(salary_line)
         gap = await _weekly_skill_gap(session, sections, user_id=user_id)
         if gap:
             lines.append("")
@@ -1757,6 +1818,9 @@ async def build_alert_chunks(
     # 🛠 Skills to learn next — the weekly digest's learning hint, mirroring
     # the email card and the My Matches panel (weekly-only).
     if weekly:
+        salary_line = await _weekly_salary_insight(session, domains, user_location)
+        if salary_line:
+            chunks.append((salary_line, []))
         gap = await _weekly_skill_gap(session, sections, user_id=user_id)
         if gap:
             gap_lines = ["🛠 <b>Skills to learn next</b>", ""]
@@ -2180,6 +2244,13 @@ async def build_daily_report_html(
         )
 
     if weekly:
+        salary_line = await _weekly_salary_insight(session, domains, user_location)
+        if salary_line:
+            parts.append(
+                "<div style='background:#ecfdf5;border-radius:12px;padding:12px 18px;"
+                "margin:18px 0;font-size:13px;font-weight:600;color:#065f46;'>"
+                f"{_esc(salary_line)}</div>"
+            )
         gap = await _weekly_skill_gap(session, sections, user_id=user_id)
         if gap:
 

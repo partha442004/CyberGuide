@@ -14,24 +14,13 @@ from interntrack.domain.models import Job
 router = APIRouter()
 
 
-@router.get("/benchmarks")
-async def salary_benchmarks(
-    db: AsyncSession = Depends(get_db),
-):
-    """Role × city salary benchmark from real stored postings.
+def _compute_benchmark_rows(jobs) -> list[dict[str, Any]]:
+    """Bucket active salaried jobs into (domain, city) benchmark rows.
 
-    Groups active jobs that carry a salary by (domain, city) and returns
-    median / average / min / max / count per bucket, plus the overall top
-    cities — so a user can answer "what does a SOC Analyst in Bangalore
-    actually pay?" from live data.
+    Shared by the API endpoint and the weekly digest's salary insight so
+    the numbers can never drift between the dashboard and notifications.
     """
     from statistics import median
-
-    from sqlalchemy import select
-
-    query = select(Job).where(Job.is_active == True)  # noqa: E712
-    result = await db.execute(query)
-    jobs = result.scalars().all()
 
     buckets: dict[tuple[str, str], list[int]] = {}
     for job in jobs:
@@ -69,6 +58,25 @@ async def salary_benchmarks(
             }
         )
     rows.sort(key=lambda r: (-r["count"], r["domain"], r["city"]))
+    return rows
+
+
+@router.get("/benchmarks")
+async def salary_benchmarks(
+    db: AsyncSession = Depends(get_db),
+):
+    """Role × city salary benchmark from real stored postings.
+
+    Groups active jobs that carry a salary by (domain, city) and returns
+    median / average / min / max / count per bucket, plus the overall top
+    cities — so a user can answer "what does a SOC Analyst in Bangalore
+    actually pay?" from live data.
+    """
+    from sqlalchemy import select
+
+    query = select(Job).where(Job.is_active == True)  # noqa: E712
+    result = await db.execute(query)
+    rows = _compute_benchmark_rows(result.scalars().all())
 
     from collections import Counter
 
@@ -80,6 +88,40 @@ async def salary_benchmarks(
             {"city": c, "buckets": n} for c, n in city_counts.most_common(8)
         ],
     }
+
+
+async def salary_benchmark_for(session, domain: str, city: str) -> dict | None:
+    """Best benchmark row for a domain + city, or ``None`` when no data.
+
+    Prefers an exact city row, then a synonym match (Bangalore vs
+    Bengaluru…), then a Remote-only row for the domain — so the weekly
+    digest's salary insight always reflects live postings. Never raises.
+    """
+    try:
+        from sqlalchemy import select
+
+        from interntrack.utils.helpers import location_matches
+
+        query = select(Job).where(Job.is_active == True)  # noqa: E712
+        result = await session.execute(query)
+        rows = _compute_benchmark_rows(result.scalars().all())
+    except Exception:  # noqa: BLE001, S110 - insight must never break the digest
+        return None
+    domain_rows = [r for r in rows if r["domain"] == domain]
+    if not domain_rows:
+        return None
+    city_key = str(city or "").strip()
+    if city_key:
+        for row in domain_rows:
+            if row["city"].lower() == city_key.lower():
+                return row
+        for row in domain_rows:
+            if location_matches(row["city"].lower(), city_key.lower()):
+                return row
+    for row in domain_rows:
+        if row["city"].lower() == "remote":
+            return row
+    return None
 
 
 def _classify_domain(title: str, description: str | None) -> str:

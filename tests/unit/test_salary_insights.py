@@ -122,3 +122,50 @@ async def test_salary_benchmarks_skips_jobs_without_salary():
     assert data["total_buckets"] == 1
     assert data["rows"][0]["count"] == 1
     assert data["rows"][0]["median"] == 1_250_000
+
+
+async def test_salary_benchmark_for_exact_city_match():
+    from interntrack.api.v1.salary_insights import salary_benchmark_for
+
+    row = await salary_benchmark_for(_FakeDB(_security_jobs()), "security", "Bangalore")
+    assert row is not None
+    assert row["domain"] == "security"
+    assert row["city"] == "Bangalore"
+    assert row["count"] == 2
+    assert row["median"] == 650_000
+
+
+async def test_salary_benchmark_for_synonym_city():
+    from interntrack.api.v1.salary_insights import salary_benchmark_for
+
+    # Bengaluru == Bangalore via the shared synonym matcher.
+    row = await salary_benchmark_for(_FakeDB(_security_jobs()), "security", "Bengaluru")
+    assert row is not None
+    assert row["median"] == 650_000
+
+
+async def test_salary_benchmark_for_unknown_domain_or_no_data():
+    from interntrack.api.v1.salary_insights import salary_benchmark_for
+
+    assert (
+        await salary_benchmark_for(_FakeDB(_security_jobs()), "design", "Bangalore")
+        is None
+    )
+    assert await salary_benchmark_for(_FakeDB([]), "security", "Bangalore") is None
+
+
+async def test_salary_benchmark_for_remote_fallback():
+    from interntrack.api.v1.salary_insights import salary_benchmark_for
+
+    jobs = [
+        _FakeJob(
+            title="SOC Analyst",
+            description="Monitor SIEM alerts.",
+            location="Remote",
+            salary_min=400_000,
+            salary_max=600_000,
+        )
+    ]
+    row = await salary_benchmark_for(_FakeDB(jobs), "security", "Unknown City")
+    assert row is not None
+    assert row["city"] == "Remote"
