@@ -2045,6 +2045,42 @@ def show_my_matches() -> None:
     with col3:
         st.metric("🎯 Best match now", f"{matches[0][1]:.0f}%" if matches else "—")
 
+    # ── Match % progress chart ────────────────────────────────────────
+    trend = fetch_data(f"/reports/match-trend?user_id={user_id}&days=120") or {}
+    points = trend.get("points") or []
+    if len(points) >= 2:
+        st.subheader("📈 Your match % progress")
+        st.caption(
+            "Your average resume-match % across recent jobs — snapshotted "
+            "daily by the platform. Watch it climb as you close skill gaps."
+        )
+        import pandas as pd
+
+        df = pd.DataFrame(points)
+        fig = px.line(
+            df,
+            x="date",
+            y="avg_match",
+            markers=True,
+            labels={"date": "", "avg_match": "Avg match %"},
+        )
+        fig.update_layout(
+            height=300,
+            margin={"l": 10, "r": 10, "t": 30, "b": 10},
+            yaxis={"range": [0, 100]},
+            showlegend=False,
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        delta = trend.get("delta")
+        if delta is not None:
+            arrow = "▲" if delta >= 0 else "▼"
+            color = "#059669" if delta >= 0 else "#dc2626"
+            st.markdown(
+                f"<span style='color:{color};font-weight:700;'> {arrow} "
+                f"{delta:+.1f} pts</span> across {len(points)} daily snapshots",
+                unsafe_allow_html=True,
+            )
+
     # ── Top matches ───────────────────────────────────────────────────
     st.subheader("🏆 Your best matches right now")
     if matches:

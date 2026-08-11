@@ -6,6 +6,26 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **📈 Match % progress tracking.** The platform now snapshots each
+  user's average resume-match % across recent active jobs once a day
+  (23:30 UTC, new `match_snapshots` table, upserted per user/day, scoped
+  to the user's domains). The My Matches page shows the trend as a
+  Plotly line chart with the overall ▲/▼ delta, and the new
+  `GET /reports/match-trend` endpoint (with pure `_match_trend_points` /
+  `_match_trend_delta` helpers) feeds it. Watch your match % climb as
+  you close skill gaps.
+
+- **📊 "Your week in applications" on the weekly digest.** The Monday
+  digest now reports how the pipeline moved in the last 7 days per user
+  (e.g. "2 applied · 1 interviews · 1 rejections") — an email card, its
+  own Telegram message, and a line in text/SMS, powered by the new
+  `_week_application_stats` helper. Purely additive: daily digests
+  unchanged, and users with no new applications get no block. 15 new
+  tests (snapshot upsert, week stats, digest block, trend helpers); full
+  unit suite 1573 passed; ruff + mypy clean.
+
+### Added
+
 - **💰 Salary insight on the weekly digest.** The Monday digest now opens
   with median pay for the user's domain + city computed from live stored
   postings ("💰 Median security pay in Bangalore: ₹6.0L–₹10.0L (from 12

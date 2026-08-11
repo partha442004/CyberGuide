@@ -444,3 +444,60 @@ async def get_report_html(
 
     html = await service.render_report(data)
     return HTMLResponse(html)
+
+
+def _match_trend_points(rows: list) -> list[dict]:
+    """MatchSnapshot rows -> ordered snapshot dicts for the trend chart."""
+    points = []
+    for row in rows:
+        date_v = getattr(row, "snapshot_date", None)
+        points.append(
+            {
+                "date": str(date_v) if date_v else "",
+                "avg_match": getattr(row, "avg_match", None),
+                "min_match": getattr(row, "min_match", None),
+                "max_match": getattr(row, "max_match", None),
+                "jobs_scored": getattr(row, "jobs_scored", 0) or 0,
+            }
+        )
+    return points
+
+
+def _match_trend_delta(points: list[dict]) -> float | None:
+    """Overall change in avg match across snapshots (None when < 2 points)."""
+    if len(points) < 2:
+        return None
+    first = points[0].get("avg_match")
+    last = points[-1].get("avg_match")
+    if first is None or last is None:
+        return None
+    return round(float(last) - float(first), 1)
+
+
+@router.get("/match-trend")
+async def get_match_trend(
+    user_id: str = "user1",
+    days: int = 90,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """A user's resume-match % progress over time (from daily snapshots)."""
+    from sqlalchemy import select
+
+    from interntrack.domain.models import MatchSnapshot
+
+    since = datetime.now(UTC).date() - timedelta(days=max(int(days), 7))
+    result = await db.execute(
+        select(MatchSnapshot)
+        .where(
+            MatchSnapshot.user_id == user_id,
+            MatchSnapshot.snapshot_date >= since,
+        )
+        .order_by(MatchSnapshot.snapshot_date.asc())
+    )
+    points = _match_trend_points(list(result.scalars().all()))
+    return {
+        "user_id": user_id,
+        "points": points,
+        "latest": points[-1] if points else None,
+        "delta": _match_trend_delta(points),
+    }

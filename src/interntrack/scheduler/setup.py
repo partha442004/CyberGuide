@@ -10,6 +10,7 @@ from interntrack.config import get_settings
 from interntrack.scheduler.jobs import (
     deactivate_expired_jobs,
     generate_daily_report,
+    record_match_snapshots,
     run_job_discovery,
     send_closing_soon_alerts,
     verify_job_links,
@@ -85,6 +86,17 @@ def setup_scheduler():
         IntervalTrigger(hours=1),
         id="expire_jobs",
         name="Expire Jobs",
+        replace_existing=True,
+    )
+
+    # Match-% progress snapshots daily at 23:30 UTC — one row per user per
+    # day so the My Matches progress chart and the weekly trend line build
+    # up over time without touching the digest path.
+    scheduler.add_job(
+        record_match_snapshots,
+        CronTrigger(hour=23, minute=30),
+        id="match_snapshots",
+        name="Match % Snapshots",
         replace_existing=True,
     )
 

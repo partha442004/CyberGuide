@@ -7,6 +7,7 @@ from uuid import uuid4
 from sqlalchemy import (
     Boolean,
     Column,
+    Date,
     DateTime,
     Enum,
     Float,
@@ -615,3 +616,30 @@ class ActivityLog(Base, TimestampMixin):
     details = Column(JSON, nullable=True)
 
     __table_args__ = (Index("idx_activity_entity", "entity_type", "entity_id"),)
+
+
+class MatchSnapshot(Base, TimestampMixin):
+    """A user's average resume-match % against recent jobs on one day.
+
+    Taken daily by the scheduler, one row per ``(user_id, snapshot_date)``
+    (upserted). Powers the My Matches progress chart and the weekly
+    digest's trend line, so users can watch their match % improve as they
+    close skill gaps.
+    """
+
+    __tablename__ = "match_snapshots"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    user_id = Column(String(100), nullable=False, index=True)
+    snapshot_date = Column(Date, nullable=False, index=True)
+    avg_match = Column(Float, nullable=True)
+    min_match = Column(Float, nullable=True)
+    max_match = Column(Float, nullable=True)
+    jobs_scored = Column(Integer, default=0)
+
+    __table_args__ = (Index("idx_match_snapshot_user_day", "user_id", "snapshot_date"),)
+
+    def __repr__(self) -> str:
+        return (
+            f"<MatchSnapshot {self.user_id} {self.snapshot_date} avg={self.avg_match}>"
+        )

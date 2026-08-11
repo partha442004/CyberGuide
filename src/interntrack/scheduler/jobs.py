@@ -945,6 +945,169 @@ async def _weekly_salary_insight(session, domains, user_location) -> str | None:
     return None
 
 
+_WEEK_STATUS_LABELS = (
+    ("applied", "applied"),
+    ("interview", "interviews"),
+    ("assessment", "assessments"),
+    ("offer", "offers"),
+    ("joined", "joined"),
+    ("rejected", "rejections"),
+)
+
+
+def _week_stats_parts(counts: dict) -> list[str]:
+    """Human labels for non-zero application status counts (text/SMS)."""
+    return [
+        f"{int(counts.get(status, 0))} {label}"
+        for status, label in _WEEK_STATUS_LABELS
+        if counts.get(status)
+    ]
+
+
+async def _week_application_stats(
+    session,
+    user_id: str,
+    days: int = 7,
+) -> dict:
+    """Applications created in the last ``days`` for a user, by current status.
+
+    Powers the weekly digest's "Your week in applications" block so users
+    see how their pipeline moved. Never raises; returns ``{}`` when there
+    is nothing to report.
+    """
+    try:
+        from datetime import UTC, datetime, timedelta
+
+        from sqlalchemy import select
+
+        from interntrack.domain.models import Application
+
+        since = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
+        result = await session.execute(
+            select(Application).where(
+                Application.user_id == user_id,
+                Application.created_at >= since,
+            )
+        )
+        status_counts: dict[str, int] = {}
+        for app in result.scalars().all():
+            status = str(getattr(app, "status", "") or "saved").strip().lower()
+            status_counts[status] = status_counts.get(status, 0) + 1
+        total = sum(status_counts.values())
+        if not total:
+            return {}
+        return {"total": total, "status_counts": status_counts, "days": days}
+    except Exception:  # noqa: BLE001 - stats must never break the digest
+        return {}
+
+
+async def _record_match_snapshot(
+    session,
+    user_id: str,
+    domains: list | None = None,
+) -> dict | None:
+    """Snapshot today's average resume-match % across recent active jobs.
+
+    Scores up to 150 recent active jobs against the user's resume (scoped
+    to their domains when configured) and upserts one ``MatchSnapshot``
+    row per ``(user_id, day)``. Never raises; returns the snapshot dict or
+    ``None`` when there is no resume / too few scored jobs (fewer than 3).
+    """
+    try:
+        from sqlalchemy import select
+
+        from interntrack.domain.models import Job, MatchSnapshot
+
+        resume_skills = await _latest_resume_skill_names(session, user_id=user_id)
+        if not resume_skills:
+            return None
+        result = await session.execute(
+            select(Job)
+            .where(Job.is_active.is_(True))
+            .order_by(Job.posted_at.desc())
+            .limit(150)
+        )
+        scores: list[float] = []
+        for job in result.scalars().all():
+            job_dict = {
+                "id": str(getattr(job, "id", "") or ""),
+                "title": getattr(job, "title", None),
+                "company": getattr(job, "company", None),
+                "required_skills": list(getattr(job, "required_skills", None) or []),
+                "preferred_skills": list(getattr(job, "preferred_skills", None) or []),
+                "tags": list(getattr(job, "tags", None) or []),
+            }
+            if domains:
+                job_domain = str(getattr(job, "domain", "") or "").strip().lower()
+                if not any(
+                    d.strip().lower() in job_domain or job_domain in d.strip().lower()
+                    for d in domains
+                ):
+                    continue
+            score = _job_match_score(resume_skills, job_dict)
+            if score is not None:
+                scores.append(score)
+        if len(scores) < 3:
+            return None
+        today = datetime.now(UTC).date()
+        existing = await session.execute(
+            select(MatchSnapshot).where(
+                MatchSnapshot.user_id == user_id,
+                MatchSnapshot.snapshot_date == today,
+            )
+        )
+        row = existing.scalar_one_or_none()
+        if row is None:
+            row = MatchSnapshot(user_id=user_id, snapshot_date=today)
+            session.add(row)
+        row.avg_match = round(sum(scores) / len(scores), 1)
+        row.min_match = round(min(scores), 1)
+        row.max_match = round(max(scores), 1)
+        row.jobs_scored = len(scores)
+        await session.commit()
+        return {
+            "date": str(today),
+            "avg_match": row.avg_match,
+            "min_match": row.min_match,
+            "max_match": row.max_match,
+            "jobs_scored": row.jobs_scored,
+        }
+    except Exception:  # noqa: BLE001 - a snapshot failure must never break the scheduler
+        return None
+
+
+async def record_match_snapshots() -> int:
+    """Daily resume-match % progress snapshots for every enabled user.
+
+    Scheduler entry point (runs at 23:30 UTC): one snapshot row per user
+    per day, so the dashboard chart and weekly trend line build up over
+    time. Falls back to the legacy ``user1`` when no accounts exist.
+    Returns how many snapshots were recorded.
+    """
+    async with get_db_session() as session:
+        targets = await _enabled_alert_targets(session)
+        if not targets:
+            prefs = await _load_alert_preferences(session)
+            snap = await _record_match_snapshot(
+                session,
+                DEFAULT_ALERT_USER,
+                prefs.get("domains") or None,
+            )
+            return 1 if snap else 0
+        recorded = 0
+        for target in targets:
+            if target["prefs"].get("is_enabled") is False:
+                continue
+            snap = await _record_match_snapshot(
+                session,
+                target["user_id"],
+                target["prefs"].get("domains") or None,
+            )
+            if snap:
+                recorded += 1
+        return recorded
+
+
 async def generate_daily_report(weekly: bool = False):
     """Generate and send daily (or weekly) reports for every enabled user.
 
@@ -1624,6 +1787,12 @@ async def build_daily_report_message(
         if domains:
             lines.append(f"🔔 Filtered to: {', '.join(domains)} only")
     if weekly:
+        week = await _week_application_stats(session, user_id) if user_id else {}
+        if week.get("total"):
+            week_parts = _week_stats_parts(week.get("status_counts") or {})
+            lines.append("")
+            lines.append(f"📊 Your week in applications ({int(week['total'])} new):")
+            lines.append("   " + " · ".join(week_parts))
         salary_line = await _weekly_salary_insight(session, domains, user_location)
         if salary_line:
             lines.append("")
@@ -1823,6 +1992,17 @@ async def build_alert_chunks(
     # 🛠 Skills to learn next — the weekly digest's learning hint, mirroring
     # the email card and the My Matches panel (weekly-only).
     if weekly:
+        week = await _week_application_stats(session, user_id) if user_id else {}
+        if week.get("total"):
+            week_parts = _week_stats_parts(week.get("status_counts") or {})
+            chunks.append(
+                (
+                    "📊 <b>Your week in applications</b> "
+                    f"({int(week['total'])} new)\n"
+                    + "\n".join(f"• {p}" for p in week_parts),
+                    [],
+                )
+            )
         salary_line = await _weekly_salary_insight(session, domains, user_location)
         if salary_line:
             chunks.append((salary_line, []))
@@ -2249,6 +2429,22 @@ async def build_daily_report_html(
         )
 
     if weekly:
+        week = await _week_application_stats(session, user_id) if user_id else {}
+        if week.get("total"):
+            week_chips = " · ".join(
+                f"<b>{int((week.get('status_counts') or {}).get(k, 0))}</b> "
+                f"{_esc(label)}"
+                for k, label in _WEEK_STATUS_LABELS
+                if (week.get("status_counts") or {}).get(k)
+            )
+            parts.append(
+                "<div style='background:#eff6ff;border:1px solid #bfdbfe;"
+                "border-radius:12px;padding:12px 18px;margin:18px 0;"
+                "font-size:13px;color:#1e40af;'>"
+                "<div style='font-weight:800;font-size:14px;'>"
+                "📊 Your week in applications</div>"
+                f"<div style='margin-top:6px;'>{week_chips}</div></div>"
+            )
         salary_line = await _weekly_salary_insight(session, domains, user_location)
         if salary_line:
             parts.append(
