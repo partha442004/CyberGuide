@@ -13,12 +13,23 @@ import plotly.express as px
 import streamlit as st
 
 try:
-    from dashboard.components.skills_gap import aggregate_skills_gap
+    from dashboard.components.skills_gap import (
+        aggregate_skills_gap,
+        skill_learn_url,
+    )
 except ImportError:  # pragma: no cover - very old deployment
 
     def aggregate_skills_gap(matches, min_score=30.0) -> dict:  # type: ignore[no-untyped-def] # noqa: ARG001
         """Fallback: no aggregated gap on old deployments."""
         return {"missing": [], "matched": [], "considered": 0}
+
+    def skill_learn_url(skill: str) -> str:  # type: ignore[no-untyped-def] # noqa: ARG001
+        """Fallback: YouTube search link on old deployments."""
+        from urllib.parse import quote
+
+        return "https://www.youtube.com/results?search_query=" + quote(
+            f"{str(skill or '').strip()} course"
+        )
 
 
 try:
@@ -2078,9 +2089,12 @@ def show_my_matches() -> None:
             "from your resume — ranked by how many matches want them."
         )
         gap_chips = "".join(
+            "<a href='"
+            + escape(skill_learn_url(str(m["skill"])))
+            + "' target='_blank' style='text-decoration:none;'>"
             '<span class="chip" style="color:#dc2626;'
             'border-color:rgba(220,38,38,0.35);">'
-            f"⬜ {escape(str(m['skill']))} · {int(m['count'])} match(es)</span>"
+            f"⬜ {escape(str(m['skill']))} · {int(m['count'])} match(es)</span></a>"
             for m in gap["missing"]
         )
         st.markdown(
@@ -2090,6 +2104,7 @@ def show_my_matches() -> None:
         top_matched = [escape(str(m["skill"])) for m in (gap.get("matched") or [])]
         if top_matched:
             st.caption("✅ Already on your resume: " + ", ".join(top_matched[:8]))
+        st.caption("💡 Click any red skill to open free courses for it.")
 
     # ── Application pipeline ──────────────────────────────────────────
     st.subheader("📋 Your application pipeline")

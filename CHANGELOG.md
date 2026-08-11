@@ -6,6 +6,17 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **📚 Skills-to-learn links — "learn the gap" one click away.** Every
+  missing skill in the My Matches panel and the weekly digest now links
+  to free learning: curated resources for 22 common skills (Splunk free
+  training, PortSwigger Web Security Academy, TryHackMe, MITRE ATT&CK,
+  Python tutorial, Linux Journey, cloud skills boosters, …) with a
+  YouTube course-search fallback for anything else. Email gap chips are
+  clickable links, Telegram gets inline "📚 Learn X" buttons, and the
+  text/SMS message appends a Learn line (top 3 skills). 6 new tests.
+
+### Added
+
 - **🛠 Weekly digest now ends with "Skills to learn next".** The Monday
   digest's email card, text/SMS message, and Telegram chunks each close
   with the top 5 skills this week's matched jobs expect but the resume

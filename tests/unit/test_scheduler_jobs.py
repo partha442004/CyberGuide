@@ -2063,3 +2063,67 @@ class TestWeeklySkillGap:
         )
         daily_texts = [text for text, _buttons in daily_chunks]
         assert not any("Skills to learn next" in t for t in daily_texts)
+
+
+class TestSkillLearnLinks:
+    """Curated + fallback learning links on the weekly skills-gap block."""
+
+    def test_skill_learn_url_curated(self):
+        from interntrack.scheduler.jobs import _skill_learn_url
+
+        assert _skill_learn_url("Splunk") == (
+            "https://www.splunk.com/en_us/training/free-courses/overview.html"
+        )
+        assert _skill_learn_url("Python") == ("https://docs.python.org/3/tutorial/")
+
+    def test_skill_learn_url_falls_back_to_youtube(self):
+        from interntrack.scheduler.jobs import _skill_learn_url
+
+        url = _skill_learn_url("Zero Trust")
+        assert url is not None
+        assert url.startswith("https://www.youtube.com/results?search_query=")
+        assert "course" in url
+
+    def test_skill_learn_url_empty(self):
+        from interntrack.scheduler.jobs import _skill_learn_url
+
+        assert _skill_learn_url("") is None
+        assert _skill_learn_url(None) is None
+
+    @pytest.mark.asyncio
+    async def test_weekly_message_includes_learn_links(self):
+        from interntrack.scheduler.jobs import build_daily_report_message
+
+        report = TestWeeklySkillGap()._report(TestWeeklySkillGap()._soc_jobs())
+        weekly = await build_daily_report_message(
+            report, TestWeeklySkillGap.FakeSession(), weekly=True
+        )
+        assert "📚 Learn Splunk: https://www.splunk.com" in weekly
+
+    @pytest.mark.asyncio
+    async def test_weekly_chunks_add_learn_buttons(self):
+        from interntrack.scheduler.jobs import build_alert_chunks
+
+        report = TestWeeklySkillGap()._report(TestWeeklySkillGap()._soc_jobs())
+        chunks = await build_alert_chunks(
+            report, TestWeeklySkillGap.FakeSession(), weekly=True, user_id="u1"
+        )
+        buttons = [
+            (label, url) for _text, btn_list in chunks for label, url in btn_list
+        ]
+        assert any(label == "📚 Learn Splunk" for label, _url in buttons)
+        assert any(
+            url == "https://www.splunk.com/en_us/training/free-courses/overview.html"
+            for _label, url in buttons
+        )
+
+    @pytest.mark.asyncio
+    async def test_weekly_html_links_chips_to_resources(self):
+        from interntrack.scheduler.jobs import build_daily_report_html
+
+        report = TestWeeklySkillGap()._report(TestWeeklySkillGap()._soc_jobs())
+        weekly = await build_daily_report_html(
+            report, TestWeeklySkillGap.FakeSession(), weekly=True
+        )
+        assert "splunk.com/en_us/training" in weekly
+        assert "target='_blank'" in weekly

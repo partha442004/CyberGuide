@@ -127,3 +127,13 @@ def test_non_dict_match_is_skipped():
     matches = [({}, 80.0, 55)]  # legacy float match must never crash
     gap = aggregate_skills_gap(matches)  # type: ignore[list-item]
     assert gap == {"missing": [], "matched": [], "considered": 0}
+
+
+def test_skill_learn_url_generates_youtube_search():
+    from urllib.parse import parse_qs, urlparse
+
+    url = skills_gap.skill_learn_url("Splunk")
+    parsed = urlparse(url)
+    assert parsed.netloc == "www.youtube.com"
+    query = parse_qs(parsed.query)
+    assert query.get("search_query") == ["Splunk course"]
