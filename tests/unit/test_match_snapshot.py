@@ -168,6 +168,80 @@ class TestMatchSnapshot:
         assert existing_row.avg_match == 60.0
         assert existing_row.jobs_scored == 3
 
+    @pytest.mark.asyncio
+    async def test_location_scopes_jobs_like_the_digest(self, monkeypatch):
+        from interntrack.scheduler.jobs import _record_match_snapshot
+
+        async def _resume(session, user_id=None):
+            return {"python"}
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._latest_resume_skill_names", _resume
+        )
+
+        class _Job:
+            def __init__(self, jid, location):
+                self.id = jid
+                self.title = f"Job {jid}"
+                self.company = "Acme"
+                self.required_skills = []
+                self.preferred_skills = []
+                self.tags = []
+                self.domain = "security"
+                self.location = location
+                self.posted_at = None
+                self.is_active = True
+
+        # 2 Bangalore jobs + 1 Chennai job that must be filtered out.
+        jobs = [
+            _Job("b1", "Bengaluru"),
+            _Job("b2", "Bangalore"),
+            _Job("c1", "Chennai"),
+            _Job("b3", "Bengaluru"),
+        ]
+
+        def _fake_score(resume_skills, job):
+            return float(job["id"][1])
+
+        monkeypatch.setattr("interntrack.scheduler.jobs._job_match_score", _fake_score)
+
+        class _Result:
+            def __init__(self, rows):
+                self._rows = rows
+
+            def scalars(self):
+                return self
+
+            def all(self):
+                return self._rows
+
+            def scalar_one_or_none(self):
+                return self._rows[0] if self._rows else None
+
+        results = [_Result(jobs), _Result([])]
+
+        class _Session:
+            def __init__(self):
+                self.added = []
+
+            async def execute(self, stmt):
+                return results.pop(0)
+
+            def add(self, obj):
+                self.added.append(obj)
+
+            async def commit(self):
+                pass
+
+        session = _Session()
+        snap = await _record_match_snapshot(
+            session, "u1", user_location="Bangalore, India"
+        )
+        assert snap is not None
+        # Chennai job excluded -> 3 scored (b1, b2, b3).
+        assert snap["jobs_scored"] == 3
+        assert snap["avg_match"] == 2.0
+
 
 class TestWeekApplicationStats:
     """The weekly digest's 'Your week in applications' block data."""
@@ -221,11 +295,19 @@ class TestWeekApplicationStats:
 
         assert await _week_application_stats(_Session(), "u1") == {}
 
-    def test_week_stats_parts_labels(self):
+    def test_week_stats_parts_labels_singular_plural(self):
         from interntrack.scheduler.jobs import _week_stats_parts
 
         parts = _week_stats_parts({"applied": 2, "interview": 1})
-        assert parts == ["2 applied", "1 interviews"]
+        assert parts == ["2 applied", "1 interview"]
+
+    def test_week_status_label_singular_and_plural(self):
+        from interntrack.scheduler.jobs import _week_status_label
+
+        assert _week_status_label("interview", 1) == "interview"
+        assert _week_status_label("interview", 3) == "interviews"
+        assert _week_status_label("rejected", 1) == "rejection"
+        assert _week_status_label("unknown", 5) == "unknown"
 
 
 class TestWeeklyWeekBlock:
@@ -279,7 +361,7 @@ class TestWeeklyWeekBlock:
         )
         assert "📊 Your week in applications" in message
         assert "1 applied" in message
-        assert "1 interviews" in message
+        assert "1 interview" in message
 
     @pytest.mark.asyncio
     async def test_daily_message_has_no_week_block(self, monkeypatch):

@@ -946,22 +946,31 @@ async def _weekly_salary_insight(session, domains, user_location) -> str | None:
 
 
 _WEEK_STATUS_LABELS = (
-    ("applied", "applied"),
-    ("interview", "interviews"),
-    ("assessment", "assessments"),
-    ("offer", "offers"),
-    ("joined", "joined"),
-    ("rejected", "rejections"),
+    ("applied", "applied", "applied"),
+    ("interview", "interview", "interviews"),
+    ("assessment", "assessment", "assessments"),
+    ("offer", "offer", "offers"),
+    ("joined", "joined", "joined"),
+    ("rejected", "rejection", "rejections"),
 )
+
+
+def _week_status_label(status: str, count: int) -> str:
+    """Singular/plural label for an application status count."""
+    for key, singular, plural in _WEEK_STATUS_LABELS:
+        if key == status:
+            return singular if count == 1 else plural
+    return status
 
 
 def _week_stats_parts(counts: dict) -> list[str]:
     """Human labels for non-zero application status counts (text/SMS)."""
-    return [
-        f"{int(counts.get(status, 0))} {label}"
-        for status, label in _WEEK_STATUS_LABELS
-        if counts.get(status)
-    ]
+    parts: list[str] = []
+    for status, _, _ in _WEEK_STATUS_LABELS:
+        count = int(counts.get(status, 0))
+        if count:
+            parts.append(f"{count} {_week_status_label(status, count)}")
+    return parts
 
 
 async def _week_application_stats(
@@ -1005,13 +1014,16 @@ async def _record_match_snapshot(
     session,
     user_id: str,
     domains: list | None = None,
+    user_location: str | None = None,
+    include_remote: bool = True,
 ) -> dict | None:
     """Snapshot today's average resume-match % across recent active jobs.
 
     Scores up to 150 recent active jobs against the user's resume (scoped
-    to their domains when configured) and upserts one ``MatchSnapshot``
-    row per ``(user_id, day)``. Never raises; returns the snapshot dict or
-    ``None`` when there is no resume / too few scored jobs (fewer than 3).
+    to their domains and, like the digest, their city when configured) and
+    upserts one ``MatchSnapshot`` row per ``(user_id, day)``. Never
+    raises; returns the snapshot dict or ``None`` when there is no resume
+    / too few scored jobs (fewer than 3).
     """
     try:
         from sqlalchemy import select
@@ -1021,6 +1033,7 @@ async def _record_match_snapshot(
         resume_skills = await _latest_resume_skill_names(session, user_id=user_id)
         if not resume_skills:
             return None
+        user_loc_lower = str(user_location or "").split(",")[0].strip().lower() or None
         result = await session.execute(
             select(Job)
             .where(Job.is_active.is_(True))
@@ -1042,6 +1055,12 @@ async def _record_match_snapshot(
                 if not any(
                     d.strip().lower() in job_domain or job_domain in d.strip().lower()
                     for d in domains
+                ):
+                    continue
+            if user_loc_lower:
+                job_loc = str(getattr(job, "location", "") or "").strip().lower()
+                if not _location_allows(
+                    job_loc, user_loc_lower, include_remote=include_remote
                 ):
                     continue
             score = _job_match_score(resume_skills, job_dict)
@@ -1098,10 +1117,17 @@ async def record_match_snapshots() -> int:
         for target in targets:
             if target["prefs"].get("is_enabled") is False:
                 continue
+            user_location = (
+                (getattr(target.get("user"), "location", None) or "").strip()
+                or DEFAULT_LOCATION
+                or None
+            )
             snap = await _record_match_snapshot(
                 session,
                 target["user_id"],
                 target["prefs"].get("domains") or None,
+                user_location=user_location,
+                include_remote=bool(target["prefs"].get("include_remote", True)),
             )
             if snap:
                 recorded += 1
@@ -2431,11 +2457,12 @@ async def build_daily_report_html(
     if weekly:
         week = await _week_application_stats(session, user_id) if user_id else {}
         if week.get("total"):
+            week_counts = week.get("status_counts") or {}
             week_chips = " · ".join(
-                f"<b>{int((week.get('status_counts') or {}).get(k, 0))}</b> "
-                f"{_esc(label)}"
-                for k, label in _WEEK_STATUS_LABELS
-                if (week.get("status_counts") or {}).get(k)
+                f"<b>{int(week_counts.get(k, 0))}</b> "
+                f"{_esc(_week_status_label(k, int(week_counts.get(k, 0))))}"
+                for k, _, _ in _WEEK_STATUS_LABELS
+                if week_counts.get(k)
             )
             parts.append(
                 "<div style='background:#eff6ff;border:1px solid #bfdbfe;"
