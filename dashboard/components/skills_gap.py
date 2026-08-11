@@ -18,6 +18,19 @@ from typing import Any
 _MAX_SKILLS = 12
 
 
+def skill_learn_url(skill: str) -> str:
+    """A free-course search link for any skill (YouTube fallback).
+
+    Kept generic (no curated map here) so the dashboard and the digest
+    never drift on hand-maintained URLs — the digest carries the curated
+    resources, the dashboard always resolves to a YouTube course search.
+    """
+    from urllib.parse import quote
+
+    query = f"{str(skill or '').strip()} course"
+    return "https://www.youtube.com/results?search_query=" + quote(query)
+
+
 def aggregate_skills_gap(
     matches: list[tuple[dict, float, dict]],
     min_score: float = 30.0,

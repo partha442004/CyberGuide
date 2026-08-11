@@ -1245,6 +1245,76 @@ def _skill_gap_counts(resume_skills, jobs: list[dict], limit: int = 5) -> list[d
     return [{"skill": display[k], "count": c} for k, c in ranked[:limit]]
 
 
+# Curated free learning resources for the most common skills (security-
+# heavy, matching the user's core focus). Anything not listed falls back
+# to a YouTube course search so the digest never dead-ends.
+_SKILL_RESOURCES: dict[str, tuple[str, str]] = {
+    "splunk": (
+        "Splunk free training",
+        "https://www.splunk.com/en_us/training/free-courses/overview.html",
+    ),
+    "siem": (
+        "SOC / SIEM course",
+        "https://www.youtube.com/results?search_query=siem+soc+analyst+course",
+    ),
+    "burp suite": (
+        "PortSwigger Web Security Academy",
+        "https://portswigger.net/web-security",
+    ),
+    "wireshark": ("Wireshark docs", "https://www.wireshark.org/docs/"),
+    "nmap": ("Nmap book", "https://nmap.org/book/toc.html"),
+    "kali linux": ("Kali docs", "https://www.kali.org/docs/"),
+    "metasploit": (
+        "Metasploit Unleashed",
+        "https://www.offsec.com/metasploit-unleashed/",
+    ),
+    "penetration testing": ("TryHackMe (free)", "https://tryhackme.com/"),
+    "ethical hacking": ("TryHackMe (free)", "https://tryhackme.com/"),
+    "vapt": (
+        "VAPT roadmap",
+        "https://www.youtube.com/results?search_query=vapt+penetration+testing+roadmap",
+    ),
+    "threat": ("MITRE ATT&CK", "https://attack.mitre.org/"),
+    "python": ("Python tutorial", "https://docs.python.org/3/tutorial/"),
+    "linux": ("Linux Journey", "https://linuxjourney.com/"),
+    "aws": ("AWS free training", "https://aws.amazon.com/training/"),
+    "azure": (
+        "Microsoft Learn",
+        "https://learn.microsoft.com/en-us/training/browse/?products=azure",
+    ),
+    "gcp": ("Google Cloud Skills Boost", "https://www.cloudskillsboost.google/"),
+    "docker": ("Docker get-started", "https://docs.docker.com/get-started/"),
+    "kubernetes": (
+        "K8s basics",
+        "https://kubernetes.io/docs/tutorials/kubernetes-basics/",
+    ),
+    "git": ("GitHub Skills", "https://skills.github.com/"),
+    "sql": ("SQLBolt", "https://sqlbolt.com/"),
+    "javascript": (
+        "MDN JS guide",
+        "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide",
+    ),
+    "react": ("React docs", "https://react.dev/learn"),
+}
+
+
+def _skill_learn_url(skill: str) -> str | None:
+    """Curated free learning resource for a skill, else a YouTube search.
+
+    Returns ``None`` only for empty input; every real skill gets at least
+    a YouTube course-search fallback so the digest never dead-ends.
+    """
+    key = str(skill or "").strip().lower()
+    if not key:
+        return None
+    curated = _SKILL_RESOURCES.get(key)
+    if curated:
+        return curated[1]
+    from urllib.parse import quote
+
+    return "https://www.youtube.com/results?search_query=" + quote(key + " course")
+
+
 def _salary_txt(job: dict) -> str:
     """Compact salary line ("₹10L–₹15L" / "$80k–$100k") or "" when unknown."""
     lo = job.get("salary_min")
@@ -1500,6 +1570,10 @@ async def build_daily_report_message(
                 lines.append(
                     f"   ⬜ {_esc(g['skill'])} — wanted by {int(g['count'])} job(s)"
                 )
+            for g in gap[:3]:
+                url = _skill_learn_url(g["skill"])
+                if url:
+                    lines.append(f"   📚 Learn {_esc(g['skill'])}: {url}")
     return "\n".join(lines)
 
 
@@ -1686,11 +1760,15 @@ async def build_alert_chunks(
         gap = await _weekly_skill_gap(session, sections, user_id=user_id)
         if gap:
             gap_lines = ["🛠 <b>Skills to learn next</b>", ""]
+            gap_buttons: list[tuple[str, str]] = []
             for g in gap:
                 gap_lines.append(
                     f"⬜ {_esc(g['skill'])} — wanted by {int(g['count'])} job(s)"
                 )
-            chunks.append(("\n".join(gap_lines), []))
+                url = _skill_learn_url(g["skill"])
+                if url and len(gap_buttons) < 3:
+                    gap_buttons.append((f"📚 Learn {_esc(g['skill'])}", url))
+            chunks.append(("\n".join(gap_lines), gap_buttons))
 
     footer_txt = _digest_footer_text()
     if footer_txt:
@@ -2104,14 +2182,24 @@ async def build_daily_report_html(
     if weekly:
         gap = await _weekly_skill_gap(session, sections, user_id=user_id)
         if gap:
-            chips = "".join(
-                "<span style='display:inline-block;margin:4px 6px 0 0;"
-                "padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;"
-                "color:#dc2626;border:1px solid rgba(220,38,38,0.35);"
-                "background:rgba(220,38,38,0.06);'>"
-                f"⬜ {_esc(g['skill'])} · {int(g['count'])} job(s)</span>"
-                for g in gap
-            )
+
+            def _gap_chip(g: dict) -> str:
+                body = (
+                    "<span style='display:inline-block;margin:4px 6px 0 0;"
+                    "padding:4px 12px;border-radius:999px;font-size:12px;"
+                    "font-weight:600;color:#dc2626;border:1px solid "
+                    "rgba(220,38,38,0.35);background:rgba(220,38,38,0.06);'>"
+                    f"⬜ {_esc(g['skill'])} · {int(g['count'])} job(s)</span>"
+                )
+                url = _skill_learn_url(g["skill"])
+                if url:
+                    return (
+                        f"<a href='{_esc(url)}' target='_blank' "
+                        f"style='text-decoration:none;'>{body}</a>"
+                    )
+                return body
+
+            chips = "".join(_gap_chip(g) for g in gap)
             parts.append(
                 "<div style='background:#fff7ed;border-radius:12px;padding:14px 18px;"
                 "margin:18px 0;font-size:13px;'>"
