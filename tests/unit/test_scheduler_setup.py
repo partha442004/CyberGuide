@@ -20,8 +20,9 @@ class TestSchedulerSetup:
 
         result = setup_scheduler()
 
-        # Should add 5 jobs
-        assert mock_scheduler.add_job.call_count == 5
+        # 7 jobs: discovery, daily + weekly reports, link verification,
+        # expiry cleanup, and the morning/evening closing-soon sweeps.
+        assert mock_scheduler.add_job.call_count == 7
         assert result == mock_scheduler
 
     @patch("interntrack.scheduler.setup.get_settings")
@@ -47,6 +48,8 @@ class TestSchedulerSetup:
         assert "weekly_report" in job_ids
         assert "link_verification" in job_ids
         assert "expire_jobs" in job_ids
+        assert "closing_soon_alerts_morning" in job_ids
+        assert "closing_soon_alerts_evening" in job_ids
 
     @patch("interntrack.scheduler.setup.get_settings")
     @patch("interntrack.scheduler.setup.scheduler")
