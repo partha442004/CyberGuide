@@ -1110,6 +1110,9 @@ def _job_lines(score, job: dict) -> list[str]:
         # Escaped: Telegram sends with HTML parse mode and scraped
         # descriptions routinely contain <, >, & (and leftover tags).
         lines.append(f"   📝 {_esc(desc)}")
+    skills = _skills_txt(job)
+    if skills:
+        lines.append(f"   🛠 Skills: {_esc(skills)}")
     if url:
         lines.append(f"   🔗 Apply: {url}")
     note = _expiry_note(job)
@@ -1138,6 +1141,32 @@ def _job_desc_snippet(job: dict, limit: int = 180) -> str:
     if len(desc) <= limit:
         return desc
     return desc[: limit - 1].rstrip() + "…"
+
+
+def _skills_txt(job: dict, limit: int = 6) -> str:
+    """Comma-joined list of skills the role expects ("what they expect").
+
+    Prefers structured ``required_skills`` (backfilled from descriptions by
+    the tag-backfill job); falls back to ``tags`` when a source only saves
+    freeform tags. Skills are deduped case-insensitively, capped at
+    ``limit``, and rendered as one compact line — or "" when the posting
+    has none.
+    """
+    raw = job.get("required_skills") or job.get("tags") or []
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in raw:
+        if len(out) >= limit:
+            break
+        skill = str(item or "").strip()
+        if not skill:
+            continue
+        key = skill.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(skill)
+    return ", ".join(out)
 
 
 def _salary_txt(job: dict) -> str:
@@ -2132,6 +2161,12 @@ def _job_html_card(score, job: dict, accent: str) -> str:
         "<div style='margin-top:8px;font-size:13px;color:#475569;'>"
         f"{' · '.join(meta_bits)}</div>"
     )
+    skills = _esc(_skills_txt(job, limit=5))
+    if skills:
+        card += (
+            "<div style='margin-top:6px;font-size:12px;color:#0f766e;'>"
+            f"🛠 Skills: {skills}</div>"
+        )
     desc = _esc(_job_desc_snippet(job, limit=240))
     if desc:
         card += (

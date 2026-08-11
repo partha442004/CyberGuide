@@ -1844,3 +1844,63 @@ class TestDigestFooter:
             lambda: _Settings(),
         )
         assert _digest_footer_text() == ""
+
+
+class TestJobSkillsLine:
+    """Digests surface the skills each role expects ("what they expect")."""
+
+    def test_skills_txt_empty(self):
+        from interntrack.scheduler.jobs import _skills_txt
+
+        assert _skills_txt({}) == ""
+        assert _skills_txt({"required_skills": [], "tags": []}) == ""
+        assert _skills_txt({"tags": [None, "", "  "]}) == ""
+
+    def test_skills_txt_prefers_required_skills_and_dedupes(self):
+        from interntrack.scheduler.jobs import _skills_txt
+
+        job = {
+            "required_skills": ["Splunk", "Splunk", "SIEM", "  ", "Incident Response"],
+            "tags": ["python", "soc"],
+        }
+        assert _skills_txt(job) == "Splunk, SIEM, Incident Response"
+
+    def test_skills_txt_falls_back_to_tags_and_caps(self):
+        from interntrack.scheduler.jobs import _skills_txt
+
+        job = {"tags": ["a", "b", "c", "d", "e", "f", "g", "h"]}
+        assert _skills_txt(job, limit=4) == "a, b, c, d"
+        assert len(_skills_txt(job).split(", ")) == 6
+
+    def test_job_lines_include_skills(self):
+        from interntrack.scheduler.jobs import _job_lines
+
+        job = {
+            "title": "SOC Analyst",
+            "company": "ACME",
+            "url": "https://example.com/job/1",
+            "required_skills": ["Splunk", "SIEM"],
+            "age_days": 1,
+        }
+        lines = _job_lines(82, job)
+        assert any("🛠 Skills: Splunk, SIEM" in line for line in lines)
+
+    def test_job_html_card_include_skills(self):
+        from interntrack.scheduler.jobs import _job_html_card
+
+        job = {
+            "title": "SOC Analyst",
+            "company": "ACME",
+            "url": "https://example.com/job/1",
+            "required_skills": ["Splunk", "SIEM"],
+            "age_days": 1,
+        }
+        html = _job_html_card(82, job, "#2563eb")
+        assert "🛠 Skills: Splunk, SIEM" in html
+
+    def test_job_html_card_omits_skills_when_none(self):
+        from interntrack.scheduler.jobs import _job_html_card
+
+        job = {"title": "Job", "url": "https://example.com/job/1", "age_days": 1}
+        html = _job_html_card(82, job, "#2563eb")
+        assert "🛠 Skills:" not in html
