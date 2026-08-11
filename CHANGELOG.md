@@ -6,6 +6,19 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **🚫 Search-engine content filter — articles are never saved as jobs.**
+  A live quality check found the search-engine source had saved *"15 Best
+  Chess Opening Moves That You Absolutely Must Know"* — LinkedIn
+  repurposes posting URLs for Pulse articles, so content pages slipped
+  through the posting-URL check. Two new guards: `/pulse/` and `/posts/`
+  URL paths are rejected outright, and a `_JUNK_TITLE_RE` drops
+  content-mill titles ("N Best … You Must Know", "Top N …", "How to
+  Become …", "7 Tips for …", "The Ultimate Guide …", "Here's how …") at
+  parse time so genuine roles ("SOC Analyst", "Security Engineer") still
+  pass. 3 new tests.
+
+### Added
+
 - **🗂 Source chips in every digest alert.** The daily email card and the
   Telegram/text job lines now show which board each job came from
   (🔗 LinkedIn, 🎓 Internshala, 💼 Naukri, 🏢 Company careers, 🔎 Search
