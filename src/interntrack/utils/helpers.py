@@ -113,6 +113,35 @@ def location_allows(job_loc: str, user_loc: str, include_remote: bool = True) ->
     return bool(include_remote and is_remote_location(job_loc))
 
 
+def job_experience_ok(job, allowed_levels: list | None) -> bool:
+    """Whether a job's experience level fits a user's allowed set.
+
+    Single source of truth for the per-user experience gate shared by the
+    daily digest, the instant alerts, the report filter and the closing-
+    soon sweep. ``allowed_levels`` is a list of ExperienceLevel values
+    (entry, junior, mid, senior, ...); an empty list / None means every
+    level passes. Jobs with no parsed level (or unknown / fresher / intern
+    tags) always pass — an unspecified posting may still be fresher-
+    friendly, so only explicitly mid / senior / lead / executive roles are
+    dropped in fresher mode. Never raises.
+    """
+    if not allowed_levels:
+        return True
+    try:
+        allowed = {str(x).strip().lower() for x in allowed_levels}
+        # Accepts ORM Job rows and plain dicts (the closing-soon sweep maps
+        # its rows to dicts before per-user filtering).
+        if isinstance(job, dict):
+            level = str(job.get("experience_level") or "").strip().lower()
+        else:
+            level = str(getattr(job, "experience_level", None) or "").strip().lower()
+        if not level or level in ("unknown", "fresher", "intern"):
+            return True
+        return level in allowed
+    except Exception:  # noqa: BLE001 - a bad level must never break a digest
+        return True
+
+
 def job_urgency(posted_at, first_seen_at=None, is_active=True):
     """Compute job urgency badge based on age.
 

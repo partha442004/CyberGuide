@@ -301,6 +301,7 @@ async def get_daily_report(
             location=user_location,
             include_remote=include_remote,
             user_id=target["user_id"],
+            experience_levels=prefs.get("experience_levels") or None,
         )
         # Per-user digest smartening (salary target + keyword highlights)
         # rides along on the report so the builders mark the same jobs in
@@ -381,6 +382,7 @@ async def get_weekly_alert(
             domains=domains,
             min_match_score=prefs.get("min_match_score"),
             since=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7),
+            experience_levels=prefs.get("experience_levels") or None,
         )
         report["report_type"] = "weekly"
         # Attach the week's most-engaged jobs (apps + bookmarks + views)

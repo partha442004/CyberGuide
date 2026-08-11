@@ -6,6 +6,16 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **🎓 Per-user experience filter (fresher-only alerts).**
+  Alert preferences gain `experience_levels` (auto-synced to live
+  tables). When set, explicitly mid/senior/lead/executive postings are
+  dropped from every alert path — daily digest, weekly recap, digest
+  preview, one-off send, instant Telegram pings and the closing-soon
+  sweep — while entry/junior and listings without a stated level stay.
+  Dashboard Settings adds an experience picker (All levels / Freshers &
+  entry-level / Entry-level only). Both accounts set to fresher-only as
+  requested. 14 new tests; full unit suite green; ruff + mypy clean.
+
 - **💰 Per-user digest smartening (target salary + highlight keywords).**
   Alert preferences gain `min_salary` (absolute annual INR) and
   `keywords` (list of highlight terms, auto-synced to live tables). Jobs

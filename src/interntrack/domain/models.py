@@ -492,6 +492,12 @@ class AlertPreferences(Base, TimestampMixin):
     # mention any of these get a "🎯 matches …" marker in the digest.
     # Auto-added by column sync.
     keywords = Column(JSON, nullable=True)
+    # Accepted experience levels (entry/junior/mid/senior/lead/executive).
+    # Empty/None = every level. When set, jobs whose experience level is
+    # outside the list are dropped from every alert path; listings with no
+    # parsed level always stay (unspecified may still be fresher-friendly).
+    # Auto-added by column sync.
+    experience_levels = Column(JSON, nullable=True)
 
     @validates("last_alert_at", "paused_until")
     def _coerce_naive_utc(self, _key: str, value):

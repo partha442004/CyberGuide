@@ -12,7 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.repositories.application_repository import ApplicationRepository
 from interntrack.repositories.job_repository import JobRepository
-from interntrack.utils.helpers import location_allows, to_naive_utc, utcnow
+from interntrack.utils.helpers import (
+    job_experience_ok,
+    location_allows,
+    to_naive_utc,
+    utcnow,
+)
 
 if TYPE_CHECKING:
     from interntrack.domain.models import Job
@@ -329,6 +334,7 @@ class ReportService:
         location: str | None = None,
         include_remote: bool = True,
         user_id: str | None = None,
+        experience_levels: list | None = None,
     ) -> dict[str, Any]:
         """Generate daily report.
 
@@ -347,8 +353,18 @@ class ReportService:
         with ``include_remote`` (default True) remote / WFH / "anywhere"
         listings also pass, so a Bangalore user gets fully-remote roles too.
         ``user_id`` scopes the follow-up reminders to one account.
+        ``experience_levels`` (list of entry/junior/mid/...) optionally drops
+        jobs whose parsed experience level is outside the accepted set;
+        listings without a parsed level always stay.
         """
         recent_jobs = await self.job_repo.get_recent_jobs(days=7)
+        # Fresher/experience scoping: when the user only wants certain
+        # experience levels, drop explicitly out-of-scope listings before
+        # any window/domain filtering so the summary counts match the alert.
+        if experience_levels:
+            recent_jobs = [
+                job for job in recent_jobs if job_experience_ok(job, experience_levels)
+            ]
         if since is not None:
             # Use string comparison to avoid tz-aware/naive mismatch on Neon/asyncpg
             if hasattr(since, "strftime"):

@@ -444,6 +444,7 @@ async def get_alert_preferences(
         paused_until=prefs.get("paused_until"),
         min_salary=prefs.get("min_salary"),
         keywords=list(prefs.get("keywords") or []),
+        experience_levels=list(prefs.get("experience_levels") or []),
     )
 
 
@@ -505,6 +506,13 @@ async def update_alert_preferences(
             if kw and kw not in cleaned_kws:
                 cleaned_kws.append(kw)
         pref.keywords = cleaned_kws[:10]  # type: ignore[assignment]
+    if update.experience_levels is not None:
+        cleaned_levels: list[str] = []
+        for lvl in update.experience_levels:
+            lvl = str(lvl).strip().lower()
+            if lvl and lvl not in cleaned_levels:
+                cleaned_levels.append(lvl)
+        pref.experience_levels = cleaned_levels  # type: ignore[assignment]
 
     await db.commit()
     await db.refresh(pref)
@@ -531,6 +539,7 @@ async def update_alert_preferences(
         paused_until=pref.paused_until,
         min_salary=pref.min_salary,
         keywords=list(pref.keywords or []),
+        experience_levels=list(pref.experience_levels or []),
     )
 
 
@@ -579,6 +588,7 @@ async def send_alert_now(
         since=prefs.get("last_alert_at"),
         location=user_location,
         include_remote=include_remote,
+        experience_levels=prefs.get("experience_levels") or None,
     )
     manager = NotificationManager(db)
     channels = prefs.get("channels") or None
@@ -691,6 +701,7 @@ async def preview_digest(
         since=prefs.get("last_alert_at"),
         location=user_location,
         include_remote=include_remote,
+        experience_levels=prefs.get("experience_levels") or None,
     )
     jobs = report.get("new_jobs") or []
 
