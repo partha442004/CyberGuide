@@ -1581,6 +1581,112 @@ class TestQuietDayDigest:
         mark_sent.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_afternoon_slot_skips_quiet_day_email(self):
+        """Only the morning slot (or manual trigger) sends the quiet email.
+
+        The cron fires 3×/day; without this gate a quiet day would send 3
+        'no new jobs' emails. Afternoon/evening slots stay silent instead.
+        """
+        from interntrack.api.v1.reports import get_daily_report
+
+        mock_db = AsyncMock()
+        mock_service = MagicMock()
+        mock_service.generate_daily_report = AsyncMock(
+            return_value={
+                "summary": {"new_jobs": 0, "new_applications": 0},
+                "new_jobs": [],
+            }
+        )
+        quiet_mock = AsyncMock()
+        mark_sent = AsyncMock()
+
+        with (
+            patch(
+                "interntrack.api.v1.reports._load_digest_targets",
+                new=AsyncMock(
+                    return_value=[
+                        {
+                            "user_id": "user1",
+                            "prefs": {
+                                "domains": ["security"],
+                                "channels": ["email"],
+                                "min_match_score": None,
+                                "is_enabled": True,
+                            },
+                            "user": None,
+                        }
+                    ]
+                ),
+            ),
+            patch(
+                "interntrack.api.v1.reports.ReportService",
+                return_value=mock_service,
+            ),
+            patch(
+                "interntrack.api.v1.reports._send_quiet_day_digest",
+                new=quiet_mock,
+            ),
+            patch(
+                "interntrack.scheduler.jobs._mark_alert_sent",
+                new=mark_sent,
+            ),
+        ):
+            await get_daily_report(db=mock_db, preview=False, slot="afternoon")
+
+        quiet_mock.assert_not_awaited()
+        mark_sent.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_morning_slot_sends_quiet_day_email(self):
+        """The morning cron slot sends the once-daily quiet email."""
+        from interntrack.api.v1.reports import get_daily_report
+
+        mock_db = AsyncMock()
+        mock_service = MagicMock()
+        mock_service.generate_daily_report = AsyncMock(
+            return_value={
+                "summary": {"new_jobs": 0, "new_applications": 0},
+                "new_jobs": [],
+            }
+        )
+        quiet_mock = AsyncMock()
+
+        with (
+            patch(
+                "interntrack.api.v1.reports._load_digest_targets",
+                new=AsyncMock(
+                    return_value=[
+                        {
+                            "user_id": "user1",
+                            "prefs": {
+                                "domains": ["security"],
+                                "channels": ["email"],
+                                "min_match_score": None,
+                                "is_enabled": True,
+                            },
+                            "user": None,
+                        }
+                    ]
+                ),
+            ),
+            patch(
+                "interntrack.api.v1.reports.ReportService",
+                return_value=mock_service,
+            ),
+            patch(
+                "interntrack.api.v1.reports._send_quiet_day_digest",
+                new=quiet_mock,
+            ),
+            patch(
+                "interntrack.scheduler.jobs._mark_alert_sent",
+                new=AsyncMock(),
+            ),
+        ):
+            await get_daily_report(db=mock_db, preview=False, slot="morning")
+
+        quiet_mock.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_preview_never_sends_quiet_day_email(self):
         """Preview mode stays send-free on quiet days too."""
         from interntrack.api.v1.reports import get_daily_report
