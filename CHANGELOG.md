@@ -4,6 +4,27 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Discovery no longer starves any user — queries now round-robin across
+  accounts.** The 3×-daily cron previously ran *every* query of the first
+  account before the second's, so one slow query (e.g. "ui developer"
+  finding 60 postings) consumed the whole 55s serverless budget and the
+  next user's queries never ran — your cybersecurity/Bangalore digest
+  stayed empty while your friend's frontend/Chennai queries dominated.
+  Queries are now interleaved per user (A1, B1, A2, B2, …) so every
+  account's top searches get a fair slice of the budget, and the deadline
+  was raised 40s → 55s (still inside Vercel's 60s maxDuration). 2 new
+  regression tests.
+- **Quiet days now email you instead of going silent.** The daily digest
+  only sent email when new jobs were found, so a day with no fresh
+  matching postings meant *no mail at all* — which looked exactly like a
+  broken system. Days with zero new jobs now send a compact
+  "📭 No new jobs today" email (email channel only, never Telegram/SMS
+  spam, honors vacation mode and disabled alerts) with a link back to the
+  dashboard, and it is recorded in the alert history. Preview mode stays
+  send-free. 4 new tests.
+
 ### Added
 
 - **💸 Estimated salary chip on job cards (when the posting hides it).**

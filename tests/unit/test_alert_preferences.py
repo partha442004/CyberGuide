@@ -1517,6 +1517,173 @@ class TestDailyReportPreview:
         mark_sent.assert_awaited_once()
 
 
+class TestQuietDayDigest:
+    """Days with no new jobs still send a compact confirmation email."""
+
+    @pytest.mark.asyncio
+    async def test_quiet_day_emails_instead_of_silence(self):
+        """A digest with zero new jobs sends the quiet-day email."""
+        from interntrack.api.v1.reports import get_daily_report
+
+        mock_db = AsyncMock()
+        mock_service = MagicMock()
+        mock_service.generate_daily_report = AsyncMock(
+            return_value={
+                "summary": {"new_jobs": 0, "new_applications": 0},
+                "new_jobs": [],
+            }
+        )
+        send_mock = AsyncMock()
+        quiet_mock = AsyncMock(return_value={"email": True})
+        mark_sent = AsyncMock()
+
+        with (
+            patch(
+                "interntrack.api.v1.reports._load_digest_targets",
+                new=AsyncMock(
+                    return_value=[
+                        {
+                            "user_id": "user1",
+                            "prefs": {
+                                "domains": ["security"],
+                                "channels": ["email"],
+                                "min_match_score": None,
+                                "is_enabled": True,
+                            },
+                            "user": None,
+                        }
+                    ]
+                ),
+            ),
+            patch(
+                "interntrack.api.v1.reports.ReportService",
+                return_value=mock_service,
+            ),
+            patch(
+                "interntrack.api.v1.reports._send_alert_digest",
+                new=send_mock,
+            ),
+            patch(
+                "interntrack.api.v1.reports._send_quiet_day_digest",
+                new=quiet_mock,
+            ),
+            patch(
+                "interntrack.scheduler.jobs._mark_alert_sent",
+                new=mark_sent,
+            ),
+        ):
+            report = await get_daily_report(db=mock_db, preview=False)
+
+        assert report["summary"]["new_jobs"] == 0
+        # Normal digest skipped (nothing new) but the quiet email went out.
+        send_mock.assert_not_awaited()
+        quiet_mock.assert_awaited_once()
+        mark_sent.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_preview_never_sends_quiet_day_email(self):
+        """Preview mode stays send-free on quiet days too."""
+        from interntrack.api.v1.reports import get_daily_report
+
+        mock_db = AsyncMock()
+        mock_service = MagicMock()
+        mock_service.generate_daily_report = AsyncMock(
+            return_value={
+                "summary": {"new_jobs": 0, "new_applications": 0},
+                "new_jobs": [],
+            }
+        )
+        quiet_mock = AsyncMock()
+        mark_sent = AsyncMock()
+
+        with (
+            patch(
+                "interntrack.api.v1.reports._load_digest_targets",
+                new=AsyncMock(
+                    return_value=[
+                        {
+                            "user_id": "user1",
+                            "prefs": {
+                                "domains": ["security"],
+                                "channels": ["email"],
+                                "min_match_score": None,
+                                "is_enabled": True,
+                            },
+                            "user": None,
+                        }
+                    ]
+                ),
+            ),
+            patch(
+                "interntrack.api.v1.reports.ReportService",
+                return_value=mock_service,
+            ),
+            patch(
+                "interntrack.api.v1.reports._send_quiet_day_digest",
+                new=quiet_mock,
+            ),
+            patch(
+                "interntrack.scheduler.jobs._mark_alert_sent",
+                new=mark_sent,
+            ),
+        ):
+            await get_daily_report(db=mock_db, preview=True)
+
+        quiet_mock.assert_not_awaited()
+        mark_sent.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_quiet_day_skips_when_email_not_enabled(self):
+        """Telegram-only accounts don't get the quiet-day email (no spam)."""
+        from interntrack.api.v1.reports import _send_quiet_day_digest
+
+        mock_db = AsyncMock()
+        mock_manager = MagicMock()
+        mock_manager.get_configured_channels.return_value = ["telegram"]
+        mock_manager.notify = AsyncMock(return_value={})
+
+        with (
+            patch(
+                "interntrack.services.notification_service.NotificationManager",
+                return_value=mock_manager,
+            ),
+            patch(
+                "interntrack.scheduler.jobs._record_alert_history",
+                new=AsyncMock(),
+            ),
+        ):
+            results = await _send_quiet_day_digest(
+                mock_db,
+                {"domains": ["security"], "channels": ["telegram"], "is_enabled": True},
+                user_id="user1",
+            )
+
+        assert results == {}
+        mock_manager.notify.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_quiet_day_never_raises(self):
+        """A broken email channel must not break the digest endpoint."""
+        from interntrack.api.v1.reports import _send_quiet_day_digest
+
+        mock_db = AsyncMock()
+        mock_manager = MagicMock()
+        mock_manager.get_configured_channels.return_value = ["email"]
+        mock_manager.notify = AsyncMock(side_effect=RuntimeError("smtp down"))
+
+        with patch(
+            "interntrack.services.notification_service.NotificationManager",
+            return_value=mock_manager,
+        ):
+            results = await _send_quiet_day_digest(
+                mock_db,
+                {"domains": ["security"], "channels": ["email"], "is_enabled": True},
+                user_id="user1",
+            )
+
+        assert results == {}
+
+
 # ---------------------------------------------------------------------------
 # Weekly top-engaged recap
 # ---------------------------------------------------------------------------

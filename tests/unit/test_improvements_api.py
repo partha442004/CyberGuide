@@ -369,6 +369,102 @@ class TestPerUserDiscoveryEndpoint:
         assert result["users"] == 0
         assert result["queries_run"] == 3  # classic fallback queries
 
+    @pytest.mark.asyncio
+    async def test_queries_round_robin_across_users(self):
+        """No single user's query batch can starve the others.
+
+        Regression guard: the discovery loop previously ran every query of
+        the first account before touching the second, so a slow first user
+        (e.g. a broad "ui developer" search) consumed the whole 40s
+        serverless budget and the second user's queries never ran — which
+        is exactly why the cybersecurity/Bangalore digest stayed empty
+        while the friend's frontend/Chennai queries dominated.
+        """
+        from interntrack.api.v1.jobs import run_discovery_for_users
+
+        targets = [
+            {
+                "user_id": "friend",
+                "prefs": {"domains": ["frontend"]},
+                "user": SimpleNamespace(skills=[], location="Chennai"),
+            },
+            {
+                "user_id": "me",
+                "prefs": {"domains": ["security"]},
+                "user": SimpleNamespace(skills=[], location="Bangalore"),
+            },
+        ]
+        registry = AsyncMock()
+        registry.fetch_all.return_value = []
+
+        with (
+            patch(
+                "interntrack.scheduler.jobs._enabled_alert_targets",
+                new=AsyncMock(return_value=targets),
+            ),
+            patch(
+                "interntrack.scrapers.registry.get_default_registry",
+                return_value=registry,
+            ),
+            patch("interntrack.api.v1.jobs.JobService") as job_cls,
+        ):
+            job_cls.return_value.save_jobs = AsyncMock(return_value=[])
+            await run_discovery_for_users(db=AsyncMock(), limit=4)
+
+        # Interleaved: security/Bangalore queries appear after at most one
+        # frontend/Chennai query, never only at the very end of the batch.
+        queries_run = [
+            str(c.kwargs.get("location", "")) for c in registry.fetch_all.call_args_list
+        ]
+        assert "Bangalore" in queries_run
+        chennai_first = queries_run.index("Chennai")
+        bangalore_first = queries_run.index("Bangalore")
+        assert bangalore_first <= chennai_first + 1
+        # And both cities are actually searched, not just the first user's.
+        assert "Chennai" in queries_run
+
+    @pytest.mark.asyncio
+    async def test_each_user_gets_at_least_one_query_first(self):
+        """Every user's top query runs before any user's second query."""
+        from interntrack.api.v1.jobs import run_discovery_for_users
+
+        targets = [
+            {
+                "user_id": "a",
+                "prefs": {"domains": ["security"]},
+                "user": SimpleNamespace(skills=[], location="Bangalore"),
+            },
+            {
+                "user_id": "b",
+                "prefs": {"domains": ["frontend"]},
+                "user": SimpleNamespace(skills=[], location="Chennai"),
+            },
+        ]
+        registry = AsyncMock()
+        registry.fetch_all.return_value = []
+
+        with (
+            patch(
+                "interntrack.scheduler.jobs._enabled_alert_targets",
+                new=AsyncMock(return_value=targets),
+            ),
+            patch(
+                "interntrack.scrapers.registry.get_default_registry",
+                return_value=registry,
+            ),
+            patch("interntrack.api.v1.jobs.JobService") as job_cls,
+        ):
+            job_cls.return_value.save_jobs = AsyncMock(return_value=[])
+            await run_discovery_for_users(db=AsyncMock(), limit=4)
+
+        locations = [
+            str(c.kwargs.get("location", "")) for c in registry.fetch_all.call_args_list
+        ]
+        # First two queries must cover both users (A1, B1 order).
+        assert locations[0] in ("Bangalore", "Chennai")
+        assert locations[1] in ("Bangalore", "Chennai")
+        assert locations[0] != locations[1]
+
 
 class TestHtmlDigest:
     """build_daily_report_html renders a styled, escaped digest."""
