@@ -82,6 +82,117 @@ class TestJobExperienceOk:
         assert job_experience_ok(SimpleNamespace(experience_level="senior"), 42) is True
 
 
+class TestUnparsedLevelDetection:
+    """Fresher mode must also catch clearly-senior unparsed listings."""
+
+    def test_senior_title_is_dropped_even_without_parsed_level(self):
+        from interntrack.utils.helpers import job_experience_ok
+
+        job = SimpleNamespace(
+            experience_level=None,
+            title="Senior Application Security Engineer",
+            description="",
+        )
+        assert job_experience_ok(job, ["entry", "junior"]) is False
+
+    def test_plain_title_stays_visible(self):
+        from interntrack.utils.helpers import job_experience_ok
+
+        job = SimpleNamespace(
+            experience_level=None, title="Security Analyst", description=""
+        )
+        assert job_experience_ok(job, ["entry", "junior"]) is True
+
+    def test_years_requirement_is_detected(self):
+        from interntrack.utils.helpers import job_experience_ok
+
+        senior = SimpleNamespace(
+            experience_level=None,
+            title="SOC Analyst",
+            description="8-13 years of SOC experience required.",
+        )
+        assert job_experience_ok(senior, ["entry", "junior"]) is False
+        fresher = SimpleNamespace(
+            experience_level=None,
+            title="SOC Analyst",
+            description="0-2 years of experience welcome. Freshers encouraged!",
+        )
+        assert job_experience_ok(fresher, ["entry", "junior"]) is True
+
+    def test_fresher_marker_passes(self):
+        from interntrack.utils.helpers import job_experience_ok
+
+        job = SimpleNamespace(
+            experience_level=None,
+            title="Cybersecurity Intern",
+            description="Entry level internship for graduates.",
+        )
+        assert job_experience_ok(job, ["entry", "junior"]) is True
+
+    def test_intern_never_matches_internal(self):
+        from interntrack.utils.helpers import job_experience_ok
+
+        # "internal" must not read as "intern" — word-boundary matching.
+        job = SimpleNamespace(
+            experience_level=None,
+            title="Security Analyst",
+            description="Internal audit exposure is a plus.",
+        )
+        assert job_experience_ok(job, ["entry", "junior"]) is True
+
+    def test_manager_title_is_dropped(self):
+        from interntrack.utils.helpers import job_experience_ok
+
+        job = SimpleNamespace(
+            experience_level=None, title="Security Operations Manager", description=""
+        )
+        assert job_experience_ok(job, ["entry", "junior"]) is False
+
+    def test_dict_rows_detect_from_title_too(self):
+        from interntrack.utils.helpers import job_experience_ok
+
+        # Closing-soon sweep maps rows to dicts (title only, no description).
+        senior = {"title": "Principal Engineer", "experience_level": None}
+        assert job_experience_ok(senior, ["entry", "junior"]) is False
+        plain = {"title": "Software Engineer", "experience_level": None}
+        assert job_experience_ok(plain, ["entry", "junior"]) is True
+
+    def test_parsed_fresher_level_is_authoritative(self):
+        from interntrack.utils.helpers import job_experience_ok
+
+        # A job the classifier marked "fresher" must pass even when its
+        # description mentions a manager — parsed levels win over text.
+        job = SimpleNamespace(
+            experience_level="fresher",
+            title="Cybersecurity Analyst",
+            description="Reporting to the Security Operations Manager.",
+        )
+        assert job_experience_ok(job, ["entry", "junior"]) is True
+
+    def test_description_mentioning_manager_does_not_drop_fresher_job(self):
+        from interntrack.utils.helpers import job_experience_ok
+
+        # Unparsed level, neutral title, description that merely mentions a
+        # manager — must stay visible (senior markers scan title only).
+        job = SimpleNamespace(
+            experience_level=None,
+            title="Security Analyst",
+            description="Work under the guidance of the Incident Response "
+            "Manager and senior engineers.",
+        )
+        assert job_experience_ok(job, ["entry", "junior"]) is True
+
+    def test_fresher_marker_in_title_still_passes(self):
+        from interntrack.utils.helpers import job_experience_ok
+
+        job = SimpleNamespace(
+            experience_level=None,
+            title="Cybersecurity Intern",
+            description="Entry level internship for graduates.",
+        )
+        assert job_experience_ok(job, ["entry", "junior"]) is True
+
+
 def _db_with_row(row) -> AsyncMock:
     """Session mock whose execute() returns a result exposing the row."""
     result = MagicMock()
