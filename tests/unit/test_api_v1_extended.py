@@ -674,6 +674,7 @@ class TestReportsAPIUnit:
             location="Bangalore",
             include_remote=True,
             user_id="user1",
+            experience_levels=None,
         )
         assert result["report_type"] == "daily"
 
@@ -738,6 +739,7 @@ class TestReportsAPIUnit:
             location="Bangalore",
             include_remote=True,
             user_id="user1",
+            experience_levels=None,
         )
         assert result["report_type"] == "daily"
 
@@ -795,6 +797,7 @@ class TestReportsAPIUnit:
             location="Bangalore",
             include_remote=True,
             user_id="user1",
+            experience_levels=None,
         )
         assert result["report_type"] == "daily"
 

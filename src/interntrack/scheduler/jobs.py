@@ -151,6 +151,9 @@ async def _load_alert_preferences(
                 "paused_until": getattr(pref, "paused_until", None),
                 "min_salary": getattr(pref, "min_salary", None),
                 "keywords": list(getattr(pref, "keywords", None) or []),
+                "experience_levels": list(
+                    getattr(pref, "experience_levels", None) or []
+                ),
             }
     except Exception:
         return {}
@@ -458,13 +461,18 @@ async def _send_instant_alerts(session, saved_jobs: list) -> dict:
             domains = prefs.get("domains") or []
             min_score = prefs.get("min_match_score")
             include_remote = bool(prefs.get("include_remote", True))
+            experience_levels = prefs.get("experience_levels") or []
             loc_lower = (getattr(user, "location", None) or "").strip().lower()
+            from interntrack.utils.helpers import job_experience_ok
+
             matches = []
             for job in saved_jobs:
                 title = str(getattr(job, "title", "") or "")
                 tags = list(getattr(job, "tags", None) or [])
                 job_domain = classify_domain(title, tags)
                 if domains and job_domain not in domains:
+                    continue
+                if experience_levels and not job_experience_ok(job, experience_levels):
                     continue
                 job_loc = str(getattr(job, "location", None) or "").lower()
                 if loc_lower and not _location_allows(
@@ -554,7 +562,7 @@ async def _send_closing_soon_sweep(session) -> dict:
 
         from interntrack.domain.models import AlertPreferences
         from interntrack.repositories.job_repository import JobRepository
-        from interntrack.utils.helpers import location_allows
+        from interntrack.utils.helpers import job_experience_ok, location_allows
 
         targets = await _enabled_alert_targets(session)
         if not targets:
@@ -570,6 +578,7 @@ async def _send_closing_soon_sweep(session) -> dict:
                 "location": str(j.location or "Remote"),
                 "url": str(j.url or ""),
                 "expires_at": j.expires_at.isoformat() if j.expires_at else None,
+                "experience_level": str(getattr(j, "experience_level", None) or ""),
                 "domain": classify_domain(
                     str(j.title or ""),
                     tags=list(getattr(j, "tags", None) or []),
@@ -587,6 +596,7 @@ async def _send_closing_soon_sweep(session) -> dict:
                 continue
             domains = prefs.get("domains") or []
             include_remote = bool(prefs.get("include_remote", True))
+            experience_levels = prefs.get("experience_levels") or []
             user_loc = (
                 (getattr(user, "location", None) or "").strip().lower() if user else ""
             )
@@ -605,6 +615,7 @@ async def _send_closing_soon_sweep(session) -> dict:
                 for cj in closing_list
                 if str(cj["id"]) not in already
                 and (not domains or cj["domain"] in domains)
+                and (not experience_levels or job_experience_ok(cj, experience_levels))
                 and (
                     not user_loc
                     or location_allows(
@@ -967,6 +978,7 @@ async def _send_alert_for(
         since=since,
         location=user_location,
         include_remote=include_remote,
+        experience_levels=prefs.get("experience_levels") or None,
     )
     if weekly:
         report["report_type"] = "weekly"

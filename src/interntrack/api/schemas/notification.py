@@ -97,6 +97,10 @@ class AlertPreferencesResponse(BaseModel):
     min_salary: int | None = None
     # Highlight keywords: matching jobs get a "🎯 matches …" marker.
     keywords: list[str] = []
+    # Accepted experience levels (entry/junior/mid/senior/lead/executive).
+    # Empty list = every level. Jobs whose parsed level is outside this set
+    # are dropped from every alert path; unparsed listings always stay.
+    experience_levels: list[str] = []
 
     model_config = {"from_attributes": True}
 
@@ -120,6 +124,8 @@ class AlertPreferencesUpdate(BaseModel):
     min_salary: int | None = None
     # Highlight keywords (lowercased, deduped, capped at 10).
     keywords: list[str] | None = None
+    # Accepted experience levels; empty list clears the filter (all levels).
+    experience_levels: list[str] | None = None
     # Set True to clear the pause immediately (kept separate from
     # ``paused_until`` because the update schema uses None = keep current).
     resume_alerts: bool | None = None

@@ -66,6 +66,7 @@ class TestLoadAlertPreferences:
             "paused_until": None,
             "min_salary": None,
             "keywords": [],
+            "experience_levels": [],
         }
 
     @pytest.mark.asyncio
@@ -101,6 +102,7 @@ class TestLoadAlertPreferences:
             "paused_until": None,
             "min_salary": None,
             "keywords": [],
+            "experience_levels": [],
         }
 
     @pytest.mark.asyncio
@@ -416,6 +418,7 @@ class TestPreferencesAPI:
             since=None,
             location="Bangalore",
             include_remote=True,
+            experience_levels=None,
         )
         # Preferred channels (email) used, not notify_all.
         mock_manager.notify.assert_awaited_once_with(
@@ -546,6 +549,7 @@ class TestPreferencesAPI:
             since=None,
             location="Bangalore",
             include_remote=True,
+            experience_levels=None,
         )
         mock_manager.notify.assert_awaited_once_with(
             ["telegram"],
@@ -609,6 +613,7 @@ class TestPreferencesAPI:
             since=None,
             location="Bangalore",
             include_remote=True,
+            experience_levels=None,
         )
 
 
@@ -1001,6 +1006,7 @@ class TestAlertWindow:
             since=None,
             location="Bangalore",
             include_remote=True,
+            experience_levels=None,
         )
         mock_manager.notify_all.assert_not_called()
         mock_manager.notify.assert_not_called()

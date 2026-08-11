@@ -4596,6 +4596,9 @@ def show_settings() -> None:
     saved_location = prefs.get("location") or ""
     saved_min_salary = prefs.get("min_salary") or None
     saved_keywords = prefs.get("keywords") or []
+    saved_exp_levels = [
+        str(x).lower().strip() for x in (prefs.get("experience_levels") or [])
+    ]
     _user_profile_settings = _current_user() or {}
     saved_telegram_chat_id = _user_profile_settings.get("telegram_chat_id") or None
 
@@ -4690,6 +4693,37 @@ def show_settings() -> None:
         "your favourite skills stand out at a glance.",
     )
     keywords_list = [kw.strip() for kw in keywords_input.split(",") if kw.strip()][:10]
+
+    # Experience level — fresher users only want entry-level roles, so an
+    # explicitly mid/senior/lead/executive posting is dropped from every
+    # alert path (listings without a parsed level still pass).
+    exp_options = {
+        "all": "🎓 All experience levels",
+        "fresher": "🎓 Freshers & entry-level only (0–2 yrs)",
+        "entry": "🎓 Entry-level only",
+    }
+    if saved_exp_levels == ["entry", "junior"]:
+        exp_default = "fresher"
+    elif saved_exp_levels == ["entry"]:
+        exp_default = "entry"
+    else:
+        exp_default = "all"
+    exp_choice = st.selectbox(
+        "🎓 Experience level",
+        list(exp_options),
+        index=list(exp_options).index(exp_default),
+        format_func=lambda k: exp_options[k],
+        help="Restrict your alerts to fresher-friendly roles. Entry & junior "
+        "(0–2 yrs) jobs plus listings without a stated level are kept; "
+        "explicitly mid/senior/lead/executive roles are skipped.",
+    )
+    # NOTE: "all" must map to [] (not None) — the PUT handler treats None
+    # as "keep current value", so only [] actually clears a saved filter.
+    exp_levels_payload = {
+        "all": [],
+        "fresher": ["entry", "junior"],
+        "entry": ["entry"],
+    }[exp_choice]
 
     # Channels to deliver alerts through.
     chan_options = [c for c in ("email", "telegram", "sms") if c in configured]
@@ -4807,6 +4841,7 @@ def show_settings() -> None:
                 if target_salary_lpa
                 else None,
                 "keywords": keywords_list or None,
+                "experience_levels": exp_levels_payload,
             }
             result = _api(
                 f"/notifications/preferences/{user_id}",
