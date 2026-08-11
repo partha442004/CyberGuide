@@ -121,3 +121,9 @@ def test_non_numeric_score_is_skipped():
     gap = aggregate_skills_gap(matches)  # type: ignore[arg-type]
     assert gap["considered"] == 0
     assert gap["missing"] == []
+
+
+def test_non_dict_match_is_skipped():
+    matches = [({}, 80.0, 55)]  # legacy float match must never crash
+    gap = aggregate_skills_gap(matches)  # type: ignore[list-item]
+    assert gap == {"missing": [], "matched": [], "considered": 0}
