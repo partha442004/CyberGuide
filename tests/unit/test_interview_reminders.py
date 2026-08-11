@@ -31,7 +31,7 @@ class TestInterviewReminderText:
         assert "Interview soon" in text
         assert "SOC Analyst" in text
         assert "Acme Corp" in text
-        assert "Wed 12 Aug · 02:30 PM" in text
+        assert "Wed 12 Aug · 02:30 PM (UTC)" in text
         assert "They expect: Splunk, SIEM, Linux" in text
         labels = [label for label, _ in buttons]
         assert "🔗 View job" in labels
@@ -175,6 +175,7 @@ class TestSendInterviewReminders:
         assert len(buttons) == 2
         assert calls["history"][0]["subject"] == "🗓️ Interview soon"
         assert calls["history"][0]["job_count"] == 1
+        # One commit per item, after the send + mark.
         assert calls["commits"] == 1
 
     @pytest.mark.asyncio

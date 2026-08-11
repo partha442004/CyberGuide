@@ -700,6 +700,7 @@ async def _interview_reminders_for(
     try:
         from sqlalchemy import select
 
+        from interntrack.domain.enums import ApplicationStatus
         from interntrack.domain.models import Application, Job
 
         now = datetime.now(UTC).replace(tzinfo=None)
@@ -709,7 +710,7 @@ async def _interview_reminders_for(
             .join(Job, Application.job_id == Job.id)
             .where(
                 Application.user_id == user_id,
-                Application.status == "interview",
+                Application.status == ApplicationStatus.INTERVIEW,
                 Application.interview_at.isnot(None),
                 Application.interview_at > now,
                 Application.interview_at <= horizon,
@@ -742,7 +743,9 @@ def _interview_reminder_text(item: dict) -> tuple[str, list[tuple[str, str]]]:
     when_txt = ""
     if when:
         try:
-            when_txt = when.strftime("%a %d %b · %I:%M %p")
+            # Times are stored as naive UTC (the model coerces), so label
+            # them rather than letting users read UTC as local time.
+            when_txt = when.strftime("%a %d %b · %I:%M %p (UTC)")
         except Exception:  # noqa: BLE001 - best-effort time formatting
             when_txt = str(when)[:16]
     title = str(item.get("job_title") or "Interview")
@@ -817,13 +820,15 @@ async def _send_interview_reminders_for_user(
             results=results,
         )
         # Mark reminded even if delivery hiccuped — never spam every run.
+        # Commit per item so a later failure can never roll back an
+        # already-sent reminder and cause a duplicate on the next run.
         await session.execute(
             update(Application)
             .where(Application.id == item["application_id"])
             .values(interview_reminder_sent_at=now)
         )
-    await session.commit()
-    sent[user_id] = len(items)
+        await session.commit()
+    sent[user_id] = len(items[:3])
 
 
 async def _send_interview_reminders(session) -> dict:
