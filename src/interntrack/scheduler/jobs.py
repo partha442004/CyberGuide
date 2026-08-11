@@ -1143,23 +1143,37 @@ def _job_desc_snippet(job: dict, limit: int = 180) -> str:
     return desc[: limit - 1].rstrip() + "…"
 
 
+# Tokens that show up in scraper-fed ``tags`` but are not skills —
+# location names, employment types, urgency words. Kept out of the digest
+# skills line so a fallback never renders "🛠 Skills: Bengaluru, Full-time".
+_SKILL_NOISE = re.compile(
+    r"\b(full[- ]time|part[- ]time|work[- ]from[- ]home|wfh|remote|hybrid|on[- ]site|"
+    r"fresher|immediate|urgent|experience|years?|bangalore|bengaluru|chennai|"
+    r"mumbai|delhi|noida|gurgaon|gurugram|hyderabad|pune|kolkata|coimbatore|"
+    r"india|internship|intern|job|career|salary)\b",
+    re.IGNORECASE,
+)
+
+
 def _skills_txt(job: dict, limit: int = 6) -> str:
     """Comma-joined list of skills the role expects ("what they expect").
 
     Prefers structured ``required_skills`` (backfilled from descriptions by
-    the tag-backfill job); falls back to ``tags`` when a source only saves
-    freeform tags. Skills are deduped case-insensitively, capped at
-    ``limit``, and rendered as one compact line — or "" when the posting
-    has none.
+    the tag-backfill job); ``tags`` top up the list when a source only
+    saves freeform tags. Entries are normalized (stripped, empties
+    dropped) before the fallback applies, so a truthy-but-empty
+    ``required_skills`` never suppresses real tags. Non-skill noise tokens
+    (locations, full/part-time, hybrid/remote, fresher, …) are filtered,
+    skills are deduped case-insensitively and capped at ``limit``.
     """
-    raw = job.get("required_skills") or job.get("tags") or []
+    raw = list(job.get("required_skills") or []) + list(job.get("tags") or [])
     seen: set[str] = set()
     out: list[str] = []
     for item in raw:
         if len(out) >= limit:
             break
         skill = str(item or "").strip()
-        if not skill:
+        if not skill or _SKILL_NOISE.search(skill):
             continue
         key = skill.lower()
         if key in seen:
