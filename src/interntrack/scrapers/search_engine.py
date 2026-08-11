@@ -94,6 +94,7 @@ _LISTING_MARKERS = (
     "&q=",
     "/internships/",
     "/posts/",
+    "/pulse/",  # LinkedIn Pulse = content articles, never job postings
     "/registration/",
     "/startups/l/",
     "/role/l/",
@@ -160,6 +161,23 @@ _LISTING_TITLE_RE = re.compile(
     r"^\d+\s+(results?|jobs?|internships?|vacancies?)\s+for\b"
     r"|\b(job search|search jobs|find jobs)\b"
     r"|\b(jobs?|internships?|vacancies|openings)\b.*\|\s*[a-z0-9.\-]+\s*$",
+    re.IGNORECASE,
+)
+
+# Titles that are content-marketing articles rather than job postings.
+# LinkedIn (and some boards) repurpose posting URLs for article/pulse
+# content, so a search result can carry a non-job title like
+# "15 Best Chess Opening Moves That You Absolutely Must Know" — these are
+# never jobs and must be dropped, not saved.
+_JUNK_TITLE_RE = re.compile(
+    r"^\d+\s+(best|top|tips?|ways|reasons|things|moves|ideas?|books|tools|"
+    r"skills|tricks)\b"
+    r"|^top\s+\d+\b"
+    r"|\b(you (absolutely )?must know|you need to know|to know in \d+|to avoid|"
+    r"to master|to succeed|check out|watch out for)\b"
+    r"|\b(ultimate guide|beginner'?s? guide|how to (become|get|learn|land|"
+    r"break into))\b"
+    r"|\b(here'?s? (how|what|why)|why you should|the best way)\b",
     re.IGNORECASE,
 )
 
@@ -279,7 +297,7 @@ class SearchEngineScraper(BaseScraper):
             m = re.search(r"<title[^>]*>([^<]+)</title>", html, re.IGNORECASE)
             if m:
                 title = m.group(1).strip()
-        if not title or _LISTING_TITLE_RE.search(title):
+        if not title or _LISTING_TITLE_RE.search(title) or _JUNK_TITLE_RE.search(title):
             return None
         m = re.search(
             r"<meta[^>]*property=\"og:site_name\"[^>]*content=\"([^\"]+)\"", html

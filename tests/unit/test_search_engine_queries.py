@@ -30,6 +30,53 @@ async def _fake_get(url: str, timeout: int = 10):  # noqa: ARG001 - scraper API 
     )
 
 
+class TestSearchEngineContentFilter:
+    """The search engine must never save content articles as jobs."""
+
+    def test_article_url_blocked(self):
+        """LinkedIn Pulse / article URLs are content, not postings."""
+        scraper = SearchEngineScraper()
+        assert not scraper._is_job_url(
+            "https://www.linkedin.com/pulse/15-best-chess-opening-moves/"
+        )
+        assert not scraper._is_job_url(
+            "https://www.linkedin.com/posts/company/some-article-123"
+        )
+        assert scraper._is_job_url("https://www.linkedin.com/jobs/view/3987654321/")
+
+    def test_junk_article_title_rejected(self):
+        """Content-mill titles ("N Best ... You Must Know") are dropped."""
+        scraper = SearchEngineScraper()
+        for title in (
+            "15 Best Chess Opening Moves That You Absolutely Must Know",
+            "Top 10 Skills to Land a Cyber Security Job",
+            "How to Become a SOC Analyst in 2026",
+            "7 Tips for Acing Your Security Interview",
+            "The Ultimate Guide to Networking",
+        ):
+            page = (
+                "<html><head>"
+                f'<meta property="og:title" content="{title}">'
+                '<meta property="og:site_name" content="LinkedIn">'
+                "</head></html>"
+            )
+            assert scraper._parse_page("https://x.com/job", page) is None, title
+
+    def test_real_job_title_kept(self):
+        """A genuine job title still parses into a RawJob."""
+        scraper = SearchEngineScraper()
+        page = (
+            "<html><head>"
+            '<meta property="og:title" content="SOC Analyst">'
+            '<meta property="og:site_name" content="SecureCo">'
+            "</head></html>"
+        )
+        job = scraper._parse_page("https://x.com/job", page)
+        assert job is not None
+        assert job.title == "SOC Analyst"
+        assert job.company == "SecureCo"
+
+
 class TestSearchEngineQueries:
     """Tests for the generated search queries."""
 
