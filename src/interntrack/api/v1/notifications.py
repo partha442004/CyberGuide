@@ -440,6 +440,7 @@ async def get_alert_preferences(
         weekly_enabled=prefs.get("weekly_enabled", True),
         instant_alerts=prefs.get("instant_alerts", True),
         include_remote=prefs.get("include_remote", True),
+        quiet_day_emails=prefs.get("quiet_day_emails", True),
         paused_until=prefs.get("paused_until"),
     )
 
