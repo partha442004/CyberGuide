@@ -2,6 +2,7 @@
 Utility functions for InternTrack.
 """
 
+import re
 from datetime import UTC, datetime
 
 
@@ -36,21 +37,31 @@ _LOCATION_SYNONYMS = {
 def location_matches(job_loc: str, user_loc: str) -> bool:
     """Fuzzy location match with synonyms (Bangalore ↔ Bengaluru, ...).
 
-    Both arguments should be lowercased. True when the user's preferred
-    city appears in the job's location string, or a known synonym does —
-    so a "Bengaluru" preference matches a "Bangalore, Karnataka" posting
-    and the same posting matches a "Hyderabad" user's filter only when it
+    Both arguments should be lowercased. ``user_loc`` may list several
+    cities ("bangalore, hyderabad" or "bangalore/hyderabad"): a job
+    matches when it mentions ANY of them. True when a preferred city
+    appears in the job's location string, or a known synonym does — so a
+    "Bengaluru" preference matches a "Bangalore, Karnataka" posting and
+    the same posting matches a "Hyderabad" user's filter only when it
     actually mentions Hyderabad. This is the single source of truth shared
     by the instant alerts, the digest builders and the report filter.
     """
     if not job_loc or not user_loc:
         return False
-    if user_loc in job_loc:
+    for part in re.split(r"\s*[,/]\s*", user_loc):
+        if part and _single_location_matches(job_loc, part):
+            return True
+    return False
+
+
+def _single_location_matches(job_loc: str, city: str) -> bool:
+    """One-city match: the city (or a known synonym) appears in job_loc."""
+    if city in job_loc:
         return True
     for canonical, alts in _LOCATION_SYNONYMS.items():
-        if user_loc == canonical and any(_alt_in(alt, job_loc) for alt in alts):
+        if city == canonical and any(_alt_in(alt, job_loc) for alt in alts):
             return True
-        if user_loc in alts and canonical in job_loc:
+        if city in alts and canonical in job_loc:
             return True
     return False
 
