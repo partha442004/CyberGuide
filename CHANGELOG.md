@@ -4,6 +4,27 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **🗄 Job source health panel on the Overview page.** The scraper-health
+  API existed but had no UI, so there was no way to see which boards were
+  actually feeding fresh jobs (LinkedIn was carrying 376 jobs but zero in
+  the last 24h — it auth-walls datacenter IPs). The new panel renders
+  `/observability/scraper-health` as color-coded tiles per source (🟢
+  healthy = 24h jobs, 🟡 degraded = 7d only, 🔴 stale = none, ⚪ unknown),
+  each showing its 🆕 24h / 📅 7d counts, a summary strip (health % +
+  healthy/degraded/stale counts), and a caption calling out stale boards
+  with a pointer to Discovery / Share-a-Job. Source names are normalized
+  from the enum strings the API returns (`JobSource.LINKEDIN` → LinkedIn).
+- **Search-engine discovery now surfaces LinkedIn postings explicitly.**
+  LinkedIn is the single biggest source but its guest jobs API auth-walls
+  datacenter IPs (0 fresh jobs), and the search-engine scraper never
+  queried `linkedin.com` directly. Two new `site:` queries —
+  `site:linkedin.com/jobs OR site:in.linkedin.com/jobs {query}` — run
+  first so posting URLs indexed by DuckDuckGo/Bing keep LinkedIn fresh
+  without credentials. 2 new tests (query presence + context, board
+  coverage).
+
 ### Fixed
 
 - **Discovery no longer starves any user — queries now round-robin across
