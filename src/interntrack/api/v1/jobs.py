@@ -57,7 +57,8 @@ _DISCOVERY_SOURCES: list[str] = [
 # Total wall-clock budget (seconds) for one discovery request. Kept at 40s so
 # the endpoint always returns a (possibly partial) result before Vercel's
 # 60s hard kill, even after a cold start.
-_DISCOVERY_DEADLINE_SECONDS = 40
+# Vercel Hobby maxDuration is 60s; keep a 5s tail for save + response.
+_DISCOVERY_DEADLINE_SECONDS = 55
 
 
 # Indian cities (plus common aliases) recognized inside discovery queries so
@@ -845,30 +846,43 @@ async def run_discovery_for_users(
     # (query, location) pairs so each user's location is passed straight to
     # the scrapers — this is what makes the India scrapers (LinkedIn India,
     # Internshala, TimesJobs, Indeed India) actually target Bangalore instead
-    # of the US geo-locked guest APIs.
-    query_locations: list[tuple[str, str | None]] = []
+    # of the US geo-locked guest APIs. Queries are grouped per user first,
+    # then interleaved round-robin below so the 40s serverless budget can
+    # never be consumed by a single account's queries (a big search-engine
+    # query like "ui developer" once starved every other user's discovery).
+    per_user_queries: list[list[tuple[str, str | None]]] = []
     for target in targets:
         user = target["user"]
         location = (getattr(user, "location", None) or "").strip() if user else None
+        user_queries: list[tuple[str, str | None]] = []
         for q in discovery_queries_for(
             target["prefs"],
             target["user"],
             limit=limit,
         ):
-            query_locations.append((q, location or DEFAULT_LOCATION))
-    if not query_locations:
-        query_locations = [
-            ("cybersecurity", DEFAULT_LOCATION),
-            ("software engineering", DEFAULT_LOCATION),
-            ("python developer", DEFAULT_LOCATION),
+            user_queries.append((q, location or DEFAULT_LOCATION))
+        if user_queries:
+            per_user_queries.append(user_queries)
+    if not per_user_queries:
+        per_user_queries = [
+            [("cybersecurity", DEFAULT_LOCATION)],
+            [("software engineering", DEFAULT_LOCATION)],
+            [("python developer", DEFAULT_LOCATION)],
         ]
+    # Round-robin interleave: A1, B1, A2, B2, ... instead of A1, A2, A3,
+    # A4, B1, ... so every user's top queries get a fair slice of the budget.
     unique: list[tuple[str, str | None]] = []
     seen: set[str] = set()
-    for q, loc in query_locations:
-        key = q.strip().lower()
-        if key and key not in seen:
-            seen.add(key)
-            unique.append((q.strip(), loc))
+    max_per_user = max(len(qs) for qs in per_user_queries)
+    for i in range(max_per_user):
+        for user_queries in per_user_queries:
+            if i >= len(user_queries):
+                continue
+            q, loc = user_queries[i]
+            key = q.strip().lower()
+            if key and key not in seen:
+                seen.add(key)
+                unique.append((q.strip(), loc))
 
     registry = get_default_registry()
     service = JobService(db)

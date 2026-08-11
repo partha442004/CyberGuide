@@ -43,6 +43,88 @@ def _resolve_slot_domains(prefs: dict, slot: str | None) -> list[str] | None:
     return None
 
 
+async def _send_quiet_day_digest(
+    db,
+    prefs: dict,
+    domains: list | None = None,
+    user_id: str | None = None,
+    user=None,
+) -> dict:
+    """Send a compact "no new matches" email on days with nothing new.
+
+    The daily digest only emails when new jobs were found, so a user with
+    no fresh matching postings gets nothing and assumes the system broke.
+    This sends a short confirmation email (email channel only — no
+    Telegram/SMS spam) with the summary + a link to the dashboard, and
+    records it in the user's alert history so the Digest Archive shows the
+    system checked in. Never raises.
+    """
+    from interntrack.scheduler.jobs import (
+        DEFAULT_ALERT_USER,
+        _alerts_paused,
+        _record_alert_history,
+    )
+    from interntrack.services.notification_service import NotificationManager
+
+    try:
+        manager = NotificationManager(db)
+        channels = prefs.get("channels") or manager.get_configured_channels() or []
+        if (
+            "email" not in channels
+            or prefs.get("is_enabled") is False
+            or _alerts_paused(prefs)
+        ):
+            return {}
+        if domains is None:
+            domains = prefs.get("domains") or []
+        domain_txt = ", ".join(domains) if domains else "all categories"
+        location_txt = (
+            (getattr(user, "location", None) or "").strip()
+            if user is not None
+            else "your area"
+        )
+        subject = f"No new {domain_txt} jobs today"
+        lines = [
+            "<b>📭 No new jobs today</b>",
+            "",
+            f"We checked for <b>{domain_txt}</b> roles"
+            + (f" in <b>{location_txt}</b>" if location_txt else ""),
+            "and found nothing new since your last digest.",
+            "",
+            "That's normal — postings refresh constantly, so your next",
+            "scheduled digest will pick up anything new. Check the live",
+            "dashboard anytime for the full catalog:",
+            "",
+            "<a href='https://cyberguide2026aug.streamlit.app'>",
+            "Open InternTrack Dashboard →</a>",
+        ]
+        recipient = None
+        if user is not None:
+            recipient = {
+                "email": getattr(user, "email", None),
+                "telegram_chat_id": getattr(user, "telegram_chat_id", None),
+                "phone_number": getattr(user, "phone_number", None),
+            }
+        results = await manager.notify(
+            ["email"],
+            "\n".join(lines),
+            subject=subject,
+            recipient=recipient,
+        )
+        await _record_alert_history(
+            db,
+            user_id=user_id or DEFAULT_ALERT_USER,
+            subject=subject,
+            channels=["email"],
+            domains=domains or [],
+            job_count=0,
+            results=results,
+        )
+        return results
+    except Exception:
+        return {}
+
+
 async def _send_alert_digest(
     db,
     prefs: dict,
@@ -301,6 +383,17 @@ async def get_daily_report(
                     db,
                     prefs,
                     report,
+                    domains=domains,
+                    user_id=target["user_id"],
+                    user=target["user"],
+                )
+        elif not preview:
+            # Quiet day: still send a compact email so the user knows the
+            # system checked in and didn't break (no Telegram/SMS spam).
+            with contextlib.suppress(Exception):
+                await _send_quiet_day_digest(
+                    db,
+                    prefs,
                     domains=domains,
                     user_id=target["user_id"],
                     user=target["user"],
