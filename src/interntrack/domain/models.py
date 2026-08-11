@@ -484,6 +484,14 @@ class AlertPreferences(Base, TimestampMixin):
     # emails that actually contain job alerts. Auto-added to existing live
     # tables by ``_sync_missing_columns``.
     quiet_day_emails = Column(Boolean, default=True)
+    # Annual minimum salary the user cares about (₹/year, INR). Jobs whose
+    # listed salary is at/above this get a "💰 Meets your target" marker in
+    # the digest. ``None`` = no target. Auto-added by column sync.
+    min_salary = Column(Integer, nullable=True)
+    # Highlight keywords: jobs whose title / description / tags / skills
+    # mention any of these get a "🎯 matches …" marker in the digest.
+    # Auto-added by column sync.
+    keywords = Column(JSON, nullable=True)
 
     @validates("last_alert_at", "paused_until")
     def _coerce_naive_utc(self, _key: str, value):

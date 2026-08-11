@@ -149,6 +149,8 @@ async def _load_alert_preferences(
                     else True
                 ),
                 "paused_until": getattr(pref, "paused_until", None),
+                "min_salary": getattr(pref, "min_salary", None),
+                "keywords": list(getattr(pref, "keywords", None) or []),
             }
     except Exception:
         return {}
@@ -971,6 +973,10 @@ async def _send_alert_for(
         # The week's most-engaged jobs (apps + bookmarks + views) lead the
         # recap. Defensive: a stats failure must never break the digest.
         report["top_engaged"] = await _weekly_top_engaged(session)
+    # Per-user digest smartening: salary target + keyword highlights ride
+    # along on the report so every builder sees the same numbers.
+    report["target_salary"] = prefs.get("min_salary") or None
+    report["keywords"] = list(prefs.get("keywords") or [])
 
     await _mark_alert_sent(session, user_id)
     if not (report.get("new_jobs") or []):
@@ -1547,7 +1553,69 @@ def _source_label(source) -> str:
     return labels.get(key, key.replace("_", " ").title())
 
 
-def _job_lines(score, job: dict) -> list[str]:
+_INR_TO_USD = 83.0  # fixed rate used to compare USD postings to an INR target
+
+
+def _salary_meets_target(job: dict, target: int | None) -> bool:
+    """Whether a job's listed minimum salary meets the user's annual target.
+
+    Both are treated as annual figures. USD postings are compared against
+    an INR target using a fixed ₹83/$ rate so a ₹ target still catches
+    remote/US roles; jobs with no salary data never "meet" the target.
+    """
+    try:
+        if not target or float(target) <= 0:
+            return False
+        lo = job.get("salary_min")
+        hi = job.get("salary_max")
+        if lo is None and hi is None:
+            return False
+        if lo is not None:
+            low = float(lo)
+        elif hi is not None:
+            low = float(hi)
+        else:
+            return False
+        currency = str(job.get("salary_currency") or "USD").upper()
+        if currency == "USD":
+            low = low * _INR_TO_USD
+        return low >= float(target)
+    except Exception:  # noqa: BLE001 - a bad salary must never break the digest
+        return False
+
+
+def _keyword_hits(job: dict, keywords: list | None) -> list[str]:
+    """Which of the user's highlight keywords match a job, capped at 3.
+
+    Case-insensitive substring match against the title, description, tags
+    and required skills. Never raises.
+    """
+    hits: list[str] = []
+    if not keywords:
+        return hits
+    try:
+        text = (
+            str(job.get("title") or "") + " " + str(job.get("description") or "")
+        ).lower()
+        text += " " + " ".join(str(t).lower() for t in (job.get("tags") or []))
+        text += " " + " ".join(
+            str(s).lower() for s in (job.get("required_skills") or [])
+        )
+        for kw in keywords:
+            kw_l = str(kw).strip().lower()
+            if kw_l and kw_l in text and kw_l not in hits:
+                hits.append(kw_l)
+    except Exception:  # noqa: BLE001 - highlight logic must never break the digest
+        return []
+    return hits[:3]
+
+
+def _job_lines(
+    score,
+    job: dict,
+    target_salary: int | None = None,
+    keywords: list | None = None,
+) -> list[str]:
     """One job's notification lines (headline + apply link + expiry note)."""
     title = (job.get("title") or "Untitled")[:90]
     company = (job.get("company") or "").strip()
@@ -1576,6 +1644,11 @@ def _job_lines(score, job: dict) -> list[str]:
     skills = _skills_txt(job)
     if skills:
         lines.append(f"   🛠 Skills: {_esc(skills)}")
+    if _salary_meets_target(job, target_salary):
+        lines.append("   💰 Meets your target salary")
+    hits = _keyword_hits(job, keywords)
+    if hits:
+        lines.append("   🔎 Matches: " + ", ".join(hits))
     if url:
         lines.append(f"   🔗 Apply: {url}")
     note = _expiry_note(job)
@@ -1978,7 +2051,14 @@ async def build_daily_report_message(
         lines.append("")
         lines.append(f"{_DOMAIN_ICONS.get(domain, domain)} ({len(items)}):")
         for score, job in items:
-            lines.extend(_job_lines(score, job))
+            lines.extend(
+                _job_lines(
+                    score,
+                    job,
+                    target_salary=report.get("target_salary"),
+                    keywords=report.get("keywords") or [],
+                )
+            )
 
     # Watched-company jobs get their own highlight section.
     watched_jobs = _watched_jobs(report, await _watched_company_names(session, user_id))
@@ -1986,7 +2066,14 @@ async def build_daily_report_message(
         lines.append("")
         lines.append(f"🏢 Watched companies ({len(watched_jobs)}):")
         for job in watched_jobs:
-            lines.extend(_job_lines(None, job))
+            lines.extend(
+                _job_lines(
+                    None,
+                    job,
+                    target_salary=report.get("target_salary"),
+                    keywords=report.get("keywords") or [],
+                )
+            )
 
     if sections or watched_jobs:
         lines.append("")
@@ -2157,7 +2244,14 @@ async def build_alert_chunks(
                 if not lines or lines[-1] != domain_label:
                     lines.append("")
                     lines.append(domain_label)
-                lines.extend(_job_lines(score, job))
+                lines.extend(
+                    _job_lines(
+                        score,
+                        job,
+                        target_salary=report.get("target_salary"),
+                        keywords=report.get("keywords") or [],
+                    )
+                )
                 url = job.get("url")
                 if url:
                     # Telegram caps button text at 64 chars.
@@ -2531,7 +2625,15 @@ async def build_daily_report_html(
             f"padding:2px 10px;font-size:12px;'>{len(items)}</span></div>"
         )
         for score, job in items:
-            parts.append(_job_html_card(score, job, style))
+            parts.append(
+                _job_html_card(
+                    score,
+                    job,
+                    style,
+                    target_salary=report.get("target_salary"),
+                    keywords=report.get("keywords") or [],
+                )
+            )
 
     watched_jobs = _watched_jobs(report, watched)
     if watched_jobs:
@@ -2543,7 +2645,15 @@ async def build_daily_report_html(
             f"padding:2px 10px;font-size:12px;'>{len(watched_jobs)}</span></div>"
         )
         for job in watched_jobs:
-            parts.append(_job_html_card(None, job, "#0ea5e9"))
+            parts.append(
+                _job_html_card(
+                    None,
+                    job,
+                    "#0ea5e9",
+                    target_salary=report.get("target_salary"),
+                    keywords=report.get("keywords") or [],
+                )
+            )
 
     # Other locations section
     if loc_lower and other_sections:
@@ -2574,7 +2684,15 @@ async def build_daily_report_html(
                 "padding:1px 8px;font-size:11px;'>" + str(len(items)) + "</span></div>"
             )
             for score, job in items:
-                parts.append(_job_html_card(score, job, accent))
+                parts.append(
+                    _job_html_card(
+                        score,
+                        job,
+                        accent,
+                        target_salary=report.get("target_salary"),
+                        keywords=report.get("keywords") or [],
+                    )
+                )
 
     # Role x location breakdown table
     if loc_lower:
@@ -2824,7 +2942,13 @@ def _location_breakdown_table(sections, other_sections):
     )
 
 
-def _job_html_card(score, job: dict, accent: str) -> str:
+def _job_html_card(
+    score,
+    job: dict,
+    accent: str,
+    target_salary: int | None = None,
+    keywords: list | None = None,
+) -> str:
     """One job as an HTML card with an Apply button."""
     title = _esc(job.get("title") or "Untitled")
     company = _esc(job.get("company") or "")
@@ -2860,6 +2984,21 @@ def _job_html_card(score, job: dict, accent: str) -> str:
             "<div style='margin-top:6px;font-size:12px;color:#0f766e;'>"
             f"🛠 Skills: {skills}</div>"
         )
+    chips = ""
+    if _salary_meets_target(job, target_salary):
+        chips += (
+            "<span style='background:#d1fae5;color:#065f46;border-radius:999px;"
+            "padding:2px 9px;font-size:11px;font-weight:700;margin-right:6px;'>"
+            "💰 Meets your target</span>"
+        )
+    for hit in _keyword_hits(job, keywords):
+        chips += (
+            "<span style='background:#fef3c7;color:#92400e;border-radius:999px;"
+            "padding:2px 9px;font-size:11px;font-weight:700;margin-right:6px;'>"
+            f"🎯 {_esc(hit)}</span>"
+        )
+    if chips:
+        card += "<div style='margin-top:8px;'>" + chips + "</div>"
     desc = _esc(_job_desc_snippet(job, limit=240))
     if desc:
         card += (

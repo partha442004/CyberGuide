@@ -4594,6 +4594,8 @@ def show_settings() -> None:
     saved_domains = prefs.get("domains") or []
     saved_min = prefs.get("min_match_score") or 0
     saved_location = prefs.get("location") or ""
+    saved_min_salary = prefs.get("min_salary") or None
+    saved_keywords = prefs.get("keywords") or []
     _user_profile_settings = _current_user() or {}
     saved_telegram_chat_id = _user_profile_settings.get("telegram_chat_id") or None
 
@@ -4667,6 +4669,27 @@ def show_settings() -> None:
         placeholder="e.g. Bangalore, Mumbai, Delhi",
         help="Leave empty to see jobs from all locations.",
     )
+
+    # Target minimum salary — jobs at/above it get a 💰 chip in the digest.
+    target_salary_lpa = st.number_input(
+        "💰 Minimum target salary (LPA)",
+        min_value=0.0,
+        max_value=200.0,
+        value=float(saved_min_salary) / 100000 if saved_min_salary else 0.0,
+        step=1.0,
+        help="If a job's salary meets this, it's marked with a 💰 chip "
+        "in your email / Telegram digest. 0 = no salary filter.",
+    )
+
+    # Highlight keywords — jobs whose title/skills mention them get a 🔥 chip.
+    keywords_input = st.text_input(
+        "🔥 Highlight keywords (comma-separated)",
+        value=", ".join(saved_keywords),
+        placeholder="e.g. Splunk, SOC, VAPT, Cloud Security",
+        help="Jobs matching any keyword get a 🔥 chip in your digest so "
+        "your favourite skills stand out at a glance.",
+    )
+    keywords_list = [kw.strip() for kw in keywords_input.split(",") if kw.strip()][:10]
 
     # Channels to deliver alerts through.
     chan_options = [c for c in ("email", "telegram", "sms") if c in configured]
@@ -4780,6 +4803,10 @@ def show_settings() -> None:
                 "quiet_day_emails": quiet_day_emails,
                 "instant_alerts": instant_alerts,
                 "location": location.strip() or None,
+                "min_salary": int(target_salary_lpa * 100000)
+                if target_salary_lpa
+                else None,
+                "keywords": keywords_list or None,
             }
             result = _api(
                 f"/notifications/preferences/{user_id}",

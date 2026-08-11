@@ -48,6 +48,8 @@ class TestLoadAlertPreferences:
         row.instant_alerts = None
         row.include_remote = None
         row.paused_until = None
+        row.min_salary = None
+        row.keywords = None
 
         prefs = await _load_alert_preferences(_db_with_row(row))
         assert prefs == {
@@ -62,6 +64,8 @@ class TestLoadAlertPreferences:
             "include_remote": True,
             "quiet_day_emails": True,
             "paused_until": None,
+            "min_salary": None,
+            "keywords": [],
         }
 
     @pytest.mark.asyncio
@@ -79,6 +83,8 @@ class TestLoadAlertPreferences:
         row.instant_alerts = True
         row.include_remote = False
         row.paused_until = None
+        row.min_salary = None
+        row.keywords = []
 
         prefs = await _load_alert_preferences(_db_with_row(row))
         assert prefs == {
@@ -93,6 +99,8 @@ class TestLoadAlertPreferences:
             "quiet_day_emails": True,
             "weekly_enabled": False,
             "paused_until": None,
+            "min_salary": None,
+            "keywords": [],
         }
 
     @pytest.mark.asyncio

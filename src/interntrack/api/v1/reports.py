@@ -302,6 +302,11 @@ async def get_daily_report(
             include_remote=include_remote,
             user_id=target["user_id"],
         )
+        # Per-user digest smartening (salary target + keyword highlights)
+        # rides along on the report so the builders mark the same jobs in
+        # previews and real sends alike.
+        report["target_salary"] = prefs.get("min_salary") or None
+        report["keywords"] = list(prefs.get("keywords") or [])
 
         # Preview mode builds the digest without delivering it and without
         # advancing the no-duplicates window (so previewing never causes a
@@ -381,6 +386,10 @@ async def get_weekly_alert(
         # Attach the week's most-engaged jobs (apps + bookmarks + views)
         # so the email / Telegram recap can lead with real activity.
         report["top_engaged"] = await _top_engaged_jobs(db)
+        # Per-user digest smartening rides along on the report so the
+        # builders can mark salary-target and keyword-highlight jobs.
+        report["target_salary"] = prefs.get("min_salary") or None
+        report["keywords"] = list(prefs.get("keywords") or [])
 
         if report.get("new_jobs") or []:
             with contextlib.suppress(Exception):
