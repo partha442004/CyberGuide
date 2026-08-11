@@ -92,6 +92,11 @@ class AlertPreferencesResponse(BaseModel):
     # Vacation mode: when set (naive UTC), all alerts are suppressed until
     # this timestamp. ``None`` means alerts are live.
     paused_until: datetime | None = None
+    # Annual minimum salary (₹/year, INR): jobs at/above this get a
+    # "💰 Meets your target" marker in the digest. ``None`` = no target.
+    min_salary: int | None = None
+    # Highlight keywords: matching jobs get a "🎯 matches …" marker.
+    keywords: list[str] = []
 
     model_config = {"from_attributes": True}
 
@@ -111,6 +116,10 @@ class AlertPreferencesUpdate(BaseModel):
     # Vacation mode timestamp (naive UTC) — set to a future time to pause
     # all alerts until then.
     paused_until: datetime | None = None
+    # Annual minimum salary (₹/year, INR). ``None`` = keep current value.
+    min_salary: int | None = None
+    # Highlight keywords (lowercased, deduped, capped at 10).
+    keywords: list[str] | None = None
     # Set True to clear the pause immediately (kept separate from
     # ``paused_until`` because the update schema uses None = keep current).
     resume_alerts: bool | None = None

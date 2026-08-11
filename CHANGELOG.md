@@ -6,6 +6,18 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **💰 Per-user digest smartening (target salary + highlight keywords).**
+  Alert preferences gain `min_salary` (absolute annual INR) and
+  `keywords` (list of highlight terms, auto-synced to live tables). Jobs
+  at/above your target pay get a "💰 Meets your target" chip, and jobs
+  whose title/skills mention a keyword get "🎯 <keyword>" chips in the
+  daily digest text, HTML email and Telegram (SMS shares the text
+  builder). The dashboard Settings page gains a target-salary input
+  (LPA ↔ INR conversion) and a comma-separated keyword box. USD postings
+  are compared correctly via the fixed ₹83 rate; chips are HTML-escaped;
+  empty keywords filtered; never raises. 16 new tests; full unit suite
+  1599 passed; ruff + mypy clean.
+
 - **🗓️ Interview reminders.** Interviews scheduled within the next 36
   hours now trigger a dedicated push through the user's saved channels —
   "🗓️ Interview soon: SOC Analyst @ Acme — Wed 12 Aug · 02:30 PM · 🧠

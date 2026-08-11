@@ -442,6 +442,8 @@ async def get_alert_preferences(
         include_remote=prefs.get("include_remote", True),
         quiet_day_emails=prefs.get("quiet_day_emails", True),
         paused_until=prefs.get("paused_until"),
+        min_salary=prefs.get("min_salary"),
+        keywords=list(prefs.get("keywords") or []),
     )
 
 
@@ -493,6 +495,16 @@ async def update_alert_preferences(
         pref.paused_until = None  # type: ignore[assignment]
     elif update.paused_until is not None:
         pref.paused_until = update.paused_until  # type: ignore[assignment]
+    if update.min_salary is not None:
+        target = max(0, int(update.min_salary))
+        pref.min_salary = target  # type: ignore[assignment]
+    if update.keywords is not None:
+        cleaned_kws: list[str] = []
+        for kw in update.keywords:
+            kw = str(kw).strip().lower()
+            if kw and kw not in cleaned_kws:
+                cleaned_kws.append(kw)
+        pref.keywords = cleaned_kws[:10]  # type: ignore[assignment]
 
     await db.commit()
     await db.refresh(pref)
@@ -517,6 +529,8 @@ async def update_alert_preferences(
             bool(pref.quiet_day_emails) if pref.quiet_day_emails is not None else True
         ),
         paused_until=pref.paused_until,
+        min_salary=pref.min_salary,
+        keywords=list(pref.keywords or []),
     )
 
 
