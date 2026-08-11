@@ -486,6 +486,8 @@ async def update_alert_preferences(
         pref.instant_alerts = update.instant_alerts  # type: ignore[assignment]
     if update.include_remote is not None:
         pref.include_remote = update.include_remote  # type: ignore[assignment]
+    if update.quiet_day_emails is not None:
+        pref.quiet_day_emails = update.quiet_day_emails  # type: ignore[assignment]
     if update.resume_alerts is True:
         pref.paused_until = None  # type: ignore[assignment]
     elif update.paused_until is not None:
@@ -509,6 +511,9 @@ async def update_alert_preferences(
         ),
         include_remote=(
             bool(pref.include_remote) if pref.include_remote is not None else True
+        ),
+        quiet_day_emails=(
+            bool(pref.quiet_day_emails) if pref.quiet_day_emails is not None else True
         ),
         paused_until=pref.paused_until,
     )

@@ -389,12 +389,17 @@ async def get_daily_report(
                     user_id=target["user_id"],
                     user=target["user"],
                 )
-        elif not preview and (slot is None or slot == "morning"):
+        elif (
+            not preview
+            and (slot is None or slot == "morning")
+            and prefs.get("quiet_day_emails", True)
+        ):
             # Quiet day: still send a compact email so the user knows the
             # system checked in and didn't break (no Telegram/SMS spam).
             # Only the morning slot (and manual triggers) sends it — the
             # afternoon/evening cron slots stay silent on empty days so a
-            # user never gets 3 'no new jobs' mails per day.
+            # user never gets 3 'no new jobs' mails per day — and accounts
+            # with quiet_day_emails off only ever get real job-alert emails.
             with contextlib.suppress(Exception):
                 await _send_quiet_day_digest(
                     db,

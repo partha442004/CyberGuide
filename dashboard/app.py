@@ -4512,6 +4512,14 @@ def show_settings() -> None:
         "📅 Send a Sunday weekly digest (recap of the week's jobs)",
         value=bool(prefs.get("weekly_enabled", True)),
     )
+    quiet_day_emails = st.checkbox(
+        "📭 Email me 'no new jobs today' on quiet days",
+        value=bool(prefs.get("quiet_day_emails", True)),
+        help="On days when nothing new matches your categories, you'd get a "
+        "compact confirmation email (once a day) so you know the system "
+        "checked in. Turn this off to only ever receive emails that "
+        "actually contain job alerts.",
+    )
     instant_alerts = st.checkbox(
         "⚡ Instant Telegram alert for new high-match jobs",
         value=bool(prefs.get("instant_alerts", True)),
@@ -4573,6 +4581,7 @@ def show_settings() -> None:
                 "is_enabled": True,
                 "slot_domains": slot_picks,
                 "weekly_enabled": weekly_enabled,
+                "quiet_day_emails": quiet_day_emails,
                 "instant_alerts": instant_alerts,
                 "location": location.strip() or None,
             }
