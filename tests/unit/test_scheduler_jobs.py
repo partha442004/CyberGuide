@@ -56,6 +56,80 @@ class TestFormatDailyReport:
         assert "Total Applications: 0" in result
 
 
+class TestSourceLabel:
+    """The source chip shows which board a job came from in the alerts."""
+
+    def test_friendly_labels_for_known_sources(self):
+        from interntrack.scheduler.jobs import _source_label
+
+        assert "LinkedIn" in _source_label("linkedin")
+        assert "Internshala" in _source_label("internshala_direct")
+        assert "Naukri" in _source_label("naukri")
+        assert "RSS" in _source_label("rss_feed")
+        assert "Shared link" in _source_label("manual")
+        assert "Search engine" in _source_label("search_engine")
+
+    def test_normalizes_enum_strings(self):
+        from interntrack.scheduler.jobs import _source_label
+
+        assert "LinkedIn" in _source_label("JobSource.LINKEDIN")
+        assert "Cutshort" in _source_label("JobSource.CUTSHORT")
+
+    def test_empty_source_is_empty_label(self):
+        from interntrack.scheduler.jobs import _source_label
+
+        assert _source_label(None) == ""
+        assert _source_label("") == ""
+
+    def test_unknown_source_falls_back_to_title_case(self):
+        from interntrack.scheduler.jobs import _source_label
+
+        assert _source_label("mystery_board") == "Mystery Board"
+
+    @pytest.mark.asyncio
+    async def test_message_includes_source_chip(self):
+        """The Telegram/text digest shows the source board per job."""
+        from interntrack.scheduler.jobs import build_daily_report_message
+
+        report = {
+            "summary": {"new_jobs": 1, "new_applications": 0, "total_applications": 0},
+            "new_jobs": [
+                {
+                    "id": "job-1",
+                    "title": "SOC Analyst",
+                    "company": "SecureCo",
+                    "url": "https://a/apply",
+                    "source": "linkedin",
+                    "age_days": 0,
+                    "domain": "security",
+                    "is_applied": False,
+                }
+            ],
+        }
+
+        message = await build_daily_report_message(report, None)
+
+        assert "🗂" in message
+        assert "LinkedIn" in message
+
+    def test_html_card_includes_source(self):
+        """The email card shows which board the job came from."""
+        from interntrack.scheduler.jobs import _job_html_card
+
+        card = _job_html_card(
+            80.0,
+            {
+                "title": "SOC Analyst",
+                "company": "SecureCo",
+                "location": "Bengaluru",
+                "source": "internshala_direct",
+            },
+            "#e5484d",
+        )
+
+        assert "Internshala" in card
+
+
 class TestJobHtmlCard:
     """Tests for the email digest job card (_job_html_card)."""
 

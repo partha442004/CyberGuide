@@ -986,6 +986,49 @@ def _age_badge(age: int) -> str:
     return f"⚪ {age}d ago"
 
 
+def _source_label(source) -> str:
+    """Friendly board name for a job's source, or "" when unknown.
+
+    Scrapers store their source name (``linkedin``, ``internshala_direct``,
+    ``rss_feed``, ...) but the API can also emit enum strings
+    (``JobSource.LINKEDIN``); both normalize to the same label so the email
+    and Telegram digests can show "which board this job came from" without
+    leaking internal enum names.
+    """
+    raw = str(source or "").strip()
+    if not raw:
+        return ""
+    if "." in raw:
+        raw = raw.rsplit(".", 1)[-1]
+    key = raw.lower()
+    labels = {
+        "linkedin": "🔗 LinkedIn",
+        "linkedin_india": "🔗 LinkedIn India",
+        "linkedin_jobs_api": "🔗 LinkedIn API",
+        "rss_feed": "📰 RSS feeds",
+        "company": "🏢 Company careers",
+        "greenhouse": "🏢 Company careers",
+        "hackernews": "🐍 HackerNews",
+        "internshala_direct": "🎓 Internshala",
+        "internshala": "🎓 Internshala",
+        "cutshort": "⚡ Cutshort",
+        "wellfound": "🚀 Wellfound",
+        "foundit": "🏢 Foundit",
+        "naukri": "💼 Naukri",
+        "apna": "🤝 Apna",
+        "indeed": "🌐 Indeed",
+        "indeed_india": "🌐 Indeed India",
+        "glassdoor": "🏫 Glassdoor",
+        "glassdoor_india": "🏫 Glassdoor India",
+        "google_jobs": "🔎 Google Jobs",
+        "timesjobs": "⏰ TimesJobs",
+        "search_engine": "🔎 Search engine",
+        "manual": "📥 Shared link",
+        "unknown": "❓ Unknown",
+    }
+    return labels.get(key, key.replace("_", " ").title())
+
+
 def _job_lines(score, job: dict) -> list[str]:
     """One job's notification lines (headline + apply link + expiry note)."""
     title = (job.get("title") or "Untitled")[:90]
@@ -1004,6 +1047,9 @@ def _job_lines(score, job: dict) -> list[str]:
     exp_level = str(job.get("experience_level") or "").strip()
     if exp_level:
         lines.append(f"   🎓 {exp_level}")
+    source = _source_label(job.get("source"))
+    if source:
+        lines.append(f"   🗂 {_esc(source)}")
     desc = _job_desc_snippet(job)
     if desc:
         # Escaped: Telegram sends with HTML parse mode and scraped
@@ -1962,7 +2008,10 @@ def _job_html_card(score, job: dict, accent: str) -> str:
     expiry = _esc(_expiry_note(job).strip())
     salary = _esc(_salary_txt(job))
     exp_level = _esc(str(job.get("experience_level") or "").strip())
+    source = _esc(_source_label(job.get("source")))
     meta_bits = [bit for bit in (status_txt, expiry, salary, exp_level) if bit]
+    if source:
+        meta_bits.append(source)
     card = (
         "<div style='border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;"
         "margin:10px 0;'>"

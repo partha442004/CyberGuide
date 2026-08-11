@@ -343,8 +343,14 @@ class SearchEngineScraper(BaseScraper):
         ]
         jobs: list[RawJob] = []
         seen: set[str] = set()
+        # Give every query a fair slice of the limit instead of letting the
+        # first productive query (usually the generic "job OR vacancy" one)
+        # eat the whole budget — otherwise the LinkedIn / Naukri / cyber-board
+        # ``site:`` queries that surface fresh postings never actually run.
+        budget = max(1, limit // len(queries))
         try:
             for search in queries:
+                query_cap = len(jobs) + budget
                 # DuckDuckGo first; Bing covers the datacenter-IP cases
                 # where DDG serves an anomaly page with no result links.
                 for engine in ("duckduckgo", "bing"):
@@ -358,7 +364,7 @@ class SearchEngineScraper(BaseScraper):
                         if not self._is_job_url(link) or link in seen:
                             continue
                         seen.add(link)
-                        if len(jobs) >= limit:
+                        if len(jobs) >= query_cap:
                             break
                         try:
                             page = await self._get(link, timeout=10)
@@ -374,7 +380,7 @@ class SearchEngineScraper(BaseScraper):
                     # actually produced jobs — otherwise try the other
                     # engine for the same query (DDG's shaped-but-unparseable
                     # links must not starve Bing).
-                    if len(jobs) > before or len(jobs) >= limit:
+                    if len(jobs) > before or len(jobs) >= query_cap:
                         break
                 if len(jobs) >= limit:
                     break
