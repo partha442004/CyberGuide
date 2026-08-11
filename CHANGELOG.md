@@ -6,6 +6,17 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **💰 Salary insight on the weekly digest.** The Monday digest now opens
+  with median pay for the user's domain + city computed from live stored
+  postings ("💰 Median security pay in Bangalore: ₹6.0L–₹10.0L (from 12
+  live postings)") — a green card in email, its own Telegram message, and
+  a line in text/SMS. Benchmark logic was extracted from the salary API
+  into a shared `_compute_benchmark_rows` + new `salary_benchmark_for`
+  (exact city → synonym match → remote fallback) so the dashboard chips
+  and digest numbers can never drift. 7 new tests.
+
+### Added
+
 - **📚 Skills-to-learn links — "learn the gap" one click away.** Every
   missing skill in the My Matches panel and the weekly digest now links
   to free learning: curated resources for 22 common skills (Splunk free

@@ -2127,3 +2127,100 @@ class TestSkillLearnLinks:
         )
         assert "splunk.com/en_us/training" in weekly
         assert "target='_blank'" in weekly
+
+
+class TestWeeklySalaryInsight:
+    """Median-pay insight on the weekly digest."""
+
+    @pytest.mark.asyncio
+    async def test_weekly_salary_insight_formats_inr(self, monkeypatch):
+        from interntrack.scheduler.jobs import _weekly_salary_insight
+
+        async def _fake_benchmark(session, domain, city):
+            assert domain == "security"
+            assert city == "Bangalore"
+            return {
+                "domain": "security",
+                "city": "Bangalore",
+                "count": 12,
+                "median": 800_000,
+                "currency": "INR",
+            }
+
+        monkeypatch.setattr(
+            "interntrack.api.v1.salary_insights.salary_benchmark_for",
+            _fake_benchmark,
+        )
+        line = await _weekly_salary_insight(
+            AsyncMock(), ["security"], "Bangalore, India"
+        )
+        assert line == (
+            "💰 Median security pay in Bangalore: ₹6.0L–₹10.0L (from 12 live postings)"
+        )
+
+    @pytest.mark.asyncio
+    async def test_weekly_salary_insight_none_without_data(self, monkeypatch):
+        from interntrack.scheduler.jobs import _weekly_salary_insight
+
+        async def _none(session, domain, city):
+            return None
+
+        monkeypatch.setattr(
+            "interntrack.api.v1.salary_insights.salary_benchmark_for", _none
+        )
+        assert (
+            await _weekly_salary_insight(AsyncMock(), ["security"], "Bangalore") is None
+        )
+
+    @pytest.mark.asyncio
+    async def test_weekly_builders_include_salary_line(self, monkeypatch):
+        from interntrack.scheduler.jobs import (
+            build_alert_chunks,
+            build_daily_report_html,
+            build_daily_report_message,
+        )
+
+        async def _fake_benchmark(session, domain, city):
+            return {
+                "domain": "security",
+                "city": "Bangalore",
+                "count": 12,
+                "median": 800_000,
+                "currency": "INR",
+            }
+
+        monkeypatch.setattr(
+            "interntrack.api.v1.salary_insights.salary_benchmark_for",
+            _fake_benchmark,
+        )
+        jobs = TestWeeklySkillGap()._soc_jobs()
+        for j in jobs:
+            j["domain"] = "security"
+        report = TestWeeklySkillGap()._report(jobs)
+        session = TestWeeklySkillGap.FakeSession()
+        msg = await build_daily_report_message(
+            report,
+            session,
+            weekly=True,
+            domains=["security"],
+            user_location="Bangalore",
+        )
+        assert "💰 Median security pay in Bangalore" in msg
+        html = await build_daily_report_html(
+            report,
+            session,
+            weekly=True,
+            domains=["security"],
+            user_location="Bangalore",
+        )
+        assert "Median security pay in Bangalore" in html
+        chunks = await build_alert_chunks(
+            report,
+            session,
+            weekly=True,
+            domains=["security"],
+            user_location="Bangalore",
+            user_id="u1",
+        )
+        texts = [text for text, _buttons in chunks]
+        assert any("Median security pay in Bangalore" in t for t in texts)
