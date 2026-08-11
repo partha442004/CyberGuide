@@ -908,7 +908,9 @@ async def _weekly_salary_insight(session, domains, user_location) -> str | None:
         city = ""
         if user_location:
             city = str(user_location).split(",")[0].strip()
-        for domain in domains or []:
+        # Security-first: a security-minded user whose prefs also list
+        # coding should see security pay, not the first domain with data.
+        for domain in sorted((domains or []), key=lambda d: d != "security"):
             mapped = _DIGEST_SALARY_DOMAINS.get(domain)
             if not mapped:
                 continue
@@ -920,7 +922,10 @@ async def _weekly_salary_insight(session, domains, user_location) -> str | None:
                 continue
             low = int(med * 0.75)
             high = int(med * 1.25)
-            if med >= 100000:  # INR scale: 8.0M -> 8.0L
+            # Scale/symbol from the row's authoritative currency field,
+            # with a magnitude fallback when it is missing.
+            currency = str(row.get("currency") or "").upper()
+            if currency == "INR" or med >= 100000:  # INR scale: 8.0M -> 8.0L
                 low_s, high_s = f"{low / 100000:.1f}L", f"{high / 100000:.1f}L"
                 symbol = "₹"
             else:  # USD scale
