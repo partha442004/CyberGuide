@@ -19,6 +19,12 @@ k8s/
 docs/
 tests/
 .vercel/
+# Desktop / mobile packaging builds (dist APKs/EXE + build + android gradle)
+packaging/
+build/
+dist/
+*.apk
+*.exe
 # Use requirements.txt instead of pyproject.toml (whose cybershield[all] extra
 # references the local interntrack package, unresolvable on Vercel's build).
 pyproject.toml
