@@ -4975,11 +4975,18 @@ def show_settings() -> None:
         "all": [],
         "fresher": ["entry", "junior"],
         "entry": ["entry"],
-    }[exp_choice]
-
-    # Channels to deliver alerts through.
-    chan_options = [c for c in ("email", "telegram", "sms") if c in configured]
-    default_chans = [c for c in chan_options if c in saved_chans] or chan_options
+    }[exp_choice]  # Channels to deliver alerts through.
+    chan_options = [
+        c for c in ("email", "telegram", "sms", "whatsapp") if c in configured
+    ]
+    if saved_chans:
+        default_chans = [c for c in chan_options if c in saved_chans]
+    else:
+        # Never auto-enroll a member in paid channels (SMS/WhatsApp) when
+        # nothing was saved yet — the default stays on free channels only.
+        default_chans = [
+            c for c in ("email", "telegram") if c in chan_options
+        ] or chan_options
     selected_chans = st.multiselect(
         "📤 Send alerts via",
         chan_options or ["email", "telegram"],

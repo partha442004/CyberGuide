@@ -994,12 +994,18 @@ class TestNotificationsAPIUnit:
             mock_settings.return_value.is_email_configured = False
             mock_settings.return_value.is_discord_configured = True
             mock_settings.return_value.is_slack_configured = False
+            mock_settings.return_value.twilio_account_sid = None
+            mock_settings.return_value.twilio_auth_token = None
+            mock_settings.return_value.twilio_phone_number = None
+            mock_settings.return_value.is_whatsapp_configured = False
 
             result = await get_channels()
 
         assert "telegram" in result.channels
         assert "discord" in result.channels
         assert "email" not in result.channels
+        assert "sms" not in result.channels
+        assert "whatsapp" not in result.channels
 
     @pytest.mark.asyncio
     async def test_get_channels_none_configured(self):
@@ -1010,10 +1016,38 @@ class TestNotificationsAPIUnit:
             mock_settings.return_value.is_email_configured = False
             mock_settings.return_value.is_discord_configured = False
             mock_settings.return_value.is_slack_configured = False
+            mock_settings.return_value.twilio_account_sid = None
+            mock_settings.return_value.twilio_auth_token = None
+            mock_settings.return_value.twilio_phone_number = None
+            mock_settings.return_value.is_whatsapp_configured = False
 
             result = await get_channels()
 
         assert result.channels == []
+
+    @pytest.mark.asyncio
+    async def test_get_channels_includes_sms_and_whatsapp(self):
+        """Twilio SMS + WhatsApp surface as selectable alert channels."""
+        from interntrack.api.v1.notifications import _ALERT_CHANNELS, get_channels
+
+        assert "sms" in _ALERT_CHANNELS
+        assert "whatsapp" in _ALERT_CHANNELS
+
+        with patch("interntrack.config.get_settings") as mock_settings:
+            mock_settings.return_value.is_telegram_configured = False
+            mock_settings.return_value.is_email_configured = False
+            mock_settings.return_value.is_discord_configured = False
+            mock_settings.return_value.is_slack_configured = False
+            mock_settings.return_value.twilio_account_sid = "sid"
+            mock_settings.return_value.twilio_auth_token = "tok"  # noqa: S105
+            mock_settings.return_value.twilio_phone_number = "+15005550006"
+            mock_settings.return_value.twilio_whatsapp_number = "whatsapp:+14155238886"
+            mock_settings.return_value.is_whatsapp_configured = True
+
+            result = await get_channels()
+
+        assert "sms" in result.channels
+        assert "whatsapp" in result.channels
 
     @pytest.mark.asyncio
     async def test_test_notification(self):

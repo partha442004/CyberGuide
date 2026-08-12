@@ -45,7 +45,7 @@ _ALERT_DOMAINS = (
     "other",
 )
 # Channels the alert can be delivered through.
-_ALERT_CHANNELS = ("email", "telegram", "discord", "slack")
+_ALERT_CHANNELS = ("email", "telegram", "sms", "whatsapp", "discord", "slack")
 
 
 def _normalize_domains(domains: list[str] | None) -> list[str]:
@@ -70,6 +70,14 @@ async def get_channels():
         channels.append("discord")
     if settings.is_slack_configured:
         channels.append("slack")
+    if (
+        settings.twilio_phone_number
+        and settings.twilio_account_sid
+        and settings.twilio_auth_token
+    ):
+        channels.append("sms")
+    if settings.is_whatsapp_configured:
+        channels.append("whatsapp")
 
     return NotificationChannelsResponse(channels=channels)
 

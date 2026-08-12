@@ -50,6 +50,14 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **SMS & WhatsApp alerts are now selectable.** The channel preferences
+  (`_ALERT_CHANNELS`) and `GET /notifications/channels` previously omitted
+  `sms` and `whatsapp` — the `SmsChannel` / `WhatsAppChannel` classes and
+  per-user phone routing existed, but users could never opt in. Both are
+  now surfaced in the Settings channel picker (WhatsApp label added).
+  Members with no saved channels still default to the free email/Telegram
+  channels only, so nobody is auto-enrolled in paid SMS/WhatsApp delivery.
+
 - **Wider discovery vocabulary.** `DOMAIN_QUERIES` gains ~37 more niche
   roles (IoT, mechatronics, power electronics, CAD, antenna, VLSI design;
   TypeScript/.NET/C++/Go/React; Power BI, Tableau, ML, analytics; Next.js,
