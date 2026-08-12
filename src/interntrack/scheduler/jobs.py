@@ -282,6 +282,237 @@ async def _team_digest_stats(
         return None
 
 
+async def team_recap_stats(session, days: int = 7) -> dict:
+    """Per-member alert delivery for the last N days, for the owner recap.
+
+    One entry per registered account with how many digests were sent, how
+    many jobs were delivered, how many emails landed, and the top domains /
+    companies covered (from the compact ``jobs`` list each digest stores).
+    Pure read — never raises: an empty ``users`` list on failure keeps both
+    the owner email job and the dashboard endpoint safe. This is the single
+    source of truth shared by the weekly owner recap email and the Team
+    page recap panel.
+    """
+    try:
+        from collections import Counter
+
+        from sqlalchemy import select
+
+        from interntrack.domain.models import NotificationHistory, User
+        from interntrack.utils.helpers import to_naive_utc
+
+        window = max(1, int(days or 7))
+        since = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=window)
+        since_str = since.strftime("%Y-%m-%d %H:%M:%S")
+
+        users_result = await session.execute(select(User))
+        users = list(users_result.scalars().all())
+        hist_result = await session.execute(select(NotificationHistory))
+        rows = list(hist_result.scalars().all())
+
+        by_user: dict[str, list] = {}
+        for row in rows:
+            created = getattr(row, "created_at", None)
+            if created is None:
+                continue
+            created_naive = to_naive_utc(created)
+            if (
+                created_naive is None
+                or created_naive.strftime("%Y-%m-%d %H:%M:%S") < since_str
+            ):
+                continue
+            uid = str(getattr(row, "user_id", "") or "")
+            by_user.setdefault(uid, []).append(row)
+
+        out: list[dict] = []
+        for u in users:
+            uid = str(getattr(u, "id", "") or "")
+            rows_for = by_user.get(uid, [])
+            sends = len(rows_for)
+            jobs = sum(int(getattr(r, "job_count", 0) or 0) for r in rows_for)
+            emails_ok = sum(
+                1
+                for r in rows_for
+                if bool((getattr(r, "results", None) or {}).get("email"))
+            )
+            domain_counter: Counter = Counter()
+            company_counter: Counter = Counter()
+            for r in rows_for:
+                for d in getattr(r, "domains", None) or []:
+                    if d:
+                        domain_counter[str(d)] += 1
+                for j in getattr(r, "jobs", None) or []:
+                    company = str((j or {}).get("company") or "").strip()
+                    if company and company.lower() != "unknown":
+                        company_counter[company] += 1
+            out.append(
+                {
+                    "user_id": uid,
+                    "name": str(getattr(u, "name", "") or ""),
+                    "email": str(getattr(u, "email", "") or ""),
+                    "location": str(getattr(u, "location", "") or ""),
+                    "domains": [str(d) for d in (getattr(u, "domains", None) or [])],
+                    "sends": sends,
+                    "jobs": jobs,
+                    "emails_ok": emails_ok,
+                    "top_domains": [d for d, _ in domain_counter.most_common(3)],
+                    "top_companies": [c for c, _ in company_counter.most_common(5)],
+                }
+            )
+        out.sort(key=lambda r: (-r["jobs"], r["name"].lower()))
+        return {
+            "days": window,
+            "total_sends": sum(r["sends"] for r in out),
+            "total_jobs": sum(r["jobs"] for r in out),
+            "users": out,
+        }
+    except Exception:  # noqa: BLE001 - a recap must never break the worker
+        return {"days": int(days or 7), "total_sends": 0, "total_jobs": 0, "users": []}
+
+
+def _build_team_recap_html(stats: dict, owner_name) -> str:
+    """HTML body for the owner's weekly team-alerts recap email.
+
+    Renders a per-member table (digests / jobs / emails delivered / top
+    roles & companies). Every interpolated value is escaped — member names
+    and companies come from untrusted account/job data.
+    """
+    from html import escape
+
+    users = stats.get("users") or []
+    total_jobs = int(stats.get("total_jobs") or 0)
+    total_sends = int(stats.get("total_sends") or 0)
+    rows: list[str] = []
+    for u in users:
+        domains = ", ".join(u.get("top_domains") or u.get("domains") or []) or "all"
+        companies = ", ".join(u.get("top_companies") or []) or "—"
+        rows.append(
+            "<tr>"
+            "<td style='padding:8px 10px;border-bottom:1px solid #e2e8f0;'>"
+            f"<b>{escape(str(u.get('name') or ''))}</b><br/>"
+            f"<span style='color:#64748b;font-size:12px;'>"
+            f"{escape(str(u.get('email') or ''))} · "
+            f"{escape(str(u.get('location') or '—'))}</span></td>"
+            f"<td style='padding:8px 10px;border-bottom:1px solid #e2e8f0;"
+            f"text-align:center;'>{u.get('sends', 0)}</td>"
+            f"<td style='padding:8px 10px;border-bottom:1px solid #e2e8f0;"
+            f"text-align:center;'>{u.get('jobs', 0)}</td>"
+            f"<td style='padding:8px 10px;border-bottom:1px solid #e2e8f0;"
+            f"text-align:center;'>{u.get('emails_ok', 0)}</td>"
+            "<td style='padding:8px 10px;border-bottom:1px solid #e2e8f0;'>"
+            f"{escape(domains)}<br/>"
+            f"<span style='color:#64748b;font-size:12px;'>🏢 "
+            f"{escape(companies)}</span></td>"
+            "</tr>"
+        )
+    return (
+        "<div style='font-family:Inter,Arial,sans-serif;max-width:640px;"
+        "margin:0 auto;'>"
+        "<h2 style='margin-bottom:4px;'>📬 Team alerts recap</h2>"
+        f"<p style='color:#64748b;margin-top:0;'>Hey "
+        f"{escape(str(owner_name or 'there'))} — here's what your team's "
+        "personalized job alerts delivered over the last 7 days.</p>"
+        "<table style='width:100%;border-collapse:collapse;'>"
+        "<tr style='background:#f1f5f9;'>"
+        "<th style='padding:8px 10px;text-align:left;'>Member</th>"
+        "<th style='padding:8px 10px;'>Digests</th>"
+        "<th style='padding:8px 10px;'>Jobs</th>"
+        "<th style='padding:8px 10px;'>Emails ✓</th>"
+        "<th style='padding:8px 10px;text-align:left;'>Top roles & companies</th>"
+        "</tr>" + "".join(rows) + "</table>"
+        f"<p style='color:#64748b;font-size:13px;'><b>{total_jobs}</b> jobs across "
+        f"<b>{total_sends}</b> digest sends for <b>{len(users)}</b> member(s). "
+        "Each person still receives only their own role + city — nothing mixed.</p>"
+        "</div>"
+    )
+
+
+async def send_team_recap() -> dict:
+    """Weekly owner email: what each team member's alerts delivered.
+
+    Runs after the Monday weekly digests (and via the ``POST
+    /notifications/team/recap/send`` endpoint on the serverless deployment,
+    which the GitHub Actions weekly cron hits). The owner is the account
+    named by ``TEAM_OWNER_EMAIL`` when set, otherwise the first-registered
+    account. Aggregates the last 7 days of per-member delivery history
+    (``team_recap_stats``) and emails one summary to the owner.
+
+    Returns a small status dict ``{"sent": bool, "reason": str | None}`` so
+    the HTTP endpoint can surface why a run was skipped. Skips quietly (no
+    email) when fewer than two accounts exist, email is not configured, or
+    there is no history in the window — never raises.
+    """
+    async with get_db_session() as session:
+        try:
+            from sqlalchemy import select
+
+            from interntrack.config import get_settings
+            from interntrack.domain.models import User
+            from interntrack.services.notification_service import EmailChannel
+
+            result = await session.execute(select(User).order_by(User.created_at.asc()))
+            users = list(result.scalars().all())
+            if len(users) < 2:
+                reason = "need at least 2 accounts"
+                print(f"[{datetime.now(UTC)}] Team recap skipped — {reason}")
+                return {"sent": False, "reason": reason}
+
+            settings = get_settings()
+            # Explicit owner override wins; otherwise the first-registered
+            # account is the team owner. An override that matches no account
+            # falls back to first-registered so the recap is never lost.
+            override = str(settings.team_owner_email or "").strip().lower()
+            owner = users[0]
+            if override:
+                matched = [
+                    u
+                    for u in users
+                    if str(getattr(u, "email", "") or "").strip().lower() == override
+                ]
+                if matched:
+                    owner = matched[0]
+            owner_email = str(getattr(owner, "email", "") or "").strip()
+            if not owner_email:
+                reason = "owner has no email"
+                print(f"[{datetime.now(UTC)}] Team recap skipped — {reason}")
+                return {"sent": False, "reason": reason}
+            if not settings.is_email_configured:
+                reason = "email not configured"
+                print(f"[{datetime.now(UTC)}] Team recap skipped — {reason}")
+                return {"sent": False, "reason": reason}
+            stats = await team_recap_stats(session, days=7)
+            if not stats.get("users"):
+                reason = "no alert history in window"
+                print(f"[{datetime.now(UTC)}] Team recap skipped — {reason}")
+                return {"sent": False, "reason": reason}
+            subject = (
+                f"📬 Team alerts recap — {len(stats['users'])} members, "
+                f"{stats['total_jobs']} jobs this week"
+            )
+            channel = EmailChannel(
+                host=settings.smtp_host,
+                port=settings.smtp_port,
+                user=settings.smtp_user or "",
+                password=settings.smtp_password or "",
+                from_email=settings.email_from,
+                to_email=owner_email,
+            )
+            await channel.send(
+                _build_team_recap_html(stats, getattr(owner, "name", None)),
+                subject=subject,
+            )
+            print(f"[{datetime.now(UTC)}] Team recap sent to {owner_email}")
+            return {
+                "sent": True,
+                "to": owner_email,
+                "members": len(stats.get("users") or []),
+                "jobs": int(stats.get("total_jobs") or 0),
+            }
+        except Exception as e:  # noqa: BLE001 - recap must never crash the worker
+            print(f"[{datetime.now(UTC)}] Team recap failed: {e}")
+            return {"sent": False, "reason": str(e)}
+
+
 async def _deliver_alert(
     manager,
     channels: list | None,

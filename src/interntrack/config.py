@@ -84,6 +84,9 @@ class Settings(BaseSettings):
     smtp_user: str | None = None
     smtp_password: str | None = None
     email_from: str = "InternTrack <noreply@interntrack.local>"
+    # Email of the team owner who receives the weekly team-alerts recap
+    # (falls back to the first-registered account when unset).
+    team_owner_email: str | None = None
 
     # Scraper Settings
     scrape_interval_minutes: int = 30

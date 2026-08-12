@@ -6,6 +6,19 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **📬 Weekly team-alerts recap.** Every Monday the team owner
+  (first-registered account, or the new TEAM_OWNER_EMAIL env override)
+  gets ONE email summarizing what each member's digests delivered over
+  the past 7 days: digests sent, jobs delivered, emails delivered, and
+  top roles/companies per person — so a growing team's alerts stay
+  visible from a single inbox. Runs from the APScheduler (Mon 09:30
+  UTC) and, on the serverless Vercel deployment, from a Monday
+  GitHub Actions cron via the new POST /notifications/team/recap/send
+  endpoint (mirroring the closing-soon pattern). The Team page gains
+  a live recap panel backed by GET /notifications/team/recap. Skips
+  quietly when fewer than two accounts exist or no history is in the
+  window. 15 new tests; ruff + mypy clean.
+
 - **🔧 New 'hardware' domain + All-India location filter.** The alert
   classifier, discovery queries, dashboard categories and registration
   now support a dedicated **hardware / embedded / PCB / RF** bucket

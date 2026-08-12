@@ -14,6 +14,7 @@ from interntrack.scheduler.jobs import (
     run_job_discovery,
     send_closing_soon_alerts,
     send_interview_reminders,
+    send_team_recap,
     verify_job_links,
 )
 
@@ -108,6 +109,17 @@ def setup_scheduler():
         IntervalTrigger(hours=6),
         id="interview_reminders",
         name="Interview Reminders",
+        replace_existing=True,
+    )
+
+    # Team alerts recap every Monday 09:30 UTC — one email to the team
+    # owner (first-registered account) summarizing what every member's
+    # daily/weekly digests delivered over the past 7 days.
+    scheduler.add_job(
+        send_team_recap,
+        CronTrigger(day_of_week="mon", hour=9, minute=30),
+        id="team_recap",
+        name="Team Alerts Recap",
         replace_existing=True,
     )
 

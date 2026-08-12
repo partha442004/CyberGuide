@@ -404,6 +404,41 @@ async def get_notification_stats(
     }
 
 
+@router.get("/team/recap")
+async def get_team_recap(
+    days: int = 7,
+    db: AsyncSession = Depends(get_db),
+):
+    """Per-member alert-delivery summary for the owner's team view.
+
+    One row per registered account: digests sent, jobs delivered, emails
+    delivered, and the top roles/companies covered over the last N days.
+    Powers the Team page recap panel and mirrors what the weekly owner
+    recap email contains. Pure read — never raises.
+    """
+    from interntrack.scheduler.jobs import team_recap_stats
+
+    return await team_recap_stats(db, days=max(1, min(int(days), 30)))
+
+
+@router.post("/team/recap/send")
+async def send_team_recap_now():
+    """Send the weekly team-alerts recap email to the owner right now.
+
+    Vercel is serverless, so the APScheduler worker never executes there;
+    the GitHub Actions weekly cron hits this endpoint every Monday (after
+    the weekly digests) so the live deployment sends the owner recap too.
+    Never raises: returns the job's status dict in every case.
+    """
+    from interntrack.scheduler.jobs import send_team_recap
+
+    try:
+        result = await send_team_recap()
+    except Exception as e:  # pragma: no cover - defensive
+        return {"sent": False, "reason": str(e)}
+    return result
+
+
 @router.post("/closing-soon")
 async def run_closing_soon_sweep():
     """Run the closing-soon sweep now and return per-user job counts.

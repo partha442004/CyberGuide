@@ -1437,6 +1437,41 @@ def _team_count() -> int:
     return len(_team_members())
 
 
+def _team_recap_block() -> None:
+    """'Team alerts recap' panel: per-member deliveries over 7 days.
+
+    Reads the API's ``/notifications/team/recap`` aggregation (the same
+    data the weekly owner email uses) and renders one compact row per
+    member. Fails silently into nothing when the API is unreachable or no
+    alert history exists yet.
+    """
+    data = fetch_data("/notifications/team/recap?days=7") or {}
+    users = data.get("users") or []
+    if not users:
+        return
+    st.markdown("**📬 Team alerts recap (7 days)**")
+    st.caption(
+        "Digests sent, jobs delivered and emails delivered per member — "
+        "the same numbers your weekly recap email summarizes."
+    )
+    for u in users:
+        domain_txt = ", ".join(u.get("top_domains") or u.get("domains") or []) or "all"
+        st.markdown(
+            f"**{escape(str(u.get('name') or ''))}** "
+            f"<span style='opacity:0.6'>{escape(str(u.get('email') or ''))}</span> "
+            f"<span style='opacity:0.6'>· 📍 {escape(str(u.get('location') or '—'))}</span>",
+            unsafe_allow_html=True,
+        )
+        recap = (
+            f"📨 {u.get('sends', 0)} digests · 💼 {u.get('jobs', 0)} jobs · "
+            f"📧 {u.get('emails_ok', 0)} emails ✓ · 🏷 {escape(domain_txt)}"
+        )
+        if u.get("top_companies"):
+            recap += f" · 🏢 {escape(', '.join(u.get('top_companies')))}"
+        st.caption(recap)
+    st.divider()
+
+
 def show_account() -> None:
     """Register / login page (email-based accounts, no passwords)."""
     st.header("👤 My Account")
@@ -1997,6 +2032,9 @@ def show_team() -> None:
                 except Exception:
                     detail = resp.text
                 st.error(f"Could not create the account: {detail}")
+
+    # ── Team alerts recap — what everyone's digests delivered ─────────
+    _team_recap_block()
 
     # ── Team directory with alert toggles ────────────────────────────
     st.divider()
