@@ -2178,6 +2178,38 @@ def show_team() -> None:
                     st.error("Could not remove the member.")
         st.divider()
 
+    # ── Delivery status: who actually got their digest ───────────────
+    st.subheader("📬 Delivery status")
+    overview = fetch_data("/notifications/delivery-overview") or {}
+    delivery_members = overview.get("members") or []
+    if not delivery_members:
+        st.caption("No enabled accounts yet.")
+    else:
+        st.caption(
+            "Last digest send per member — if a row says *never sent*, their "
+            "first digest goes out at the next slot (8:00 / 13:00 / 19:00 IST)."
+        )
+        for m in delivery_members:
+            if m.get("last_email_ok"):
+                badge = "🟢 email delivered"
+            elif m.get("last_alert_at"):
+                badge = "🔴 last send had no email"
+            else:
+                badge = "⚪ never sent"
+            paused = " ⏸ paused" if m.get("paused") else ""
+            st.markdown(
+                f"**{escape(m.get('name') or '—')}** "
+                f"<span style='opacity:0.6'>{escape(m.get('email') or '')}</span>",
+                unsafe_allow_html=True,
+            )
+            st.caption(
+                f"{badge}{paused} · 🕒 last: {m.get('last_alert_at') or '—'} · "
+                f"💼 {m.get('last_job_count') or 0} job(s) · "
+                f"📍 {escape(m.get('location') or '—')} · "
+                f"🏷 {escape(', '.join(m.get('domains') or []) or 'All')}"
+            )
+            st.divider()
+
 
 # ---------------------------------------------------------------------------
 # Page: My Matches (personal stats)

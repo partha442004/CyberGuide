@@ -6,7 +6,15 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Fixed
 
-- **Only genuinely fresh jobs ever reach digests.** `get_recent_jobs`
+- **Multi-city profiles search every city.** `discovery_queries_for` used to
+  mash a profile's cities into one unsearchable query (`"hardware engineer
+  Chennai, Bangalore, Coimbatore"`), so multi-city users' discovery found
+  almost nothing. Cities are now split and cycled round-robin over the
+  searches (each within the limit), and `run-for-users` passes the single
+  city extracted from each query to the India scrapers instead of the
+  comma-list. Single-city behavior is unchanged.
+
+- **Only genuinely fresh jobs ever reach digests.** `get_recent_jobs` `get_recent_jobs`
   previously ignored its `days` window and returned *all* active jobs — so a
   first-ever digest (no `last_alert_at` yet) could include weeks-old
   listings. It now enforces the window with a tz-safe string comparison
@@ -33,6 +41,17 @@ All notable changes to the InternTrack project will be documented in this file.
   partial) result.
 
 ### Added
+
+- **Owner delivery dashboard: “did my friend get their mail?”** New
+  `GET /notifications/delivery-overview` returns every member's last digest
+  send (time, jobs included, email/Telegram result, channels, role + city
+  scoping, paused state), and the Team & Users page shows a 📬 Delivery
+  status panel for it.
+
+- **Tier-2 Indian cities recognized.** `_INDIA_LOCATIONS` gains ~28 cities
+  (Coimbatore, Kochi, Jaipur, Visakhapatnam, Madurai, Trichy, ...) so
+  multi-city discovery and per-query geo-targeting work for non-metro
+  profiles.
 
 - **Two more live job sources in discovery.** Symantec and Trend Micro
   direct career boards verified working and joined `_DISCOVERY_SOURCES`
