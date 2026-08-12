@@ -449,7 +449,7 @@ class ReportService:
                 "salary_currency": getattr(job, "salary_currency", None),
                 "experience_level": getattr(job, "experience_level", None),
             }
-            for job in recent_jobs[:50]
+            for job in recent_jobs
         ]
         if domains:
             jobs = [job for job in jobs if job["domain"] in domains]
@@ -467,6 +467,10 @@ class ReportService:
                     include_remote=include_remote,
                 )
             ]
+        # Cap AFTER the per-user domain/location filters so a niche-domain
+        # user (frontend + Chennai) still gets their freshest matches even
+        # when other domains dominate the most-recent postings.
+        jobs = jobs[:50]
 
         return {
             "report_type": "daily",

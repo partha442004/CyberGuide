@@ -51,6 +51,11 @@ _DISCOVERY_SOURCES: list[str] = [
     "rss_feed",
     "hackernews",
     "company",
+    # Direct vendor career boards that verified working. CrowdStrike, Palo
+    # Alto, Fortinet, Check Point and McAfee block automated clients (0
+    # results / Workday 422s), so only the live sources below are wired in.
+    "symantec",
+    "trendmicro",
     "search_engine",
 ]
 

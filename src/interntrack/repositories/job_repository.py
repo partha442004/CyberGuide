@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from interntrack.domain.enums import JobSource, JobType
 from interntrack.domain.models import Job
 from interntrack.repositories.base import BaseRepository
-from interntrack.utils.helpers import utcnow
+from interntrack.utils.helpers import to_naive_utc, utcnow
 
 _DEDUP_NON_ALNUM = re.compile(r"[^a-z0-9]+")
 
@@ -24,6 +24,14 @@ def _normalize_dedup_text(value: str) -> str:
     become "penetrationtestertexas".
     """
     return _DEDUP_NON_ALNUM.sub("", (value or "").lower())
+
+
+def _created_at_str(job: Job) -> str:
+    """Format a job's created_at as a naive UTC string (tz-safe)."""
+    dt = to_naive_utc(getattr(job, "created_at", None))
+    if dt is None:
+        return ""
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
 class JobRepository(BaseRepository[Job]):
@@ -320,19 +328,23 @@ class JobRepository(BaseRepository[Job]):
         return list(result.scalars().all())
 
     async def get_recent_jobs(self, days: int = 7) -> list[Job]:
-        """Get active jobs (posted in the last N days).
+        """Get active jobs created within the last ``days`` days.
 
-        Uses ``is_active`` rather than a ``created_at`` cutoff to avoid
-        tz-aware / tz-naive comparison failures on Neon + asyncpg.
+        The window is enforced with a tz-safe string comparison against
+        ``created_at`` (avoiding tz-aware / tz-naive comparison failures on
+        Neon + asyncpg) so digests only ever see genuinely fresh listings —
+        a 7-day window never returns weeks-old jobs, even on a first-ever
+        alert when no ``since`` marker exists yet.
         Returns empty list for non-positive ``days``.
         """
         if days <= 0:
             return []
+        cutoff = (utcnow() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
         query = (
-            select(Job).where(Job.is_active).order_by(Job.created_at.desc()).limit(200)
+            select(Job).where(Job.is_active).order_by(Job.created_at.desc()).limit(500)
         )
         result = await self.session.execute(query)
-        return list(result.scalars().all())
+        return [job for job in result.scalars().all() if _created_at_str(job) >= cutoff]
 
     async def get_closing_soon(self, days: int = 2) -> list[Job]:
         """Get jobs closing within N days."""
