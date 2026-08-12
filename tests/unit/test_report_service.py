@@ -326,6 +326,25 @@ class TestGenerateDailyReport:
             "Chennai, India",
         ]
 
+    @pytest.mark.asyncio
+    async def test_domain_filter_applies_before_cap(self):
+        """A niche-domain user still gets matches beyond the global top-50."""
+        service = ReportService(MagicMock())
+        service.job_repo = AsyncMock()
+        service.job_repo.get_recent_jobs.return_value = [
+            _MockJob(title="Security Engineer", job_id=f"sec{i}") for i in range(50)
+        ] + [_MockJob(title="Frontend Engineer", job_id=f"fe{i}") for i in range(5)]
+        service.app_repo = AsyncMock()
+        service.app_repo.get_recent_applications.return_value = []
+        service.app_repo.get_status_counts.return_value = {}
+        service.app_repo.get_applied_job_ids.return_value = set()
+        service.job_repo.get_closing_soon.return_value = []
+
+        report = await service.generate_daily_report(domains=["frontend"])
+
+        assert [j["title"] for j in report["new_jobs"]] == ["Frontend Engineer"] * 5
+        assert report["summary"]["new_jobs"] == 5
+
 
 class TestClassifyDomain:
     """Tests for the domain classifier used in alert sections."""

@@ -363,6 +363,22 @@ class TestJobRepository:
         assert await repo.get_recent_jobs(days=-1) == []
 
     @pytest.mark.asyncio
+    async def test_get_recent_jobs_enforces_days_window(self, db_session):
+        """Old listings fall outside the window; fresh ones stay."""
+        repo = JobRepository(db_session)
+        now = datetime.now(UTC).replace(tzinfo=None)
+        await repo.create_many(
+            [
+                make_job(title="Fresh Job", created_at=now),
+                make_job(title="Stale Job", created_at=now - timedelta(days=10)),
+            ]
+        )
+        recent = await repo.get_recent_jobs(days=1)
+        assert [j.title for j in recent] == ["Fresh Job"]
+        wide = await repo.get_recent_jobs(days=30)
+        assert {j.title for j in wide} == {"Fresh Job", "Stale Job"}
+
+    @pytest.mark.asyncio
     async def test_get_closing_soon(self, db_session):
         repo = JobRepository(db_session)
         soon = datetime.now(UTC) + timedelta(days=1)

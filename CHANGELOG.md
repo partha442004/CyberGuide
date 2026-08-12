@@ -4,7 +4,29 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Only genuinely fresh jobs ever reach digests.** `get_recent_jobs`
+  previously ignored its `days` window and returned *all* active jobs — so a
+  first-ever digest (no `last_alert_at` yet) could include weeks-old
+  listings. It now enforces the window with a tz-safe string comparison
+  (limit raised 200→500, `days<=0 → []` preserved). This also makes the
+  dashboard's 7-day list and the recommender's 30-day pool respect their
+  windows.
+
+- **Per-user digests filter by domain/location BEFORE the 50-job cap.** The
+  daily report sliced the newest 50 jobs globally and only then applied the
+  user's domain + city filters — a niche user (e.g. frontend + Chennai)
+  could get an empty or stale digest while their fresh matches sat beyond
+  position 50 behind other domains. Filtering now happens first, then the
+  cap.
+
 ### Added
+
+- **Two more live job sources in discovery.** Symantec and Trend Micro
+  direct career boards verified working and joined `_DISCOVERY_SOURCES`
+  (CrowdStrike / Palo Alto / Fortinet / Check Point / McAfee block
+  automated clients with 0 results / Workday 422s, so they stay out).
 
 - **📧 Email deliverability overhaul (fixes Spam-folder alerts).** Emails
   now carry the full hygiene header set — Date, Message-ID,
