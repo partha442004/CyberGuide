@@ -15,7 +15,6 @@ on:
     - cron: '30 7 * * *'   # 13:00 IST — afternoon slot: software engineering
     - cron: '30 13 * * *'  # 19:00 IST — evening slot: python developer
     - cron: '30 3 * * 0'   # Sunday 09:00 IST — weekly digest recap
-    - cron: '30 4 * * 1'   # Monday 10:00 IST — team alerts recap email
   workflow_dispatch:      # allow manual "Run workflow" from the Actions tab
 
 jobs:
@@ -59,18 +58,6 @@ jobs:
             "$API_BASE/api/v1/notifications/closing-soon" \
             && echo "closing-soon sweep ran OK" \
             || echo "closing-soon sweep failed or timed out"
-
-      # The APScheduler worker never runs on Vercel, so this Monday cron
-      # fires the weekly team-alerts recap email through the public API,
-      # mirroring the scheduler's 09:30 UTC trigger. One email to the team
-      # owner summarizing what every member's digests delivered.
-      - name: Team alerts recap (owner weekly email)
-        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 4 * * 1'
-        run: |
-          curl -sSf --max-time 150 -X POST 
-            "$API_BASE/api/v1/notifications/team/recap/send" 
-            && echo "team recap ran OK" 
-            || echo "team recap failed or timed out"
 
       - name: Generate daily report (morning slot — security)
         if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *'

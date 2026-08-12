@@ -440,6 +440,49 @@ chmod +x setup.sh
 
 ---
 
+## 📨 Email Deliverability (why alerts land in Spam)
+
+Emails are sent through the provider configured in `.env`. A common
+cause of alerts landing in the **Spam** folder is the From address:
+the historical default `EMAIL_FROM="InternTrack <noreply@interntrack.local>"`
+uses a non-routable `.local` domain, which can never pass SPF/DKIM
+authentication. Since v1.22 the code never sends From such an address —
+it automatically falls back to the authenticated SMTP account — and adds
+deliverability headers (`Date`, `Message-ID`, `List-Unsubscribe`, and a
+plain-text alternative) to every message.
+
+### Recommended: Resend (best deliverability)
+```env
+RESEND_API_KEY=re_xxxxxxxx
+# Optional: a verified sending domain; falls back to EMAIL_FROM
+# RESEND_FROM=Alerts <alerts@yourdomain.com>
+```
+Resend authenticates mail automatically (SPF/DKIM/DMARC), works from
+serverless, and is used automatically whenever `RESEND_API_KEY` is set.
+
+### SMTP (Gmail or any relay)
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=you@gmail.com
+SMTP_PASSWORD=app-password
+# Optional: a real, routable domain you own (best results).
+# EMAIL_FROM=Alerts <alerts@yourdomain.com>
+```
+For Gmail use an [app password](https://myaccount.google.com/apppasswords)
+and set `EMAIL_FROM` to your own Gmail address (or any domain with valid
+SPF/DKIM records). If alerts still land in Spam:
+
+1. Open one InternTrack email in Gmail and choose **Report not spam**.
+2. Add the From address to your contacts.
+3. For a custom domain, publish SPF (`v=spf1 include:... ~all`), DKIM and
+   DMARC records for it.
+
+The dashboard **Settings → Email deliverability** panel shows the live
+provider, the effective From address and these tips.
+
+---
+
 ## 🆘 Getting Help
 
 - **Documentation**: Check `docs/` folder

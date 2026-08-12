@@ -240,6 +240,7 @@ class TestSendTeamRecap:
             smtp_password = "pw"
             email_from = "InternTrack <noreply@test>"
             team_owner_email = owner_email
+            team_recap_enabled = True
 
             @property
             def is_email_configured(self):
@@ -282,6 +283,50 @@ class TestSendTeamRecap:
         }
 
     @pytest.mark.asyncio
+    async def test_skips_when_disabled_by_default(self, monkeypatch):
+        """TEAM_RECAP_ENABLED is off by default — no recap email may fire."""
+        from interntrack.scheduler import jobs as jobs_mod
+
+        sent = []
+
+        class _FakeEmailChannel:
+            def __init__(self, **kwargs):
+                sent.append(kwargs.get("to_email"))
+
+            async def send(self, message, subject=None):  # noqa: ARG002
+                sent.append(subject)
+
+        class _OffSettings:
+            smtp_user = "me@test"
+            smtp_password = "pw"
+            team_recap_enabled = False
+
+        monkeypatch.setattr(
+            jobs_mod,
+            "get_db_session",
+            lambda: self._ctx(
+                [
+                    _user("u1", "Boss", email="boss@x.com"),
+                    _user("u2", "Jeeva", email="jeeva@x.com"),
+                ]
+            ),
+        )
+        monkeypatch.setattr(
+            "interntrack.services.notification_service.EmailChannel",
+            _FakeEmailChannel,
+        )
+        monkeypatch.setattr(
+            "interntrack.config.get_settings",
+            lambda: _OffSettings(),
+        )
+
+        result = await jobs_mod.send_team_recap()
+
+        assert sent == []
+        assert result["sent"] is False
+        assert "disabled" in result["reason"]
+
+    @pytest.mark.asyncio
     async def test_skips_when_fewer_than_two_accounts(self, monkeypatch):
         from interntrack.scheduler import jobs as jobs_mod
 
@@ -302,6 +347,10 @@ class TestSendTeamRecap:
         monkeypatch.setattr(
             "interntrack.services.notification_service.EmailChannel",
             _FakeEmailChannel,
+        )
+        monkeypatch.setattr(
+            "interntrack.config.get_settings",
+            lambda: self._settings(),
         )
 
         result = await jobs_mod.send_team_recap()
@@ -521,6 +570,66 @@ class TestSendTeamRecap:
         result = await jobs_mod.send_team_recap()
         assert result["sent"] is False
         assert "smtp down" in result["reason"]
+
+
+class TestOwnerEndpoint:
+    """GET /notifications/owner resolves the admin account."""
+
+    @pytest.mark.asyncio
+    async def test_owner_override_wins(self, monkeypatch):
+        from interntrack.api.v1.notifications import get_owner
+
+        class _Cfg:
+            team_owner_email = "boss@x.com"
+
+        monkeypatch.setattr(
+            "interntrack.api.v1.notifications.get_settings",
+            lambda: _Cfg(),
+        )
+
+        result = await get_owner()
+
+        assert result["email"] == "boss@x.com"
+        assert result["is_owner"] is True
+
+    @pytest.mark.asyncio
+    async def test_owner_falls_back_to_first_registered(self, monkeypatch):
+        from interntrack.api.v1.notifications import get_owner
+
+        class _Cfg:
+            team_owner_email = None
+
+        monkeypatch.setattr(
+            "interntrack.api.v1.notifications.get_settings",
+            lambda: _Cfg(),
+        )
+
+        # First-registered account wins (oldest created_at).
+        users = [
+            _user("u1", "Boss", email="boss@x.com"),
+            _user("u2", "Jeeva", email="jeeva@x.com"),
+        ]
+
+        class _FakeDb:
+            async def execute(self, stmt):  # noqa: ARG002
+                return _FakeResult(users)
+
+        class _Gen:
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                return _FakeDb()
+
+        monkeypatch.setattr(
+            "interntrack.api.v1.notifications.get_db",
+            lambda: _Gen(),
+        )
+
+        result = await get_owner()
+
+        assert result["email"] == "boss@x.com"
+        assert result["is_owner"] is True
 
 
 class TestTeamRecapEndpoint:

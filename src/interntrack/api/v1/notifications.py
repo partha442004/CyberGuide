@@ -13,6 +13,7 @@ from interntrack.api.schemas.notification import (
     NotificationTestRequest,
     NotificationTestResponse,
 )
+from interntrack.config import get_settings
 from interntrack.database.session import get_db
 from interntrack.scheduler.jobs import (
     ALERT_SLOTS as _ALERT_SLOTS,
@@ -27,6 +28,7 @@ from interntrack.scheduler.jobs import (
 )
 from interntrack.services.notification_service import NotificationManager
 from interntrack.services.report_service import ReportService
+from interntrack.utils.helpers import _domain_is_routable, email_domain
 
 router = APIRouter()
 
@@ -88,6 +90,45 @@ async def send_test_notification(
         results=results,
         configured_channels=manager.get_configured_channels(),
     )
+
+
+@router.get("/email-status")
+async def get_email_status():
+    """Email deliverability status for the Settings page.
+
+    Reports which provider is active (Resend beats SMTP when configured),
+    the effective From address actually used (never the non-routable
+    ``.local`` default), and whether that address is likely to authenticate
+    (SPF/DKIM). Lets the dashboard explain — and fix — Spam-folder issues.
+    """
+    settings = get_settings()
+    effective_from = settings.effective_email_from
+    domain = email_domain(effective_from)
+    routable = _domain_is_routable(domain)
+    provider = "none"
+    if settings.resend_api_key:
+        provider = "resend"
+    elif settings.is_email_configured:
+        provider = "smtp"
+    return {
+        "provider": provider,
+        "configured": settings.is_email_configured or bool(settings.resend_api_key),
+        "from": effective_from,
+        "domain": domain or None,
+        "routable": routable,
+        "tips": [
+            (
+                "Mark one InternTrack email as 'Not spam' in Gmail — the "
+                "sender learns and future mail lands in Inbox."
+            ),
+            "Add the From address to your contacts.",
+            (
+                "A real sending domain (EMAIL_FROM) with SPF/DKIM/DMARC "
+                "DNS records fixes this permanently."
+            ),
+            ("Best fix: set RESEND_API_KEY — Resend handles SPF/DKIM automatically."),
+        ],
+    }
 
 
 @router.get("/telegram/chat-id")
@@ -402,6 +443,37 @@ async def get_notification_stats(
         "per_user": per_user,
         "trend": [{"date": d, **v} for d, v in sorted(trend.items())],
     }
+
+
+@router.get("/owner")
+async def get_owner():
+    """Email of the owner (admin) account.
+
+    The owner is the account named by ``TEAM_OWNER_EMAIL`` when set,
+    otherwise the first-registered account. The dashboard uses this to
+    show the Team & Users admin page to the owner only — members are
+    separate users and must not see each other's profiles or stats.
+    """
+    settings = get_settings()
+    override = str(settings.team_owner_email or "").strip().lower()
+    # Avoid a full async DB round-trip for the common override case.
+    if override:
+        return {"email": override, "is_owner": True}
+    # Fall back to the first-registered account.
+    try:
+        from sqlalchemy import select
+
+        from interntrack.domain.models import User
+
+        async for db in get_db():
+            result = await db.execute(select(User).order_by(User.created_at.asc()))
+            users = list(result.scalars().all())
+            if users:
+                email = str(getattr(users[0], "email", "") or "").strip()
+                return {"email": email, "is_owner": True}
+    except Exception as exc:  # noqa: BLE001 - never fail the dashboard
+        print(f"[owner lookup] failed: {exc}")
+    return {"email": None, "is_owner": False}
 
 
 @router.get("/team/recap")

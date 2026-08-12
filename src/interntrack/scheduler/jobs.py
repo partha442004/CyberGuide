@@ -450,6 +450,12 @@ async def send_team_recap() -> dict:
             from interntrack.domain.models import User
             from interntrack.services.notification_service import EmailChannel
 
+            settings = get_settings()
+            if not settings.team_recap_enabled:
+                reason = "team recap disabled (TEAM_RECAP_ENABLED unset)"
+                print(f"[{datetime.now(UTC)}] Team recap skipped — {reason}")
+                return {"sent": False, "reason": reason}
+
             result = await session.execute(select(User).order_by(User.created_at.asc()))
             users = list(result.scalars().all())
             if len(users) < 2:
@@ -457,7 +463,6 @@ async def send_team_recap() -> dict:
                 print(f"[{datetime.now(UTC)}] Team recap skipped — {reason}")
                 return {"sent": False, "reason": reason}
 
-            settings = get_settings()
             # Explicit owner override wins; otherwise the first-registered
             # account is the team owner. An override that matches no account
             # falls back to first-registered so the recap is never lost.

@@ -9,6 +9,7 @@ from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from interntrack import __version__
+from interntrack.utils.helpers import deliverable_from_email
 
 
 class Settings(BaseSettings):
@@ -87,6 +88,10 @@ class Settings(BaseSettings):
     # Email of the team owner who receives the weekly team-alerts recap
     # (falls back to the first-registered account when unset).
     team_owner_email: str | None = None
+    # Weekly team-alerts recap email. OFF by default: members are separate
+    # users, not a team, and must not receive summaries of other users'
+    # activity. Turn on only for an explicit owner-dashboard use case.
+    team_recap_enabled: bool = False
 
     # Scraper Settings
     scrape_interval_minutes: int = 30
@@ -141,6 +146,16 @@ class Settings(BaseSettings):
     @property
     def is_email_configured(self) -> bool:
         return bool(self.smtp_user and self.smtp_password)
+
+    @property
+    def effective_email_from(self) -> str:
+        """A From address SPF/DKIM can actually authenticate.
+
+        The ``email_from`` default (``noreply@interntrack.local``) is a
+        non-routable domain that lands mail in Spam — fall back to the
+        authenticated SMTP account so relays see a valid sender domain.
+        """
+        return deliverable_from_email(self.email_from, self.smtp_user)
 
     @property
     def is_twilio_configured(self) -> bool:
