@@ -21,6 +21,17 @@ All notable changes to the InternTrack project will be documented in this file.
   position 50 behind other domains. Filtering now happens first, then the
   cap.
 
+### Fixed
+
+- **Discovery no longer times out (504) on Vercel.** `run-for-users`
+  (which feeds every digest) blew past Vercel's 60s serverless hard kill
+  because the discovery loop spent its full 48s budget and the save +
+  Telegram instant-alert tail ran unbounded — the daily GitHub cron
+  tolerated the failure with `|| echo` and digests stayed empty. The loop
+  deadline is now 38s and both notification tails are bounded with
+  `asyncio.wait_for(8s)`, so the request always completes with a (possibly
+  partial) result.
+
 ### Added
 
 - **Two more live job sources in discovery.** Symantec and Trend Micro

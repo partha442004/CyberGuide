@@ -59,13 +59,14 @@ _DISCOVERY_SOURCES: list[str] = [
     "search_engine",
 ]
 
-# Total wall-clock budget (seconds) for one discovery request. Kept at 40s so
-# the endpoint always returns a (possibly partial) result before Vercel's
-# 60s hard kill, even after a cold start.
-# Vercel Hobby maxDuration is 60s and cold starts eat ~3-6s of that, so
-# keep a comfortable tail: the loop stops at 48s so save + response always
-# finish before the serverless kill.
-_DISCOVERY_DEADLINE_SECONDS = 48
+# Total wall-clock budget (seconds) for one discovery request. Vercel Hobby
+# maxDuration is 60s and cold starts eat ~3-6s of that, so the loop stops
+# early enough that the save step and the best-effort Telegram instant-alert
+# tail (both bounded) always finish before the serverless kill. Discovery
+# returns a (possibly partial) result instead of dying with
+# FUNCTION_INVOCATION_TIMEOUT — which previously 504'd every run and left
+# the daily digests empty.
+_DISCOVERY_DEADLINE_SECONDS = 38
 
 
 # Indian cities (plus common aliases) recognized inside discovery queries so
@@ -922,12 +923,14 @@ async def run_discovery_for_users(
     # Ping users on Telegram the moment a high-match job lands (instead of
     # waiting for the next daily slot). One consolidated pass after all
     # queries so a user gets a single ping per run, not one per query.
-    # Best-effort — never blocks/breaks discovery.
+    # Best-effort — never blocks/breaks discovery: bound the pings so a slow
+    # Telegram call can't push the request past the 60s kill after the
+    # discovery loop has already spent its budget.
     if saved_all:
         from interntrack.scheduler.jobs import _send_instant_alerts
 
         with contextlib.suppress(Exception):
-            await _send_instant_alerts(db, saved_all)
+            await asyncio.wait_for(_send_instant_alerts(db, saved_all), timeout=8)
     return {
         "users": len(targets),
         "queries_run": len(details),
@@ -981,11 +984,11 @@ async def run_discovery(
                 f"Found: {len(jobs)} · Newly saved: {len(saved)}\n\n"
                 f"Check the dashboard or the Jobs page to review them."
             )
-            await NotificationManager(db).notify_all(
-                message,
-                subject="New Jobs Found",
+            await asyncio.wait_for(
+                NotificationManager(db).notify_all(message, subject="New Jobs Found"),
+                timeout=8,
             )
-            # Per-user instant Telegram pings for high-match jobs.
-            await _send_instant_alerts(db, saved)
+            # Per-user instant Telegram pings for high-match jobs (bounded).
+            await asyncio.wait_for(_send_instant_alerts(db, saved), timeout=8)
 
     return {"discovered": len(jobs), "saved": len(saved)}
