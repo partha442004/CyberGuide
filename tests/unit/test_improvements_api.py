@@ -232,6 +232,37 @@ class TestDiscoveryQueries:
         assert _extract_location_from_query("soc analyst bengaluru") == "Bangalore"
         assert _extract_location_from_query("devops engineer") is None
 
+    def test_location_extraction_tier2_cities(self):
+        """Tier-2 cities (Coimbatore, Kochi, ...) resolve too."""
+        from interntrack.api.v1.jobs import _extract_location_from_query
+
+        assert _extract_location_from_query("hardware engineer coimbatore") == (
+            "Coimbatore"
+        )
+        assert _extract_location_from_query("pcb design engineer jaipur") == "Jaipur"
+        assert _extract_location_from_query("embedded engineer kochi") == "Kochi"
+        assert _extract_location_from_query("data analyst vizag") == "Visakhapatnam"
+
+    def test_multi_city_queries_cover_every_city(self):
+        """A 'chennai, bangalore, coimbatore' profile searches each city.
+
+        Regression guard: all cities were previously mashed into one
+        unsearchable 'engineer chennai, bangalore, coimbatore' query, so
+        multi-city users' discovery found almost nothing.
+        """
+        from interntrack.scheduler.jobs import discovery_queries_for
+
+        user = SimpleNamespace(skills=[], location="Chennai, Bangalore, Coimbatore")
+        queries = discovery_queries_for({"domains": ["security"]}, user=user, limit=6)
+        assert len(queries) == 6
+        # Every query targets a single city (never a comma-joined blob).
+        for q in queries:
+            assert any(
+                city in q.lower() for city in ("chennai", "bangalore", "coimbatore")
+            ), q
+        assert len({q.split()[-1].lower() for q in queries}) >= 3
+        assert "chennai" in queries[0].lower()
+
     def test_strip_location_from_query(self):
         """The city is removed from the keyword (it goes in ``location``)."""
         from interntrack.api.v1.jobs import _strip_location_from_query

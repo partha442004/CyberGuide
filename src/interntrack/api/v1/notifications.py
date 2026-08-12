@@ -771,6 +771,71 @@ async def get_alert_history(
     }
 
 
+@router.get("/delivery-overview")
+async def delivery_overview(db: AsyncSession = Depends(get_db)):
+    """Per-account digest delivery status (owner/admin view).
+
+    One row per enabled account: last digest send time, jobs included and
+    per-channel delivery results, plus the account's role/city scoping.
+    Answers "did my friend actually get their mail?" at a glance.
+    """
+    from sqlalchemy import select
+
+    from interntrack.domain.models import NotificationHistory
+    from interntrack.scheduler.jobs import _alerts_paused, _enabled_alert_targets
+
+    targets = await _enabled_alert_targets(db)
+    hist_rows = list(
+        (
+            await db.execute(
+                select(NotificationHistory).order_by(
+                    NotificationHistory.created_at.desc()
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    latest: dict[str, NotificationHistory] = {}
+    for row in hist_rows:
+        uid = str(getattr(row, "user_id", "") or "")
+        if uid and uid not in latest:
+            latest[uid] = row
+    overview = []
+    for target in targets:
+        user = target.get("user")
+        prefs = target.get("prefs") or {}
+        uid = str(
+            target.get("user_id") or (getattr(user, "id", None) if user else None) or ""
+        )
+        last_row = latest.get(uid)
+        results: dict = {}
+        if last_row and isinstance(last_row.results, dict):
+            results = dict(last_row.results)
+        overview.append(
+            {
+                "user_id": uid,
+                "name": str(getattr(user, "name", "") or ""),
+                "email": str(getattr(user, "email", "") or ""),
+                "domains": prefs.get("domains") or [],
+                "channels": prefs.get("channels") or [],
+                "location": str(getattr(user, "location", "") or ""),
+                "experience_levels": prefs.get("experience_levels") or [],
+                "is_enabled": bool(prefs.get("is_enabled", True)),
+                "paused": bool(_alerts_paused(prefs)),
+                "last_alert_at": (
+                    last_row.created_at.isoformat()
+                    if last_row and last_row.created_at
+                    else None
+                ),
+                "last_job_count": (last_row.job_count or 0) if last_row else 0,
+                "last_email_ok": bool(results.get("email")) if last_row else None,
+                "last_telegram_ok": bool(results.get("telegram")) if last_row else None,
+            }
+        )
+    return {"members": overview, "total": len(overview)}
+
+
 @router.get("/preferences/{user_id}/preview")
 async def preview_digest(
     user_id: str,

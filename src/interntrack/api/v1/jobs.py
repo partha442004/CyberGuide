@@ -86,6 +86,36 @@ _INDIA_LOCATIONS: dict[str, str] = {
     "noida": "Noida",
     "gurgaon": "Gurgaon",
     "gurugram": "Gurgaon",
+    # Tier-2 cities — multi-city profiles (e.g. "chennai, coimbatore") are
+    # searched per city, so the extractor must recognize these too.
+    "coimbatore": "Coimbatore",
+    "kochi": "Kochi",
+    "cochin": "Kochi",
+    "trivandrum": "Thiruvananthapuram",
+    "thiruvananthapuram": "Thiruvananthapuram",
+    "vizag": "Visakhapatnam",
+    "visakhapatnam": "Visakhapatnam",
+    "ahmedabad": "Ahmedabad",
+    "surat": "Surat",
+    "jaipur": "Jaipur",
+    "chandigarh": "Chandigarh",
+    "lucknow": "Lucknow",
+    "indore": "Indore",
+    "nagpur": "Nagpur",
+    "bhubaneswar": "Bhubaneswar",
+    "guwahati": "Guwahati",
+    "mysore": "Mysore",
+    "mysuru": "Mysore",
+    "madurai": "Madurai",
+    "trichy": "Tiruchirappalli",
+    "tiruchirappalli": "Tiruchirappalli",
+    "salem": "Salem",
+    "erode": "Erode",
+    "vijayawada": "Vijayawada",
+    "bhopal": "Bhopal",
+    "patna": "Patna",
+    "kanpur": "Kanpur",
+    "goa": "Goa",
     "india": "India",
 }
 
@@ -868,7 +898,11 @@ async def run_discovery_for_users(
             target["user"],
             limit=limit,
         ):
-            user_queries.append((q, location or DEFAULT_LOCATION))
+            # Each located query carries its own city; pass that single city
+            # (not the full comma-list) to the India scrapers so they
+            # geo-target one place at a time.
+            city = _extract_location_from_query(q) or location or DEFAULT_LOCATION
+            user_queries.append((q, city))
         if user_queries:
             per_user_queries.append(user_queries)
     if not per_user_queries:

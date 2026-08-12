@@ -3417,11 +3417,18 @@ def discovery_queries_for(prefs: dict, user=None, limit: int = 4) -> list[str]:
     location = (getattr(user, "location", None) or "").strip() if user else ""
     if not location:
         location = DEFAULT_LOCATION
+    # A profile may list several cities ("chennai, bangalore, coimbatore").
+    # Split them and cycle round-robin over the base queries so EVERY city
+    # gets a search within the limit — mashing them into one
+    # "engineer chennai, bangalore, coimbatore" blob made every scraper miss.
+    cities = [
+        part.strip() for part in re.split(r"\s*[,/]\s*", location) if part.strip()
+    ] or [location]
     located_queries: list[str] = []
-    if location:
-        for q in list(queries):
-            if location.lower() not in q.lower():
-                located_queries.append(f"{q} {location}")
+    for idx, q in enumerate(list(queries)):
+        city = cities[idx % len(cities)]
+        if city.lower() not in q.lower():
+            located_queries.append(f"{q} {city}")
     queries = located_queries + list(queries)
     seen: set[str] = set()
     unique: list[str] = []

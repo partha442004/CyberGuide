@@ -664,3 +664,80 @@ class TestTeamRecapEndpoint:
         await get_team_recap(days=999, db=AsyncMock())
 
         assert captured["days"] == 30
+
+
+class TestDeliveryOverview:
+    """GET /notifications/delivery-overview reports last send per member."""
+
+    @pytest.mark.asyncio
+    async def test_reports_last_send_per_member(self, monkeypatch):
+        from interntrack.api.v1.notifications import delivery_overview
+
+        targets = [
+            {
+                "user_id": "u1",
+                "user": _user(
+                    "u1",
+                    "Jeeva",
+                    email="jeeva@x.com",
+                    location="Chennai, Coimbatore",
+                ),
+                "prefs": {
+                    "domains": ["hardware"],
+                    "channels": ["email"],
+                    "is_enabled": True,
+                },
+            }
+        ]
+
+        class _FakeDb:
+            async def execute(self, stmt):  # noqa: ARG002
+                return _FakeResult([_history("u1", 1, job_count=5)])
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._enabled_alert_targets",
+            AsyncMock(return_value=targets),
+        )
+
+        result = await delivery_overview(db=_FakeDb())
+
+        assert result["total"] == 1
+        member = result["members"][0]
+        assert member["email"] == "jeeva@x.com"
+        assert member["location"] == "Chennai, Coimbatore"
+        assert member["last_job_count"] == 5
+        assert member["last_email_ok"] is True
+        assert member["last_alert_at"] is not None
+
+    @pytest.mark.asyncio
+    async def test_never_sent_when_no_history(self, monkeypatch):
+        from interntrack.api.v1.notifications import delivery_overview
+
+        targets = [
+            {
+                "user_id": "u2",
+                "user": _user("u2", "Panthal", email="p@x.com"),
+                "prefs": {
+                    "domains": ["data"],
+                    "channels": ["email"],
+                    "is_enabled": True,
+                },
+            }
+        ]
+
+        class _FakeDb:
+            async def execute(self, stmt):  # noqa: ARG002
+                return _FakeResult([])
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._enabled_alert_targets",
+            AsyncMock(return_value=targets),
+        )
+
+        result = await delivery_overview(db=_FakeDb())
+
+        member = result["members"][0]
+        assert member["last_alert_at"] is None
+        assert member["last_email_ok"] is None
+        assert member["last_job_count"] == 0
+        assert member["paused"] is False
