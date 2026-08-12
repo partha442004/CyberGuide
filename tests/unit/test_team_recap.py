@@ -195,7 +195,8 @@ class TestBuildTeamRecapHtml:
         assert "Team alerts recap" in html
         assert "Jeeva" in html
         assert "ABB" in html
-        assert "6" in html and "3" in html
+        assert "6" in html
+        assert "3" in html
         # No top companies -> fallback dash.
         assert "🏢 —" in html
 
