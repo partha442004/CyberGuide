@@ -263,6 +263,40 @@ class TestDiscoveryQueries:
         assert len({q.split()[-1].lower() for q in queries}) >= 3
         assert "chennai" in queries[0].lower()
 
+    def test_rotation_keeps_located_first(self):
+        """The day-based rotation never pushes plain keywords ahead of
+        location-suffixed ones (a Mumbai user's top queries stay Mumbai)."""
+        from interntrack.scheduler.jobs import discovery_queries_for
+
+        user = SimpleNamespace(skills=[], location="Mumbai")
+        queries = discovery_queries_for({"domains": ["coding"]}, user=user, limit=4)
+        assert len(queries) == 4
+        assert all("mumbai" in q.lower() for q in queries)
+
+    def test_niche_domain_queries_present(self):
+        """New niche roles were added to hardware/data/coding/frontend."""
+        from interntrack.scheduler.jobs import DOMAIN_QUERIES, discovery_queries_for
+
+        assert "iot engineer" in DOMAIN_QUERIES["hardware"]
+        assert "vlsi design" in DOMAIN_QUERIES["hardware"]
+        assert "power bi developer" in DOMAIN_QUERIES["data"]
+        assert "ml engineer" in DOMAIN_QUERIES["data"]
+        assert "typescript developer" in DOMAIN_QUERIES["coding"]
+        assert "next.js developer" in DOMAIN_QUERIES["frontend"]
+        # They surface through discovery within a wide limit.
+        queries = discovery_queries_for({"domains": ["hardware"]}, limit=30)
+        assert any("iot engineer" in q for q in queries)
+        queries = discovery_queries_for({"domains": ["data"]}, limit=30)
+        assert any("power bi" in q for q in queries)
+
+    def test_base_query_cities_do_not_drift(self):
+        """The suffixing skip-list stays in sync with the city extractor."""
+        from interntrack.api.v1.jobs import _INDIA_LOCATIONS
+        from interntrack.scheduler.jobs import _BASE_QUERY_CITIES
+
+        for city in _BASE_QUERY_CITIES:
+            assert city in _INDIA_LOCATIONS, city
+
     def test_strip_location_from_query(self):
         """The city is removed from the keyword (it goes in ``location``)."""
         from interntrack.api.v1.jobs import _strip_location_from_query

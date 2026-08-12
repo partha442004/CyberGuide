@@ -862,7 +862,7 @@ async def get_closing_soon(
 
 @router.post("/discovery/run-for-users")
 async def run_discovery_for_users(
-    limit: int = Query(4, ge=1, le=8),
+    limit: int = Query(6, ge=1, le=8),
     db: AsyncSession = Depends(get_db),
 ):
     """Run discovery with queries derived from every enabled user's profile.

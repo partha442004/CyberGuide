@@ -6,6 +6,14 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Fixed
 
+- **Every search query surfaces over the week.** Discovery previously ran
+  the same top-4 queries per user every slot, so niche searches (VLSI,
+  SDET, LabVIEW, IoT, Power BI, ...) never ran. The per-user query list now
+  rotates by day, and the per-request limit rose 4→6, so the full query
+  pool gets covered across the 3 daily slots. A skip-guard also prevents
+  double-city queries (`frontend developer bangalore chennai`) when a base
+  query already ends in a city.
+
 - **Multi-city profiles search every city.** `discovery_queries_for` used to
   mash a profile's cities into one unsearchable query (`"hardware engineer
   Chennai, Bangalore, Coimbatore"`), so multi-city users' discovery found
@@ -14,7 +22,7 @@ All notable changes to the InternTrack project will be documented in this file.
   city extracted from each query to the India scrapers instead of the
   comma-list. Single-city behavior is unchanged.
 
-- **Only genuinely fresh jobs ever reach digests.** `get_recent_jobs` `get_recent_jobs`
+- **Only genuinely fresh jobs ever reach digests.** `get_recent_jobs`
   previously ignored its `days` window and returned *all* active jobs — so a
   first-ever digest (no `last_alert_at` yet) could include weeks-old
   listings. It now enforces the window with a tz-safe string comparison
@@ -41,6 +49,12 @@ All notable changes to the InternTrack project will be documented in this file.
   partial) result.
 
 ### Added
+
+- **Wider discovery vocabulary.** `DOMAIN_QUERIES` gains ~37 more niche
+  roles (IoT, mechatronics, power electronics, CAD, antenna, VLSI design;
+  TypeScript/.NET/C++/Go/React; Power BI, Tableau, ML, analytics; Next.js,
+  React Native, ...) so hardware, data, coding and frontend users find more
+  fresh roles.
 
 - **Owner delivery dashboard: “did my friend get their mail?”** New
   `GET /notifications/delivery-overview` returns every member's last digest
