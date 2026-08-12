@@ -33,23 +33,135 @@ _LOCATION_SYNONYMS = {
     "hyderabad": ["secunderabad"],
 }
 
+# Phrases meaning "any Indian city is fine". A user who sets their
+# preferred location to "All India" (optionally alongside specific cities)
+# matches any posting that mentions India or a major Indian city.
+_INDIA_WIDE_PHRASES = (
+    "all india",
+    "anywhere in india",
+    "across india",
+    "pan india",
+    "india wide",
+    "throughout india",
+    "india",
+)
+
+# Major Indian cities used to recognise an Indian posting when its location
+# string lacks the literal word "India" (e.g. just "Bengaluru").
+_INDIAN_CITIES = (
+    "bangalore",
+    "bengaluru",
+    "chennai",
+    "madras",
+    "mumbai",
+    "bombay",
+    "delhi",
+    "new delhi",
+    "hyderabad",
+    "secunderabad",
+    "pune",
+    "kolkata",
+    "calcutta",
+    "ahmedabad",
+    "gurgaon",
+    "gurugram",
+    "noida",
+    "jaipur",
+    "kochi",
+    "cochin",
+    "coimbatore",
+    "indore",
+    "lucknow",
+    "nagpur",
+    "surat",
+    "visakhapatnam",
+    "vijayawada",
+    "mysore",
+    "mysuru",
+    "thiruvananthapuram",
+    "trivandrum",
+    "madurai",
+    "kanpur",
+    "chandigarh",
+    "bhubaneswar",
+    "guwahati",
+    "amritsar",
+    "varanasi",
+    "ludhiana",
+    "raipur",
+    "patna",
+    "ranchi",
+    "mangalore",
+    "mangaluru",
+    "bhopal",
+    "dehradun",
+    "nashik",
+    "nasik",
+    "agra",
+    "tiruchirappalli",
+    "tirupur",
+    "salem",
+    "erode",
+    "nellore",
+    "kakinada",
+    "vadodara",
+    "rajkot",
+    "gwalior",
+    "jabalpur",
+    "jamshedpur",
+    "siliguri",
+    "puducherry",
+    "panaji",
+    "shimla",
+    "udupi",
+)
+
+
+def _is_india_wide(pref: str) -> bool:
+    """True when a location preference means 'any Indian city is fine'."""
+    return pref.strip().lower() in _INDIA_WIDE_PHRASES
+
+
+def _is_indian_job(job_loc: str) -> bool:
+    """True when a location string points at India (country or city name).
+
+    The country name is matched with word boundaries so "Indiana, USA" (a
+    US state) can never pass an all-India filter — only "India" as a
+    standalone word does (e.g. "Bengaluru, Karnataka, India").
+    """
+    if not job_loc:
+        return False
+    lower = job_loc.lower()
+    if _alt_in("india", lower):
+        return True
+    return any(_alt_in(city, lower) for city in _INDIAN_CITIES)
+
 
 def location_matches(job_loc: str, user_loc: str) -> bool:
     """Fuzzy location match with synonyms (Bangalore ↔ Bengaluru, ...).
 
     Both arguments should be lowercased. ``user_loc`` may list several
     cities ("bangalore, hyderabad" or "bangalore/hyderabad"): a job
-    matches when it mentions ANY of them. True when a preferred city
-    appears in the job's location string, or a known synonym does — so a
-    "Bengaluru" preference matches a "Bangalore, Karnataka" posting and
-    the same posting matches a "Hyderabad" user's filter only when it
-    actually mentions Hyderabad. This is the single source of truth shared
-    by the instant alerts, the digest builders and the report filter.
+    matches when it mentions ANY of them. An "all india" / "india"
+    preference matches any posting that mentions India or a major Indian
+    city, so a pan-India user never misses a Pune or Mumbai role. True
+    when a preferred city appears in the job's location string, or a
+    known synonym does — so a "Bengaluru" preference matches a
+    "Bangalore, Karnataka" posting and the same posting matches a
+    "Hyderabad" user's filter only when it actually mentions Hyderabad.
+    This is the single source of truth shared by the instant alerts, the
+    digest builders and the report filter.
     """
     if not job_loc or not user_loc:
         return False
     for part in re.split(r"\s*[,/]\s*", user_loc):
-        if part and _single_location_matches(job_loc, part):
+        if not part:
+            continue
+        if _is_india_wide(part):
+            if _is_indian_job(job_loc):
+                return True
+            continue
+        if _single_location_matches(job_loc, part):
             return True
     return False
 

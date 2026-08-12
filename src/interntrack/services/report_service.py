@@ -96,6 +96,40 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
         ),
     ),
     (
+        # Hardware / embedded / electronics sits before coding so titles like
+        # "Embedded Software Engineer" or "PCB Design Engineer" are never
+        # swallowed by the generic software bucket. Bare "test engineer" /
+        # "testing" titles intentionally stay in coding (software QA/testing
+        # is a coding concern); hardware testing roles carry hardware context
+        # words ("pcb test", "electronics") and land here.
+        "hardware",
+        (
+            "hardware",
+            "embedded",
+            "pcb",
+            "circuit",
+            "electronics",
+            "vlsi",
+            "fpga",
+            "verilog",
+            "vhdl",
+            "microcontroller",
+            "labview",
+            "firmware",
+            "rf ",
+            "antenna",
+            "schematic",
+            "altium",
+            "cadence",
+            "analog",
+            "power electronics",
+            "signal integrity",
+            "iot",
+            "sensor",
+            "actuator",
+        ),
+    ),
+    (
         "coding",
         (
             "software",
@@ -118,6 +152,15 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "data scientist",
             "ai",
             "architect",
+            "qa",
+            "sdet",
+            "test automation",
+            "software testing",
+            "software tester",
+            "manual test",
+            "quality assurance",
+            "test engineer",
+            "testing",
         ),
     ),
     (
@@ -129,6 +172,10 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "bi ",
             "business intelligence",
             "database",
+            "etl",
+            "data engineering",
+            "data warehouse",
+            "big data",
         ),
     ),
     (

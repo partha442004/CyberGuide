@@ -298,6 +298,32 @@ class TestLocationMatches:
         assert not location_matches("chennai, tamil nadu", "bangalore, hyderabad")
         assert not location_matches("pune, maharashtra", "bangalore/hyderabad")
 
+    def test_all_india_wildcard(self):
+        """'All India' / 'anywhere in India' matches any Indian posting."""
+        from interntrack.utils.helpers import location_matches
+
+        assert location_matches("chennai, tamil nadu, india", "all india")
+        assert location_matches("bengaluru, karnataka", "all india")
+        assert location_matches("mumbai, maharashtra, india", "anywhere in india")
+        assert location_matches("coimbatore, tamil nadu", "pan india")
+        assert location_matches("hyderabad, telangana", "india")
+        # Foreign postings never pass an all-India filter.
+        assert not location_matches("london, uk", "all india")
+        assert not location_matches("new york, usa", "anywhere in india")
+        assert not location_matches("singapore", "pan india")
+        # "Indiana, USA" contains "india" as a prefix — word-boundary
+        # matching must keep the US state out of an all-India filter.
+        assert not location_matches("indiana, usa", "all india")
+        assert not location_matches("indianapolis, usa", "all india")
+
+    def test_all_india_mixes_with_cities(self):
+        """A preference may list cities plus the all-India fallback."""
+        from interntrack.utils.helpers import location_matches
+
+        assert location_matches("pune, maharashtra", "chennai, all india")
+        assert location_matches("chennai, tamil nadu", "chennai, all india")
+        assert not location_matches("sydney, australia", "chennai, all india")
+
 
 class TestIsRemoteLocation:
     """Remote / WFH / "anywhere" detection for the location gate."""

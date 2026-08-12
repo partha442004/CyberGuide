@@ -391,6 +391,53 @@ class TestClassifyDomain:
         assert classify_domain("Full Stack Engineer", []) == "coding"
         assert classify_domain("Data Engineer", []) == "coding"
 
+    def test_hardware_domain(self):
+        """Hardware / embedded / PCB / RF titles land in the hardware bucket
+        — and win over generic software words when both appear."""
+        from interntrack.services.report_service import classify_domain
+
+        for title in [
+            "Hardware Engineer",
+            "Embedded Systems Engineer",
+            "Embedded Software Engineer",
+            "PCB Design Engineer",
+            "RF Engineer",
+            "VLSI Design Engineer",
+            "FPGA Engineer",
+            "Hardware Test Engineer",
+            "Electronics Engineer",
+            "Firmware Engineer",
+            "LabVIEW Developer",
+        ]:
+            assert classify_domain(title, []) == "hardware", title
+        # Tags give hardware context to otherwise-generic titles.
+        assert (
+            classify_domain("Engineer", ["embedded", "microcontroller"]) == "hardware"
+        )
+
+    def test_software_testing_stays_coding(self):
+        """QA / software-testing roles must NOT be dragged into hardware."""
+        from interntrack.services.report_service import classify_domain
+
+        for title in [
+            "Software Test Engineer",
+            "QA Engineer",
+            "Test Automation Engineer",
+            "Software Tester",
+            "SDET",
+            "Testing Engineer",
+        ]:
+            assert classify_domain(title, []) == "coding", title
+
+    def test_hardware_accepted_by_alert_normalization(self):
+        """The registration / preferences path accepts the hardware domain."""
+        from interntrack.api.v1.notifications import _normalize_domains
+
+        assert _normalize_domains(["hardware", "coding", "bogus"]) == [
+            "hardware",
+            "coding",
+        ]
+
     def test_frontend_domain(self):
         """Frontend-flavoured roles land in the frontend bucket, not coding."""
         from interntrack.services.report_service import classify_domain

@@ -403,6 +403,34 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
         ),
     ),
     (
+        "hardware",
+        (
+            "hardware",
+            "embedded",
+            "pcb",
+            "circuit",
+            "electronics",
+            "vlsi",
+            "fpga",
+            "verilog",
+            "vhdl",
+            "microcontroller",
+            "labview",
+            "firmware",
+            "rf ",
+            "antenna",
+            "schematic",
+            "altium",
+            "cadence",
+            "analog",
+            "power electronics",
+            "signal integrity",
+            "iot",
+            "sensor",
+            "actuator",
+        ),
+    ),
+    (
         "coding",
         (
             "software",
@@ -425,11 +453,30 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "data scientist",
             "ai",
             "architect",
+            "qa",
+            "sdet",
+            "test automation",
+            "software testing",
+            "software tester",
+            "manual test",
+            "quality assurance",
+            "test engineer",
+            "testing",
         ),
     ),
     (
         "data",
-        ("data", "analyst", "analytics", "business intelligence", "database"),
+        (
+            "data",
+            "analyst",
+            "analytics",
+            "business intelligence",
+            "database",
+            "etl",
+            "data engineering",
+            "data warehouse",
+            "big data",
+        ),
     ),
     ("design", ("designer", "ux", "graphic", "visual", "product design")),
     ("finance", ("finance", "accountant", "accounting", "audit", "tax", "bookkeep")),
@@ -453,6 +500,7 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
 _DOMAIN_LABELS = {
     "security": "🔐 Cybersecurity / VAPT / SOC",
     "frontend": "🖥️ Frontend / UI",
+    "hardware": "🔧 Hardware / Embedded / PCB",
     "coding": "💻 Coding / Software",
     "data": "📊 Data & Analytics",
     "design": "🎨 Design",
@@ -464,6 +512,7 @@ _DOMAIN_LABELS = {
 _DOMAIN_ORDER = [
     "security",
     "frontend",
+    "hardware",
     "coding",
     "data",
     "design",
@@ -484,6 +533,11 @@ _CATEGORY_STYLE = {
         "color": "#06b6d4",
         "grad": "linear-gradient(135deg,#22d3ee,#0e7490)",
         "icon": "🖥️",
+    },
+    "hardware": {
+        "color": "#0d9488",
+        "grad": "linear-gradient(135deg,#2dd4bf,#0f766e)",
+        "icon": "🔧",
     },
     "coding": {
         "color": "#3b82f6",
@@ -3271,7 +3325,7 @@ def _render_saved_jobs_tab(jobs: list) -> None:
         _stat_tile(fresh_count, "New · 24h")
     with stat_cols[3]:
         _stat_tile(
-            sum(len(grouped[d]) for d in ("security", "coding", "data")),
+            sum(len(grouped[d]) for d in ("security", "coding", "data", "hardware")),
             "Tech Roles",
         )
     st.markdown("")
