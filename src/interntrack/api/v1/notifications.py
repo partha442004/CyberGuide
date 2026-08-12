@@ -36,6 +36,7 @@ _ALERT_DOMAINS = (
     "frontend",
     "coding",
     "data",
+    "hardware",
     "design",
     "finance",
     "marketing",

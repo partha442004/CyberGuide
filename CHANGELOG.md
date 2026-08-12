@@ -6,6 +6,20 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **🔧 New 'hardware' domain + All-India location filter.** The alert
+  classifier, discovery queries, dashboard categories and registration
+  now support a dedicated **hardware / embedded / PCB / RF** bucket
+  (checked before the generic coding bucket so 'Embedded Software
+  Engineer' classifies correctly); QA / software-testing terms
+  (qa, sdet, test automation, software testing, test engineer, testing)
+  were added to the coding bucket and ETL / data-engineering terms to
+  the data bucket, and the discovery query map gained matching
+  Chennai/Bangalore/Coimbatore searches. Users whose preferred
+  location is 'All India' (or 'anywhere in India' / 'pan india')
+  now match any posting that mentions India or ~60 major Indian
+  cities, word-bounded so 'Indiana, USA' can never pass. 14 new
+  tests; full unit suite 1630 passed; ruff + mypy clean.
+
 - **🧠 Smarter fresher detection.** Jobs whose experience level was never
   parsed no longer sail past the fresher filter: `job_experience_ok` now
   scans the title for senior/fresher role markers (Senior/Lead/Manager/
