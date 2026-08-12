@@ -3307,6 +3307,12 @@ DOMAIN_QUERIES = {
         "javascript developer",
         "frontend internship",
         "frontend developer internship",
+        # Niche frontend roles (surfaced by the day rotation).
+        "web developer",
+        "html css developer",
+        "next.js developer",
+        "typescript developer",
+        "react native developer",
     ],
     "hardware": [
         "hardware engineer",
@@ -3332,6 +3338,18 @@ DOMAIN_QUERIES = {
         "electronics engineer bangalore",
         "embedded internship",
         "electronics internship",
+        # Niche hardware / electronics roles (surfaced by the day rotation).
+        "iot engineer",
+        "mechatronics engineer",
+        "power electronics engineer",
+        "control systems engineer",
+        "instrumentation engineer",
+        "antenna engineer",
+        "automotive electronics",
+        "cad engineer",
+        "hardware design",
+        "schematics design",
+        "vlsi design",
     ],
     "coding": [
         "software engineer",
@@ -3355,6 +3373,15 @@ DOMAIN_QUERIES = {
         "software tester",
         "sdet",
         "full stack developer internship",
+        # Niche developer roles (surfaced by the day rotation).
+        "typescript developer",
+        "dotnet developer",
+        "c++ developer",
+        "golang developer",
+        "react developer",
+        "web developer",
+        "java developer internship",
+        "python developer internship",
     ],
     "data": [
         "data analyst",
@@ -3370,6 +3397,17 @@ DOMAIN_QUERIES = {
         "data analyst bangalore",
         "data engineer bangalore",
         "data analyst internship",
+        # Niche data roles (surfaced by the day rotation).
+        "power bi developer",
+        "tableau developer",
+        "machine learning engineer",
+        "ml engineer",
+        "analytics engineer",
+        "database administrator",
+        "data science internship",
+        "data engineer internship",
+        "sql developer chennai",
+        "sql developer bangalore",
     ],
     "design": [
         "ux designer",
@@ -3386,6 +3424,31 @@ DOMAIN_QUERIES = {
     ],
     "other": ["internship", "entry level", "graduate trainee"],
 }
+
+# City tokens that may already appear at the end of a base DOMAIN_QUERIES
+# entry ("frontend developer chennai", "data engineer bangalore", ...).
+# Location suffixing skips these so a query never ends up with two cities.
+_BASE_QUERY_CITIES = (
+    "bangalore",
+    "bengaluru",
+    "chennai",
+    "coimbatore",
+    "mumbai",
+    "delhi",
+    "hyderabad",
+    "pune",
+    "kolkata",
+    "noida",
+    "gurgaon",
+    "gurugram",
+    "india",
+)
+
+
+def _query_already_located(q: str) -> bool:
+    """Whether a base query already ends with an Indian city token."""
+    words = q.lower().split()
+    return bool(words and words[-1] in _BASE_QUERY_CITIES)
 
 
 def discovery_queries_for(prefs: dict, user=None, limit: int = 4) -> list[str]:
@@ -3410,6 +3473,13 @@ def discovery_queries_for(prefs: dict, user=None, limit: int = 4) -> list[str]:
             skill_name = str(skill).strip()
             if skill_name:
                 queries.append(f"{skill_name} intern")
+    # Day-based rotation: each daily slot surfaces a different slice of the
+    # query list, so niche searches that fall outside the [:limit] cap
+    # (vlsi, sdet, labview, iot engineer, ...) still get run over the
+    # course of a week instead of the same top-4 forever.
+    shift = datetime.now(UTC).toordinal() % max(len(queries), 1)
+    if shift:
+        queries = queries[shift:] + queries[:shift]
     # Location-aware: location-suffixed queries go FIRST so the [:limit] cap
     # keeps them (a Bangalore user's alerts should search "cybersecurity
     # bangalore" before plain "cybersecurity"). The dedupe below then drops
@@ -3427,7 +3497,10 @@ def discovery_queries_for(prefs: dict, user=None, limit: int = 4) -> list[str]:
     located_queries: list[str] = []
     for idx, q in enumerate(list(queries)):
         city = cities[idx % len(cities)]
-        if city.lower() not in q.lower():
+        # Skip base queries that already end in a city (e.g.
+        # "frontend developer bangalore") so a profile city never produces
+        # a double-city query like "frontend developer bangalore chennai".
+        if not _query_already_located(q) and city.lower() not in q.lower():
             located_queries.append(f"{q} {city}")
     queries = located_queries + list(queries)
     seen: set[str] = set()
