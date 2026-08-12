@@ -6,18 +6,27 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
-- **📬 Weekly team-alerts recap.** Every Monday the team owner
-  (first-registered account, or the new TEAM_OWNER_EMAIL env override)
-  gets ONE email summarizing what each member's digests delivered over
-  the past 7 days: digests sent, jobs delivered, emails delivered, and
-  top roles/companies per person — so a growing team's alerts stay
-  visible from a single inbox. Runs from the APScheduler (Mon 09:30
-  UTC) and, on the serverless Vercel deployment, from a Monday
-  GitHub Actions cron via the new POST /notifications/team/recap/send
-  endpoint (mirroring the closing-soon pattern). The Team page gains
-  a live recap panel backed by GET /notifications/team/recap. Skips
-  quietly when fewer than two accounts exist or no history is in the
-  window. 15 new tests; ruff + mypy clean.
+- **📧 Email deliverability overhaul (fixes Spam-folder alerts).** Emails
+  now carry the full hygiene header set — Date, Message-ID,
+  List-Unsubscribe (one-click), Precedence: bulk, Auto-Submitted — plus a
+  plain-text alternative that preserves Apply links. The From address is
+  sanitized at send time: the old non-routable `noreply@interntrack.local`
+  default (which could never pass SPF/DKIM and caused Spam-folder delivery)
+  now falls back to the authenticated SMTP account
+  (Settings.effective_email_from). The Settings page gained a
+  "📬 Email deliverability" panel (GET /notifications/email-status)
+  showing the live provider, effective From and step-by-step Spam fixes;
+  SETUP.md documents SPF/DKIM/DMARC and Resend as the recommended relay.
+- **🚫 Team recap email removed (members are separate users).** The weekly
+  owner recap email is off by default (TEAM_RECAP_ENABLED, default false),
+  its APScheduler registration and Monday GitHub Actions cron were removed,
+  and the dashboard recap panel was dropped. Members are independent
+  accounts: each gets only their own personalized digests and never
+  cross-user summaries.
+- **🔑 Team & Users page is owner-only.** A new GET /notifications/owner
+  endpoint resolves the admin account (TEAM_OWNER_EMAIL or first-registered)
+  and the dashboard hides the Team & Users nav entry for everyone else, so
+  no user sees other users' emails, locations or alert stats.
 
 - **🔧 New 'hardware' domain + All-India location filter.** The alert
   classifier, discovery queries, dashboard categories and registration

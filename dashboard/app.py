@@ -1065,6 +1065,20 @@ def _current_user_id() -> str:
     return user["id"] if user else "user1"
 
 
+def _is_owner() -> bool:
+    """Whether the signed-in user is the owner (admin) account.
+
+    Members are separate users — only the owner may see the Team & Users
+    page, so nobody else gets other users' emails, locations or stats.
+    """
+    user = _current_user()
+    if not user or not user.get("email"):
+        return False
+    owner = fetch_data("/notifications/owner") or {}
+    owner_email = str(owner.get("email") or "").strip().lower()
+    return bool(owner_email) and str(user["email"]).strip().lower() == owner_email
+
+
 def _track_application(job_id: Any, title: str, status: str | None = None) -> None:
     """Create an application for the current user via the real API.
 
@@ -1449,10 +1463,11 @@ def _team_recap_block() -> None:
     users = data.get("users") or []
     if not users:
         return
-    st.markdown("**📬 Team alerts recap (7 days)**")
+    st.markdown("**📬 Alerts overview (7 days)**")
     st.caption(
-        "Digests sent, jobs delivered and emails delivered per member — "
-        "the same numbers your weekly recap email summarizes."
+        "Digests sent, jobs delivered and emails delivered per registered "
+        "account. (Admin view only — members are separate users and never "
+        "receive cross-user summaries; no recap email is sent.)"
     )
     for u in users:
         domain_txt = ", ".join(u.get("top_domains") or u.get("domains") or []) or "all"
@@ -2033,9 +2048,6 @@ def show_team() -> None:
                     detail = resp.text
                 st.error(f"Could not create the account: {detail}")
 
-    # ── Team alerts recap — what everyone's digests delivered ─────────
-    _team_recap_block()
-
     # ── Team directory with alert toggles ────────────────────────────
     st.divider()
     st.subheader("🗂 Team directory")
@@ -2405,8 +2417,8 @@ def main() -> None:
                 "Learning",
                 "Settings",
                 "My Account",
-                "Team & Users",
-            ],
+            ]
+            + (["Team & Users"] if _is_owner() else []),
         )
         st.divider()
         user = _current_user()
@@ -4693,6 +4705,50 @@ _NOTIF_CHANNEL_LABELS = {
 }
 
 
+def _email_deliverability_block() -> None:
+    """Settings panel explaining email deliverability (Spam-folder fixes).
+
+    Pulls ``GET /notifications/email-status`` for the live provider / From
+    address and renders concrete steps to move alerts out of Spam.
+    """
+    st.subheader("📬 Email deliverability")
+    status = fetch_data("/notifications/email-status")
+    if not status or not status.get("configured"):
+        st.info("Email alerts are not configured yet.")
+        return
+    provider = {
+        "resend": "Resend (best deliverability)",
+        "smtp": "SMTP relay",
+        "none": "not configured",
+    }.get(status.get("provider"), status.get("provider"))
+    frm = status.get("from") or "unknown"
+    routable = bool(status.get("routable"))
+    col1, col2 = st.columns(2)
+    col1.metric("Provider", provider)
+    col2.metric("From address", frm)
+    if routable:
+        st.success(
+            "✅ Your From address uses a real domain — mail should authenticate "
+            "(SPF/DKIM). If alerts still land in Spam, use the tips below."
+        )
+    else:
+        st.warning(
+            "⚠️ Your From address uses a non-routable domain (e.g. .local), so "
+            "Gmail cannot authenticate it and sends it to Spam. Fix it with the "
+            "steps below."
+        )
+    with st.expander(
+        "How to get alerts into your Inbox (and never Spam)", expanded=True
+    ):
+        for i, tip in enumerate(status.get("tips") or [], start=1):
+            st.markdown(f"{i}. {tip}")
+        st.markdown(
+            "**Already in Spam?** In Gmail, open the InternTrack email → click"
+            " **⋮ → Report not spam** — the sender learns and future mail"
+            " lands in Inbox."
+        )
+
+
 def show_settings() -> None:
     """Show settings page."""
     st.header("⚙️ Settings")
@@ -5436,6 +5492,13 @@ def show_settings() -> None:
             "This is a sample - your actual email will show your matched jobs "
             "with real apply links, match scores, and expiry badges."
         )
+
+    st.divider()
+
+    # ------------------------------------------------------------------
+    # 📬 Email deliverability — why alerts land in Spam and how to fix it
+    # ------------------------------------------------------------------
+    _email_deliverability_block()
 
     st.divider()
 

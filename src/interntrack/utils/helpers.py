@@ -4,6 +4,72 @@ Utility functions for InternTrack.
 
 import re
 from datetime import UTC, datetime
+from html import (
+    unescape,
+)  # TLDs (and the bare single-label domain) that can never receive mail.
+
+# Sending From these guarantees SPF/DKIM failure and a one-way ticket to
+# the Spam folder (the default EMAIL_FROM was "noreply@interntrack.local").
+# Only the final label is checked, so real routable domains like
+# ``test.com``, ``myapp.testing.com`` or ``foo.localdomain.com`` are never
+# mistaken for the reserved ``.test`` / ``.local`` TLDs.
+_NON_ROUTABLE_TLDS = {"local", "invalid", "example", "test", "localhost"}
+
+
+def email_domain(address: str) -> str:
+    """Lowercased domain of an address, or empty when unparseable."""
+    m = re.search(r"@([^@>\s]+)", address)
+    return m.group(1).strip(".").lower() if m else ""
+
+
+def _domain_is_routable(domain: str) -> bool:
+    """True when the domain is a real, deliverable one."""
+    if not domain:
+        return False
+    tld = domain.rsplit(".", 1)[-1].lower()
+    return tld not in _NON_ROUTABLE_TLDS
+
+
+def deliverable_from_email(
+    from_email: str | None,
+    smtp_user: str | None,
+) -> str:
+    """A From address that can actually be delivered from.
+
+    The config default ``noreply@interntrack.local`` is a non-routable
+    domain — Gmail flags such mail as spam because SPF/DKIM can never
+    authenticate it. When the configured From is missing or uses a
+    non-routable domain, fall back to the authenticated SMTP account
+    (e.g. the real Gmail address), whose domain carries valid SPF/DKIM
+    records. Never raises; the last resort is a bare "InternTrack".
+    """
+    raw = str(from_email or "").strip()
+    if raw and _domain_is_routable(email_domain(raw)):
+        return raw
+    fallback = str(smtp_user or "").strip()
+    if fallback and "@" in fallback:
+        return f"InternTrack <{fallback}>"
+    return "InternTrack"
+
+
+def html_to_text(html_body: str) -> str:
+    """Crude but safe HTML -> plain text (for the multipart alternative)."""
+    text = re.sub(r"<style[^>]*>.*?</style>", " ", html_body, flags=re.S | re.I)
+    text = re.sub(r"<br\s*/?>\s*", "\n", text, flags=re.I)
+    text = re.sub(r"</(p|div|li|tr|h[1-6])>\s*", "\n", text, flags=re.I)
+    # Keep link URLs alive in the plain-text part — a stripped "Apply"
+    # button with no URL is useless in text-only clients.
+    text = re.sub(
+        r'<a\s+[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
+        r"\2 (\1)",
+        text,
+        flags=re.S | re.I,
+    )
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = unescape(text)
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n\s*\n+", "\n\n", text)
+    return text.strip()
 
 
 def utcnow():

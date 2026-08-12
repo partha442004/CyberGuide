@@ -2,11 +2,18 @@
 Notification service for multi-channel notifications.
 """
 
+from email.utils import formatdate, make_msgid
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.config import get_settings
 from interntrack.domain.exceptions import NotificationError
 from interntrack.metrics import business_metrics_store
+from interntrack.utils.helpers import (
+    deliverable_from_email,
+    email_domain,
+    html_to_text,
+)
 
 settings = get_settings()
 
@@ -77,7 +84,9 @@ class EmailChannel(NotificationChannel):
         self.port = port
         self.user = user
         self.password = password
-        self.from_email = from_email
+        # Never send From a non-routable address (e.g. the .local default) —
+        # fall back to the authenticated SMTP account so SPF/DKIM align.
+        self.from_email = deliverable_from_email(from_email, user)
         # Alerts go to the account owner unless a recipient is given.
         self.to_email = to_email or user
 
@@ -94,11 +103,25 @@ class EmailChannel(NotificationChannel):
             from email.mime.multipart import MIMEMultipart
             from email.mime.text import MIMEText
 
-            msg = MIMEMultipart()
+            msg = MIMEMultipart("alternative")
             msg["From"] = self.from_email
             msg["To"] = self.to_email
             msg["Subject"] = subject
-            msg.attach(MIMEText(message, "html"))
+            msg["Date"] = formatdate(localtime=True)
+            # Unique Message-ID on the sender's domain keeps threading sane
+            # and avoids the "missing Message-ID" spam heuristic.
+            domain = email_domain(self.from_email) or "interntrack"
+            msg["Message-ID"] = make_msgid(domain=domain)
+            # One-click unsubscribe target (a real mailbox) — heavily
+            # rewarded by Gmail/Outlook spam filters for bulk mail.
+            msg["List-Unsubscribe"] = f"<mailto:{self.user}>"
+            # One-click unsubscribe (Gmail renders a button instead of a link).
+            msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+            msg["Precedence"] = "bulk"
+            msg["Auto-Submitted"] = "auto-generated"
+            # Plain-text alternative improves both filters and readers.
+            msg.attach(MIMEText(html_to_text(message), "plain", "utf-8"))
+            msg.attach(MIMEText(message, "html", "utf-8"))
 
             with smtplib.SMTP(self.host, self.port) as server:
                 server.starttls()
@@ -344,7 +367,7 @@ class NotificationManager:
                 settings.smtp_port,
                 settings.smtp_user,
                 settings.smtp_password,
-                settings.email_from,
+                settings.effective_email_from,
             )
 
         if settings.discord_webhook_url:
@@ -380,7 +403,7 @@ class NotificationManager:
         if api_key:
             self._channels["email"] = ResendEmailChannel(
                 api_key,
-                settings.resend_from or settings.email_from,
+                settings.resend_from or settings.effective_email_from,
             )
 
     async def notify(
@@ -452,7 +475,7 @@ class NotificationManager:
             if api_key:
                 return ResendEmailChannel(
                     api_key,
-                    settings.resend_from or settings.email_from,
+                    settings.resend_from or settings.effective_email_from,
                     to_email=email,
                 )
             if settings.smtp_user and settings.smtp_password:
@@ -461,7 +484,7 @@ class NotificationManager:
                     settings.smtp_port,
                     settings.smtp_user,
                     settings.smtp_password,
-                    settings.email_from,
+                    settings.effective_email_from,
                     to_email=email,
                 )
             return None
