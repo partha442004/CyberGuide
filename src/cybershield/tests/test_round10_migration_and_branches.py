@@ -305,6 +305,10 @@ class TestInterntrackNotificationChannels:
                 "is_email_configured": True,
                 "is_discord_configured": False,
                 "is_slack_configured": True,
+                "twilio_phone_number": None,
+                "twilio_account_sid": None,
+                "twilio_auth_token": None,
+                "is_whatsapp_configured": False,
             },
         )()
         with patch("interntrack.config.get_settings", return_value=settings_mock):
