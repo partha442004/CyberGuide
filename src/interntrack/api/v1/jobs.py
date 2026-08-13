@@ -429,7 +429,7 @@ async def create_job(
     except DuplicateJobError as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create job: {e}") from e
+        raise HTTPException(status_code=500, detail="Failed to create job") from e
 
 
 _TRACKING_PARAMS = {"fbclid", "gclid", "mc_cid", "mc_eid", "igshid", "ref"}
