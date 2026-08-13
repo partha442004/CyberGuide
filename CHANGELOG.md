@@ -23,7 +23,10 @@ All notable changes to the InternTrack project will be documented in this file.
   `Job.job_type` and `Job.experience_level` now use a `LenientEnum`
   column type that maps unknown stored values to `UNKNOWN`/`None` on
   load instead of raising. A unique-constraint race on `url` also now
-  surfaces as a 409 duplicate rather than a 500.
+  surfaces as a 409 duplicate rather than a 500. `backfill-job-types`
+  now also repairs rows holding raw scraper labels (`"Fulltime"`, ...)
+  by inferring the type from the title, so the dashboard chart and
+  filters stay meaningful.
 
 ### Added
 
