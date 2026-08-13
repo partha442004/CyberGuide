@@ -742,3 +742,34 @@ def generate_id():
     from uuid import uuid4
 
     return str(uuid4())
+
+
+def salary_band_txt(
+    low: float | None, high: float | None, currency: str = "INR"
+) -> str:
+    """Compact median salary band ("₹8–12 LPA" / "$80k–100k"), or "".
+
+    Pure formatter for the digest market snapshot: given the median low /
+    high bounds of a company's posted salaries, render a short readable
+    band. Unknown bounds return "". INR values >= 1L render as lakhs
+    ("₹12 LPA"), smaller as thousands ("₹45K").
+    """
+    if low is None and high is None:
+        return ""
+    currency = str(currency or "INR").upper()
+    symbol = "₹" if currency == "INR" else "$"
+
+    def fmt(value: float) -> str:
+        if currency == "INR" and value >= 100000:
+            return f"{value / 100000:.1f}".rstrip("0").rstrip(".") + " LPA"
+        if currency == "INR":
+            return f"{value / 1000:.0f}K"
+        return f"{value / 1000:.0f}k"
+
+    if low is not None and high is not None and high > low:
+        return f"{symbol}{fmt(low)}–{symbol}{fmt(high)}"
+    if low is not None:
+        return f"{symbol}{fmt(low)}"
+    if high is not None:
+        return f"{symbol}{fmt(high)}"
+    return ""

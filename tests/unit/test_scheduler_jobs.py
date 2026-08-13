@@ -2393,7 +2393,7 @@ class TestDigestMarketSections:
         from interntrack.scheduler.jobs import build_daily_report_html
 
         async def _fake_companies(session, user_location=None, include_remote=True):
-            return [("Acme Corp", 4), ("SecureCo", 2)]
+            return [("Acme Corp", 4, "₹12–15 LPA"), ("SecureCo", 2, "")]
 
         monkeypatch.setattr(
             "interntrack.scheduler.jobs._top_companies_near", _fake_companies
@@ -2501,7 +2501,7 @@ class TestDigestMarketSections:
         from interntrack.scheduler.jobs import build_daily_report_message
 
         async def _fake_companies(session, user_location=None, include_remote=True):
-            return [("Acme Corp", 4)]
+            return [("Acme Corp", 4, "₹8 LPA")]
 
         async def _fake_fresher(report, session, domains=None, user_id=None, limit=3):
             return [
@@ -2538,6 +2538,43 @@ class TestDigestMarketSections:
             report, AsyncMock(), user_location="Pune"
         )
         assert "Top companies hiring near Pune" in message
-        assert "Acme Corp — 4 fresh role(s)" in message
+        assert "Acme Corp — 4 fresh role(s) · ₹8 LPA" in message
         assert "🎓 Internships & fresher roles:" in message
         assert "SOC Intern" in message
+
+    @pytest.mark.asyncio
+    async def test_html_company_chip_shows_salary(self, monkeypatch):
+        """Company chips render the median salary band when available."""
+        from interntrack.scheduler.jobs import build_daily_report_html
+
+        async def _fake_companies(session, user_location=None, include_remote=True):
+            return [("Acme Corp", 4, "₹12–15 LPA")]
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._top_companies_near", _fake_companies
+        )
+        report = {
+            "summary": {"new_jobs": 1, "new_applications": 0},
+            "new_jobs": [
+                {
+                    "id": "job-1",
+                    "title": "Security Engineer",
+                    "company": "Acme Corp",
+                    "url": "https://acme.example/apply",
+                    "tags": ["security"],
+                }
+            ],
+        }
+        html = await build_daily_report_html(report, AsyncMock())
+        assert "₹12–15 LPA" in html
+        assert "💰" in html
+
+    def test_salary_band_txt(self):
+        """salary_band_txt renders INR lakhs, thousands and empty bands."""
+        from interntrack.utils.helpers import salary_band_txt
+
+        assert salary_band_txt(800000, 1200000) == "₹8 LPA–₹12 LPA"
+        assert salary_band_txt(45000, 60000) == "₹45K–₹60K"
+        assert salary_band_txt(1200000, None) == "₹12 LPA"
+        assert salary_band_txt(None, None) == ""
+        assert salary_band_txt(80000, 100000, currency="USD") == "$80k–$100k"

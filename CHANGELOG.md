@@ -9,7 +9,9 @@ All notable changes to the InternTrack project will be documented in this file.
 - **🏢 Top companies hiring near you** section in daily digests. A market
   snapshot ranked by fresh postings in the member's own city (synonym-
   aware, remote opt-in), rendered as chips in the HTML email and a
-  company list in the plain-text digest.
+  company list in the plain-text digest. Each entry shows the company's
+  median salary band (e.g. ₹8–12 LPA) via the new shared
+  ``salary_band_txt`` helper.
 - **🎓 Internships & fresher roles** highlight for fresher-only members
   (experience prefs limited to entry/junior): the freshest entry-level
   postings from their own digest lead the email so qualifying roles are
