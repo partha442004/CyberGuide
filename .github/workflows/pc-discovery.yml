@@ -1,0 +1,39 @@
+name: PC discovery (bot-gated sources)
+
+# Runs the pc_discovery CLI on a GitHub-hosted runner so the boards that
+# bot-gate Vercel's datacenter IPs (JobDexo, Foundit, Apna, Cutshort) can
+# still feed the live DB without anyone touching a computer. If a source
+# also blocks GitHub runner IPs it simply reports 0 found — the run still
+# succeeds and the search-engine net (DDG/Bing/Brave) covers the rest.
+#
+# Schedules (UTC): 05:30 daily = 11:00 IST — one fresh batch every day,
+# plus an extra afternoon batch on weekdays (12:30 UTC = 18:00 IST).
+on:
+  schedule:
+    - cron: '30 5 * * *'    # 11:00 IST daily
+    - cron: '30 12 * * 1-5' # 18:00 IST Mon-Fri
+  workflow_dispatch:        # allow manual "Run workflow" from the Actions tab
+
+jobs:
+  discover:
+    name: Run blocked-source discovery
+    runs-on: ubuntu-latest
+    env:
+      API_BASE: https://cyberguide-api.vercel.app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run discovery and push fresh jobs to the live DB
+        run: |
+          export PYTHONPATH=src
+          python scripts/pc_discovery.py --all-members --api-url "$API_BASE" --limit 15
