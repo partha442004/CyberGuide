@@ -2600,6 +2600,9 @@ class TestRequirementsChecklist:
         assert "REQUIREMENTS CHECKLIST" in card
         assert "✅ python" in card
         assert "⬜ splunk" in card
+        # Missing skills carry a 📚 learn link so the member can close the gap.
+        assert "📚 learn" in card
+        assert "youtube.com" in card or "course" in card
 
     def test_html_checklist_skipped_without_resume(self):
         """No resume skills → no checklist block on the card."""

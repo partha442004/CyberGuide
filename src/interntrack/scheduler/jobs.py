@@ -3729,7 +3729,17 @@ def _skills_checklist_html(job: dict, resume_skills: set | None) -> str:
         for skill in (result.related_skills or [])[:2]:
             rows.append(f"<span style='color:#b45309;'>🟡 {_esc(str(skill))}</span>")
         for skill in (result.missing_skills or [])[:4]:
-            rows.append(f"<span style='color:#b91c1c;'>⬜ {_esc(str(skill))}</span>")
+            learn = _skill_learn_url(skill)
+            learn_link = (
+                f" <a href='{_esc(learn)}' style='color:#0f766e;"
+                f"font-weight:700;text-decoration:none;' target='_blank'>"
+                f"📚 learn</a>"
+                if learn
+                else ""
+            )
+            rows.append(
+                f"<span style='color:#b91c1c;'>⬜ {_esc(str(skill))}{learn_link}</span>"
+            )
         if not rows:
             return ""
         chips = (

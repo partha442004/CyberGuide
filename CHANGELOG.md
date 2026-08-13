@@ -16,6 +16,15 @@ All notable changes to the InternTrack project will be documented in this file.
   (experience prefs limited to entry/junior): the freshest entry-level
   postings from their own digest lead the email so qualifying roles are
   never buried under senior listings.
+- **🖥 One-click PC discovery automation** (``scripts/run_pc_discovery.bat``).
+  A double-click runner that auto-installs deps, covers every member's
+  domains + cities, and logs to ``%USERPROFILE%\pc_discovery.log`` —
+  wire it into Windows Task Scheduler for a daily automatic batch.
+  Verified honestly: GitHub-runner IPs are bot-gated by the same boards
+  that block Vercel (all returned 0), so the residential-network PC task
+  is the only automatic path for JobDexo / Foundit / Apna / Cutshort;
+  the main pipeline (DDG/Bing/Brave net, Internshala, RSS) already runs
+  3× daily from Vercel with no action needed.
 - **💻 PC discovery CLI** (``scripts/pc_discovery.py``). JobDexo, Foundit,
   Apna and Cutshort bot-gate datacenter IPs, so the server cron can't
   fetch them — but from a residential network they work. The CLI runs

@@ -251,8 +251,25 @@ python scripts/pc_discovery.py --all-members --limit 20
 ```
 
 Each run prints what was found vs. what actually saved (duplicates are
-skipped automatically). You can schedule it yourself (Task Scheduler /
-cron) or just run it whenever you want a fresh batch from those boards.
+skipped automatically).
+
+**To run it automatically every day from your PC** (residential IP, so the
+blocked boards work):
+
+1. Double-click `scripts/run_pc_discovery.bat` once to confirm it works
+   (it auto-installs deps and logs to `%USERPROFILE%\pc_discovery.log`).
+2. Open **Task Scheduler** → **Create Basic Task**:
+   - Trigger: **Daily** at a time your PC is usually on (e.g. 09:00)
+   - Action: **Start a program** → browse to
+     `scripts/run_pc_discovery.bat` (start in: the repo folder)
+   - Check **Run whether user is logged on or not** for background runs
+
+> Honest note on automation: the *main* pipeline (search-engine net over
+> DuckDuckGo/Bing/Brave, Internshala, RSS and the other unblocked
+> sources) already runs automatically 3× a day from Vercel — no action
+> needed. JobDexo / Foundit / Apna / Cutshort block **both** Vercel and
+> GitHub-runner IPs (verified), so they can only be fetched from a
+> residential network — that is exactly what this PC task does.
 
 ---
 
