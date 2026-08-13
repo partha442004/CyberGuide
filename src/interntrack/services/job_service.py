@@ -186,6 +186,42 @@ def classify_job_type(title: str) -> str:
     return "full_time"
 
 
+_JOB_TYPE_ALIASES = {
+    # Scraper labels -> canonical JobType enum values (the live Postgres
+    # ``jobtype`` column is a native enum — anything else is a 500).
+    "fulltime": "full_time",
+    "full time": "full_time",
+    "full-time": "full_time",
+    "parttime": "part_time",
+    "part time": "part_time",
+    "part-time": "part_time",
+    "intern": "internship",
+    "internship": "internship",
+    "contract": "contract",
+    "freelance": "freelance",
+    "remote": "remote",
+}
+
+
+_VALID_JOB_TYPES = {"internship", "full_time", "part_time", "contract", "freelance", "remote", "unknown"}
+
+
+def _normalize_job_type(value) -> str | None:
+    """Map a raw job-type label to a valid enum value (or None).
+
+    Scrapers send free text ("Fulltime", "Full Time", "Parttime", ...)
+    but the live Postgres ``jobtype`` column is a native enum — inserting
+    anything outside it fails with a 500. Unknown/empty labels return
+    None so the caller infers the type from the title instead.
+    """
+    if not value:
+        return None
+    cleaned = str(value).strip().lower()
+    if cleaned in _VALID_JOB_TYPES:
+        return cleaned
+    return _JOB_TYPE_ALIASES.get(cleaned)
+
+
 def _normalize_job_fields(job_data: dict) -> dict:
     """Clamp string fields to the Job model's column limits."""
     normalized = dict(job_data)
@@ -194,6 +230,9 @@ def _normalize_job_fields(job_data: dict) -> dict:
         if isinstance(value, str):
             stripped = value.strip()
             normalized[field] = stripped[:limit] if len(stripped) > limit else stripped
+    # Map scraper job-type labels to valid enum values ("Fulltime" ->
+    # "full_time") so a free-text label never 500s on the native enum.
+    normalized["job_type"] = _normalize_job_type(normalized.get("job_type"))
     # Infer a job type when the scraper didn't provide one, so dashboards
     # and filters show meaningful categories instead of all-unknown.
     if not normalized.get("job_type") or str(normalized.get("job_type")).lower() in (
