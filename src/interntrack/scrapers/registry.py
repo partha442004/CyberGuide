@@ -117,6 +117,7 @@ def get_default_registry() -> ScraperRegistry:
     from interntrack.scrapers.indeed_api import IndeedAPIScraper
     from interntrack.scrapers.indeed_india import IndeedIndiaScraper
     from interntrack.scrapers.internshala_direct import InternshalaDirectScraper
+    from interntrack.scrapers.jobdexo import JobDexoScraper
     from interntrack.scrapers.linkedin import LinkedInScraper
     from interntrack.scrapers.linkedin_india import LinkedInIndiaScraper
     from interntrack.scrapers.linkedin_jobs_api import LinkedInJobsAPIScraper
@@ -137,6 +138,7 @@ def get_default_registry() -> ScraperRegistry:
     registry.register(ApnaScraper())
     registry.register(TimesJobsScraper())
     registry.register(CutshortScraper())
+    registry.register(JobDexoScraper())
     # Foundit direct is bot-gated from datacenter IPs (returns [] there);
     # its posting URLs still arrive via SearchEngineScraper's Bing path.
     registry.register(FounditScraper())

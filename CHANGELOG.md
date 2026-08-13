@@ -4,6 +4,21 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **New source: JobDexo (jobdexo.com) — "India's first job index for
+  freshers".** Direct HTML scraper (`src/interntrack/scrapers/jobdexo.py`)
+  parses the server-rendered search cards (`GET /?q=<query>`) — title link
+  is the direct posting URL, plus company, city, INR salary band (LPA and
+  ₹ ranges), Fulltime/Internship badge, deadline and a description snippet.
+  Registered in the default registry, added to the `JobSource` enum and
+  the source-alias map, and covered by 16 unit tests (card extraction,
+  double-escaped entities, salary/deadline parsing, relevance filter,
+  HTTP-error fallback). Live-verified: "cybersecurity" → Security Analyst I
+  (Fortuna Cysec), Associate Security Analytics (Charles Schwab);
+  "data analyst" → 10 roles incl. Baner/Pune listings; "hardware engineer"
+  → Qualcomm (12 LPA).
+
 ### Fixed
 
 - **Every search query surfaces over the week.** Discovery previously ran
