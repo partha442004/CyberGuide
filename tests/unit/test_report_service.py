@@ -393,6 +393,27 @@ class TestClassifyDomain:
         assert classify_domain("SQL Developer", []) == "coding"
         assert classify_domain("Senior SQL Developer", []) == "coding"
 
+    def test_frontend_domain_covers_js_web_roles(self):
+        """JavaScript/TypeScript/Web/Next.js/HTML-CSS developers are frontend
+        roles — a frontend-only subscriber gets exactly these, never backend
+        or fullstack (those carry no frontend token)."""
+        from interntrack.services.report_service import classify_domain
+
+        for title in (
+            "Frontend Developer",
+            "JavaScript Developer",
+            "TypeScript Developer",
+            "Web Developer",
+            "Next.js Developer",
+            "HTML CSS Developer",
+            "React Developer",
+            "UI Developer",
+        ):
+            assert classify_domain(title, []) == "frontend", title
+
+        for title in ("Backend Developer", "Full Stack Developer", "Java Developer"):
+            assert classify_domain(title, []) == "coding", title
+
     def test_company_prefix_does_not_leak_into_domain(self):
         """Only the role after 'Company: ' is classified."""
         from interntrack.services.report_service import classify_domain

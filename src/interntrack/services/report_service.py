@@ -93,6 +93,20 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "vue",
             "ui developer",
             "ui engineer",
+            # Frontend titles that would otherwise fall into the broad
+            # "coding" bucket (JavaScript/TypeScript/Web/HTML-CSS/Next.js
+            # developers are frontend roles). A user who opted into
+            # frontend-only alerts gets exactly these, never backend or
+            # fullstack roles (those don't carry these tokens).
+            "javascript developer",
+            "typescript developer",
+            "web developer",
+            "html css developer",
+            "html developer",
+            "css developer",
+            "next.js developer",
+            "nextjs developer",
+            "react native developer",
         ),
     ),
     (
