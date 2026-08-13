@@ -379,3 +379,91 @@ class TestSendAlertForLocation:
             mock_service.generate_daily_report.call_args.kwargs.get("include_remote")
             is True
         )
+
+
+class TestMemberChannelPolicy:
+    """Members are email + SMS only; Telegram stays for the owner.
+
+    Product decision: SMS is the member notification channel for now —
+    Telegram/others are added for a member only when explicitly enabled.
+    """
+
+    def test_without_telegram_strips_for_member(self):
+        from types import SimpleNamespace
+
+        from interntrack.scheduler.jobs import _without_telegram_for_members
+
+        member = SimpleNamespace(email="member@example.com")
+        channels = _without_telegram_for_members(
+            ["email", "telegram", "sms"],
+            member,
+            owner_email="owner@example.com",
+        )
+        assert channels == ["email", "sms"]
+
+    def test_without_telegram_keeps_owner_telegram(self):
+        from types import SimpleNamespace
+
+        from interntrack.scheduler.jobs import _without_telegram_for_members
+
+        owner = SimpleNamespace(email="Owner@Example.com")
+        channels = _without_telegram_for_members(
+            ["email", "telegram", "sms"],
+            owner,
+            owner_email="owner@example.com",
+        )
+        assert channels == ["email", "telegram", "sms"]
+
+    def test_without_telegram_empty_channels(self):
+        from interntrack.scheduler.jobs import _without_telegram_for_members
+
+        assert _without_telegram_for_members(None, None, None) == []
+        assert _without_telegram_for_members([], None, None) == []
+
+    def test_owner_email_prefers_override(self):
+        from types import SimpleNamespace
+
+        from interntrack.scheduler.jobs import _owner_email
+
+        class _Settings:
+            team_owner_email = "boss@example.com"
+
+        class _FakeResult:
+            def scalars(self):
+                return self
+
+            def all(self):
+                return [
+                    SimpleNamespace(email="first@example.com"),
+                    SimpleNamespace(email="boss@example.com"),
+                ]
+
+        class _FakeSession:
+            async def execute(self, stmt):  # noqa: ARG002
+                return _FakeResult()
+
+        import asyncio
+
+        with patch("interntrack.config.get_settings", return_value=_Settings()):
+            owner = asyncio.run(_owner_email(_FakeSession()))
+        assert owner == "boss@example.com"
+
+    def test_member_default_channels_never_telegram(self):
+        from interntrack.api.v1.users import _member_default_channels
+
+        class _Settings:
+            is_email_configured = True
+            is_twilio_configured = True
+
+        with patch("interntrack.api.v1.users.get_settings", return_value=_Settings()):
+            assert _member_default_channels() == ["email", "sms"]
+
+        class _SettingsNoTwilio:
+            is_email_configured = True
+            is_twilio_configured = False
+
+        with patch(
+            "interntrack.api.v1.users.get_settings",
+            return_value=_SettingsNoTwilio(),
+        ):
+            assert _member_default_channels() == ["email"]

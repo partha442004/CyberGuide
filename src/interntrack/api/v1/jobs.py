@@ -202,6 +202,23 @@ async def backfill_job_types(
     return {"updated": updated}
 
 
+@router.post("/dedupe-cleanup")
+async def dedupe_cleanup(
+    limit: int = Query(500, ge=1, le=2000),
+    db: AsyncSession = Depends(get_db),
+):
+    """Deactivate duplicate active jobs sharing the same url.
+
+    Legacy rows (or re-inserts from several sources) can leave the same
+    posting saved 2-3 times under one url. Keeps the earliest row per url
+    active and deactivates the rest so dedup checks and digests never
+    double-send. Returns ``{"deactivated": n}``.
+    """
+    repo = JobRepository(db)
+    deactivated = await repo.deactivate_duplicate_urls(limit=limit)
+    return {"deactivated": deactivated}
+
+
 @router.post("/backfill-tags")
 async def backfill_job_tags(
     limit: int = Query(500, ge=1, le=2000),

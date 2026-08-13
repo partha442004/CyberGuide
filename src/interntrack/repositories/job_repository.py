@@ -473,6 +473,47 @@ class JobRepository(BaseRepository[Job]):
 
         return len(expired_ids)
 
+    async def deactivate_duplicate_urls(self, limit: int = 500) -> int:
+        """Deactivate duplicate active jobs sharing the same url.
+
+        ``url`` is unique in the model, but legacy rows predating the
+        constraint (or re-inserts from different sources) left duplicates
+        in the live DB — they also defeat the URL-based dedup check. Keeps
+        the earliest job per url active and deactivates the rest.
+        Returns the number of jobs deactivated.
+        """
+        dup_urls = (
+            (
+                await self.session.execute(
+                    select(Job.url)
+                    .where(and_(Job.is_active, Job.url.isnot(None)))
+                    .group_by(Job.url)
+                    .having(func.count(Job.id) > 1)
+                    .limit(limit),
+                )
+            )
+            .scalars()
+            .all()
+        )
+        deactivated = 0
+        for url in dup_urls:
+            rows = (
+                (
+                    await self.session.execute(
+                        select(Job)
+                        .where(and_(Job.is_active, Job.url == url))
+                        .order_by(Job.created_at.asc()),
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for dup in rows[1:]:
+                dup.is_active = False  # type: ignore[assignment]
+                deactivated += 1
+        await self.session.flush()
+        return deactivated
+
     async def archive_expired_jobs(self, days: int = 30) -> int:
         """Move jobs older than `days` to the expired_jobs archive table.
 

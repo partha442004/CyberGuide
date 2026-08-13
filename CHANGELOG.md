@@ -4,6 +4,29 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Members are email + SMS only (no Telegram).** Per the product decision,
+  SMS is the member notification channel for now — new accounts default to
+  `["email", "sms"]` and every member delivery path (daily/weekly digests,
+  closing-soon alerts, interview reminders, follow-up nudges) drops Telegram
+  unless the recipient is the team owner. The owner's own digests and the
+  Telegram failure pings are unaffected; Telegram/other channels can be
+  enabled for a member later without code changes.
+
+- **Hardware/embedded role coverage.** Auto-tagging and resume-match
+  keywords now include PCB, schematic, circuit, analog/digital electronics,
+  VLSI, FPGA, microcontroller, embedded C, firmware, RTOS, LabVIEW, RF
+  design, antenna, sensors, IoT, mechatronics, power electronics, control
+  systems, instrumentation, Altium, KiCad, CAN bus, UART/SPI/I2C, Arduino,
+  Raspberry Pi, ESP32, oscilloscope and more — hardware-domain jobs (e.g.
+  hardware/PCB/embedded/RF/test engineers) now earn real tags and match %
+  instead of scoring null.
+
+- **`POST /api/v1/jobs/dedupe-cleanup`.** Deactivates duplicate active jobs
+  sharing the same URL (keeps the earliest row), cleaning legacy duplicates
+  so URL-based dedup and digests never double-send.
+
 ### Fixed
 
 - **Job creation 500 on scraper job-type labels.** The live Postgres
