@@ -16,6 +16,13 @@ All notable changes to the InternTrack project will be documented in this file.
   (experience prefs limited to entry/junior): the freshest entry-level
   postings from their own digest lead the email so qualifying roles are
   never buried under senior listings.
+- **✅ Requirements checklist on every email job card.** Each card now
+  compares the role's expected skills against the member's own resume and
+  renders ✅ matched / 🟡 related (same skill family) / ⬜ missing chips,
+  using the same skill-classification engine as the match % so the
+  checklist always agrees with the score — members see at a glance what
+  the role expects vs. what they already have. Plain-text and Telegram
+  digests carry a compact version.
 - **Full role description in digest emails.** Job cards now offer an
   expandable "📄 What they expect — full description" block that shows the
   complete posting text (HTML-tags stripped, whitespace collapsed) instead

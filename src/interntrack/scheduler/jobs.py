@@ -1956,6 +1956,7 @@ def _job_lines(
     job: dict,
     target_salary: int | None = None,
     keywords: list | None = None,
+    resume_skills: set | None = None,
 ) -> list[str]:
     """One job's notification lines (headline + apply link + expiry note)."""
     title = (job.get("title") or "Untitled")[:90]
@@ -1985,6 +1986,9 @@ def _job_lines(
     skills = _skills_txt(job)
     if skills:
         lines.append(f"   🛠 Skills: {_esc(skills)}")
+    checklist = _skills_checklist_lines(job, resume_skills)
+    if checklist:
+        lines.append("   " + "  ".join(checklist))
     if _salary_meets_target(job, target_salary):
         lines.append("   💰 Meets your target salary")
     hits = _keyword_hits(job, keywords)
@@ -2345,6 +2349,8 @@ async def build_daily_report_message(
     lines = [format_daily_report(report, title)]
 
     sections = await _score_and_group_jobs(report, session, domains, user_id=user_id)
+    # Resume skills drive the ✅/⬜ requirements checklist on each job line.
+    resume_skills = await _latest_resume_skill_names(session, user_id=user_id)
 
     # 🔥 Job of the day — the user's best match, right at the top.
     job_of_day = _job_of_day(sections, user_location, include_remote=include_remote)
@@ -2435,6 +2441,7 @@ async def build_daily_report_message(
                     job,
                     target_salary=report.get("target_salary"),
                     keywords=report.get("keywords") or [],
+                    resume_skills=resume_skills,
                 )
             )
 
@@ -2450,6 +2457,7 @@ async def build_daily_report_message(
                     job,
                     target_salary=report.get("target_salary"),
                     keywords=report.get("keywords") or [],
+                    resume_skills=resume_skills,
                 )
             )
 
@@ -2542,6 +2550,8 @@ async def build_alert_chunks(
     """
     title = "📅 Weekly Digest" if weekly else "📊 Daily Report"
     sections = await _score_and_group_jobs(report, session, domains, user_id=user_id)
+    # Resume skills drive the ✅/⬜ requirements checklist on each job line.
+    resume_skills = await _latest_resume_skill_names(session, user_id=user_id)
     loc_lower = (user_location or "").strip().lower()
 
     # Split into "your area" vs "other locations" like the email does.
@@ -2659,6 +2669,7 @@ async def build_alert_chunks(
                         job,
                         target_salary=report.get("target_salary"),
                         keywords=report.get("keywords") or [],
+                        resume_skills=resume_skills,
                     )
                 )
                 url = job.get("url")
@@ -2871,6 +2882,9 @@ async def build_daily_report_html(
     """
     sections = await _score_and_group_jobs(report, session, domains, user_id=user_id)
     watched = await _watched_company_names(session, user_id)
+    # The member's resume skills drive the ✅ requirements checklist on every
+    # job card (same source as the match %). Loaded once, never raises.
+    resume_skills = await _latest_resume_skill_names(session, user_id=user_id)
     summary = report.get("summary") or {}
     generated = report.get("generated_at") or ""
 
@@ -3041,6 +3055,7 @@ async def build_daily_report_html(
                     style,
                     target_salary=report.get("target_salary"),
                     keywords=report.get("keywords") or [],
+                    resume_skills=resume_skills,
                 )
             )
 
@@ -3061,6 +3076,7 @@ async def build_daily_report_html(
                     "#0ea5e9",
                     target_salary=report.get("target_salary"),
                     keywords=report.get("keywords") or [],
+                    resume_skills=resume_skills,
                 )
             )
 
@@ -3077,6 +3093,7 @@ async def build_daily_report_html(
                         "#10b981",
                         target_salary=report.get("target_salary"),
                         keywords=report.get("keywords") or [],
+                        resume_skills=resume_skills,
                     )
                 )
             parts.append(
@@ -3161,6 +3178,7 @@ async def build_daily_report_html(
                         accent,
                         target_salary=report.get("target_salary"),
                         keywords=report.get("keywords") or [],
+                        resume_skills=resume_skills,
                     )
                 )
 
@@ -3412,14 +3430,112 @@ def _location_breakdown_table(sections, other_sections):
     )
 
 
+def _skills_checklist_lines(job: dict, resume_skills: set | None) -> list[str]:
+    """Plain-text requirements checklist: ✅ matched / 🟡 related / ⬜ missing.
+
+    Mirrors ``_skills_checklist_html`` (same skill-classification engine)
+    so the plain-text digest agrees with the email. Returns up to 6 chips
+    as a list of short strings; ``[]`` when no resume or no skills.
+    """
+    if not resume_skills:
+        return []
+    try:
+        from cybershield.api.v1.resumes import (
+            _calculate_job_match,
+            _JobMatchData,
+        )
+
+        job_data = _JobMatchData(
+            id=str(job.get("id") or ""),
+            title=str(job.get("title") or ""),
+            company=str(job.get("company") or ""),
+            required_skills=job.get("required_skills") or [],
+            preferred_skills=job.get("preferred_skills") or [],
+            tags=job.get("tags") or [],
+        )
+        result = _calculate_job_match(resume_skills, job_data)
+        rows = []
+        for skill in (result.matched_skills or [])[:3]:
+            rows.append(f"✅{_esc(str(skill))}")
+        for skill in (result.related_skills or [])[:1]:
+            rows.append(f"🟡{_esc(str(skill))}")
+        for skill in (result.missing_skills or [])[:2]:
+            rows.append(f"⬜{_esc(str(skill))}")
+        return rows
+    except Exception:  # noqa: BLE001 - a checklist must never break the card
+        return []
+
+
+def _skills_checklist_html(job: dict, resume_skills: set | None) -> str:
+    """HTML requirements checklist for a job vs the member's resume skills.
+
+    Uses the same skill-classification engine as the match % (exact /
+    synonym / category tiers from ``_calculate_job_match``) so the
+    checklist always agrees with the score on the card. Renders up to 8
+    skills as ✅ matched / 🟡 related / ⬜ missing chips; returns "" when
+    the member has no resume or the job lists no skills. All skill names
+    are escaped (external scrape data).
+    """
+    if not resume_skills:
+        return ""
+    try:
+        from cybershield.api.v1.resumes import (
+            _calculate_job_match,
+            _JobMatchData,
+        )
+
+        job_data = _JobMatchData(
+            id=str(job.get("id") or ""),
+            title=str(job.get("title") or ""),
+            company=str(job.get("company") or ""),
+            required_skills=job.get("required_skills") or [],
+            preferred_skills=job.get("preferred_skills") or [],
+            tags=job.get("tags") or [],
+        )
+        result = _calculate_job_match(resume_skills, job_data)
+        rows = []
+        for skill in (result.matched_skills or [])[:4]:
+            rows.append(f"<span style='color:#065f46;'>✅ {_esc(str(skill))}</span>")
+        for skill in (result.related_skills or [])[:2]:
+            rows.append(f"<span style='color:#b45309;'>🟡 {_esc(str(skill))}</span>")
+        for skill in (result.missing_skills or [])[:4]:
+            rows.append(f"<span style='color:#b91c1c;'>⬜ {_esc(str(skill))}</span>")
+        if not rows:
+            return ""
+        chips = (
+            "<span style='display:inline-block;margin:3px 8px 0 0;'>"
+            + "</span><span style='display:inline-block;margin:3px 8px 0 0;'>".join(
+                rows
+            )
+            + "</span>"
+        )
+        return (
+            "<div style='margin-top:8px;padding:8px 10px;background:#f0fdf4;"
+            "border-radius:6px;font-size:12px;line-height:1.6;'>"
+            "<div style='font-weight:700;color:#166534;font-size:11px;"
+            "letter-spacing:.4px;'>✅ REQUIREMENTS CHECKLIST</div>"
+            f"<div style='margin-top:2px;'>{chips}</div></div>"
+        )
+    except Exception:  # noqa: BLE001 - a checklist must never break the card
+        return ""
+
+
 def _job_html_card(
     score,
     job: dict,
     accent: str,
     target_salary: int | None = None,
     keywords: list | None = None,
+    resume_skills: set | None = None,
 ) -> str:
-    """One job as an HTML card with an Apply button."""
+    """One job as an HTML card with an Apply button.
+
+    When ``resume_skills`` is given, the card also renders a **requirements
+    checklist**: the job's expected skills compared against the member's
+    resume — ✅ matched, 🟡 related (same skill family), ⬜ missing — so
+    the member sees at a glance exactly what the role expects vs. what
+    they already have.
+    """
     title = _esc(job.get("title") or "Untitled")
     company = _esc(job.get("company") or "")
     url = _esc(job.get("url") or "")
@@ -3461,6 +3577,9 @@ def _job_html_card(
             "<div style='margin-top:6px;font-size:12px;color:#0f766e;'>"
             f"🛠 Skills: {skills}</div>"
         )
+    checklist = _skills_checklist_html(job, resume_skills)
+    if checklist:
+        card += checklist
     chips = ""
     if _salary_meets_target(job, target_salary):
         chips += (
