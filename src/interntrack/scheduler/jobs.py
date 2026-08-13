@@ -427,6 +427,68 @@ def _build_team_recap_html(stats: dict, owner_name) -> str:
     )
 
 
+async def _notify_owner_of_failure(
+    session,
+    member_name: str,
+    member_email: str,
+    channel: str,
+    domain_label: str = "",
+) -> bool:
+    """Ping the team owner on Telegram when a member's delivery fails.
+
+    The owner is the account named by ``TEAM_OWNER_EMAIL`` when set,
+    otherwise the first-registered account (same rule as the weekly team
+    recap). The ping only fires when the bot token is configured AND the
+    owner has a ``telegram_chat_id`` saved on their profile; otherwise it
+    silently skips — the member's own history still records the failure.
+    Never raises; returns whether a ping was attempted.
+    """
+    try:
+        from sqlalchemy import select
+
+        from interntrack.config import get_settings
+        from interntrack.domain.models import User
+        from interntrack.services.notification_service import TelegramChannel
+
+        settings = get_settings()
+        if not (settings.telegram_bot_token and settings.is_telegram_configured):
+            return False
+        result = await session.execute(select(User).order_by(User.created_at.asc()))
+        users = list(result.scalars().all())
+        if not users:
+            return False
+        override = str(settings.team_owner_email or "").strip().lower()
+        owner = users[0]
+        if override:
+            for u in users:
+                if str(getattr(u, "email", "") or "").strip().lower() == override:
+                    owner = u
+                    break
+        owner_chat = str(getattr(owner, "telegram_chat_id", "") or "").strip()
+        if not owner_chat:
+            return False
+        lines = [
+            "⚠️ <b>Alert delivery failed</b>",
+            f"👤 {_esc(member_name or member_email or 'Member')}",
+            f"📧 {_esc(member_email or '—')}",
+            f"📡 channel: <b>{_esc(channel)}</b>",
+        ]
+        if domain_label:
+            lines.append(f"🎯 domains: {_esc(domain_label)}")
+        lines.append("")
+        lines.append(
+            "Check the SMTP / Resend credentials or the member's "
+            "spam settings — their digest did not go out."
+        )
+        await TelegramChannel(
+            bot_token=str(settings.telegram_bot_token),
+            chat_id=owner_chat,
+        ).send("\n".join(lines), subject="⚠️ Alert delivery failed")
+        return True
+    except Exception:  # noqa: BLE001 - owner pings must never break delivery
+        return False
+
+
 async def send_team_recap() -> dict:
     """Weekly owner email: what each team member's alerts delivered.
 
@@ -1252,6 +1314,26 @@ async def _send_alert_for(
         weekly=weekly,
         user=user,
     )
+    # Owner failure alerts: when a member's email channel was attempted but
+    # reports delivered=False, ping the owner on Telegram so a silent SMTP /
+    # Resend outage never leaves members without digests. Best-effort — the
+    # digest pipeline itself is unaffected by a failed ping.
+    try:
+        attempted = prefs.get("channels") or manager.get_configured_channels()
+        if "email" in attempted and results.get("email") is False:
+            member_name = str(getattr(user, "name", "") or "") if user else ""
+            member_email = str(getattr(user, "email", "") or "") if user else ""
+            fallback_id = user_id if user_id != DEFAULT_ALERT_USER else ""
+            await _notify_owner_of_failure(
+                session,
+                member_name=member_name,
+                member_email=member_email or fallback_id,
+                channel="email",
+                domain_label=", ".join(domains or []),
+            )
+    except Exception:  # noqa: BLE001, S110 - failure pings never break digests
+        pass
+
     # Compact snapshot of the jobs that were actually sent (with match %), so
     # the dashboard history shows the real digest content, not just a count.
     # Built defensively: history must never be lost to a scoring hiccup after

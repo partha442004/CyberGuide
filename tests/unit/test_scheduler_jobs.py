@@ -2633,3 +2633,134 @@ class TestRequirementsChecklist:
 
         assert _skills_checklist_lines({"tags": ["splunk"]}, None) == []
         assert _skills_checklist_lines({"tags": []}, {"python"}) == []
+
+
+class _FakeOwnerUser:
+    """Minimal User stand-in for owner-failure-alert tests."""
+
+    def __init__(self, email="owner@example.com", chat="12345"):
+        self.email = email
+        self.telegram_chat_id = chat
+        self.name = "Owner"
+        self.created_at = None
+
+
+class TestOwnerFailureAlert:
+    """Tests for the ⚠️ owner Telegram ping on member email failures."""
+
+    @pytest.mark.asyncio
+    async def test_pings_owner_when_email_fails(self, monkeypatch):
+        """A failed member email triggers a Telegram ping to the owner."""
+        from interntrack.scheduler.jobs import _notify_owner_of_failure
+
+        class _Settings:
+            telegram_bot_token = "bot:token"
+            telegram_chat_id = "111"
+            team_owner_email = None
+            is_telegram_configured = True
+
+        class _Result:
+            def scalars(self):
+                return self
+
+            def all(self):
+                return [_FakeOwnerUser()]
+
+        class _Session:
+            async def execute(self, *a, **k):
+                return _Result()
+
+        sent = {}
+
+        async def _fake_send(self, message, subject=None, buttons=None):
+            sent["message"] = message
+            sent["chat"] = self.chat_id
+            return True
+
+        monkeypatch.setattr("interntrack.config.get_settings", lambda: _Settings())
+        monkeypatch.setattr(
+            "interntrack.services.notification_service.TelegramChannel.send",
+            _fake_send,
+        )
+        ok = await _notify_owner_of_failure(
+            _Session(),
+            member_name="Skarkuzhali",
+            member_email="sk@example.com",
+            channel="email",
+            domain_label="frontend",
+        )
+        assert ok is True
+        assert sent["chat"] == "12345"
+        assert "Skarkuzhali" in sent["message"]
+        assert "sk@example.com" in sent["message"]
+        assert "frontend" in sent["message"]
+
+    @pytest.mark.asyncio
+    async def test_skips_when_telegram_not_configured(self, monkeypatch):
+        """No bot token → no ping (silent skip)."""
+        from interntrack.scheduler.jobs import _notify_owner_of_failure
+
+        class _Settings:
+            telegram_bot_token = None
+            telegram_chat_id = None
+            team_owner_email = None
+            is_telegram_configured = False
+
+        class _Session:
+            async def execute(self, *a, **k):
+                raise AssertionError("no DB call expected")
+
+        monkeypatch.setattr("interntrack.config.get_settings", lambda: _Settings())
+        ok = await _notify_owner_of_failure(
+            _Session(), member_name="X", member_email="x@x.com", channel="email"
+        )
+        assert ok is False
+
+    @pytest.mark.asyncio
+    async def test_skips_when_owner_has_no_chat_id(self, monkeypatch):
+        """Owner without a Telegram chat id → silent skip."""
+        from interntrack.scheduler.jobs import _notify_owner_of_failure
+
+        class _Settings:
+            telegram_bot_token = "bot:token"
+            telegram_chat_id = "111"
+            team_owner_email = None
+            is_telegram_configured = True
+
+        class _Result:
+            def scalars(self):
+                return self
+
+            def all(self):
+                return [_FakeOwnerUser(chat=None)]
+
+        class _Session:
+            async def execute(self, *a, **k):
+                return _Result()
+
+        monkeypatch.setattr("interntrack.config.get_settings", lambda: _Settings())
+        ok = await _notify_owner_of_failure(
+            _Session(), member_name="X", member_email="x@x.com", channel="email"
+        )
+        assert ok is False
+
+    @pytest.mark.asyncio
+    async def test_never_raises_on_db_failure(self, monkeypatch):
+        """A broken session never breaks the digest pipeline."""
+        from interntrack.scheduler.jobs import _notify_owner_of_failure
+
+        class _Settings:
+            telegram_bot_token = "bot:token"
+            telegram_chat_id = "111"
+            team_owner_email = None
+            is_telegram_configured = True
+
+        class _Session:
+            async def execute(self, *a, **k):
+                raise RuntimeError("db down")
+
+        monkeypatch.setattr("interntrack.config.get_settings", lambda: _Settings())
+        ok = await _notify_owner_of_failure(
+            _Session(), member_name="X", member_email="x@x.com", channel="email"
+        )
+        assert ok is False

@@ -16,6 +16,14 @@ All notable changes to the InternTrack project will be documented in this file.
   (experience prefs limited to entry/junior): the freshest entry-level
   postings from their own digest lead the email so qualifying roles are
   never buried under senior listings.
+- **⚠️ Owner failure alerts.** When a member's digest email is attempted
+  but reports ``delivered=False`` (SMTP / Resend outage, bad credentials),
+  the team owner is pinged on Telegram with the member's name, email and
+  domains — so a silent mail failure never leaves members without digests.
+  Owner = ``TEAM_OWNER_EMAIL`` when set, else the first-registered
+  account; pings only fire when the bot token is configured and the owner
+  has a Telegram chat id saved. Best-effort: a failed ping never breaks
+  the digest pipeline.
 - **✅ Requirements checklist on every email job card.** Each card now
   compares the role's expected skills against the member's own resume and
   renders ✅ matched / 🟡 related (same skill family) / ⬜ missing chips,
