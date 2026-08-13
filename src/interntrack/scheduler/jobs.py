@@ -995,6 +995,154 @@ async def send_closing_soon_alerts() -> dict:
         return await _send_closing_soon_sweep(session)
 
 
+def _follow_up_nudge_text(item: dict) -> tuple[str, list[tuple[str, str]]]:
+    """Message + buttons for one stale-application follow-up nudge.
+
+    ``item`` carries application_id / job_title / company / job_url /
+    days_since. Renders a short message with a copy-paste follow-up
+    template the user can send the recruiter, plus a View-job button.
+    Pure and testable.
+    """
+    title = str(item.get("job_title") or "the role")
+    company = str(item.get("company") or "the company")
+    days = int(item.get("days_since") or 0)
+    lines = [
+        f"⏰ <b>Still waiting after {days} day{'s' if days != 1 else ''}?</b>",
+        (
+            f"You applied for <b>{_esc(title)}</b> @ {_esc(company)} and there "
+            "has been no update since."
+        ),
+        "",
+        "💬 A quick follow-up can revive it — try:",
+        (
+            f'"Hi {_esc(company)} team, I applied for the {_esc(title)} role '
+            "recently and wanted to check in on the status. I am very excited "
+            "about the opportunity and happy to provide any further details. "
+            'Thank you!"'
+        ),
+        "",
+        (
+            "Send it on LinkedIn or email, then update the status on your "
+            "dashboard when you hear back."
+        ),
+    ]
+    buttons: list[tuple[str, str]] = []
+    if item.get("job_url"):
+        buttons.append(("🔗 View job", str(item["job_url"])))
+    return "\n".join(lines), buttons
+
+
+async def _send_follow_up_nudges(session, days: int = 7) -> dict:
+    """One follow-up nudge per user for applications stuck in 'applied'.
+
+    Applications that have been sitting in the ``applied`` status for
+    ``days``+ (no interview, no rejection, no offer) get a short nudge
+    through the user's saved channels with a copy-paste follow-up
+    template. Each application is nudged exactly once (``reminded``
+    flag). Only enabled, non-paused accounts are pinged; the legacy
+    ``user1`` default is skipped when accounts exist. Never raises;
+    returns ``{user_id: count}`` for logging.
+    """
+    sent: dict = {}
+    try:
+        from sqlalchemy import select
+
+        from interntrack.domain.enums import ApplicationStatus
+        from interntrack.domain.models import Application, Job
+
+        now = datetime.now(UTC).replace(tzinfo=None)
+        cutoff = (now - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
+        result = await session.execute(
+            select(Application, Job)
+            .join(Job, Application.job_id == Job.id)
+            .where(
+                Application.status == ApplicationStatus.APPLIED,
+                Application.reminded.is_(False),
+                Application.applied_at.isnot(None),
+            )
+        )
+        rows = result.all()
+        targets = await _enabled_alert_targets(session)
+        by_user = {t["user_id"]: t for t in targets if t.get("user_id")}
+        pending: list[dict] = []
+        for app, job in rows:
+            applied_at = getattr(app, "applied_at", None)
+            if applied_at is None:
+                continue
+            stamp = applied_at.strftime("%Y-%m-%d %H:%M:%S")
+            if stamp >= cutoff:
+                continue
+            pending.append(
+                {
+                    "application_id": str(getattr(app, "id", "") or ""),
+                    "user_id": str(getattr(app, "user_id", "") or ""),
+                    "job_title": getattr(job, "title", None) or "the role",
+                    "company": getattr(job, "company", None) or "the company",
+                    "job_url": getattr(job, "url", None) or "",
+                    "days_since": max(1, (now - applied_at).days),
+                }
+            )
+        if not pending:
+            return sent
+        for item in pending:
+            uid = item["user_id"]
+            target = by_user.get(uid)
+            if not target:
+                continue
+            prefs = target.get("prefs") or {}
+            if _alerts_paused(prefs):
+                continue
+            manager = NotificationManager(session)
+            channel_list = (
+                prefs.get("channels")
+                or manager.get_configured_channels()
+                or ["email", "telegram"]
+            )
+            text, buttons = _follow_up_nudge_text(item)
+            recipient = None
+            user = target.get("user")
+            if user is not None:
+                recipient = {
+                    "email": getattr(user, "email", None),
+                    "telegram_chat_id": getattr(user, "telegram_chat_id", None),
+                    "phone_number": getattr(user, "phone_number", None),
+                }
+            results = await manager.notify(
+                channel_list,
+                text,
+                subject="⏰ Follow up on your application",
+                buttons=buttons or None,
+                recipient=recipient,
+            )
+            await _record_alert_history(
+                session,
+                user_id=uid,
+                subject="⏰ Follow up on your application",
+                channels=list(results.keys()),
+                domains=prefs.get("domains") or [],
+                job_count=1,
+                results=results,
+            )
+            from sqlalchemy import update
+
+            await session.execute(
+                update(Application)
+                .where(Application.id == item["application_id"])
+                .values(reminded=True)
+            )
+            await session.commit()
+            sent[uid] = sent.get(uid, 0) + 1
+    except Exception as e:  # noqa: BLE001 - nudge must never break the app
+        print(f"[{datetime.now(UTC)}] Follow-up nudges failed: {e}")
+    return sent
+
+
+async def send_follow_up_nudges() -> dict:
+    """Scheduled wrapper: run the follow-up nudge sweep on its own session."""
+    async with get_db_session() as session:
+        return await _send_follow_up_nudges(session)
+
+
 async def _interview_reminders_for(
     session,
     user_id: str,
