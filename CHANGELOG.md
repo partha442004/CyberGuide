@@ -4,6 +4,16 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Job creation 500 on scraper job-type labels.** The live Postgres
+  `jobtype` column is a native enum; free-text labels from scrapers
+  (e.g. JobDexo's `"Fulltime"`) crashed inserts with a 500. Job creation
+  now maps scraper labels (`Fulltime`/`Full Time` → `full_time`,
+  `Parttime`/`part-time` → `part_time`, `Intern` → `internship`, ...)
+  and falls back to title-based inference for anything unrecognized, so
+  the PC discovery CLI and every other save path are protected.
+
 ### Added
 
 - **🏢 Top companies hiring near you** section in daily digests. A market

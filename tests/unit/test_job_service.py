@@ -101,6 +101,63 @@ class TestJobService:
         assert created.job_type == "full_time"
 
     @pytest.mark.asyncio
+    async def test_create_job_maps_scraper_job_type_labels(
+        self, service, mock_job_repo
+    ):
+        """Free-text scraper labels map to valid enum values.
+
+        The live Postgres ``jobtype`` column is a native enum — a scraper
+        label like ``"Fulltime"`` (JobDexo) used to crash inserts with a
+        500. Every label must land on a canonical enum value or fall back
+        to title inference.
+        """
+        cases = [
+            ("Fulltime", "full_time"),
+            ("Full Time", "full_time"),
+            ("part-time", "part_time"),
+            ("Parttime", "part_time"),
+            ("Intern", "internship"),
+            ("Contract", "contract"),
+            ("Freelance", "freelance"),
+        ]
+        for raw, expected in cases:
+            mock_job_repo.reset_mock()
+            mock_job_repo.create.return_value = Job(
+                id="x",
+                title="Role",
+                company="Co",
+                url="https://example.com/x",
+                source=JobSource.MANUAL,
+            )
+            await service.create_job(
+                {
+                    "title": "Security Analyst",
+                    "company": "SecureCo",
+                    "url": f"https://example.com/{expected}",
+                    "job_type": raw,
+                }
+            )
+            created = mock_job_repo.create.call_args[0][0]
+            assert created.job_type == expected, f"{raw!r} -> {created.job_type}"
+
+    @pytest.mark.asyncio
+    async def test_create_job_unknown_job_type_falls_back_to_title(
+        self, service, mock_job_repo
+    ):
+        """Unrecognized labels fall back to title-based inference."""
+        await service.create_job(
+            {
+                "title": "Cybersecurity Intern",
+                "company": "SecureCo",
+                "url": "https://example.com/weird",
+                "job_type": "Fulltime Employment",
+            }
+        )
+
+        created = mock_job_repo.create.call_args[0][0]
+        assert created.job_type == "internship"
+
+    @pytest.mark.asyncio
     async def test_create_job_truncates_overlong_fields(self, service, mock_job_repo):
         """Over-long fields are clamped so Postgres varchar(N) never rejects."""
         job_data = {
