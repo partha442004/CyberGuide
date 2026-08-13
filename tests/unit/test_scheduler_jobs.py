@@ -2578,3 +2578,58 @@ class TestDigestMarketSections:
         assert salary_band_txt(1200000, None) == "₹12 LPA"
         assert salary_band_txt(None, None) == ""
         assert salary_band_txt(80000, 100000, currency="USD") == "$80k–$100k"
+
+
+class TestRequirementsChecklist:
+    """Tests for the ✅/⬜ requirements checklist on job cards."""
+
+    def test_html_checklist_renders_matched_and_missing(self):
+        """With resume skills, cards render ✅ matched / ⬜ missing chips."""
+        from interntrack.scheduler.jobs import _job_html_card
+
+        card = _job_html_card(
+            60.0,
+            {
+                "title": "SOC Analyst",
+                "company": "SecureCo",
+                "tags": ["splunk", "python", "siem"],
+            },
+            "#e5484d",
+            resume_skills={"python"},
+        )
+        assert "REQUIREMENTS CHECKLIST" in card
+        assert "✅ python" in card
+        assert "⬜ splunk" in card
+
+    def test_html_checklist_skipped_without_resume(self):
+        """No resume skills → no checklist block on the card."""
+        from interntrack.scheduler.jobs import _job_html_card
+
+        card = _job_html_card(
+            80.0,
+            {
+                "title": "SOC Analyst",
+                "company": "SecureCo",
+                "tags": ["splunk"],
+            },
+            "#e5484d",
+        )
+        assert "REQUIREMENTS CHECKLIST" not in card
+
+    def test_lines_checklist_plain_text(self):
+        """Plain-text digest shows compact ✅/⬜ skill chips."""
+        from interntrack.scheduler.jobs import _skills_checklist_lines
+
+        rows = _skills_checklist_lines(
+            {"tags": ["splunk", "python", "siem"]},
+            {"python"},
+        )
+        assert any("✅python" in r for r in rows)
+        assert any("⬜splunk" in r for r in rows)
+
+    def test_lines_checklist_skipped_without_resume(self):
+        """No resume → empty checklist (never raises)."""
+        from interntrack.scheduler.jobs import _skills_checklist_lines
+
+        assert _skills_checklist_lines({"tags": ["splunk"]}, None) == []
+        assert _skills_checklist_lines({"tags": []}, {"python"}) == []
