@@ -235,6 +235,25 @@ Vercel (serverless) with a Neon Postgres database. Both are free forever.
 
 Note: serverless cold start is ~1-3s on the first request after idle.
 
+### 💻 PC discovery CLI (optional — unlock bot-gated sources)
+
+Some boards (JobDexo, Foundit, Apna, Cutshort) bot-gate datacenter IPs,
+so Vercel's cron can't fetch them directly. From a residential network
+*your machine* they work fine. `scripts/pc_discovery.py` runs those
+scrapers locally and pushes the parsed jobs straight into the live DB:
+
+```bash
+# One quick run: cybersecurity jobs near Bangalore, all 4 blocked sources
+python scripts/pc_discovery.py --query "cybersecurity" --location "Bangalore"
+
+# Every member's domains + cities in one go
+python scripts/pc_discovery.py --all-members --limit 20
+```
+
+Each run prints what was found vs. what actually saved (duplicates are
+skipped automatically). You can schedule it yourself (Task Scheduler /
+cron) or just run it whenever you want a fresh batch from those boards.
+
 ---
 
 ## 🐳 Docker Deployment
