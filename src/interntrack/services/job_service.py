@@ -203,7 +203,15 @@ _JOB_TYPE_ALIASES = {
 }
 
 
-_VALID_JOB_TYPES = {"internship", "full_time", "part_time", "contract", "freelance", "remote", "unknown"}
+_VALID_JOB_TYPES = {
+    "internship",
+    "full_time",
+    "part_time",
+    "contract",
+    "freelance",
+    "remote",
+    "unknown",
+}
 
 
 def _normalize_job_type(value) -> str | None:
