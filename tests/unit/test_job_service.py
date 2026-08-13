@@ -2,6 +2,7 @@
 Unit tests for JobService.
 """
 
+from datetime import UTC
 from unittest.mock import AsyncMock
 
 import pytest
@@ -383,3 +384,124 @@ class TestJobService:
         assert "salary_stats" in result
         assert "top_companies" in result
         assert "job_types" in result
+
+
+class TestLenientEnum:
+    """Legacy rows with out-of-enum values must load, not crash.
+
+    SQLAlchemy's Enum (validate_strings=False) stores any string on bind
+    but raises on *load* for values outside the enum — the live Postgres
+    had rows saved with a scraper's raw ``job_type="Fulltime"``, which
+    turned dedup/search/stats reads into 500s. LenientEnum maps unknown
+    stored values to a safe fallback.
+    """
+
+    def test_legacy_job_type_loads_as_unknown(self):
+        from datetime import datetime
+
+        from sqlalchemy import create_engine, text
+
+        from interntrack.domain.models import Base, Job
+
+        engine = create_engine("sqlite://")
+        Base.metadata.create_all(engine)
+        now = datetime.now(UTC)
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO jobs (id, title, company, url, source, job_type, "
+                    "created_at, updated_at) VALUES ('j1', 'Old Role', 'Old Co', "
+                    "'https://x/1', 'search_engine', 'Fulltime', :now, :now)"
+                ),
+                {"now": now},
+            )
+        with engine.connect() as conn:
+            job = (
+                conn.execute(text("SELECT * FROM jobs WHERE id = 'j1'"))
+                .mappings()
+                .one()
+            )
+            assert job["job_type"] == "Fulltime"
+
+        # Re-load through the ORM: the bad stored value maps to UNKNOWN.
+        from sqlalchemy.orm import Session
+
+        with Session(engine) as session:
+            loaded = session.get(Job, "j1")
+            assert loaded.job_type == JobType.UNKNOWN
+            assert loaded.source == JobSource.SEARCH_ENGINE
+
+    def test_legacy_experience_level_loads_as_none(self):
+        from datetime import datetime
+
+        from sqlalchemy import create_engine, text
+        from sqlalchemy.orm import Session
+
+        from interntrack.domain.models import Base, Job
+
+        engine = create_engine("sqlite://")
+        Base.metadata.create_all(engine)
+        now = datetime.now(UTC)
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO jobs (id, title, company, url, source, job_type, "
+                    "experience_level, created_at, updated_at) VALUES "
+                    "('j2', 'Role', 'Co', 'https://x/2', 'manual', 'full_time', "
+                    "'Entry Level', :now, :now)"
+                ),
+                {"now": now},
+            )
+        with Session(engine) as session:
+            loaded = session.get(Job, "j2")
+            assert loaded.experience_level is None
+
+
+class TestJobServiceIntegrity:
+    """Unique-constraint races surface as 409s, not 500s."""
+
+    @pytest.fixture
+    def mock_session(self):
+        """Mock database session."""
+        return AsyncMock()
+
+    @pytest.fixture
+    def mock_job_repo(self):
+        """Mock job repository."""
+        repo = AsyncMock()
+        repo.get_by_url.return_value = None
+        repo.find_cross_source_duplicate.return_value = None
+        repo.create.return_value = Job(
+            id="x",
+            title="Test Job",
+            company="Test Company",
+            url="https://example.com/job/1",
+            source=JobSource.MANUAL,
+        )
+        return repo
+
+    @pytest.fixture
+    def service(self, mock_session, mock_job_repo):
+        """Create JobService with mocked dependencies."""
+        service = JobService(mock_session)
+        service.job_repo = mock_job_repo
+        return service
+
+    @pytest.mark.asyncio
+    async def test_create_job_maps_integrity_error_to_duplicate(
+        self, service, mock_job_repo
+    ):
+        """A unique-constraint race on url surfaces as a 409, not a 500."""
+        from sqlalchemy.exc import IntegrityError
+
+        mock_job_repo.create.side_effect = IntegrityError(
+            "INSERT INTO jobs", {}, Exception("unique constraint")
+        )
+        with pytest.raises(DuplicateJobError):
+            await service.create_job(
+                {
+                    "title": "Race Job",
+                    "company": "Race Co",
+                    "url": "https://example.com/race",
+                }
+            )

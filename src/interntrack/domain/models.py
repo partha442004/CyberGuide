@@ -19,6 +19,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.orm import DeclarativeBase, relationship, validates
+from sqlalchemy.types import TypeDecorator
 
 from interntrack.domain.enums import (
     ApplicationStatus,
@@ -44,6 +45,47 @@ class TimestampMixin:
         onupdate=utcnow,
         nullable=False,
     )
+
+
+class LenientEnum(TypeDecorator):
+    """Enum-backed column that tolerates legacy stored values.
+
+    SQLAlchemy's ``Enum`` (``validate_strings=False``, the default) stores
+    any string on bind but raises on *load* for a value outside the enum
+    class. Rows saved before label normalization existed (e.g. a scraper's
+    ``job_type="Fulltime"``) then turn every query that loads them —
+    cross-source dedup, search, stats — into a 500. This wrapper maps
+    unknown stored values to a safe fallback instead of raising: the
+    ``fallback`` member (e.g. ``JobType.UNKNOWN``) for non-nullable
+    columns, or ``None`` for nullable ones. Raw labels are still mapped to
+    enum members on bind when possible, so new writes stay canonical.
+    """
+
+    impl = String
+    cache_ok = True
+
+    def __init__(self, enum_cls, fallback=None, length: int = 50, **kwargs):
+        super().__init__(length=length, **kwargs)
+        self.enum_cls = enum_cls
+        self.fallback = fallback
+
+    def process_bind_param(self, value, _dialect):
+        if value is None:
+            return None
+        if isinstance(value, self.enum_cls):
+            return value.value
+        try:
+            return self.enum_cls(value).value
+        except ValueError:
+            return None if self.fallback is None else self.fallback.value
+
+    def process_result_value(self, value, _dialect):
+        if value is None:
+            return None
+        try:
+            return self.enum_cls(value)
+        except ValueError:
+            return self.fallback
 
 
 class User(Base, TimestampMixin):
@@ -95,29 +137,17 @@ class Job(Base, TimestampMixin):
     description = Column(Text, nullable=True)
     url = Column(String(2000), nullable=False, unique=True)
     source: Column = Column(
-        Enum(
-            JobSource,
-            native_enum=False,
-            values_callable=lambda e: [m.value for m in e],
-        ),
+        LenientEnum(JobSource, fallback=JobSource.UNKNOWN, length=30),
         nullable=False,
         default=JobSource.UNKNOWN,
     )
     job_type: Column = Column(
-        Enum(
-            JobType,
-            native_enum=False,
-            values_callable=lambda e: [m.value for m in e],
-        ),
+        LenientEnum(JobType, fallback=JobType.UNKNOWN, length=30),
         nullable=False,
         default=JobType.UNKNOWN,
     )
     experience_level: Column = Column(
-        Enum(
-            ExperienceLevel,
-            native_enum=False,
-            values_callable=lambda e: [m.value for m in e],
-        ),
+        LenientEnum(ExperienceLevel, fallback=None, length=30),
         nullable=True,
     )
     salary_min = Column(Integer, nullable=True)
