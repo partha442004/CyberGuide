@@ -2482,9 +2482,7 @@ async def build_daily_report_message(
             lines.append(f"🏢 Top companies hiring{near_txt}:")
             for company, count, salary in companies:
                 salary_txt = f" · {salary}" if salary else ""
-                lines.append(
-                    f"   {_esc(company)} — {count} fresh role(s){salary_txt}"
-                )
+                lines.append(f"   {_esc(company)} — {count} fresh role(s){salary_txt}")
 
     if sections or watched_jobs:
         lines.append("")
