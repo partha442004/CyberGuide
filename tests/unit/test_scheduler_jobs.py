@@ -2382,3 +2382,162 @@ class TestWeeklySalaryInsight:
         await _weekly_salary_insight(AsyncMock(), ["coding", "security"], "Bangalore")
         # security is tried first even when it is second in the pref list.
         assert seen[0] == "security"
+
+
+class TestDigestMarketSections:
+    """Tests for the 🏢 Top companies and 🎓 Internships & fresher sections."""
+
+    @pytest.mark.asyncio
+    async def test_html_shows_top_companies_near(self, monkeypatch):
+        """Daily HTML email renders the market snapshot when companies exist."""
+        from interntrack.scheduler.jobs import build_daily_report_html
+
+        async def _fake_companies(session, user_location=None, include_remote=True):
+            return [("Acme Corp", 4), ("SecureCo", 2)]
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._top_companies_near", _fake_companies
+        )
+        report = {
+            "summary": {"new_jobs": 1, "new_applications": 0},
+            "new_jobs": [
+                {
+                    "id": "job-1",
+                    "title": "Security Engineer",
+                    "company": "Acme Corp",
+                    "location": "Bengaluru",
+                    "url": "https://acme.example/apply",
+                    "tags": ["security"],
+                    "experience_level": "senior",
+                }
+            ],
+        }
+        html = await build_daily_report_html(
+            report, AsyncMock(), user_location="Bangalore"
+        )
+        assert "Top companies hiring near you" in html
+        assert "Acme Corp" in html
+        assert "4" in html
+
+    @pytest.mark.asyncio
+    async def test_html_fresher_highlight_for_fresher_only(self, monkeypatch):
+        """Fresher-only users get the 🎓 section with their fresher roles."""
+        from interntrack.scheduler.jobs import build_daily_report_html
+
+        async def _fake_fresher(report, session, domains=None, user_id=None, limit=3):
+            return [
+                {
+                    "title": "SOC Intern",
+                    "company": "SecureCo",
+                    "location": "Pune",
+                    "url": "https://secure.example/intern",
+                    "experience_level": "intern",
+                    "tags": ["security"],
+                }
+            ]
+
+        async def _fake_companies(session, user_location=None, include_remote=True):
+            return []
+
+        monkeypatch.setattr("interntrack.scheduler.jobs._fresher_roles", _fake_fresher)
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._top_companies_near", _fake_companies
+        )
+        report = {
+            "summary": {"new_jobs": 1, "new_applications": 0},
+            "fresher_only": True,
+            "new_jobs": [
+                {
+                    "id": "job-1",
+                    "title": "SOC Intern",
+                    "company": "SecureCo",
+                    "location": "Pune",
+                    "url": "https://secure.example/intern",
+                    "tags": ["security"],
+                    "experience_level": "intern",
+                }
+            ],
+        }
+        html = await build_daily_report_html(report, AsyncMock())
+        assert (
+            "🎓 Internships &amp; fresher roles" in html
+            or "🎓 Internships & fresher roles" in html
+        )
+        assert "SOC Intern" in html
+
+    @pytest.mark.asyncio
+    async def test_no_fresher_section_when_not_fresher_only(self, monkeypatch):
+        """Non-fresher-only users never see the 🎓 highlight."""
+        from interntrack.scheduler.jobs import build_daily_report_html
+
+        async def _fake_companies(session, user_location=None, include_remote=True):
+            return []
+
+        async def _unexpected(report, session, domains=None, user_id=None, limit=3):
+            raise AssertionError("_fresher_roles must not be called")
+
+        monkeypatch.setattr("interntrack.scheduler.jobs._fresher_roles", _unexpected)
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._top_companies_near", _fake_companies
+        )
+        report = {
+            "summary": {"new_jobs": 1, "new_applications": 0},
+            "new_jobs": [
+                {
+                    "id": "job-1",
+                    "title": "Security Engineer",
+                    "company": "Acme Corp",
+                    "url": "https://acme.example/apply",
+                    "tags": ["security"],
+                }
+            ],
+        }
+        html = await build_daily_report_html(report, AsyncMock())
+        assert "Internships &amp; fresher" not in html
+
+    @pytest.mark.asyncio
+    async def test_message_shows_top_companies_and_fresher(self, monkeypatch):
+        """Plain-text digest renders both new sections."""
+        from interntrack.scheduler.jobs import build_daily_report_message
+
+        async def _fake_companies(session, user_location=None, include_remote=True):
+            return [("Acme Corp", 4)]
+
+        async def _fake_fresher(report, session, domains=None, user_id=None, limit=3):
+            return [
+                {
+                    "title": "SOC Intern",
+                    "company": "SecureCo",
+                    "location": "Pune",
+                    "url": "https://secure.example/intern",
+                    "experience_level": "intern",
+                    "tags": ["security"],
+                }
+            ]
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._top_companies_near", _fake_companies
+        )
+        monkeypatch.setattr("interntrack.scheduler.jobs._fresher_roles", _fake_fresher)
+        report = {
+            "summary": {"new_jobs": 1, "new_applications": 0},
+            "fresher_only": True,
+            "new_jobs": [
+                {
+                    "id": "job-1",
+                    "title": "SOC Intern",
+                    "company": "SecureCo",
+                    "location": "Pune",
+                    "url": "https://secure.example/intern",
+                    "tags": ["security"],
+                    "experience_level": "intern",
+                }
+            ],
+        }
+        message = await build_daily_report_message(
+            report, AsyncMock(), user_location="Pune"
+        )
+        assert "Top companies hiring near Pune" in message
+        assert "Acme Corp — 4 fresh role(s)" in message
+        assert "🎓 Internships & fresher roles:" in message
+        assert "SOC Intern" in message
