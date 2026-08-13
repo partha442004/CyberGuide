@@ -59,14 +59,20 @@ def _now() -> str:
     return datetime.now(UTC).strftime("%H:%M:%S")
 
 
-async def _member_queries(api_url: str, location: str) -> list[str]:
-    """Derive (query, location) pairs from the live delivery overview.
+async def _member_queries(api_url: str, location: str) -> list[tuple[str, str]]:
+    """Derive (keyword, location) pairs from the live delivery overview.
 
-    Each member's stored domains + location become one discovery query so
-    a single ``--all-members`` run covers every account's interests.
+    Each member's stored domains are mapped to their real search keywords
+    (the same ``DOMAIN_QUERIES`` the scheduler uses — e.g. the
+    ``security`` domain becomes ``cybersecurity``, ``soc analyst``, ...)
+    because boards like JobDexo index specific keywords and return 0 for
+    bare domain labels or double-city compound queries. The location is
+    passed separately so each scraper appends it in its own format.
     """
     pairs: list[tuple[str, str]] = []
     try:
+        from interntrack.scheduler.jobs import DOMAIN_QUERIES
+
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(f"{api_url}/api/v1/notifications/delivery-overview")
             resp.raise_for_status()
@@ -75,13 +81,16 @@ async def _member_queries(api_url: str, location: str) -> list[str]:
             domains = [d for d in (m.get("domains") or []) if d]
             loc = (m.get("location") or location).strip()
             for d in domains[:2]:
-                pairs.append((d, loc))
+                keywords = [k for k in (DOMAIN_QUERIES.get(d) or [d])[:2] if k.strip()]
+                for keyword in keywords:
+                    if (keyword, loc) not in pairs:
+                        pairs.append((keyword, loc))
     except Exception as e:  # noqa: BLE001 - fall back to defaults
         print(f"  ⚠ delivery overview unavailable ({e}) — using defaults")
         pairs.append(("cybersecurity", location))
     if not pairs:
         pairs.append(("cybersecurity", location))
-    return [f"{q} {loc}".strip() for q, loc in pairs]
+    return pairs
 
 
 async def _run_scraper(name: str, query: str, location: str) -> list:
