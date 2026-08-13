@@ -14,7 +14,10 @@ All notable changes to the InternTrack project will be documented in this file.
   Registered in the default registry, added to the `JobSource` enum and
   the source-alias map, and covered by 16 unit tests (card extraction,
   double-escaped entities, salary/deadline parsing, relevance filter,
-  HTTP-error fallback). Live-verified: "cybersecurity" → Security Analyst I
+  HTTP-error fallback). Like foundit, the direct HTML fetch is bot-gated
+  from Vercel's datacenter IPs, so `search_engine` also surfaces
+  ``site:jobdexo.com`` postings (Bing path) as the always-on fallback.
+  Live-verified locally: "cybersecurity" → Security Analyst I
   (Fortuna Cysec), Associate Security Analytics (Charles Schwab);
   "data analyst" → 10 roles incl. Baner/Pune listings; "hardware engineer"
   → Qualcomm (12 LPA).

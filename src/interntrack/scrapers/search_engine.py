@@ -48,6 +48,7 @@ _JOB_HOSTS = (
     "shine.com",
     "hirect.in",
     "jobhai.com",
+    "jobdexo.com",
     "freshersworld.com",
     "unstop.com",
     "hackerearth.com",
@@ -345,7 +346,10 @@ class SearchEngineScraper(BaseScraper):
             f"site:linkedin.com/jobs OR site:in.linkedin.com/jobs {q}",
             f"site:cutshort.io {q}",
             f"site:wellfound.com {q}",
-            f"site:foundit.in OR site:timesjobs.com OR site:hirect.in {q}",
+            (
+                f"site:foundit.in OR site:timesjobs.com OR site:hirect.in "
+                f"OR site:jobdexo.com {q}"
+            ),
             (
                 f"site:naukri.com OR site:shine.com OR site:freshersworld.com "
                 f"OR site:unstop.com {q}"

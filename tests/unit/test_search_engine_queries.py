@@ -107,6 +107,7 @@ class TestSearchEngineQueries:
             "site:foundit.in",
             "site:timesjobs.com",
             "site:hirect.in",
+            "site:jobdexo.com",
             # Cybersecurity-specific boards.
             "site:cybersecurityjobs.com",
             "site:cybersecurityjobsite.com",
