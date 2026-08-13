@@ -195,7 +195,7 @@ class JobDexoScraper(BaseScraper):
         jobs: list[RawJob] = []
         try:
             async with httpx.AsyncClient(
-                timeout=15,
+                timeout=20,
                 follow_redirects=True,
                 headers={
                     "User-Agent": (
@@ -203,6 +203,7 @@ class JobDexoScraper(BaseScraper):
                         "AppleWebKit/537.36 Chrome/126.0.0.0 Safari/537.36"
                     ),
                     "Accept": "text/html,application/xhtml+xml",
+                    "Accept-Language": "en-IN,en;q=0.9",
                 },
             ) as client:
                 resp = await client.get(self._search_url(query, location))
@@ -214,6 +215,13 @@ class JobDexoScraper(BaseScraper):
                     )
                     return jobs
                 cards = self._extract_cards(resp.text)
+                if not cards:
+                    # A 200 page without job-card blocks is almost always a
+                    # bot-wall/captcha page, not a genuinely empty search.
+                    logger.warning(
+                        "JobDexo returned 200 with no cards for %s (bot page?)",
+                        self._search_url(query, location),
+                    )
                 for card in cards:
                     if len(jobs) >= limit:
                         break
