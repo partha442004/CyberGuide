@@ -1307,24 +1307,27 @@ async def _top_companies_near(
     include_remote: bool = True,
     days: int = 7,
     limit: int = 6,
-) -> list[tuple[str, int]]:
+) -> list[tuple[str, int, str]]:
     """Hiring companies near a user's city, ranked by recent postings.
 
     Counts active jobs from the last ``days`` days whose location matches
     the user's preferred city (synonym-aware, remote opt-in), grouped by
     company — a "who is hiring around me right now" market snapshot for
-    the daily email, even on days with few new matches. ``Unknown``
-    companies are skipped. Never raises; ``[]`` on any problem.
+    the daily email, even on days with few new matches. Each entry is
+    ``(company, job_count, salary_range)`` where the salary range is the
+    median band (e.g. ``₹8–12 LPA``) of that company's posted roles, or
+    ``""`` when none carry a salary. ``Unknown`` companies are skipped.
+    Never raises; ``[]`` on any problem.
     """
     try:
-        from collections import Counter
+        from statistics import median
 
         from interntrack.repositories.job_repository import JobRepository
-        from interntrack.utils.helpers import location_allows
+        from interntrack.utils.helpers import location_allows, salary_band_txt
 
         jobs = await JobRepository(session).get_recent_jobs(days=days)
         loc_lower = (user_location or "").strip().lower()
-        counts: Counter = Counter()
+        per_company: dict[str, dict] = {}
         for job in jobs:
             if not getattr(job, "is_active", True):
                 continue
@@ -1337,8 +1340,20 @@ async def _top_companies_near(
                 include_remote=include_remote,
             ):
                 continue
-            counts[company] += 1
-        return counts.most_common(limit)
+            entry = per_company.setdefault(company, {"count": 0, "min": [], "max": []})
+            entry["count"] += 1
+            if getattr(job, "salary_min", None) is not None:
+                entry["min"].append(float(job.salary_min))
+            if getattr(job, "salary_max", None) is not None:
+                entry["max"].append(float(job.salary_max))
+        out: list[tuple[str, int, str]] = []
+        for company, entry in sorted(
+            per_company.items(), key=lambda kv: kv[1]["count"], reverse=True
+        )[:limit]:
+            low = median(entry["min"]) if entry["min"] else None
+            high = median(entry["max"]) if entry["max"] else None
+            out.append((company, entry["count"], salary_band_txt(low, high)))
+        return out
     except Exception:  # noqa: BLE001 - never break the digest
         return []
 
@@ -2465,8 +2480,11 @@ async def build_daily_report_message(
             lines.append("")
             near_txt = f" near {user_location}" if user_location else ""
             lines.append(f"🏢 Top companies hiring{near_txt}:")
-            for company, count in companies:
-                lines.append(f"   {_esc(company)} — {count} fresh role(s)")
+            for company, count, salary in companies:
+                salary_txt = f" · {salary}" if salary else ""
+                lines.append(
+                    f"   {_esc(company)} — {count} fresh role(s){salary_txt}"
+                )
 
     if sections or watched_jobs:
         lines.append("")
@@ -3084,13 +3102,19 @@ async def build_daily_report_html(
         )
         if companies:
             company_chips = []
-            for company, count in companies:
+            for company, count, salary in companies:
+                salary_html = (
+                    f"<br/><span style='color:#047857;font-size:11px;'>"
+                    f"💰 {_esc(salary)}</span>"
+                    if salary
+                    else ""
+                )
                 company_chips.append(
                     "<div style='display:inline-block;margin:4px 6px 0 0;"
                     "padding:7px 14px;border-radius:999px;font-size:12px;"
                     "font-weight:600;color:#0f172a;background:#f1f5f9;"
-                    "border:1px solid #e2e8f0;'>"
-                    f"🏢 {_esc(company)} · <b>{count}</b></div>"
+                    "border:1px solid #e2e8f0;text-align:center;'>"
+                    f"🏢 {_esc(company)} · <b>{count}</b>{salary_html}</div>"
                 )
             near_txt = " near you" if loc_lower else ""
             parts.append(
