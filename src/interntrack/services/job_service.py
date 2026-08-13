@@ -2,6 +2,7 @@
 Job service for job management and discovery orchestration.
 """
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.domain.enums import JobType
@@ -295,7 +296,18 @@ class JobService:
             )
 
         job = Job(**job_data)
-        return await self.job_repo.create(job)
+        try:
+            return await self.job_repo.create(job)
+        except IntegrityError as e:
+            # The url column is unique — a race between two writers (or a
+            # dedup miss on a re-normalized URL) trips the constraint before
+            # the Python-side checks see the row. Surface it as a 409
+            # duplicate instead of a 500.
+            await self.session.rollback()
+            raise DuplicateJobError(
+                job_data.get("title", "Unknown"),
+                job_data.get("company", "Unknown"),
+            ) from e
 
     async def get_job(self, job_id: str) -> Job | None:
         """Get a job by ID."""

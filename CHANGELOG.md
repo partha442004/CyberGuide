@@ -14,6 +14,17 @@ All notable changes to the InternTrack project will be documented in this file.
   and falls back to title-based inference for anything unrecognized, so
   the PC discovery CLI and every other save path are protected.
 
+- **Legacy out-of-enum rows no longer crash reads.** SQLAlchemy's `Enum`
+  (default `validate_strings=False`) stores any string on bind but
+  raises on *load* for values outside the enum — rows saved before label
+  normalization existed (e.g. `job_type="Fulltime"`) turned every query
+  touching them (cross-source dedup, job search, stats overview) into a
+  500, including the PC discovery CLI's POSTs. `Job.source`,
+  `Job.job_type` and `Job.experience_level` now use a `LenientEnum`
+  column type that maps unknown stored values to `UNKNOWN`/`None` on
+  load instead of raising. A unique-constraint race on `url` also now
+  surfaces as a 409 duplicate rather than a 500.
+
 ### Added
 
 - **🏢 Top companies hiring near you** section in daily digests. A market
