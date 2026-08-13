@@ -6,6 +6,19 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Full role description in digest emails.** Job cards now offer an
+  expandable "📄 What they expect — full description" block that shows the
+  complete posting text (HTML-tags stripped, whitespace collapsed) instead
+  of only the 240-char snippet, so recipients see exactly what the role
+  expects before applying.
+- **Fresher-first, freshness-aware digest ordering.** Within each domain
+  section, jobs sort by match score, then 🎓 fresher/entry/intern roles
+  lead, then newest postings come first — fresher-only members always see
+  the freshest suitable roles at the top, never an older job above a newer
+  one at the same score.
+- **🎓 Fresher badge** on email job cards for entry-level roles, so
+  fresher-focused members can spot qualifying roles at a glance.
+
 - **New source: JobDexo (jobdexo.com) — "India's first job index for
   freshers".** Direct HTML scraper (`src/interntrack/scrapers/jobdexo.py`)
   parses the server-rendered search cards (`GET /?q=<query>`) — title link

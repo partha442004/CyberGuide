@@ -1,5 +1,6 @@
 """Unit tests for scheduler/jobs.py."""
 
+import asyncio
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -201,6 +202,117 @@ class TestJobHtmlCard:
         assert ">" not in snippet
         assert "Headquarters:" in snippet
         assert "SIEM" in snippet
+
+    def test_card_full_description_expandable(self):
+        """Long postings get an expandable "What they expect" block with the
+        complete description — the user asked for the full role expectations
+        in the mail, not just a snippet."""
+        from interntrack.scheduler.jobs import _job_html_card
+
+        long_desc = (
+            "Monitor SIEM alerts, triage security incidents and escalate to "
+            "the incident response team. " * 30
+        )
+        card = _job_html_card(
+            78.0,
+            {
+                "title": "SOC Analyst",
+                "company": "Zscaler",
+                "location": "Bengaluru",
+                "description": long_desc,
+            },
+            "#e5484d",
+        )
+
+        assert "What they expect" in card
+        assert "<details" in card
+        # The full text survives (first words of the 7th repetition).
+        assert "Monitor SIEM alerts" in card
+
+    def test_card_no_expandable_for_short_description(self):
+        """Short postings keep the snippet only — no empty details block."""
+        from interntrack.scheduler.jobs import _job_html_card
+
+        card = _job_html_card(
+            78.0,
+            {
+                "title": "SOC Analyst",
+                "company": "Zscaler",
+                "location": "Bengaluru",
+                "description": "Monitor SIEM alerts and triage incidents.",
+            },
+            "#e5484d",
+        )
+
+        assert "What they expect" not in card
+        assert "<details" not in card
+
+    def test_card_fresher_badge(self):
+        """Fresher/entry roles show a 🎓 Fresher badge on the email card."""
+        from interntrack.scheduler.jobs import _job_fresher_rank, _job_html_card
+
+        card = _job_html_card(
+            80.0,
+            {
+                "title": "SOC Analyst",
+                "company": "SecureCo",
+                "location": "Bengaluru",
+                "experience_level": "fresher",
+            },
+            "#e5484d",
+        )
+        assert "🎓 Fresher" in card
+        assert _job_fresher_rank({"experience_level": "intern"}) == 0
+        assert _job_fresher_rank({"experience_level": "0-2 years"}) == 1
+
+    def test_sections_sort_fresher_first_then_freshest(self, monkeypatch):
+        """Within a section, fresher roles lead, then newer postings come
+        before older ones at the same score."""
+        from interntrack.scheduler.jobs import _score_and_group_jobs
+
+        async def _no_skills(session, user_id=None):
+            return None
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._latest_resume_skill_names", _no_skills
+        )
+        report = {
+            "new_jobs": [
+                {
+                    "title": "Senior SOC Lead",
+                    "company": "A",
+                    "domain": "security",
+                    "experience_level": "senior",
+                    "age_days": 1,
+                },
+                {
+                    "title": "Fresher SOC Analyst",
+                    "company": "B",
+                    "domain": "security",
+                    "experience_level": "fresher",
+                    "age_days": 5,
+                },
+                {
+                    "title": "Entry Analyst",
+                    "company": "C",
+                    "domain": "security",
+                    "experience_level": "entry",
+                    "age_days": 0,
+                },
+            ],
+        }
+        sections = asyncio.run(_score_and_group_jobs(report, _FakeSession()))
+        titles = [job["title"] for _, items in sections for _, job in items]
+        assert titles[0] == "Entry Analyst"  # fresher, newest
+        assert titles[1] == "Fresher SOC Analyst"  # fresher, older
+        assert titles[2] == "Senior SOC Lead"  # non-fresher last
+
+
+class _FakeSession:
+    """Minimal stand-in so _score_and_group_jobs never touches the DB."""
+
+    async def execute(self, *a, **k):
+        raise AssertionError("unexpected DB call")
 
 
 class TestBuildDailyReportMessage:

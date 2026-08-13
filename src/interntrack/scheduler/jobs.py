@@ -1908,6 +1908,33 @@ def _job_lines(
 _HTML_TAG_RE = re.compile(r"<[^>]*>")
 
 
+def _job_desc_full(job: dict) -> str:
+    """Clean, full job description text (no truncation).
+
+    Same sanitizing as the snippet (raw HTML tags stripped, whitespace
+    collapsed) but the whole posting is kept so the email card can offer
+    an expandable \"What they expect\" block with the complete role
+    description — no more cutting multi-paragraph postings mid-sentence.
+    """
+    desc = str(job.get("description") or "").strip()
+    if not desc:
+        return ""
+    desc = _HTML_TAG_RE.sub(" ", desc)
+    return " ".join(desc.split())
+
+
+def _job_fresher_rank(job: dict) -> int:
+    """0 for fresher/entry/intern roles, 1 otherwise — freshers sort first.
+
+    Experience values stored by the scrapers are free-ish text
+    (``fresher``/``intern``/``junior``/``senior``, sometimes with a year
+    range), so the check is a loose substring match. Unknown/missing levels
+    rank as non-fresher so explicit fresher roles always lead.
+    """
+    level = str(job.get("experience_level") or "").lower()
+    return 0 if any(tok in level for tok in ("fresher", "entry", "intern")) else 1
+
+
 def _job_desc_snippet(job: dict, limit: int = 180) -> str:
     """One-line job description snippet, or '' when the posting has none.
 
@@ -2145,7 +2172,17 @@ async def _score_and_group_jobs(
         items = grouped.get(domain)
         if not items:
             continue
-        items.sort(key=lambda item: (item[0] is None, -(item[0] or 0.0)))
+        # Match score first, then fresher/entry roles lead, then the
+        # freshest postings (never hide a newer job behind an older one at
+        # the same score — "real fresh jobs, not older").
+        items.sort(
+            key=lambda item: (
+                item[0] is None,
+                -(item[0] or 0.0),
+                _job_fresher_rank(item[1]),
+                int(item[1].get("age_days", 0) or 0),
+            )
+        )
         sections.append((domain, items))
     return sections
 
@@ -3210,6 +3247,13 @@ def _job_html_card(
     salary = _esc(_salary_txt(job))
     exp_level = _esc(str(job.get("experience_level") or "").strip())
     source = _esc(_source_label(job.get("source")))
+    fresher_badge = (
+        "<span style='background:#dcfce7;color:#166534;border-radius:999px;"
+        "padding:2px 9px;font-size:11px;font-weight:700;margin-right:6px;'>"
+        "🎓 Fresher</span>"
+        if _job_fresher_rank(job) == 0
+        else ""
+    )
     meta_bits = [bit for bit in (status_txt, expiry, salary, exp_level) if bit]
     if source:
         meta_bits.append(source)
@@ -3247,12 +3291,23 @@ def _job_html_card(
         )
     if chips:
         card += "<div style='margin-top:8px;'>" + chips + "</div>"
+    if fresher_badge:
+        card += "<div style='margin-top:8px;'>" + fresher_badge + "</div>"
     desc = _esc(_job_desc_snippet(job, limit=240))
+    full_desc = _esc(_job_desc_full(job))
     if desc:
         card += (
             "<div style='margin-top:8px;padding:8px 10px;background:#f8fafc;"
             "border-left:3px solid " + accent + ";border-radius:6px;"
             "color:#475569;font-size:13px;line-height:1.45;'>" + desc + "</div>"
+        )
+    if full_desc and len(full_desc) > 240:
+        card += (
+            "<details style='margin-top:8px;'><summary style='cursor:pointer;"
+            "color:#475569;font-size:12px;font-weight:600;'>📄 What they expect "
+            "— full description</summary><div style='margin-top:6px;padding:8px "
+            "10px;background:#f1f5f9;border-radius:6px;color:#475569;"
+            "font-size:13px;line-height:1.5;'>" + full_desc + "</div></details>"
         )
     if url:
         card += (
