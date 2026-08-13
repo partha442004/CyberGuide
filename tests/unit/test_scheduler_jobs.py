@@ -2764,3 +2764,52 @@ class TestOwnerFailureAlert:
             _Session(), member_name="X", member_email="x@x.com", channel="email"
         )
         assert ok is False
+
+
+class TestFollowUpNudges:
+    """Tests for the ⏰ stale-application follow-up nudge sweep."""
+
+    def test_nudge_text_includes_template_and_button(self):
+        """The message carries a copy-paste follow-up + View job button."""
+        from interntrack.scheduler.jobs import _follow_up_nudge_text
+
+        text, buttons = _follow_up_nudge_text(
+            {
+                "application_id": "a1",
+                "job_title": "Security Engineer",
+                "company": "Acme Corp",
+                "job_url": "https://acme.example/job",
+                "days_since": 8,
+            }
+        )
+        assert "8 days" in text
+        assert "Security Engineer" in text
+        assert "Acme Corp" in text
+        assert "check in on the status" in text
+        assert buttons == [("🔗 View job", "https://acme.example/job")]
+
+    def test_nudge_text_singular_day(self):
+        """1 day renders '1 day' (not '1 days')."""
+        from interntrack.scheduler.jobs import _follow_up_nudge_text
+
+        text, _ = _follow_up_nudge_text(
+            {
+                "application_id": "a1",
+                "job_title": "Intern",
+                "company": "Co",
+                "days_since": 1,
+            }
+        )
+        assert "1 day?" in text
+
+    @pytest.mark.asyncio
+    async def test_sweep_never_raises_on_broken_session(self):
+        """A DB failure yields an empty result, never an exception."""
+        from interntrack.scheduler.jobs import _send_follow_up_nudges
+
+        class _Broken:
+            async def execute(self, *a, **k):
+                raise RuntimeError("db down")
+
+        result = await _send_follow_up_nudges(_Broken())
+        assert result == {}

@@ -20,12 +20,13 @@ class TestSchedulerSetup:
 
         result = setup_scheduler()
 
-        # 9 jobs: discovery, daily + weekly reports, link verification,
+        # 10 jobs: discovery, daily + weekly reports, link verification,
         # expiry cleanup, morning/evening closing-soon sweeps, daily
-        # match-% progress snapshots, and the interview reminders.
+        # match-% progress snapshots, the interview reminders, and the
+        # daily follow-up nudges.
         # (The team-alerts recap was removed — members are separate users,
         # not a team, so no cross-user summary email is scheduled.)
-        assert mock_scheduler.add_job.call_count == 9
+        assert mock_scheduler.add_job.call_count == 10
         assert result == mock_scheduler
 
     @patch("interntrack.scheduler.setup.get_settings")

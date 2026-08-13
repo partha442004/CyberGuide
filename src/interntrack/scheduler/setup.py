@@ -13,6 +13,7 @@ from interntrack.scheduler.jobs import (
     record_match_snapshots,
     run_job_discovery,
     send_closing_soon_alerts,
+    send_follow_up_nudges,
     send_interview_reminders,
     verify_job_links,
 )
@@ -108,6 +109,16 @@ def setup_scheduler():
         IntervalTrigger(hours=6),
         id="interview_reminders",
         name="Interview Reminders",
+        replace_existing=True,
+    )
+
+    # Follow-up nudges daily — applications stuck in "applied" for 7+ days
+    # get one nudge with a copy-paste follow-up message.
+    scheduler.add_job(
+        send_follow_up_nudges,
+        CronTrigger(hour=9, minute=0),
+        id="follow_up_nudges",
+        name="Follow-up Nudges",
         replace_existing=True,
     )
 

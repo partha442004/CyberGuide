@@ -16,6 +16,13 @@ All notable changes to the InternTrack project will be documented in this file.
   (experience prefs limited to entry/junior): the freshest entry-level
   postings from their own digest lead the email so qualifying roles are
   never buried under senior listings.
+- **⏰ Follow-up nudges for stale applications.** A new daily sweep
+  finds applications stuck in ``applied`` for 7+ days (no interview,
+  rejection or offer) and sends each user one nudge through their saved
+  channels with a copy-paste follow-up message they can send the
+  recruiter, plus a View-job button. Each application is nudged exactly
+  once (the existing ``reminded`` flag), only enabled non-paused accounts
+  are pinged, and the sweep never raises.
 - **⚠️ Owner failure alerts.** When a member's digest email is attempted
   but reports ``delivered=False`` (SMTP / Resend outage, bad credentials),
   the team owner is pinged on Telegram with the member's name, email and
