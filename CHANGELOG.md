@@ -16,6 +16,17 @@ All notable changes to the InternTrack project will be documented in this file.
   (experience prefs limited to entry/junior): the freshest entry-level
   postings from their own digest lead the email so qualifying roles are
   never buried under senior listings.
+- **Third search engine: Brave.** The search-engine discovery net now
+  queries DuckDuckGo, Bing *and* Brave (browser UA, no API key) per
+  keyword. Brave indexes internship/fresher boards (Internshala
+  postings, Jooble, MakeIntern, ...) that the other engines rank lower,
+  so internship volume rises even from datacenter IPs. Best-effort:
+  rate-limited or blocked engines are skipped silently.
+- **More sources: Instahyre + Hirist + an internship-focused query.**
+  ``_JOB_HOSTS`` and the ``site:`` query list gain instahyre.com and
+  hirist.com, plus a dedicated ``site:internshala.com OR
+  site:in.indeed.com/internships`` line so intern postings are searched
+  explicitly on every discovery run.
 - **⏰ Follow-up nudges for stale applications.** A new daily sweep
   finds applications stuck in ``applied`` for 7+ days (no interview,
   rejection or offer) and sends each user one nudge through their saved

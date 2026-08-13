@@ -27,6 +27,20 @@ class TestSearchEngineScraper:
         assert links[0] == target
         assert links[1] == "https://example.com/direct"
 
+    def test_brave_links_extracts_external_results(self):
+        """Brave links are plain external hrefs; chrome is filtered out."""
+        s = self._scraper()
+        html = (
+            '<a href="https://internshala.com/internship/detail/cyber-intern-1">I</a>'
+            '<a href="https://search.brave.com/settings">settings</a>'
+            '<a href="https://cdn.search.brave.com/asset.js">asset</a>'
+            '<a href="https://in.indeed.com/viewjob?jk=1&amp;from=app">J</a>'
+        )
+        links = s._brave_links(html)
+        assert "https://internshala.com/internship/detail/cyber-intern-1" in links
+        assert "https://in.indeed.com/viewjob?jk=1&from=app" in links
+        assert not any("brave.com" in link for link in links)
+
     def test_is_job_url(self):
         s = self._scraper()
         assert s._is_job_url("https://in.linkedin.com/jobs/view/soc-1")
