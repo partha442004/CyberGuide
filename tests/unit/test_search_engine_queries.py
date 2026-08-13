@@ -108,6 +108,8 @@ class TestSearchEngineQueries:
             "site:timesjobs.com",
             "site:hirect.in",
             "site:jobdexo.com",
+            "site:instahyre.com",
+            "site:hirist.com",
             # Cybersecurity-specific boards.
             "site:cybersecurityjobs.com",
             "site:cybersecurityjobsite.com",
@@ -206,3 +208,25 @@ class TestSearchEngineQueries:
         assert "site:linkedin.com/jobs" in joined
         assert "site:naukri.com" in joined
         assert "site:cybersecurityjobs.com" in joined
+
+    @pytest.mark.asyncio
+    async def test_internship_board_query_and_brave_engine(self):
+        """Internship boards are queried explicitly, and the Brave engine
+        is attempted after DDG/Bing so intern postings keep surfacing."""
+        scraper = SearchEngineScraper()
+        engines: list[str] = []
+        seen: list[str] = []
+
+        async def fake_search(engine: str, query: str) -> list[str]:
+            engines.append(engine)
+            seen.append(query)
+            return []
+
+        scraper._search_links = fake_search  # type: ignore[method-assign]
+        await scraper.fetch("internship", "Chennai", limit=8)
+
+        assert engines, "no engine was tried"
+        assert "brave" in engines, "brave engine missing from the fallback chain"
+        joined = " ".join(seen)
+        assert "site:internshala.com" in joined
+        assert "site:in.indeed.com/internships" in joined

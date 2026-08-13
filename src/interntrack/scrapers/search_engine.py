@@ -29,6 +29,17 @@ _SEARCH_URL = "https://html.duckduckgo.com/html/?q={query}"
 # tolerates them and can be pinned to the Indian market.
 _BING_URL = "https://www.bing.com/search?mkt=en-IN&setlang=en&q={query}"
 
+# Brave third engine (HTML, no key) — indexes internship/fresher boards
+# (internshala, jooble, makeintern, ...) that DDG/Bing rank lower, and
+# tolerates datacenter IPs. Results are plain external hrefs. Brave
+# serves a JS shell to non-browser user agents, so the Brave requests
+# carry a Chrome UA (the app UA stays for every other request).
+_BRAVE_URL = "https://search.brave.com/search?q={query}"
+_BRAVE_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+)
+
 # Hosts known to carry job postings — a result whose URL belongs to one of
 # these is worth fetching *unless* it is a board listing/search page.
 _JOB_HOSTS = (
@@ -52,6 +63,8 @@ _JOB_HOSTS = (
     "freshersworld.com",
     "unstop.com",
     "hackerearth.com",
+    "instahyre.com",
+    "hirist.com",
     "lever.co",
     "greenhouse.io",
     "ashbyhq.com",
@@ -219,6 +232,24 @@ class SearchEngineScraper(BaseScraper):
         return links
 
     @staticmethod
+    def _brave_links(html: str) -> list[str]:
+        """Extract organic result URLs from a Brave results page.
+
+        Brave renders results as plain external ``<a href>`` links (no
+        redirect wrapper); internal chrome (settings, ads, the Brave
+        homepage, CDN assets) is filtered out and ``&amp;`` is decoded.
+        ``_is_job_url`` downstream drops everything that isn't a posting.
+        """
+        links: list[str] = []
+        for m in re.finditer(r'href="(https?://[^"]+)"', html):
+            href = m.group(1).replace("&amp;", "&")
+            if any(skip in href for skip in ("brave.com", "bravesoftware")):
+                continue
+            if href not in links:
+                links.append(href)
+        return links
+
+    @staticmethod
     def _decode_bing_redirect(url: str) -> str:
         """Decode a bing.com/ck/a redirect back to the real result URL."""
         if "bing.com/ck/a" not in url:
@@ -255,6 +286,10 @@ class SearchEngineScraper(BaseScraper):
             url = _BING_URL.format(query=urllib.parse.quote_plus(query))
             resp = await self._get(url, timeout=10)
             return self._bing_links(resp.text)
+        if engine == "brave":
+            url = _BRAVE_URL.format(query=urllib.parse.quote_plus(query))
+            resp = await self._get(url, timeout=10, headers={"User-Agent": _BRAVE_UA})
+            return self._brave_links(resp.text)
         url = _SEARCH_URL.format(query=urllib.parse.quote_plus(query))
         resp = await self._get(url, timeout=10)
         return self._result_links(resp.text)
@@ -352,8 +387,12 @@ class SearchEngineScraper(BaseScraper):
             ),
             (
                 f"site:naukri.com OR site:shine.com OR site:freshersworld.com "
-                f"OR site:unstop.com {q}"
+                f"OR site:unstop.com OR site:instahyre.com OR site:hirist.com {q}"
             ),
+            # Internship-focused boards (Internshala listings are rejected as
+            # listing pages, but their individual postings and the other
+            # intern boards' postings surface through this query).
+            f"site:internshala.com OR site:in.indeed.com/internships {q}",
             (
                 f"site:cybersecurityjobs.com OR site:cybersecurityjobsite.com "
                 f"OR site:cybersn.com OR site:clearedjobs.net {q}"
@@ -375,7 +414,7 @@ class SearchEngineScraper(BaseScraper):
                 query_cap = len(jobs) + budget
                 # DuckDuckGo first; Bing covers the datacenter-IP cases
                 # where DDG serves an anomaly page with no result links.
-                for engine in ("duckduckgo", "bing"):
+                for engine in ("duckduckgo", "bing", "brave"):
                     before = len(jobs)
                     try:
                         found = await self._search_links(engine, search)
