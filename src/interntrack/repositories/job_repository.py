@@ -119,15 +119,23 @@ class JobRepository(BaseRepository[Job]):
         dashboard's job-type chart isn't all "unknown" (scrapers never
         populate job_type, so the classifier fills it in at save time for
         new jobs; this covers jobs saved before the classifier existed).
+
+        Also catches rows holding *raw scraper labels* ("Fulltime",
+        "Full Time", ...) that were saved before label normalization
+        existed — they load as UNKNOWN through the lenient enum column, so
+        the same title-based inference repairs them in place.
         """
+        from interntrack.domain.enums import JobType
         from interntrack.services.job_service import classify_job_type
 
+        valid_types = [m.value for m in JobType]
         query = (
             select(Job)
             .where(
                 or_(
                     Job.job_type.is_(None),
                     func.lower(Job.job_type) == "unknown",
+                    func.lower(Job.job_type).notin_(valid_types),
                 ),
             )
             .limit(limit)
