@@ -154,6 +154,7 @@ class Job(Base, TimestampMixin):
         "apna": "apna",
         "cutshort": "cutshort",
         "foundit": "foundit",
+        "jobdexo": "jobdexo",
         "search_engine": "search_engine",
         "search": "search_engine",
         "duckduckgo": "search_engine",
