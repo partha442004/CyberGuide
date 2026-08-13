@@ -862,6 +862,7 @@ async def _send_closing_soon_sweep(session) -> dict:
         from interntrack.repositories.job_repository import JobRepository
         from interntrack.utils.helpers import job_experience_ok, location_allows
 
+        owner_email = await _owner_email(session)
         targets = await _enabled_alert_targets(session)
         if not targets:
             return {}
@@ -938,10 +939,12 @@ async def _send_closing_soon_sweep(session) -> dict:
                 if cj["url"]:
                     buttons.append((f"✅ Apply — {cj['title'][:40]}", cj["url"]))
             manager = NotificationManager(session)
-            channel_list = (
+            channel_list = _without_telegram_for_members(
                 prefs.get("channels")
                 or manager.get_configured_channels()
-                or ["email", "telegram"]
+                or ["email", "sms"],
+                user,
+                owner_email,
             )
             recipient = None
             if user is not None:
@@ -1050,6 +1053,7 @@ async def _send_follow_up_nudges(session, days: int = 7) -> dict:
         from interntrack.domain.enums import ApplicationStatus
         from interntrack.domain.models import Application, Job
 
+        owner_email = await _owner_email(session)
         now = datetime.now(UTC).replace(tzinfo=None)
         cutoff = (now - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
         result = await session.execute(
@@ -1093,14 +1097,16 @@ async def _send_follow_up_nudges(session, days: int = 7) -> dict:
             if _alerts_paused(prefs):
                 continue
             manager = NotificationManager(session)
-            channel_list = (
+            user = target.get("user")
+            channel_list = _without_telegram_for_members(
                 prefs.get("channels")
                 or manager.get_configured_channels()
-                or ["email", "telegram"]
+                or ["email", "sms"],
+                user,
+                owner_email,
             )
             text, buttons = _follow_up_nudge_text(item)
             recipient = None
-            user = target.get("user")
             if user is not None:
                 recipient = {
                     "email": getattr(user, "email", None),
@@ -1243,10 +1249,11 @@ async def _send_interview_reminders_for_user(
     if not items:
         return
     manager = NotificationManager(session)
-    channel_list = (
-        prefs.get("channels")
-        or manager.get_configured_channels()
-        or ["email", "telegram"]
+    owner_email = await _owner_email(session)
+    channel_list = _without_telegram_for_members(
+        prefs.get("channels") or manager.get_configured_channels() or ["email", "sms"],
+        user,
+        owner_email,
     )
     recipient = None
     if user is not None:
@@ -1386,6 +1393,53 @@ async def _user_profile(session, user_id: str):
     return None
 
 
+async def _owner_email(session) -> str | None:
+    """Email of the team owner (TEAM_OWNER_EMAIL, else first-registered).
+
+    Same rule as the owner failure pings and the weekly team recap. Never
+    raises — channel building must survive a broken prefs read.
+    """
+    try:
+        from sqlalchemy import select
+
+        from interntrack.config import get_settings
+        from interntrack.domain.models import User
+
+        result = await session.execute(select(User).order_by(User.created_at.asc()))
+        users = list(result.scalars().all())
+        if not users:
+            return None
+        override = str(get_settings().team_owner_email or "").strip().lower()
+        if override:
+            for u in users:
+                if str(getattr(u, "email", "") or "").strip().lower() == override:
+                    return str(u.email or "") or None
+        return str(users[0].email or "") or None
+    except Exception:  # noqa: BLE001, S110 - best-effort
+        return None
+
+
+def _without_telegram_for_members(
+    channels: list | None,
+    user,
+    owner_email: str | None,
+) -> list:
+    """Members get email + SMS only; Telegram stays for the owner.
+
+    Product decision: SMS is the member notification channel for now —
+    Telegram/others are added for a member only when explicitly enabled.
+    The owner's own digests keep Telegram. Returns a new list, never
+    mutates the caller's.
+    """
+    if not channels:
+        return list(channels or [])
+    if owner_email and user is not None:
+        email = str(getattr(user, "email", "") or "").strip().lower()
+        if email == owner_email.strip().lower():
+            return list(channels)
+    return [c for c in channels if c != "telegram"]
+
+
 async def _send_alert_for(
     session,
     user_id: str,
@@ -1452,9 +1506,17 @@ async def _send_alert_for(
     subject = "Weekly Digest" if weekly else "Daily Report"
     if domains:
         subject += f" ({', '.join(domains)})"
+    # Members are email + SMS only for now (no Telegram) — the owner keeps
+    # Telegram on their own digest.
+    owner_email = await _owner_email(session)
+    member_channels = _without_telegram_for_members(
+        prefs.get("channels") or None,
+        user,
+        owner_email,
+    )
     results = await _deliver_alert(
         manager,
-        prefs.get("channels") or None,
+        member_channels or None,
         report,
         session,
         domains=domains,

@@ -50,6 +50,23 @@ def _configured_channels() -> list[str]:
     return channels
 
 
+def _member_default_channels() -> list[str]:
+    """Channels new members start with: email + SMS only.
+
+    Product decision: SMS is the member notification channel for now —
+    Telegram/others are added for a member only when explicitly enabled
+    later. Email is always included when configured; SMS joins it once
+    Twilio is configured. This list never contains Telegram.
+    """
+    settings = get_settings()
+    channels = []
+    if settings.is_email_configured:
+        channels.append("email")
+    if settings.is_twilio_configured:
+        channels.append("sms")
+    return channels or ["email"]
+
+
 async def _get_user_or_404(db: AsyncSession, user_id: str) -> User:
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
@@ -164,7 +181,7 @@ async def register_user(
         AlertPreferences(
             user_id=user.id,
             domains=_normalize_domains(payload.domains),
-            channels=_configured_channels(),
+            channels=_member_default_channels(),
             is_enabled=True,
         )
     )
