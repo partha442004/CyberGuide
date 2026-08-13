@@ -1225,6 +1225,12 @@ async def _send_alert_for(
     # along on the report so every builder sees the same numbers.
     report["target_salary"] = prefs.get("min_salary") or None
     report["keywords"] = list(prefs.get("keywords") or [])
+    # Fresher-only members get the 🎓 Internships & fresher roles highlight
+    # (experience_levels like ["entry", "junior"] mean fresher-only).
+    _levels = prefs.get("experience_levels") or []
+    report["fresher_only"] = bool(_levels) and not any(
+        lvl in ("mid", "senior", "lead", "executive") for lvl in _levels
+    )
 
     await _mark_alert_sent(session, user_id)
     if not (report.get("new_jobs") or []):
@@ -1292,6 +1298,78 @@ async def _weekly_top_engaged(session, days: int = 7, limit: int = 5) -> list[di
 
         return await JobRepository(session).get_most_engaged(days=days, limit=limit)
     except Exception:  # noqa: BLE001 - never break the weekly digest
+        return []
+
+
+async def _top_companies_near(
+    session,
+    user_location: str | None = None,
+    include_remote: bool = True,
+    days: int = 7,
+    limit: int = 6,
+) -> list[tuple[str, int]]:
+    """Hiring companies near a user's city, ranked by recent postings.
+
+    Counts active jobs from the last ``days`` days whose location matches
+    the user's preferred city (synonym-aware, remote opt-in), grouped by
+    company — a "who is hiring around me right now" market snapshot for
+    the daily email, even on days with few new matches. ``Unknown``
+    companies are skipped. Never raises; ``[]`` on any problem.
+    """
+    try:
+        from collections import Counter
+
+        from interntrack.repositories.job_repository import JobRepository
+        from interntrack.utils.helpers import location_allows
+
+        jobs = await JobRepository(session).get_recent_jobs(days=days)
+        loc_lower = (user_location or "").strip().lower()
+        counts: Counter = Counter()
+        for job in jobs:
+            if not getattr(job, "is_active", True):
+                continue
+            company = str(getattr(job, "company", "") or "").strip()
+            if not company or company.lower() == "unknown":
+                continue
+            if loc_lower and not location_allows(
+                str(getattr(job, "location", "") or "").lower(),
+                loc_lower,
+                include_remote=include_remote,
+            ):
+                continue
+            counts[company] += 1
+        return counts.most_common(limit)
+    except Exception:  # noqa: BLE001 - never break the digest
+        return []
+
+
+async def _fresher_roles(
+    report: dict,
+    session,
+    domains: list | None = None,
+    user_id: str | None = None,
+    limit: int = 3,
+) -> list[dict]:
+    """Fresher/entry/intern roles in today's jobs for a fresher-only user.
+
+    Re-uses the digest's own scored sections so the highlighted roles are
+    exactly the ones already shown (never anything new or duplicated) —
+    the freshest entry-level postings across the user's domains, capped
+    at ``limit``. Returns ``[]`` when the user isn't fresher-only or no
+    fresher roles exist. Never raises.
+    """
+    try:
+        sections = await _score_and_group_jobs(
+            report, session, domains, user_id=user_id
+        )
+        fresher = [
+            job
+            for _domain, items in sections
+            for _score, job in items
+            if _job_fresher_rank(job) == 0
+        ]
+        return fresher[:limit]
+    except Exception:  # noqa: BLE001 - never break the digest
         return []
 
 
@@ -2360,6 +2438,36 @@ async def build_daily_report_message(
                 )
             )
 
+    # 🎓 Internships & fresher roles highlight for fresher-only members.
+    if report.get("fresher_only") and not weekly:
+        fresher = await _fresher_roles(report, session, domains, user_id=user_id)
+        if fresher:
+            lines.append("")
+            lines.append("🎓 Internships & fresher roles:")
+            for job in fresher:
+                lines.append(
+                    f"   🎓 {_esc(job.get('title') or 'Untitled')} @ "
+                    f"{_esc(job.get('company') or 'Unknown')} · "
+                    f"{_esc(job.get('location') or 'Remote')}"
+                )
+                url = job.get("url") or ""
+                if url:
+                    lines.append(f"   🔗 Apply: {url}")
+
+    # 🏢 Top companies hiring near the user (market snapshot).
+    if not weekly and (sections or watched_jobs):
+        companies = await _top_companies_near(
+            session,
+            user_location=user_location,
+            include_remote=include_remote,
+        )
+        if companies:
+            lines.append("")
+            near_txt = f" near {user_location}" if user_location else ""
+            lines.append(f"🏢 Top companies hiring{near_txt}:")
+            for company, count in companies:
+                lines.append(f"   {_esc(company)} — {count} fresh role(s)")
+
     if sections or watched_jobs:
         lines.append("")
         lines.append(
@@ -2938,6 +3046,61 @@ async def build_daily_report_html(
                     target_salary=report.get("target_salary"),
                     keywords=report.get("keywords") or [],
                 )
+            )
+
+    # 🎓 Internships & fresher roles — highlighted for fresher-only members.
+    if report.get("fresher_only") and not weekly:
+        fresher = await _fresher_roles(report, session, domains, user_id=user_id)
+        if fresher:
+            fresher_rows = []
+            for job in fresher:
+                fresher_rows.append(
+                    _job_html_card(
+                        None,
+                        job,
+                        "#10b981",
+                        target_salary=report.get("target_salary"),
+                        keywords=report.get("keywords") or [],
+                    )
+                )
+            parts.append(
+                "<div style='margin:26px 0 8px;padding:12px 16px;border-radius:10px;"
+                "background:#ecfdf5;border-left:5px solid #10b981;'>"
+                "<b style='font-size:15px;color:#065f46;'>"
+                "🎓 Internships & fresher roles</b> "
+                "<span style='background:#10b981;color:#fff;border-radius:999px;"
+                "padding:2px 10px;font-size:12px;'>"
+                + str(len(fresher))
+                + "</span></div>"
+            )
+            parts.extend(fresher_rows)
+
+    # 🏢 Top companies hiring near the user (market snapshot).
+    if not weekly and (sections or watched_jobs):
+        companies = await _top_companies_near(
+            session,
+            user_location=user_location,
+            include_remote=include_remote,
+        )
+        if companies:
+            company_chips = []
+            for company, count in companies:
+                company_chips.append(
+                    "<div style='display:inline-block;margin:4px 6px 0 0;"
+                    "padding:7px 14px;border-radius:999px;font-size:12px;"
+                    "font-weight:600;color:#0f172a;background:#f1f5f9;"
+                    "border:1px solid #e2e8f0;'>"
+                    f"🏢 {_esc(company)} · <b>{count}</b></div>"
+                )
+            near_txt = " near you" if loc_lower else ""
+            parts.append(
+                "<div style='background:#f8fafc;border:1px solid #e2e8f0;"
+                "border-radius:12px;padding:14px 18px;margin:24px 0 0;'>"
+                "<div style='font-weight:800;font-size:14px;'>"
+                f"🏢 Top companies hiring{near_txt}</div>"
+                "<div style='font-size:12px;color:#64748b;margin:4px 0 8px;'>"
+                "Who is posting the most fresh roles in your area this week."
+                "</div>" + "".join(company_chips) + "</div>"
             )
 
     # Other locations section

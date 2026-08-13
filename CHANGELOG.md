@@ -6,6 +6,14 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **🏢 Top companies hiring near you** section in daily digests. A market
+  snapshot ranked by fresh postings in the member's own city (synonym-
+  aware, remote opt-in), rendered as chips in the HTML email and a
+  company list in the plain-text digest.
+- **🎓 Internships & fresher roles** highlight for fresher-only members
+  (experience prefs limited to entry/junior): the freshest entry-level
+  postings from their own digest lead the email so qualifying roles are
+  never buried under senior listings.
 - **Full role description in digest emails.** Job cards now offer an
   expandable "📄 What they expect — full description" block that shows the
   complete posting text (HTML-tags stripped, whitespace collapsed) instead
