@@ -24,6 +24,14 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Fixed
 
+- **Frontend-only subscribers get exactly frontend roles.** JavaScript /
+  TypeScript / Web / Next.js / HTML-CSS developer titles used to classify
+  into the broad "coding" bucket, so a user who opted into the frontend
+  domain alone silently lost those frontend jobs (and a frontend+coding
+  user got every backend/fullstack role too). The frontend keyword set now
+  covers those titles — frontend-only digests and instant alerts include
+  exactly frontend roles, while backend / fullstack / Java stay coding.
+
 - **Every search query surfaces over the week.** Discovery previously ran
   the same top-4 queries per user every slot, so niche searches (VLSI,
   SDET, LabVIEW, IoT, Power BI, ...) never ran. The per-user query list now
