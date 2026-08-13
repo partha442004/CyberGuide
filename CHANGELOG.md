@@ -16,6 +16,17 @@ All notable changes to the InternTrack project will be documented in this file.
   (experience prefs limited to entry/junior): the freshest entry-level
   postings from their own digest lead the email so qualifying roles are
   never buried under senior listings.
+- **💻 PC discovery CLI** (``scripts/pc_discovery.py``). JobDexo, Foundit,
+  Apna and Cutshort bot-gate datacenter IPs, so the server cron can't
+  fetch them — but from a residential network they work. The CLI runs
+  those scrapers locally and pushes the parsed jobs to the live API's
+  ``POST /api/v1/jobs/`` (duplicates skipped automatically), so their
+  fresh roles land in the DB and flow into everyone's digests. Supports
+  ``--all-members`` (derives queries + cities from the live member
+  list), ``--query``/``--location``/``--sources``/``--limit`` flags, and
+  UTF-8-safe output on Windows consoles. Live-verified: 3 fresh JobDexo
+  postings (Fortuna Cysec, Charles Schwab, Deloitte Australia) pushed
+  into the live DB.
 - **Third search engine: Brave.** The search-engine discovery net now
   queries DuckDuckGo, Bing *and* Brave (browser UA, no API key) per
   keyword. Brave indexes internship/fresher boards (Internshala
