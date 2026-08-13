@@ -13,6 +13,33 @@ from interntrack.engines.deduplication import DeduplicationEngine
 class TestDeduplicationEngine:
     """Tests for DeduplicationEngine."""
 
+    @pytest.mark.asyncio
+    async def test_get_by_url_tolerates_duplicate_rows(self):
+        """Duplicate URL rows must not raise MultipleResultsFound.
+
+        Regression: the same posting can be saved by several sources under
+        one URL (e.g. the PC discovery CLI + the search-engine net), so
+        ``scalar_one_or_none`` used to raise on the first duplicate and
+        turn the dedup check into a 500. ``first()`` must win.
+        """
+        from unittest.mock import AsyncMock
+
+        from interntrack.repositories.job_repository import JobRepository
+
+        class _Scalars:
+            def first(self):
+                return "first-job"
+
+        class _Result:
+            def scalars(self):
+                return _Scalars()
+
+        session = AsyncMock()
+        session.execute.return_value = _Result()
+        repo = JobRepository(session)
+        found = await repo.get_by_url("https://example.com/job/dup")
+        assert found == "first-job"
+
     @pytest.fixture
     def mock_session(self):
         """Mock database session."""

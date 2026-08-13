@@ -41,9 +41,16 @@ class JobRepository(BaseRepository[Job]):
         super().__init__(Job, session)
 
     async def get_by_url(self, url: str) -> Job | None:
-        """Get a job by URL (for deduplication)."""
+        """Get a job by URL (for deduplication).
+
+        ``url`` is not a unique column — the same posting can be saved by
+        several sources under the same URL, so ``scalar_one_or_none``
+        would raise ``MultipleResultsFound`` on the first duplicate and
+        turn a dedup check into a 500. ``first()`` keeps the check
+        tolerant: any match is a duplicate, the first row is enough.
+        """
         result = await self.session.execute(select(Job).where(Job.url == url))
-        return result.scalar_one_or_none()
+        return result.scalars().first()
 
     async def find_duplicate(
         self,
@@ -63,7 +70,9 @@ class JobRepository(BaseRepository[Job]):
             ),
         )
         result = await self.session.execute(query)
-        return result.scalar_one_or_none()
+        # Any match is a duplicate — first() keeps dedup tolerant of
+        # duplicate rows (see get_by_url).
+        return result.scalars().first()
 
     async def find_cross_source_duplicate(
         self,
