@@ -77,6 +77,61 @@ class TestSearchEngineContentFilter:
         assert job.company == "SecureCo"
 
 
+class TestCareerPortalUrlShapes:
+    """Company / university career-portal URL shapes (company.com/careers,
+    /jobs/<role>, /internships/<role>) must be recognized as postings, while
+    the bare roots are listing pages and stay rejected."""
+
+    def test_careers_role_path_is_posting(self):
+        scraper = SearchEngineScraper()
+        assert scraper._is_job_url("https://acme.com/careers/security-engineer")
+        assert scraper._is_job_url("https://acme.com/careers/internships/soc-analyst")
+
+    def test_jobs_role_path_is_posting(self):
+        scraper = SearchEngineScraper()
+        assert scraper._is_job_url("https://acme.com/jobs/soc-analyst")
+        assert scraper._is_job_url("https://university.edu/jobs/research-intern")
+
+    def test_internships_role_path_is_posting(self):
+        scraper = SearchEngineScraper()
+        assert scraper._is_job_url(
+            "https://acme.com/internships/summer-security-analyst"
+        )
+        assert scraper._is_job_url("https://university.edu/internships/ml-intern")
+
+    def test_opportunities_path_is_posting(self):
+        scraper = SearchEngineScraper()
+        assert scraper._is_job_url("https://lab.university.edu/opportunities/research")
+
+    def test_bare_career_roots_rejected(self):
+        scraper = SearchEngineScraper()
+        for url in (
+            "https://acme.com/careers",
+            "https://acme.com/jobs",
+            "https://acme.com/internships",
+            "https://acme.com/careers/",
+            "https://university.edu/internships",
+            "https://university.edu/jobs",
+        ):
+            assert not scraper._is_job_url(url), url
+
+    def test_plural_internships_category_still_rejected(self):
+        """Internshala-style category pages (…-internships-in-<city>) stay
+        listing pages even after /internships/ became a posting shape."""
+        scraper = SearchEngineScraper()
+        assert not scraper._is_job_url(
+            "https://internshala.com/internships/cyber-security-internships-in-chennai"
+        )
+        assert scraper._is_job_url(
+            "https://internshala.com/internship/detail/remote-cyber-security-internship-123"
+        )
+
+    def test_amazon_jobs_recognized_but_shopping_skipped(self):
+        scraper = SearchEngineScraper()
+        assert scraper._is_job_url("https://www.amazon.jobs/en/jobs/12345")
+        assert not scraper._is_job_url("https://www.amazon.in/dp/B0ABC123")
+
+
 class TestSearchEngineQueries:
     """Tests for the generated search queries."""
 
@@ -215,6 +270,36 @@ class TestSearchEngineQueries:
             "site:jazzhr.com",
             "site:breezy.hr",
             "site:bamboohr.com/jobs",
+            # More bug bounty platforms.
+            "site:hackenproof.com",
+            "site:immunefi.com",
+            "site:code4rena.com",
+            # Research / structured programs.
+            "site:summerofcode.withgoogle.com",
+            "site:outreachy.org",
+            "site:mlh.io",
+            # Big-tech internships / graduate careers.
+            "site:careers.google.com",
+            "site:careers.microsoft.com",
+            "site:amazon.jobs",
+            "site:jobs.ibm.com",
+            "site:careers.adobe.com",
+            # University placement cells.
+            "site:placement.iitm.ac.in",
+            "site:ccd.iitd.ac.in",
+            "site:placement.iitb.ac.in",
+            # Govt / defence / regulatory portals.
+            "site:drdo.gov.in",
+            "site:isro.gov.in",
+            "site:rbi.org.in",
+            "site:cert-in.org.in",
+            # Apprenticeships.
+            "site:naps.gov.in",
+            # CTF / learning platforms + communities (query-only signals).
+            "site:ctftime.org",
+            "site:tryhackme.com",
+            "site:null.community",
+            "site:defcon.org",
         ):
             assert host in joined, f"missing {host} in search queries"
 
