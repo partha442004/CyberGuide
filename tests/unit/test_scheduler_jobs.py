@@ -2020,6 +2020,92 @@ class TestDigestFooter:
         )
         assert _digest_footer_text() == ""
 
+    @pytest.mark.asyncio
+    async def test_html_omits_dashboard_link_for_member(self, monkeypatch):
+        """Members get the digest without the dashboard/manage footer."""
+        from interntrack.scheduler.jobs import build_daily_report_html
+
+        class _Settings:
+            dashboard_url = "https://dash.example.com"
+
+        monkeypatch.setattr(
+            "interntrack.config.get_settings",
+            lambda: _Settings(),
+        )
+        report = {"summary": {"new_jobs": 0}, "new_jobs": []}
+        with (
+            patch(
+                "interntrack.scheduler.jobs._score_and_group_jobs",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "interntrack.scheduler.jobs._watched_company_names",
+                new=AsyncMock(return_value=[]),
+            ),
+        ):
+            html = await build_daily_report_html(
+                report, AsyncMock(), show_dashboard_link=False
+            )
+        assert "Open full dashboard" not in html
+        assert "Settings page" not in html
+
+    @pytest.mark.asyncio
+    async def test_html_keeps_dashboard_link_for_owner(self, monkeypatch):
+        """The owner's own digest still links to the dashboard."""
+        from interntrack.scheduler.jobs import build_daily_report_html
+
+        class _Settings:
+            dashboard_url = "https://dash.example.com"
+
+        monkeypatch.setattr(
+            "interntrack.config.get_settings",
+            lambda: _Settings(),
+        )
+        report = {"summary": {"new_jobs": 0}, "new_jobs": []}
+        with (
+            patch(
+                "interntrack.scheduler.jobs._score_and_group_jobs",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "interntrack.scheduler.jobs._watched_company_names",
+                new=AsyncMock(return_value=[]),
+            ),
+        ):
+            html = await build_daily_report_html(
+                report, AsyncMock(), show_dashboard_link=True
+            )
+        assert "Open full dashboard" in html
+
+    @pytest.mark.asyncio
+    async def test_chunks_omit_dashboard_link_for_member(self, monkeypatch):
+        """Telegram chunks for a member drop the dashboard footer too."""
+        from interntrack.scheduler.jobs import build_alert_chunks
+
+        class _Settings:
+            dashboard_url = "https://dash.example.com"
+
+        monkeypatch.setattr(
+            "interntrack.config.get_settings",
+            lambda: _Settings(),
+        )
+        report = {"summary": {"new_jobs": 0}, "new_jobs": []}
+        with (
+            patch(
+                "interntrack.scheduler.jobs._score_and_group_jobs",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "interntrack.scheduler.jobs._watched_company_names",
+                new=AsyncMock(return_value=[]),
+            ),
+        ):
+            chunks = await build_alert_chunks(
+                report, AsyncMock(), show_dashboard_link=False
+            )
+        joined = "\n".join(text for text, _ in chunks)
+        assert "Open full dashboard" not in joined
+
 
 class TestJobSkillsLine:
     """Digests surface the skills each role expects ("what they expect")."""

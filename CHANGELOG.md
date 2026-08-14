@@ -4,6 +4,16 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- **No dashboard links in member digests.** Members receive job digests
+  only — the "Open full dashboard" / "manage alerts" footer (email HTML +
+  Telegram chunks) is now owner-only, detected by comparing the recipient
+  against the team-owner email. The owner's own digest (and the legacy
+  single-user path) keeps the links. Members who want the dashboard can
+  still be pointed at it separately — nothing in their inbox implies they
+  need an account.
+
 ### Added
 
 - **Brand logo everywhere.** The project now ships a logo asset
