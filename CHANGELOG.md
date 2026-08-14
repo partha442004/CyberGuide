@@ -6,6 +6,20 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Scam guard for digests.** A conservative red-flag detector scans every
+  posting's title + description for common fresher-scam tells — money
+  transfer / registration & joining fees / UPI & crypto payments, guaranteed
+  income or 100% placement, no-interview hiring, sketchy Telegram/WhatsApp-
+  only contact. Postings hitting **two or more** distinct flag groups are
+  dropped from all member digests (logged); single-flag postings pass but
+  carry a **⚠️ Review carefully — red flags: …** note on the email card and
+  in the Telegram chunk. Also completes the direct-hiring-signal feature on
+  Telegram: walk-in / campus / off-campus / immediate-hiring / referral /
+  send-resume signals now show as a line in every Telegram job chunk, not
+  just the email card.
+
+### Added
+
 - **Direct hiring signals + PDF recruitment notices + ~70 more sources.**
   Digest job cards now surface **hiring-signal badges** — walk-in interview /
   campus / off-campus drive, immediate hiring, referral, send-resume,
