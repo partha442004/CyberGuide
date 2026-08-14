@@ -43,6 +43,9 @@ DEFAULT_FEEDS = {
     "virtualvocations": "https://www.virtualvocations.com/jobs/rss",
     # Authentic Jobs — curated design/dev/creative job feed (verified live).
     "authenticjobs": "https://authenticjobs.com/rss",
+    # RojgarResult — another big Indian govt-job portal (verified live:
+    # RRB JE / Railway Section Controller postings).
+    "rojgarresult": "https://www.rojgarresult.com/feed",
 }
 
 

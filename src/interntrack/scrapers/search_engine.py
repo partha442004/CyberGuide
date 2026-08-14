@@ -121,6 +121,68 @@ _JOB_HOSTS = (
     "cybersecpeople.com",
     "cybersec4u.com",
     "dice.com",
+    # More India boards + govt portals.
+    "careernet.co.in",
+    "iimjobs.com",
+    "elitmus.com",
+    "aasaanjobs.com",
+    "rojgarresult.com",
+    "employmentnews.gov.in",
+    "apprenticeshipindia.gov.in",
+    # Global boards.
+    "themuse.com",
+    "builtin.com",
+    "ladders.com",
+    "snagajob.com",
+    "getwork.com",
+    "jobcase.com",
+    "jobrapido.com",
+    "jobserve.com",
+    # Startup / tech boards.
+    "workatastartup.com",
+    "otta.com",
+    "cord.co",
+    "landing.jobs",
+    "turing.com",
+    "gun.io",
+    "contra.com",
+    "usebraintrust.com",
+    "arc.dev",
+    # Bug bounty / security communities.
+    "hackerone.com",
+    "bugcrowd.com",
+    "intigriti.com",
+    "yeswehack.com",
+    "isc2.org",
+    "isaca.org",
+    "issa.org",
+    "sans.org",
+    "owasp.org",
+    # Research / academic.
+    "researchgate.net",
+    "nature.com",
+    "jobs.ac.uk",
+    "ieee.org",
+    "acm.org",
+    # More remote boards.
+    "jobicy.com",
+    "remotejobs.com",
+    "remote3.co",
+    "remote100k.com",
+    "remotees.com",
+    "skipthedrive.com",
+    "remotelyawesomejobs.com",
+    # ATS career portals.
+    "myworkdayjobs.com",
+    "icims.com",
+    "jobvite.com",
+    "taleo.net",
+    "successfactors.eu",
+    "recruitee.com",
+    "pinpoint.world",
+    "teamtailor.com",
+    "jazzhr.com",
+    "breezy.hr",
 )
 
 # URL shapes that mean "this is a search / listing page, not a posting".
@@ -493,6 +555,73 @@ class SearchEngineScraper(BaseScraper):
                 f"site:cybersecpeople.com OR site:cybersec4u.com "
                 f"OR site:securityjobs.net OR site:clearedjobs.net OR site:dice.com {q}"
             ),
+            # More India boards (CareerNet / iimjobs / eLitmus / AasaanJobs /
+            # WorkIndia / Rojgar Result / Employment News / NATS).
+            (
+                f"site:careernet.co.in OR site:iimjobs.com OR site:elitmus.com "
+                f"OR site:aasaanjobs.com OR site:rojgarresult.com {q}"
+            ),
+            (
+                f"site:employmentnews.gov.in OR site:nats.education.gov.in "
+                f"OR site:apprenticeshipindia.gov.in OR site:superset.com {q}"
+            ),
+            # Global boards (The Muse / Built In / Ladders / Snagajob /
+            # Getwork / Jobcase / Jobrapido / JobServe).
+            (
+                f"site:themuse.com OR site:builtin.com OR site:ladders.com "
+                f"OR site:snagajob.com OR site:getwork.com {q}"
+            ),
+            (
+                f"site:jobcase.com OR site:jobrapido.com OR site:jobserve.com "
+                f"OR site:careerbliss.com {q}"
+            ),
+            # Startup / tech boards (YC / Otta / Cord / Landing.jobs / Turing /
+            # Arc / Gun.io / Contra / Braintrust).
+            (
+                f"site:workatastartup.com OR site:otta.com OR site:cord.co "
+                f"OR site:landing.jobs OR site:turing.com {q}"
+            ),
+            (
+                f"site:gun.io OR site:contra.com OR site:usebraintrust.com "
+                f"OR site:arc.dev {q}"
+            ),
+            # Bug bounty / security-community platforms.
+            (
+                f"site:hackerone.com OR site:bugcrowd.com OR site:intigriti.com "
+                f"OR site:yeswehack.com {q}"
+            ),
+            (
+                f"site:isc2.org OR site:isaca.org OR site:issa.org "
+                f"OR site:sans.org OR site:owasp.org {q}"
+            ),
+            # Research / academic job boards.
+            (
+                f"site:researchgate.net OR site:nature.com/naturecareers "
+                f"OR site:science.org/careers OR site:jobs.ac.uk {q}"
+            ),
+            (f"site:ieee.org OR site:acm.org OR site:careers.ieee.org {q}"),
+            # More remote boards (Jobicy / RemoteJobs.com / Remote3 /
+            # Remote100K / Remotees / SkipTheDrive).
+            (
+                f"site:jobicy.com OR site:remotejobs.com OR site:remote3.co "
+                f"OR site:remote100k.com OR site:remotees.com {q}"
+            ),
+            (
+                f"site:skipthedrive.com OR site:remotelyawesomejobs.com "
+                f"OR site:virtualvocations.com OR site:authenticjobs.com {q}"
+            ),
+            # ATS career portals (Workday / iCIMS / Jobvite / Taleo /
+            # SuccessFactors / Recruitee / Pinpoint / Teamtailor / JazzHR /
+            # Breezy HR). These host most company career pages directly.
+            (
+                f"site:myworkdayjobs.com OR site:icims.com/jobs "
+                f"OR site:jobvite.com OR site:taleo.net {q}"
+            ),
+            (
+                f"site:successfactors.eu OR site:recruitee.com "
+                f"OR site:pinpoint.world OR site:teamtailor.com {q}"
+            ),
+            (f"site:jazzhr.com OR site:breezy.hr OR site:bamboohr.com/jobs {q}"),
         ]
         jobs: list[RawJob] = []
         seen: set[str] = set()

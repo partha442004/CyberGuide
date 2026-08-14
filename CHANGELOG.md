@@ -6,6 +6,25 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Even more boards surface via the search net + a new govt feed.** The
+  discovery search gained 12 new `site:` query families covering more
+  India boards (CareerNet / iimjobs / eLitmus / AasaanJobs / Employment
+  News / NATS / apprenticeship portal), global boards (The Muse / Built In /
+  Ladders / Snagajob / Getwork / Jobcase / Jobrapido / JobServe), startup
+  boards (YC / Otta / Cord / Landing.jobs / Turing / Arc / Gun.io / Contra /
+  Braintrust), bug-bounty & security communities (HackerOne / Bugcrowd /
+  Intigriti / YesWeHack / ISC2 / ISACA / ISSA / SANS / OWASP), research &
+  academic boards (ResearchGate / Nature Careers / Science Careers /
+  jobs.ac.uk / IEEE / ACM), more remote boards (Jobicy / RemoteJobs /
+  Remote3 / Remote100K / Remotees / SkipTheDrive) and the major ATS career
+  portals (Workday / iCIMS / Jobvite / Taleo / SuccessFactors / Recruitee /
+  Pinpoint / Teamtailor / JazzHR / Breezy HR / BambooHR). ~40 new hosts are
+  recognized posting URLs, and a new live-verified RSS feed joined the
+  rotation: RojgarResult (Indian govt jobs, e.g. RRB JE / Railway Section
+  Controller), complementing the 4 existing sarkari feeds.
+
+### Added
+
 - **Many more sources surface in discovery.** The search-engine net
   (DDG/Bing/Brave) gained 7 new `site:` query families covering job
   aggregators (SimplyHired / Jooble / Talent.com / CareerJet / Adzuna /
