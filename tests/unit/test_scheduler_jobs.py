@@ -187,6 +187,59 @@ class TestJobHtmlCard:
         assert "alert(&#x27;xss&#x27;)" in card  # quotes escaped too
         assert "Oversee security" in card
 
+    def test_card_shows_walk_in_hiring_signal(self):
+        """Direct hiring signals (walk-in drive) surface as a badge."""
+        from interntrack.scheduler.jobs import _job_html_card
+
+        card = _job_html_card(
+            None,
+            {
+                "title": "Security Intern",
+                "company": "Acme",
+                "location": "Chennai",
+                "description": (
+                    "Walk-in interview on Friday. Send resume to "
+                    "hr@acme.example and join immediately."
+                ),
+            },
+            "#e5484d",
+        )
+
+        assert "Walk-in interview" in card
+
+    def test_card_shows_campus_hiring_signal_from_title(self):
+        from interntrack.scheduler.jobs import _job_html_card
+
+        card = _job_html_card(
+            None,
+            {
+                "title": "Campus Hiring Drive 2026",
+                "company": "Acme",
+                "location": "Bengaluru",
+            },
+            "#e5484d",
+        )
+
+        assert "Campus hiring" in card
+
+    def test_card_no_hiring_signal_without_keywords(self):
+        from interntrack.scheduler.jobs import _job_html_card
+
+        card = _job_html_card(
+            None,
+            {
+                "title": "SOC Analyst",
+                "company": "SecureCo",
+                "location": "Remote",
+                "description": "Monitor SIEM alerts and respond to incidents.",
+            },
+            "#e5484d",
+        )
+
+        assert "Walk-in" not in card
+        assert "Now hiring" not in card
+        assert "Campus" not in card
+
     def test_snippet_strips_html_tags(self):
         """Raw markup from greenhouse/notion/RSS sources never leaks into
         the digest snippet."""

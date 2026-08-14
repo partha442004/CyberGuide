@@ -3962,6 +3962,67 @@ def _skills_checklist_html(job: dict, resume_skills: set | None) -> str:
         return ""
 
 
+# Direct hiring signals detected in a job's title / description. When one
+# matches, the job card shows a badge (walk-in drive, campus hiring, …) so
+# members spot immediate-apply opportunities at a glance.
+_HIRING_SIGNALS = (
+    (
+        "🚶 Walk-in interview",
+        ("walk-in interview", "walk in interview", "walkin interview"),
+    ),
+    ("🏢 Walk-in drive", ("walk-in drive", "walk in drive", "walk-in")),
+    (
+        "🎓 Campus hiring",
+        ("campus hiring", "campus placement", "campus drive", "campus recruitment"),
+    ),
+    (
+        "🎓 Off-campus drive",
+        ("off-campus drive", "off campus drive", "offcampus drive"),
+    ),
+    ("⚡ Immediate hiring", ("immediate hiring", "immediate joining", "urgent hiring")),
+    ("📣 Now hiring", ("we are hiring", "now hiring", "looking for")),
+    ("🔗 Referral", ("referral", "employee referral", "refer and earn")),
+    (
+        "💼 Internship opening",
+        (
+            "internship opening",
+            "intern opening",
+            "looking for interns",
+            "intern required",
+        ),
+    ),
+    (
+        "📬 Send resume",
+        ("send resume", "send your resume", "mail your resume", "submit your resume"),
+    ),
+    ("🖥️ Virtual drive", ("virtual hiring", "virtual drive", "online drive")),
+    (
+        "🔬 Research intern",
+        ("research intern", "research internship", "research intern required"),
+    ),
+    ("🌐 Remote okay", ("remote okay", "work from anywhere")),
+)
+
+
+def _hiring_signal_badge(job: dict) -> str:
+    """First direct hiring signal found in title + description, as a chip.
+
+    Never raises and never emits text on non-matching jobs — it is a pure
+    display enhancement.
+    """
+    text = f"{job.get('title') or ''} {job.get('description') or ''}".lower()
+    if not text.strip():
+        return ""
+    for label, phrases in _HIRING_SIGNALS:
+        if any(phrase in text for phrase in phrases):
+            return (
+                "<span style='background:#fce7f3;color:#9d174d;border-radius:999px;"
+                "padding:2px 9px;font-size:11px;font-weight:700;margin-right:6px;'>"
+                f"{label}</span>"
+            )
+    return ""
+
+
 def _job_html_card(
     score,
     job: dict,
@@ -4029,6 +4090,9 @@ def _job_html_card(
             "padding:2px 9px;font-size:11px;font-weight:700;margin-right:6px;'>"
             "💰 Meets your target</span>"
         )
+    hiring_badge = _hiring_signal_badge(job)
+    if hiring_badge:
+        chips += hiring_badge
     for hit in _keyword_hits(job, keywords):
         chips += (
             "<span style='background:#fef3c7;color:#92400e;border-radius:999px;"
