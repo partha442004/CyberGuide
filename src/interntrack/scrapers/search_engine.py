@@ -86,6 +86,41 @@ _JOB_HOSTS = (
     "sarkariexam.com",
     "sarkarijobfind.com",
     "indgovtjobs.in",
+    # Job aggregators.
+    "simplyhired",
+    "jooble",
+    "talent.com",
+    "careerjet",
+    "adzuna",
+    "ziprecruiter.com",
+    "jora.com",
+    "trovit",
+    "careerbliss.com",
+    "careerage.com",
+    # Remote-first boards.
+    "remote.co",
+    "jobspresso.co",
+    "workingnomads.com",
+    "flexjobs.com",
+    "virtualvocations.com",
+    "nordesk.io",
+    "justremote.co",
+    "remoteok.com",
+    "authenticjobs.com",
+    "pangian.com",
+    # More India boards + student platforms.
+    "fresherslive.com",
+    "workindia.in",
+    "youth4work.com",
+    "placementindia.com",
+    "prosple.com",
+    "twenty19.com",
+    "letsintern.com",
+    "hellointern.com",
+    # More cybersecurity boards.
+    "cybersecpeople.com",
+    "cybersec4u.com",
+    "dice.com",
 )
 
 # URL shapes that mean "this is a search / listing page, not a posting".
@@ -424,6 +459,39 @@ class SearchEngineScraper(BaseScraper):
                 f"site:sarkariresult.com OR site:freejobalert.com "
                 f"OR site:sarkariexam.com OR site:sarkarijobfind.com "
                 f"OR site:indgovtjobs.in {q}"
+            ),
+            # Job aggregators (index everything, so postings surface via
+            # the search engines without ever touching their APIs).
+            (
+                f"site:simplyhired.co.in OR site:jooble.org OR site:talent.com "
+                f"OR site:careerjet.in OR site:adzuna.in {q}"
+            ),
+            (
+                f"site:ziprecruiter.com OR site:jora.com OR site:trovit.co.in "
+                f"OR site:careerbliss.com OR site:careerage.com {q}"
+            ),
+            # Remote-first boards (remote / WFH / anywhere roles).
+            (
+                f"site:remote.co OR site:jobspresso.co OR site:workingnomads.com "
+                f"OR site:flexjobs.com OR site:virtualvocations.com {q}"
+            ),
+            (
+                f"site:nordesk.io OR site:justremote.co OR site:remoteok.com "
+                f"OR site:authenticjobs.com OR site:pangian.com {q}"
+            ),
+            # More India boards + student/internship platforms.
+            (
+                f"site:fresherslive.com OR site:workindia.in OR site:youth4work.com "
+                f"OR site:placementindia.com OR site:careerage.com {q}"
+            ),
+            (
+                f"site:prosple.com OR site:twenty19.com OR site:letsintern.com "
+                f"OR site:hellointern.com OR site:internshala.com/internships {q}"
+            ),
+            # Cybersecurity-specific boards (more of them).
+            (
+                f"site:cybersecpeople.com OR site:cybersec4u.com "
+                f"OR site:securityjobs.net OR site:clearedjobs.net OR site:dice.com {q}"
             ),
         ]
         jobs: list[RawJob] = []

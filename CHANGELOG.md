@@ -4,6 +4,21 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Many more sources surface in discovery.** The search-engine net
+  (DDG/Bing/Brave) gained 7 new `site:` query families covering job
+  aggregators (SimplyHired / Jooble / Talent.com / CareerJet / Adzuna /
+  ZipRecruiter / Jora / Trovit / CareerBliss / CareerAge), remote-first
+  boards (Remote.co / Jobspresso / Working Nomads / FlexJobs / Virtual
+  Vocations / NoDesk / JustRemote / RemoteOK / Authentic Jobs / Pangian),
+  more India boards (Fresherslive / WorkIndia / Youth4work /
+  PlacementIndia), student/internship platforms (Prosple / Twenty19 /
+  LetsIntern / HelloIntern) and more cyber boards (CyberSecPeople /
+  CyberSec4U / Dice). Those hosts are now recognized posting URLs too.
+  Two live-verified RSS feeds joined the rotation: VirtualVocations and
+  Authentic Jobs.
+
 ### Changed
 
 - **No dashboard links in member digests.** Members receive job digests

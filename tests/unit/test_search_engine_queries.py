@@ -134,6 +134,41 @@ class TestSearchEngineQueries:
             "site:sarkariexam.com",
             "site:sarkarijobfind.com",
             "site:indgovtjobs.in",
+            # Job aggregators.
+            "site:simplyhired.co.in",
+            "site:jooble.org",
+            "site:talent.com",
+            "site:careerjet.in",
+            "site:adzuna.in",
+            "site:ziprecruiter.com",
+            "site:jora.com",
+            "site:trovit.co.in",
+            "site:careerbliss.com",
+            "site:careerage.com",
+            # Remote-first boards.
+            "site:remote.co",
+            "site:jobspresso.co",
+            "site:workingnomads.com",
+            "site:flexjobs.com",
+            "site:virtualvocations.com",
+            "site:nordesk.io",
+            "site:justremote.co",
+            "site:remoteok.com",
+            "site:authenticjobs.com",
+            "site:pangian.com",
+            # More India boards + student platforms.
+            "site:fresherslive.com",
+            "site:workindia.in",
+            "site:youth4work.com",
+            "site:placementindia.com",
+            "site:prosple.com",
+            "site:twenty19.com",
+            "site:letsintern.com",
+            "site:hellointern.com",
+            # More cybersecurity boards.
+            "site:cybersecpeople.com",
+            "site:cybersec4u.com",
+            "site:dice.com",
         ):
             assert host in joined, f"missing {host} in search queries"
 
