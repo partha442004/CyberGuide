@@ -144,7 +144,7 @@ class TestGenerateDailyReport:
             mock_manager.notify.assert_awaited_once_with(
                 ["telegram"],
                 "chunk",
-                subject="Daily Report",
+                subject="🎯 1 matching jobs in Bangalore",
                 buttons=[],
             )
 
