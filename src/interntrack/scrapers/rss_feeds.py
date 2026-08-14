@@ -3,12 +3,26 @@ RSS Feed job scraper.
 """
 
 import contextlib
+import re
 from datetime import UTC, datetime
 
 import feedparser
 
 from interntrack.domain.enums import JobSource
 from interntrack.scrapers.base import BaseScraper, RawJob, matches_query
+
+# Article-style titles that are NOT job postings. Some feeds (remote.co,
+# freejobalert's blog, sarkari portals) mix listicles / "N Companies Hiring"
+# articles in with real postings; the query matcher would happily accept
+# them because the keyword appears in the title. These never become jobs.
+_RSS_JUNK_TITLE_RE = re.compile(
+    r"^\d+\s+(best|top|companies|ways|tips|reasons|things|moves|tools|skills)\b"
+    r"|^top\s+\d+\b"
+    r"|\b(companies hiring|hiring in|to get hired|to land a job)\b"
+    r"|\b(you (must|need to) know|how to (become|get|land|break into|learn))\b"
+    r"|\b(ultimate guide|salary guide|interview tips|resume tips)\b",
+    re.IGNORECASE,
+)
 
 # Popular job RSS feeds.
 #
@@ -124,6 +138,12 @@ class RSSFeedScraper(BaseScraper):
         link = entry.get("link", "")
         summary = entry.get("summary", "")
         published = entry.get("published_parsed")
+
+        # Listicle / article titles are never job postings, even when the
+        # query keyword appears in them ("Remote Cybersecurity Jobs: 10
+        # Companies Hiring" is an article, not a role).
+        if _RSS_JUNK_TITLE_RE.search(title):
+            return None
 
         # Check if matches query (multi-token + security-family expansion;
         # security queries match against the title so descriptions mentioning

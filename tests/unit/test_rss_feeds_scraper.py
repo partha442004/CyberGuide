@@ -161,6 +161,41 @@ class TestRSSFeedScraper:
         result = scraper._parse_entry(entry, "python", "rss_feed")
         assert result is None
 
+    def test_parse_entry_rejects_listicle_article_titles(self):
+        """Article-style titles ("N Companies Hiring", "how to land a
+        job") are never saved as jobs even when the keyword matches."""
+        from interntrack.scrapers.rss_feeds import RSSFeedScraper
+
+        scraper = RSSFeedScraper()
+        for title in (
+            "Remote Cybersecurity Jobs: 10 Companies Hiring",
+            "Top 8 Skills to Get Hired in Cybersecurity",
+            "How to Become a SOC Analyst",
+            "Cybersecurity Salary Guide 2026",
+        ):
+            entry = {
+                "title": title,
+                "link": "https://example.com/article",
+                "summary": "A useful article about cybersecurity jobs.",
+            }
+            assert scraper._parse_entry(entry, "cybersecurity", "rss_feed") is None, (
+                title
+            )
+
+    def test_parse_entry_keeps_real_job_with_numbers(self):
+        """A genuine posting whose title has numbers still passes."""
+        from interntrack.scrapers.rss_feeds import RSSFeedScraper
+
+        scraper = RSSFeedScraper()
+        entry = {
+            "title": "SOC Analyst L2 - 24/7 Shift",
+            "link": "https://example.com/job/1",
+            "summary": "Monitor SIEM alerts and respond to incidents.",
+        }
+        result = scraper._parse_entry(entry, "soc analyst", "rss_feed")
+        assert result is not None
+        assert result.title == "SOC Analyst L2 - 24/7 Shift"
+
     def test_parse_entry_returns_job_for_match(self):
         from interntrack.scrapers.rss_feeds import RSSFeedScraper
 
