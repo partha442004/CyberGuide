@@ -6,6 +6,20 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Fresher-aware discovery + hiring-drives section.** Discovery queries are
+  now fresher-aware: members whose saved experience levels are fresher-only
+  (entry/junior) get fresher-flavored searches (`<role> fresher`) for the
+  first half of their query budget, so discovery *finds* fresher roles
+  instead of finding mid/senior roles that the experience gate then drops
+  (the second half stays plain so postings that don't literally say
+  "fresher" still surface). The email digest also gains a **🚶 Hiring
+  drives today** section that collects the day's walk-in / campus /
+  off-campus / virtual-drive jobs (from the hiring-signal detector) into
+  one highlighted block with Apply buttons, so instant-apply roles are
+  unmissable.
+
+### Added
+
 - **Scam guard for digests.** A conservative red-flag detector scans every
   posting's title + description for common fresher-scam tells — money
   transfer / registration & joining fees / UPI & crypto payments, guaranteed
