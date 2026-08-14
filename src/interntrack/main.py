@@ -3,11 +3,13 @@ InternTrack - Main FastAPI Application
 """
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from interntrack.api.router import api_router
@@ -82,6 +84,12 @@ app.include_router(api_router, prefix="/api")
 
 # PWA install shell (root-level /app routes, outside the /api prefix).
 app.include_router(pwa_router)
+
+# Brand assets (logo) served at /static/logo.png so emails can embed a
+# public URL. Uses a package-relative path so it works from any CWD.
+_static_dir = Path(__file__).resolve().parent / "static"
+if _static_dir.is_dir():
+    app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 
 @app.exception_handler(AppException)

@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     # recipients can open the full dashboard and manage their alerts.
     dashboard_url: str | None = None
 
+    # Public API base URL (e.g. https://cyberguide-api.vercel.app). Used to
+    # build hotlinkable asset URLs (the brand logo at /static/logo.png) in
+    # emails. Falls back to ``dashboard_url`` when unset so a single env var
+    # still yields working links in self-hosted setups.
+    api_base_url: str | None = None
+
     # Database
     database_url: str = "sqlite+aiosqlite:///./data/interntrack.db"
 

@@ -6,6 +6,14 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Brand logo everywhere.** The project now ships a logo asset
+  (`src/interntrack/static/logo.png` + `dashboard/static/logo.png`) served
+  by the API at `/static/logo.png` and shown in the Streamlit dashboard
+  header (`st.logo`). Daily/weekly digest emails embed it in the header
+  (hotlinked from `API_BASE_URL`, falling back to `DASHBOARD_URL`), so
+  every touchpoint carries the same brand mark. Missing URL or old
+  Streamlit degrade silently — never breaks a digest.
+
 - **Deeper sarkari coverage — 3 more govt job feeds.** The govt domain now
   pulls from FreeJobAlert (100 live items: RRB JE, NHPC, IARI, IIT project
   roles), SarkariExam (UPPSC / STET / nursing postings) and SarkariJobFind
