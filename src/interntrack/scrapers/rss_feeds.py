@@ -29,6 +29,15 @@ DEFAULT_FEEDS = {
     # reachable from datacenter IPs (verified: Railway RRB / SSC / UPSC /
     # bank-postings with application dates).
     "sarkariresult": "https://www.sarkariresult.com/feed",
+    # FreeJobAlert — big govt/bank/defence job-alert portal (verified 100
+    # live items via the real scraper: RRB JE, NHPC, IARI, IIT project roles).
+    "freejobalert": "https://www.freejobalert.com/feed/",
+    # SarkariExam — another large govt exam/job portal (verified 40 entries:
+    # UPPSC admit cards, STET, nursing council, etc.).
+    "sarkariexam": "https://www.sarkariexam.com/feed",
+    # SarkariJobFind — govt recruitment aggregator (verified 10 entries:
+    # SBI clerk, Bihar STET, RRB JE, ICF Chennai apprentice).
+    "sarkarijobfind": "https://sarkarijobfind.com/feed",
 }
 
 

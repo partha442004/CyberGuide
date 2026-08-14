@@ -34,6 +34,9 @@ class TestRSSFeedScraper:
         assert scraper.feeds == DEFAULT_FEEDS
         assert "himalayas" in DEFAULT_FEEDS
         assert "sarkariresult" in DEFAULT_FEEDS
+        assert "freejobalert" in DEFAULT_FEEDS
+        assert "sarkariexam" in DEFAULT_FEEDS
+        assert "sarkarijobfind" in DEFAULT_FEEDS
 
     def test_extract_company_from_title_hiring(self):
         from interntrack.scrapers.rss_feeds import RSSFeedScraper
