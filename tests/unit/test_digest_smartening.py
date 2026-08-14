@@ -68,6 +68,53 @@ class TestSalaryMeetsTarget:
         assert _salary_meets_target(_job(salary_min=None), "garbage") is False
 
 
+class TestSalaryBelowFloor:
+    def test_no_floor_never_drops(self):
+        from interntrack.scheduler.jobs import _salary_below_floor
+
+        assert _salary_below_floor(_job(salary_min=100000), None) is False
+        assert _salary_below_floor(_job(salary_min=100000), 0) is False
+
+    def test_below_floor_dropped(self):
+        from interntrack.scheduler.jobs import _salary_below_floor
+
+        assert _salary_below_floor(_job(salary_min=600000), 800000) is True
+        assert _salary_below_floor(_job(salary_min=800000), 800000) is False
+        assert _salary_below_floor(_job(salary_min=900000), 800000) is False
+
+    def test_unknown_salary_kept(self):
+        """No salary data must never drop a job — freshers lose nothing."""
+        from interntrack.scheduler.jobs import _salary_below_floor
+
+        assert (
+            _salary_below_floor(_job(salary_min=None, salary_max=None), 800000) is False
+        )
+
+    def test_uses_minimum_not_maximum(self):
+        from interntrack.scheduler.jobs import _salary_below_floor
+
+        # Min below the floor but max above: still dropped.
+        assert (
+            _salary_below_floor(_job(salary_min=600000, salary_max=1200000), 800000)
+            is True
+        )
+
+    def test_usd_postings_compared_against_inr_floor(self):
+        from interntrack.scheduler.jobs import _salary_below_floor
+
+        # 5k USD ~= 415k INR, below an 8 LPA floor → dropped.
+        assert (
+            _salary_below_floor(_job(salary_min=5000, salary_currency="USD"), 800000)
+            is True
+        )
+
+    def test_bad_values_never_raise(self):
+        from interntrack.scheduler.jobs import _salary_below_floor
+
+        assert _salary_below_floor(_job(salary_min="n/a"), 800000) is False
+        assert _salary_below_floor(_job(salary_min=None), "garbage") is False
+
+
 class TestKeywordHits:
     def test_empty_keywords_returns_nothing(self):
         from interntrack.scheduler.jobs import _keyword_hits

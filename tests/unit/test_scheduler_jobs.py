@@ -307,6 +307,69 @@ class TestJobHtmlCard:
         assert titles[1] == "Fresher SOC Analyst"  # fresher, older
         assert titles[2] == "Senior SOC Lead"  # non-fresher last
 
+    def test_salary_floor_drops_below_floor_keeps_unknown(self, monkeypatch):
+        """target_salary drops known-below-floor jobs; unknown-salary stays."""
+        from interntrack.scheduler.jobs import _score_and_group_jobs
+
+        async def _no_skills(session, user_id=None):
+            return None
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._latest_resume_skill_names", _no_skills
+        )
+        report = {
+            "target_salary": 800000,
+            "new_jobs": [
+                {
+                    "title": "Well Paid Role",
+                    "company": "A",
+                    "domain": "security",
+                    "salary_min": 1200000,
+                    "salary_currency": "INR",
+                },
+                {
+                    "title": "Underpaid Role",
+                    "company": "B",
+                    "domain": "security",
+                    "salary_min": 500000,
+                    "salary_currency": "INR",
+                },
+                {
+                    "title": "No Salary Listed",
+                    "company": "C",
+                    "domain": "security",
+                },
+            ],
+        }
+        sections = asyncio.run(_score_and_group_jobs(report, _FakeSession()))
+        titles = [job["title"] for _, items in sections for _, job in items]
+        assert titles == ["Well Paid Role", "No Salary Listed"]
+        assert "Underpaid Role" not in titles
+
+    def test_salary_floor_not_set_keeps_all(self, monkeypatch):
+        from interntrack.scheduler.jobs import _score_and_group_jobs
+
+        async def _no_skills(session, user_id=None):
+            return None
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._latest_resume_skill_names", _no_skills
+        )
+        report = {
+            "new_jobs": [
+                {
+                    "title": "Low Pay",
+                    "company": "A",
+                    "domain": "security",
+                    "salary_min": 100000,
+                    "salary_currency": "INR",
+                },
+            ],
+        }
+        sections = asyncio.run(_score_and_group_jobs(report, _FakeSession()))
+        titles = [job["title"] for _, items in sections for _, job in items]
+        assert titles == ["Low Pay"]
+
 
 class _FakeSession:
     """Minimal stand-in so _score_and_group_jobs never touches the DB."""

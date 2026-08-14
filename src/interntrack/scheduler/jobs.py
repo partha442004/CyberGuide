@@ -2,6 +2,7 @@
 Scheduled background jobs.
 """
 
+import asyncio
 import re
 from datetime import UTC, datetime, timedelta
 
@@ -9,6 +10,12 @@ from interntrack.database.session import get_db_session
 from interntrack.services.job_service import JobService
 from interntrack.services.notification_service import NotificationManager
 from interntrack.services.report_service import ReportService, classify_domain
+
+# How long to wait before retrying an email that failed to deliver once.
+# Short enough to not stall the digest run, long enough to let a busy
+# relay catch its breath. The owner failure ping only fires after this
+# retry also fails.
+EMAIL_RETRY_DELAY_SECONDS = 3.0
 
 
 async def run_job_discovery():
@@ -675,6 +682,21 @@ async def _deliver_alert(
             )
         else:
             results.update(await manager.notify(email_targets, html, subject=subject))
+        # One quick retry for transient SMTP/relay failures (a busy relay or
+        # a blip is common; the failure ping to the owner should only fire
+        # after the retry also fails). Delivered emails skip the retry.
+        if results.get("email") is False:
+            await asyncio.sleep(EMAIL_RETRY_DELAY_SECONDS)
+            if recipient:
+                results.update(
+                    await manager.notify(
+                        email_targets, html, subject=subject, recipient=recipient
+                    )
+                )
+            else:
+                results.update(
+                    await manager.notify(email_targets, html, subject=subject)
+                )
     if text_targets:
         message = await build_daily_report_message(
             report,
@@ -2217,6 +2239,35 @@ def _salary_meets_target(job: dict, target: int | None) -> bool:
         return False
 
 
+def _salary_below_floor(job: dict, floor: int | None) -> bool:
+    """True when a job's listed salary is definitively below the floor.
+
+    Jobs with no salary data return False (kept) so freshers don't lose
+    unknown-salary roles — only postings whose *known* salary is below the
+    member's target are dropped. USD postings are compared against an INR
+    floor with the same fixed rate ``_salary_meets_target`` uses.
+    """
+    try:
+        if not floor or float(floor) <= 0:
+            return False
+        lo = job.get("salary_min")
+        hi = job.get("salary_max")
+        if lo is None and hi is None:
+            return False
+        if lo is not None:
+            low = float(lo)
+        elif hi is not None:
+            low = float(hi)
+        else:
+            return False
+        currency = str(job.get("salary_currency") or "USD").upper()
+        if currency == "USD":
+            low = low * _INR_TO_USD
+        return low < float(floor)
+    except Exception:  # noqa: BLE001 - a bad salary must never break the digest
+        return False
+
+
 def _keyword_hits(job: dict, keywords: list | None) -> list[str]:
     """Which of the user's highlight keywords match a job, capped at 3.
 
@@ -2537,6 +2588,12 @@ async def _score_and_group_jobs(
     min_score = report.get("min_match_score")
     if min_score:
         scored = [(s, job) for s, job in scored if s is None or (s or 0) >= min_score]
+    # Per-member salary floor: drop postings whose listed salary is
+    # definitely below the target (unknown-salary jobs stay — a fresher
+    # must not lose roles that simply don't advertise pay).
+    floor = report.get("target_salary")
+    if floor:
+        scored = [(s, job) for s, job in scored if not _salary_below_floor(job, floor)]
     if not scored:
         return []
 
@@ -2792,6 +2849,12 @@ async def build_daily_report_message(
         )
         if domains:
             lines.append(f"🔔 Filtered to: {', '.join(domains)} only")
+        salary_floor = report.get("target_salary")
+        if salary_floor:
+            lines.append(
+                f"💰 Only jobs at/above ₹{int(salary_floor):,}/yr shown "
+                "(below it are filtered out)"
+            )
     if weekly:
         week = await _week_application_stats(session, user_id) if user_id else {}
         if week.get("total"):
@@ -3592,6 +3655,12 @@ async def build_daily_report_html(
                 f"<div style='margin-top:8px;'>{chips}</div></div>"
             )
 
+    salary_floor = report.get("target_salary")
+    if salary_floor:
+        parts.append(
+            "<p style='color:#64748b;font-size:12px;'>💰 Only jobs at/above "
+            f"₹{int(salary_floor):,}/yr shown — below it are filtered out.</p>"
+        )
     parts.append(
         "<p style='color:#64748b;font-size:12px;margin-top:22px;'>"
         "Match % = how well your uploaded resume fits each job · "
