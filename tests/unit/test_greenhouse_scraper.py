@@ -7,6 +7,13 @@ import pytest
 
 class TestGreenhouseBoardScraper:
     @pytest.mark.asyncio
+    def test_default_boards_include_verified_tech_employers(self):
+        """The default board list covers the live-verified tech employers."""
+        from interntrack.scrapers.greenhouse import GREENHOUSE_COMPANIES
+
+        for company in ("elastic", "gitlab", "datadog", "mongodb", "zscaler"):
+            assert company in GREENHOUSE_COMPANIES
+
     async def test_source_name(self):
         from interntrack.scrapers.greenhouse import GreenhouseBoardScraper
 

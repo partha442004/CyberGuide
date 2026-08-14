@@ -15,6 +15,7 @@ from interntrack.scrapers.base import BaseScraper, RawJob, matches_query
 # Security vendors with public Greenhouse boards (verified reachable;
 # each returns 200 + a JSON job list from boards-api.greenhouse.io).
 GREENHOUSE_COMPANIES = [
+    # Security vendors (the original focus).
     "zscaler",
     "okta",
     "cloudflare",
@@ -26,6 +27,13 @@ GREENHOUSE_COMPANIES = [
     "dragos",
     "tanium",
     "sumologic",
+    # Large tech employers with public Greenhouse boards (verified reachable
+    # from datacenter IPs; each returns 200+ live roles so discovery gets
+    # the full tech stack, not just security).
+    "elastic",
+    "gitlab",
+    "datadog",
+    "mongodb",
 ]
 
 _BOARD_URL = "https://boards-api.greenhouse.io/v1/boards/{company}/jobs"

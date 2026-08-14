@@ -21,6 +21,10 @@ from interntrack.scrapers.base import BaseScraper, RawJob, matches_query
 DEFAULT_FEEDS = {
     "weworkremotely": "https://weworkremotely.com/remote-jobs.rss",
     "remotive": "https://remotive.com/remote-jobs/feed",
+    # Himalayas — India-focused remote job board with a live RSS feed
+    # (verified 100+ entries; surfaces India + remote roles the other two
+    # feeds under-represent).
+    "himalayas": "https://himalayas.app/jobs/rss",
 }
 
 
