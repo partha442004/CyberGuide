@@ -131,6 +131,9 @@ class TestSearchEngineQueries:
             # Government / sarkari job portals.
             "site:sarkariresult.com",
             "site:freejobalert.com",
+            "site:sarkariexam.com",
+            "site:sarkarijobfind.com",
+            "site:indgovtjobs.in",
         ):
             assert host in joined, f"missing {host} in search queries"
 

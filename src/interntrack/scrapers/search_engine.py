@@ -80,6 +80,12 @@ _JOB_HOSTS = (
     "securityjobs.net",
     "ninjajobs.com",
     "techfetch.com",
+    # Government / sarkari job portals.
+    "sarkariresult.com",
+    "freejobalert.com",
+    "sarkariexam.com",
+    "sarkarijobfind.com",
+    "indgovtjobs.in",
 )
 
 # URL shapes that mean "this is a search / listing page, not a posting".
@@ -416,7 +422,8 @@ class SearchEngineScraper(BaseScraper):
             # Government / sarkari job portals (India).
             (
                 f"site:sarkariresult.com OR site:freejobalert.com "
-                f"OR site:govtjobspreparation.com OR site:jobriya.com {q}"
+                f"OR site:sarkariexam.com OR site:sarkarijobfind.com "
+                f"OR site:indgovtjobs.in {q}"
             ),
         ]
         jobs: list[RawJob] = []

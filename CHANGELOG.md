@@ -6,6 +6,16 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Deeper sarkari coverage — 3 more govt job feeds.** The govt domain now
+  pulls from FreeJobAlert (100 live items: RRB JE, NHPC, IARI, IIT project
+  roles), SarkariExam (UPPSC / STET / nursing postings) and SarkariJobFind
+  (SBI clerk, Bihar STET, RRB JE, ICF Chennai apprentice) alongside
+  SarkariResult — all live-verified through the real scraper (36 unique
+  jobs across all feeds in one pass). The govt-portal search query family
+  grew to SarkariResult / FreeJobAlert / SarkariExam / SarkariJobFind /
+  IndGovtJobs, and those hosts are now recognized posting URLs (dead
+  portals Jobriya / GovtJobsPreparation were dropped).
+
 - **Govt / Sarkari job domain.** New selectable alert domain (`govt`) for
   future members who want government jobs: discovery queries cover Railway
   RRB / SSC / UPSC / IBPS / Bank PO / police / constable / PSU / defence /
