@@ -1205,6 +1205,78 @@ class TestAlertChunks:
             buttons=[("Apply", "https://x")],
         )
 
+    async def test_email_retries_once_on_transient_failure(self):
+        """A failed email send is retried once before the result is final."""
+        from interntrack.scheduler.jobs import _deliver_alert
+
+        calls = {"n": 0}
+
+        async def _flaky_notify(channels, *_args, **_kwargs):
+            calls["n"] += 1
+            return {channels[0]: calls["n"] > 1}  # fail first, succeed retry
+
+        mock_manager = MagicMock()
+        mock_manager.notify = AsyncMock(side_effect=_flaky_notify)
+        report = self._report(2)
+
+        with (
+            patch(
+                "interntrack.scheduler.jobs.build_daily_report_html",
+                new=AsyncMock(return_value="full email text"),
+            ),
+            patch(
+                "interntrack.scheduler.jobs.build_alert_chunks",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch("interntrack.scheduler.jobs.asyncio.sleep", new=AsyncMock()),
+        ):
+            results = await _deliver_alert(
+                mock_manager,
+                ["email"],
+                report,
+                AsyncMock(),
+                domains=["security"],
+            )
+
+        assert results == {"email": True}
+        assert calls["n"] == 2  # original + one retry
+
+    async def test_email_no_retry_when_delivered(self):
+        """A delivered email is never retried."""
+        from interntrack.scheduler.jobs import _deliver_alert
+
+        calls = {"n": 0}
+
+        async def _ok_notify(channels, *_args, **_kwargs):
+            calls["n"] += 1
+            return {channels[0]: True}
+
+        mock_manager = MagicMock()
+        mock_manager.notify = AsyncMock(side_effect=_ok_notify)
+        report = self._report(2)
+
+        with (
+            patch(
+                "interntrack.scheduler.jobs.build_daily_report_html",
+                new=AsyncMock(return_value="full email text"),
+            ),
+            patch(
+                "interntrack.scheduler.jobs.build_alert_chunks",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch("interntrack.scheduler.jobs.asyncio.sleep", new=AsyncMock()),
+        ):
+            results = await _deliver_alert(
+                mock_manager,
+                ["email"],
+                report,
+                AsyncMock(),
+                domains=["security"],
+            )
+
+        assert results == {"email": True}
+        assert calls["n"] == 1  # no retry on success
+
 
 # ---------------------------------------------------------------------------
 # Vacation mode (pause all alerts)

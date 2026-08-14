@@ -6,6 +6,18 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Per-member salary floor now actually filters.** A member's
+  `min_salary` target previously only added a "Meets your target salary"
+  marker; now jobs whose *known* salary is below the floor are dropped from
+  the digest entirely (unknown-salary jobs stay, so freshers don't lose
+  roles that don't advertise pay). Both the text and HTML digests add a
+  "Only jobs at/above ₹X/yr shown" footer when a floor is set.
+
+- **Email delivery retries once on transient failure.** A failed member
+  email is retried after a short delay before the owner Telegram failure
+  ping fires, so a busy relay blip no longer produces a false alarm or a
+  missed digest.
+
 - **Members are email + SMS only (no Telegram).** Per the product decision,
   SMS is the member notification channel for now — new accounts default to
   `["email", "sms"]` and every member delivery path (daily/weekly digests,
