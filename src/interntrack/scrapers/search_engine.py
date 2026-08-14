@@ -413,6 +413,11 @@ class SearchEngineScraper(BaseScraper):
                 f"site:glassdoor.co.in OR site:careerbuilder.co.in "
                 f"OR site:monsterindia.com OR site:jobhai.com {q}"
             ),
+            # Government / sarkari job portals (India).
+            (
+                f"site:sarkariresult.com OR site:freejobalert.com "
+                f"OR site:govtjobspreparation.com OR site:jobriya.com {q}"
+            ),
         ]
         jobs: list[RawJob] = []
         seen: set[str] = set()

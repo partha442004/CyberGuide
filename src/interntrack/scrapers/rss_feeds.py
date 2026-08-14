@@ -25,6 +25,10 @@ DEFAULT_FEEDS = {
     # (verified 100+ entries; surfaces India + remote roles the other two
     # feeds under-represent).
     "himalayas": "https://himalayas.app/jobs/rss",
+    # SarkariResult — India's largest government-job portal; its feed is
+    # reachable from datacenter IPs (verified: Railway RRB / SSC / UPSC /
+    # bank-postings with application dates).
+    "sarkariresult": "https://www.sarkariresult.com/feed",
 }
 
 

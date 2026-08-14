@@ -1736,6 +1736,9 @@ _DIGEST_SALARY_DOMAINS = {
     "frontend": "development",
     "coding": "development",
     "design": "design",
+    # govt intentionally unmapped: salary benchmarks have no govt bucket,
+    # so a govt-only member simply gets no benchmark line (cleaner than a
+    # misleading private-sector number).
 }
 
 
@@ -2151,6 +2154,7 @@ _DOMAIN_ICONS = {
     "design": "🎨 Design",
     "marketing": "📣 Marketing / Sales",
     "finance": "💰 Finance / Admin",
+    "govt": "🏛️ Govt / Sarkari / PSU",
     "other": "📦 Other",
 }
 
@@ -2611,6 +2615,7 @@ async def _score_and_group_jobs(
         "design",
         "marketing",
         "finance",
+        "govt",
         "other",
     ]
     sections: list[tuple[str, list[tuple[float | None, dict]]]] = []
@@ -3148,7 +3153,16 @@ def _telegram_breakdown(
     top_locs = [loc for loc, _ in loc_totals.most_common(6)]
     if not top_locs:
         return ""
-    d_order = ["security", "coding", "data", "design", "finance", "marketing", "other"]
+    d_order = [
+        "security",
+        "coding",
+        "data",
+        "design",
+        "finance",
+        "marketing",
+        "govt",
+        "other",
+    ]
     rows = []
     td = "padding:4px 8px;border:1px solid #e2e8f0;text-align:center;"
     for d in d_order:
@@ -3736,7 +3750,16 @@ def _location_breakdown_table(sections, other_sections):
     top_locs = [loc for loc, _ in loc_totals.most_common(6)]
     if not top_locs:
         return ""
-    d_order = ["security", "coding", "data", "design", "finance", "marketing", "other"]
+    d_order = [
+        "security",
+        "coding",
+        "data",
+        "design",
+        "finance",
+        "marketing",
+        "govt",
+        "other",
+    ]
     rows = []
     td = "padding:6px 10px;border:1px solid #e2e8f0;"
     for d in d_order:
@@ -4151,6 +4174,46 @@ DOMAIN_QUERIES = {
         "digital marketing",
         "sales intern",
         "growth marketing",
+    ],
+    "govt": [
+        # Single tokens first: sarkariresult feed titles name the exam
+        # directly ("Railway RRB Junior Engineer JE Online Form 2026"), and
+        # the matcher requires every query word, so multi-word AND queries
+        # like "government job" would match nothing on that feed.
+        "railway",
+        "rrb",
+        "ssc",
+        "upsc",
+        "ibps",
+        "bank",
+        "police",
+        "constable",
+        "teacher",
+        "sarkari",
+        "government job",
+        "govt job",
+        "bank po",
+        "sbi recruitment",
+        "psu recruitment",
+        "defence jobs",
+        "army recruitment",
+        "police recruitment",
+        "government internship",
+        # Niche govt roles (surfaced by the day rotation).
+        "gramin dak sevak",
+        "post office",
+        "teaching recruitment",
+        "central government",
+        "state government",
+        "navy",
+        "air force",
+        "customs",
+        "income tax",
+        "clerk",
+        "staff nurse",
+        "computer assistant",
+        "online form",
+        "admit card",
     ],
     "other": ["internship", "entry level", "graduate trainee"],
 }
