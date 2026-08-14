@@ -119,6 +119,15 @@ class TestSearchEngineQueries:
             "site:securityjobs.net",
             "site:ninjajobs.com",
             "site:techfetch.com",
+            # ATS career boards + extra India boards.
+            "site:boards.greenhouse.io",
+            "site:jobs.lever.co",
+            "site:jobs.ashbyhq.com",
+            "site:careers.smartrecruiters.com",
+            "site:glassdoor.co.in",
+            "site:careerbuilder.co.in",
+            "site:monsterindia.com",
+            "site:jobhai.com",
         ):
             assert host in joined, f"missing {host} in search queries"
 

@@ -401,6 +401,18 @@ class SearchEngineScraper(BaseScraper):
                 f"site:infosec-jobs.com OR site:securityjobs.net "
                 f"OR site:ninjajobs.com OR site:techfetch.com {q}"
             ),
+            # ATS career boards (Greenhouse / Lever / Ashby / SmartRecruiters)
+            # — direct company postings that are fully indexed.
+            (
+                f"site:boards.greenhouse.io OR site:jobs.lever.co "
+                f"OR site:jobs.ashbyhq.com OR site:careers.smartrecruiters.com {q}"
+            ),
+            # More India job boards (Monster/Foundit mirror, Glassdoor IN,
+            # CareerBuilder India, Apna, JobHai, Shine already above).
+            (
+                f"site:glassdoor.co.in OR site:careerbuilder.co.in "
+                f"OR site:monsterindia.com OR site:jobhai.com {q}"
+            ),
         ]
         jobs: list[RawJob] = []
         seen: set[str] = set()

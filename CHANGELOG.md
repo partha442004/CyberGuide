@@ -6,6 +6,14 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **More live job sources.** Discovery now pulls from 4 more large-tech
+  Greenhouse career boards (Elastic, GitLab, Datadog, MongoDB — all verified
+  reachable from datacenter IPs with 200+ live roles each), the Himalayas
+  remote-jobs RSS feed (India + remote roles), and two more search-engine
+  query families: ATS career boards (`site:boards.greenhouse.io` / Lever /
+  Ashby / SmartRecruiters) and extra India boards (Glassdoor IN, CareerBuilder
+  IN, Monster India, JobHai). All additions were live-verified before wiring.
+
 - **Per-member salary floor now actually filters.** A member's
   `min_salary` target previously only added a "Meets your target salary"
   marker; now jobs whose *known* salary is below the floor are dropped from
