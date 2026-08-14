@@ -3,6 +3,7 @@ Scheduled background jobs.
 """
 
 import asyncio
+import logging
 import re
 from datetime import UTC, datetime, timedelta
 
@@ -10,6 +11,8 @@ from interntrack.database.session import get_db_session
 from interntrack.services.job_service import JobService
 from interntrack.services.notification_service import NotificationManager
 from interntrack.services.report_service import ReportService, classify_domain
+
+logger = logging.getLogger("interntrack.scheduler.jobs")
 
 # How long to wait before retrying an email that failed to deliver once.
 # Short enough to not stall the digest run, long enough to let a busy
@@ -2357,6 +2360,14 @@ def _job_lines(
     hits = _keyword_hits(job, keywords)
     if hits:
         lines.append("   🔎 Matches: " + ", ".join(hits))
+    signal = _hiring_signal(job)
+    if signal:
+        lines.append(f"   {_esc(signal)}")
+    scam_flags = _scam_signals(job)
+    if scam_flags:
+        lines.append(
+            f"   ⚠️ Review carefully — red flags: {_esc(', '.join(scam_flags))}"
+        )
     if url:
         lines.append(f"   🔗 Apply: {url}")
     note = _expiry_note(job)
@@ -2603,8 +2614,18 @@ async def _score_and_group_jobs(
     jobs = report.get("new_jobs") or []
     if not jobs:
         return []
+    # Scam guard: postings with 2+ distinct red-flag groups (money transfer +
+    # guaranteed income etc.) never reach members — freshers are prime
+    # targets. Single-flag jobs pass but carry a ⚠️ review note on the card.
+    clean_jobs = [job for job in jobs if not _is_likely_scam(job)]
+    if len(clean_jobs) != len(jobs):
+        logger.warning(
+            "Dropped %d likely-scam postings from digest (%d kept)",
+            len(jobs) - len(clean_jobs),
+            len(clean_jobs),
+        )
     resume_skills = await _latest_resume_skill_names(session, user_id=user_id)
-    scored = [(_job_match_score(resume_skills, job), job) for job in jobs]
+    scored = [(_job_match_score(resume_skills, job), job) for job in clean_jobs]
     min_score = report.get("min_match_score")
     if min_score:
         scored = [(s, job) for s, job in scored if s is None or (s or 0) >= min_score]
@@ -4004,23 +4025,87 @@ _HIRING_SIGNALS = (
 )
 
 
-def _hiring_signal_badge(job: dict) -> str:
-    """First direct hiring signal found in title + description, as a chip.
-
-    Never raises and never emits text on non-matching jobs — it is a pure
-    display enhancement.
-    """
+def _hiring_signal(job: dict) -> str | None:
+    """First direct hiring signal label found in title + description, or None."""
     text = f"{job.get('title') or ''} {job.get('description') or ''}".lower()
     if not text.strip():
-        return ""
+        return None
     for label, phrases in _HIRING_SIGNALS:
         if any(phrase in text for phrase in phrases):
-            return (
-                "<span style='background:#fce7f3;color:#9d174d;border-radius:999px;"
-                "padding:2px 9px;font-size:11px;font-weight:700;margin-right:6px;'>"
-                f"{label}</span>"
-            )
-    return ""
+            return label
+    return None
+
+
+def _hiring_signal_badge(job: dict) -> str:
+    """The hiring signal as an HTML chip (empty when no signal matches)."""
+    label = _hiring_signal(job)
+    if not label:
+        return ""
+    return (
+        "<span style='background:#fce7f3;color:#9d174d;border-radius:999px;"
+        "padding:2px 9px;font-size:11px;font-weight:700;margin-right:6px;'>"
+        f"{label}</span>"
+    )
+
+
+# Red-flag groups used to catch fake / scam postings aimed at freshers.
+# These are deliberately conservative: money-transfer or guaranteed-income
+# phrases are common scam tells; single matches are flagged (⚠️) on the
+# card, two or more distinct groups drop the job from digests entirely.
+_SCAM_PATTERNS = (
+    (
+        "money transfer",
+        (
+            "registration fee",
+            "processing fee",
+            "joining fee",
+            "pay to apply",
+            "send money",
+            "money transfer",
+            "bank details",
+            "upi payment",
+            "deposit of",
+            "payout",
+            "bitcoin",
+            "crypto",
+        ),
+    ),
+    (
+        "guaranteed income",
+        (
+            "guaranteed job",
+            "guaranteed income",
+            "100% placement",
+            "guaranteed placement",
+            "earn ₹",
+            "earn rs ",
+            "no experience needed earn",
+        ),
+    ),
+    (
+        "no-interview hiring",
+        ("no interview needed", "without interview", "direct offer"),
+    ),
+    (
+        "sketchy contact",
+        ("contact on telegram", "telegram only", "whatsapp only", "dm me for"),
+    ),
+)
+
+
+def _scam_signals(job: dict) -> list[str]:
+    """Distinct red-flag groups matched in the title + description."""
+    text = f"{job.get('title') or ''} {job.get('description') or ''}".lower()
+    if not text.strip():
+        return []
+    return [
+        label for label, phrases in _SCAM_PATTERNS if any(p in text for p in phrases)
+    ]
+
+
+def _is_likely_scam(job: dict) -> bool:
+    """Two or more distinct red-flag groups = likely scam, drop from digests."""
+    return len(_scam_signals(job)) >= 2
 
 
 def _job_html_card(
@@ -4101,6 +4186,14 @@ def _job_html_card(
         )
     if chips:
         card += "<div style='margin-top:8px;'>" + chips + "</div>"
+    scam_flags = _scam_signals(job)
+    if scam_flags:
+        card += (
+            "<div style='margin-top:8px;background:#fef2f2;border:1px solid #fecaca;"
+            "border-radius:6px;padding:6px 10px;color:#b91c1c;font-size:12px;'>"
+            f"⚠️ Review carefully — red flags: {_esc(', '.join(scam_flags))}. "
+            "Legit employers never ask for money.</div>"
+        )
     if fresher_badge:
         card += "<div style='margin-top:8px;'>" + fresher_badge + "</div>"
     desc = _esc(_job_desc_snippet(job, limit=240))

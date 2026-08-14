@@ -240,6 +240,110 @@ class TestJobHtmlCard:
         assert "Now hiring" not in card
         assert "Campus" not in card
 
+    def test_card_warns_on_single_scam_flag(self):
+        """One red-flag group passes but shows a ⚠️ review note."""
+        from interntrack.scheduler.jobs import _job_html_card
+
+        card = _job_html_card(
+            None,
+            {
+                "title": "Home Data Entry",
+                "company": "Unknown",
+                "location": "Remote",
+                "description": "Send money as registration fee to secure your seat.",
+            },
+            "#e5484d",
+        )
+
+        assert "Review carefully" in card
+        assert "money transfer" in card
+
+
+class TestScamDetection:
+    """Heuristic scam guard for fresher-targeted fake postings."""
+
+    def test_scam_signals_money_transfer(self):
+        from interntrack.scheduler.jobs import _scam_signals
+
+        job = {
+            "title": "Work from home job",
+            "description": "Pay a registration fee of ₹500 to apply.",
+        }
+        assert "money transfer" in _scam_signals(job)
+
+    def test_clean_job_has_no_signals(self):
+        from interntrack.scheduler.jobs import _scam_signals
+
+        job = {
+            "title": "SOC Analyst",
+            "company": "Zscaler",
+            "description": "Monitor SIEM alerts and respond to incidents.",
+        }
+        assert _scam_signals(job) == []
+
+    def test_two_groups_is_likely_scam(self):
+        from interntrack.scheduler.jobs import _is_likely_scam
+
+        job = {
+            "title": "Guaranteed job offer",
+            "description": "Guaranteed placement after a joining fee. Pay via UPI.",
+        }
+        assert _is_likely_scam(job)
+
+    def test_digest_drops_likely_scams_keeps_clean(self, monkeypatch):
+        """Postings with 2+ red-flag groups never reach the digest sections."""
+        from interntrack.scheduler.jobs import _score_and_group_jobs
+
+        async def _no_skills(session, user_id=None):
+            return None
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs._latest_resume_skill_names", _no_skills
+        )
+        report = {
+            "new_jobs": [
+                {
+                    "title": "Legit SOC Analyst",
+                    "company": "Zscaler",
+                    "domain": "security",
+                    "experience_level": "fresher",
+                    "description": "Monitor SIEM alerts.",
+                },
+                {
+                    "title": "Fake Guaranteed Job",
+                    "company": "Unknown",
+                    "domain": "security",
+                    "experience_level": "fresher",
+                    "description": (
+                        "Guaranteed placement after registration fee. "
+                        "Send money via UPI to confirm."
+                    ),
+                },
+            ],
+        }
+        sections = asyncio.run(_score_and_group_jobs(report, _FakeSession()))
+        titles = [job["title"] for _, items in sections for _, job in items]
+        assert "Legit SOC Analyst" in titles
+        assert "Fake Guaranteed Job" not in titles
+
+    def test_job_lines_include_signal_and_scam_warning(self):
+        """Telegram lines carry the hiring signal + scam review note."""
+        from interntrack.scheduler.jobs import _job_lines
+
+        lines = _job_lines(
+            None,
+            {
+                "title": "Walk-in interview for interns",
+                "company": "Acme",
+                "location": "Chennai",
+                "description": "Send resume today. Registration fee required.",
+                "url": "https://acme.example/apply",
+            },
+        )
+        joined = "\n".join(lines)
+        assert "Walk-in interview" in joined
+        assert "money transfer" in joined
+
     def test_snippet_strips_html_tags(self):
         """Raw markup from greenhouse/notion/RSS sources never leaks into
         the digest snippet."""
