@@ -128,6 +128,9 @@ class TestSearchEngineQueries:
             "site:careerbuilder.co.in",
             "site:monsterindia.com",
             "site:jobhai.com",
+            # Government / sarkari job portals.
+            "site:sarkariresult.com",
+            "site:freejobalert.com",
         ):
             assert host in joined, f"missing {host} in search queries"
 

@@ -390,6 +390,34 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
         ),
     ),
     (
+        "govt",
+        (
+            "sarkari",
+            "government job",
+            "govt job",
+            "govt",
+            "railway",
+            "rrb",
+            "ssc",
+            "upsc",
+            "bank exam",
+            "bank po",
+            "sbi",
+            "ibps",
+            "psu",
+            "defence",
+            "army",
+            "navy",
+            "air force",
+            "police",
+            "constable",
+            "tehsil",
+            "panchayat",
+            "government of",
+            "ministry of",
+        ),
+    ),
+    (
         "frontend",
         (
             "frontend",
@@ -506,6 +534,7 @@ _DOMAIN_LABELS = {
     "design": "🎨 Design",
     "finance": "💰 Finance / Admin",
     "marketing": "📣 Marketing / Sales",
+    "govt": "🏛️ Govt / Sarkari / PSU",
     "other": "📦 Other",
 }
 
@@ -518,6 +547,7 @@ _DOMAIN_ORDER = [
     "design",
     "finance",
     "marketing",
+    "govt",
     "other",
 ]
 
@@ -563,6 +593,11 @@ _CATEGORY_STYLE = {
         "color": "#f59e0b",
         "grad": "linear-gradient(135deg,#fbbf24,#b45309)",
         "icon": "📣",
+    },
+    "govt": {
+        "color": "#0ea5e9",
+        "grad": "linear-gradient(135deg,#38bdf8,#0369a1)",
+        "icon": "🏛️",
     },
     "other": {
         "color": "#64748b",

@@ -42,6 +42,7 @@ _ALERT_DOMAINS = (
     "design",
     "finance",
     "marketing",
+    "govt",
     "other",
 )
 # Channels the alert can be delivered through.

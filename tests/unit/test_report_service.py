@@ -357,6 +357,22 @@ class TestClassifyDomain:
         assert classify_domain("DevSecOps Engineer", []) == "security"
         assert classify_domain("Information Security Manager") == "security"
 
+    def test_govt_domain(self):
+        """Sarkari / govt / PSU / railway titles classify as govt."""
+        from interntrack.services.report_service import classify_domain
+
+        for title in [
+            "Railway RRB Junior Engineer JE Online Form 2026",
+            "SSC CGL Recruitment 2026",
+            "Sarkari Naukri - Bank PO",
+            "UPSC Civil Services Exam 2026",
+            "IBPS Clerk Online Form",
+            "Police Constable Recruitment",
+            "PSU Engineer Recruitment",
+            "Defence Jobs - Army Recruitment",
+        ]:
+            assert classify_domain(title, []) == "govt", title
+
     def test_security_keywords_cover_modern_titles(self):
         """GRC / threat intel / OSINT / DFIR / web-app titles classify security."""
         from interntrack.services.report_service import classify_domain

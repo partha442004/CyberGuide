@@ -6,6 +6,17 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Govt / Sarkari job domain.** New selectable alert domain (`govt`) for
+  future members who want government jobs: discovery queries cover Railway
+  RRB / SSC / UPSC / IBPS / Bank PO / police / constable / PSU / defence /
+  teaching roles, classification routes sarkari-govt titles to the domain
+  (checked before generic coding tokens so "Railway RRB Junior Engineer"
+  lands in Govt, not Coding), and the dashboard + digests render it with
+  its own label/icon/color. Sources: the SarkariResult RSS feed (live-
+  verified: Railway / UPPSC / Bank of Baroda / staff-nurse postings) plus
+  a govt-portal `site:` query family (SarkariResult / FreeJobAlert /
+  Jobriya / GovtJobsPreparation).
+
 - **More live job sources.** Discovery now pulls from 4 more large-tech
   Greenhouse career boards (Elastic, GitLab, Datadog, MongoDB — all verified
   reachable from datacenter IPs with 200+ live roles each), the Himalayas
