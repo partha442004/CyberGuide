@@ -183,6 +183,52 @@ _JOB_HOSTS = (
     "teamtailor.com",
     "jazzhr.com",
     "breezy.hr",
+    # More bug bounty / security-research platforms.
+    "hackenproof.com",
+    "synack.com",
+    "immunefi.com",
+    "code4rena.com",
+    "sherlock.xyz",
+    # Research / structured programs (paid opportunities, not just jobs).
+    "summerofcode.withgoogle.com",
+    "outreachy.org",
+    "mlh.io",
+    "linuxfoundation.org",
+    "cncf.io",
+    # Big-tech career pages / internship portals.
+    "careers.google.com",
+    "careers.microsoft.com",
+    "university.microsoft.com",
+    "amazon.jobs",
+    "careers.cisco.com",
+    "jobs.ibm.com",
+    "careers.qualcomm.com",
+    "jobs.intel.com",
+    "careers.adobe.com",
+    "careers.salesforce.com",
+    # University placement / internship cells (India).
+    "placement.iitm.ac.in",
+    "ccd.iitd.ac.in",
+    "placement.iitb.ac.in",
+    "cdc.iitkgp.ac.in",
+    "placement.iisc.ac.in",
+    # Govt / defence / regulatory recruitment portals.
+    "drdo.gov.in",
+    "isro.gov.in",
+    "nic.in",
+    "cdac.in",
+    "nielit.gov.in",
+    "bel-india.in",
+    "hal-india.com",
+    "ecil.co.in",
+    "bhel.com",
+    "rbi.org.in",
+    "sebi.gov.in",
+    "npci.org.in",
+    "uidai.gov.in",
+    "cert-in.org.in",
+    # Apprenticeship / trainee schemes.
+    "naps.gov.in",
 )
 
 # URL shapes that mean "this is a search / listing page, not a posting".
@@ -209,7 +255,13 @@ _LISTING_MARKERS = (
     "jobsearch",
     "?q=",
     "&q=",
-    "/internships/",
+    # Plural "…-internships" slugs are category pages (Internshala); the
+    # singular /internships/<role> paths are real postings and pass.
+    "-internships",
+    # Internshala category pages also use singular slugs
+    # (<role>-internship-in-<city>[/stipend-<amt>]) — listings, not postings.
+    "-internship-in-",
+    "/stipend-",
     "/posts/",
     "/pulse/",  # LinkedIn Pulse = content articles, never job postings
     "/registration/",
@@ -233,6 +285,11 @@ _POSTING_MARKERS = (
     "/job-details/",
     "/internship/detail/",
     "/job/",
+    # Company / university career-portal posting shapes: company.com/careers/<role>,
+    # /jobs/<role>, /internships/<role>. The bare roots are rejected separately.
+    "/careers/",
+    "/internships/",
+    "/jobs/",
     "/position/",
     "/positions",
     "/requisition",
@@ -242,6 +299,25 @@ _POSTING_MARKERS = (
     "/openings/",
     "/opportunities/",
     "/apply/",
+)
+
+# Career-portal roots that are listing pages, never individual postings
+# (company.com/careers, university.edu/internships …). Paths *under* them
+# (/careers/security-engineer, /internships/summer-analyst) are postings.
+_LISTING_ROOTS = frozenset(
+    {
+        "careers",
+        "career",
+        "jobs",
+        "internships",
+        "internship",
+        "opportunities",
+        "openings",
+        "positions",
+        "position",
+        "vacancies",
+        "vacancy",
+    }
 )
 
 _SKIP_HOSTS = (
@@ -256,7 +332,8 @@ _SKIP_HOSTS = (
     "stackoverflow.com",
     "github.com",
     "medium.com",
-    "amazon.",
+    "amazon.in",
+    "amazon.com",
     "flipkart.",
     # Docs / help / marketing / app subdomains, not postings.
     "help.",
@@ -419,6 +496,11 @@ class SearchEngineScraper(BaseScraper):
         # A bare host root (jobs.lever.co/, app landing, board homepage) is
         # never an individual posting.
         if path in ("", "/", "/index.html", "/index.htm"):
+            return False
+        # A career-portal root (company.com/careers, university.edu/internships)
+        # is a listing, never a posting — but specific paths under it are.
+        segments = [s for s in path.split("/") if s]
+        if len(segments) == 1 and segments[0] in _LISTING_ROOTS:
             return False
         if any(h in host for h in _JOB_HOSTS):
             return True
@@ -622,6 +704,68 @@ class SearchEngineScraper(BaseScraper):
                 f"OR site:pinpoint.world OR site:teamtailor.com {q}"
             ),
             (f"site:jazzhr.com OR site:breezy.hr OR site:bamboohr.com/jobs {q}"),
+            # More bug bounty / security-research platforms (HackenProof /
+            # Synack / Immunefi / Code4rena / Sherlock).
+            (
+                f"site:hackenproof.com OR site:synack.com OR site:immunefi.com "
+                f"OR site:code4rena.com OR site:sherlock.xyz {q}"
+            ),
+            # CTF / cybersecurity learning platforms — talent signals, not
+            # postings. Queried so events / competition / recruitment pages
+            # still surface, but they are not host-trusted (no digest spam).
+            (
+                f"site:ctftime.org OR site:tryhackme.com OR site:hackthebox.com "
+                f"OR site:portswigger.net OR site:picoctf.org {q}"
+            ),
+            (
+                f"site:cyberdefenders.org OR site:blueteamlabs.online "
+                f"OR site:root-me.org OR site:overthewire.org {q}"
+            ),
+            # Research / structured programs (Google Summer of Code / Outreachy /
+            # MLH Fellowship / Linux Foundation / CNCF).
+            (
+                f"site:summerofcode.withgoogle.com OR site:outreachy.org "
+                f"OR site:mlh.io OR site:linuxfoundation.org OR site:cncf.io {q}"
+            ),
+            # Big-tech internships / graduate careers.
+            (
+                f"site:careers.google.com OR site:careers.microsoft.com "
+                f"OR site:amazon.jobs OR site:university.microsoft.com {q}"
+            ),
+            (
+                f"site:careers.cisco.com OR site:jobs.ibm.com "
+                f"OR site:careers.qualcomm.com OR site:jobs.intel.com {q}"
+            ),
+            (
+                f"site:careers.adobe.com OR site:careers.salesforce.com "
+                f"OR site:nvidia.com/en-us/about-nvidia/careers {q}"
+            ),
+            # University placement / internship cells (IIT / IISc / IIIT / NIT).
+            (
+                f"site:placement.iitm.ac.in OR site:ccd.iitd.ac.in "
+                f"OR site:placement.iitb.ac.in OR site:cdc.iitkgp.ac.in {q}"
+            ),
+            (f"site:placement.iisc.ac.in OR site:nitc.ac.in OR site:iiitb.ac.in {q}"),
+            # Govt / defence / regulatory recruitment portals.
+            (
+                f"site:drdo.gov.in OR site:isro.gov.in OR site:nic.in "
+                f"OR site:cdac.in OR site:nielit.gov.in {q}"
+            ),
+            (
+                f"site:bel-india.in OR site:hal-india.com OR site:ecil.co.in "
+                f"OR site:bhel.com {q}"
+            ),
+            (
+                f"site:rbi.org.in OR site:sebi.gov.in OR site:npci.org.in "
+                f"OR site:uidai.gov.in OR site:cert-in.org.in {q}"
+            ),
+            # Apprenticeship / trainee schemes (NAPS; NATS already above).
+            (f"site:naps.gov.in OR site:apprenticeshipindia.gov.in {q}"),
+            # Security communities (events / talks / hiring connections).
+            (
+                f"site:null.community OR site:defcon.org OR site:bsides.org "
+                f"OR site:eccouncil.org {q}"
+            ),
         ]
         jobs: list[RawJob] = []
         seen: set[str] = set()

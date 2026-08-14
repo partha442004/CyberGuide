@@ -6,6 +6,24 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Career-portal URL shapes + another ~45 job sources.** The search net
+  now recognizes posting URLs directly on company/university career portals
+  (`/careers/<role>`, `/jobs/<role>`, `/internships/<role>`,
+  `/opportunities/<role>`) while still rejecting the bare listing roots
+  (`/careers`, `/jobs`, `/internships`) and internshala category pages.
+  New host-trusted sources: more bug-bounty platforms (HackenProof / Synack /
+  Immunefi / Code4rena / Sherlock), structured programs (Google Summer of
+  Code / Outreachy / MLH / Linux Foundation / CNCF), big-tech careers &
+  internships (Google / Microsoft / Amazon.jobs / Cisco / IBM / Qualcomm /
+  Intel / Adobe / Salesforce), IIT-IISc-IIIT-NIT placement cells, govt /
+  defence / regulatory recruitment (DRDO / ISRO / NIC / C-DAC / NIELIT /
+  BEL / HAL / ECIL / BHEL / RBI / SEBI / NPCI / UIDAI / CERT-In) and the
+  NAPS apprenticeship portal. CTF / learning platforms and security
+  communities (CTFtime / TryHackMe / HTB / DEF CON / BSides / Null) are
+  queried as talent signals but not host-trusted, so digests stay job-only.
+
+### Added
+
 - **Even more boards surface via the search net + a new govt feed.** The
   discovery search gained 12 new `site:` query families covering more
   India boards (CareerNet / iimjobs / eLitmus / AasaanJobs / Employment
