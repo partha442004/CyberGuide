@@ -38,6 +38,11 @@ DEFAULT_FEEDS = {
     # SarkariJobFind — govt recruitment aggregator (verified 10 entries:
     # SBI clerk, Bihar STET, RRB JE, ICF Chennai apprentice).
     "sarkarijobfind": "https://sarkarijobfind.com/feed",
+    # Virtual Vocations — US remote-job board with a live RSS feed
+    # (verified: returns entries; surfaces roles other remote feeds miss).
+    "virtualvocations": "https://www.virtualvocations.com/jobs/rss",
+    # Authentic Jobs — curated design/dev/creative job feed (verified live).
+    "authenticjobs": "https://authenticjobs.com/rss",
 }
 
 
