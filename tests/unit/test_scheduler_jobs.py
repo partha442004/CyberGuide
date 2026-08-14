@@ -326,6 +326,44 @@ class TestScamDetection:
         assert "Legit SOC Analyst" in titles
         assert "Fake Guaranteed Job" not in titles
 
+    def test_hiring_drives_collects_instant_apply_roles(self):
+        """Walk-in / campus / off-campus / virtual drives are pulled out of
+        the digest sections; plain postings stay behind."""
+        from interntrack.scheduler.jobs import _hiring_drives
+
+        sections = [
+            (
+                "security",
+                [
+                    (80.0, {"title": "Walk-in interview for SOC interns"}),
+                    (75.0, {"title": "Off-campus drive — VAPT freshers"}),
+                    (90.0, {"title": "Security Analyst"}),
+                ],
+            ),
+            (
+                "coding",
+                [(70.0, {"title": "Campus hiring 2026 — SDE"})],
+            ),
+        ]
+        drives = _hiring_drives(sections)
+        assert len(drives) == 3
+        labels = [label for label, _, _ in drives]
+        assert any("Walk-in" in label for label in labels)
+        assert any("Campus" in label for label in labels)
+        # The plain posting is not a drive.
+        assert all("Security Analyst" not in str(job) for _, _, job in drives)
+
+    def test_hiring_drives_respects_cap(self):
+        from interntrack.scheduler.jobs import _hiring_drives
+
+        sections = [
+            (
+                "security",
+                [(80.0, {"title": f"Walk-in drive {i}"}) for i in range(9)],
+            )
+        ]
+        assert len(_hiring_drives(sections, cap=5)) == 5
+
     def test_job_lines_include_signal_and_scam_warning(self):
         """Telegram lines carry the hiring signal + scam review note."""
         from interntrack.scheduler.jobs import _job_lines

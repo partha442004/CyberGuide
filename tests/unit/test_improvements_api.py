@@ -168,6 +168,32 @@ class TestDiscoveryQueries:
         assert any("burp suite intern" in q for q in queries)
         assert any("nmap intern" in q for q in queries)
 
+    def test_fresher_mode_adds_fresher_queries(self):
+        """Fresher-only members (entry/junior) search for fresher roles."""
+        from interntrack.scheduler.jobs import discovery_queries_for
+
+        queries = discovery_queries_for(
+            {"domains": ["security"], "experience_levels": ["entry", "junior"]},
+            limit=30,
+        )
+        assert any(q.strip().endswith("fresher") for q in queries)
+        # Plain (non-fresher-suffixed) domain queries must still be there
+        # alongside, so roles that don't literally say "fresher" get found.
+        assert any("fresher" not in q for q in queries)
+
+    def test_all_levels_mode_has_no_fresher_queries(self):
+        """Empty experience_levels (all levels, e.g. Panthalarajan) and
+        mixed levels never get fresher-flavored searches."""
+        from interntrack.scheduler.jobs import discovery_queries_for
+
+        for prefs in (
+            {"domains": ["security"]},
+            {"domains": ["security"], "experience_levels": []},
+            {"domains": ["security"], "experience_levels": ["mid", "senior"]},
+        ):
+            queries = discovery_queries_for(prefs, limit=30)
+            assert not any("fresher" in q for q in queries), prefs
+
     def test_deduplicated_and_limited(self):
         from interntrack.scheduler.jobs import discovery_queries_for
 

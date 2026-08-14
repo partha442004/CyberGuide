@@ -3386,6 +3386,45 @@ async def build_daily_report_html(
             f"<div style='margin-top:8px;'>{jotd_score_txt}</div>{jotd_link}</div>"
         )
 
+    # 🚶 Hiring drives today — walk-in / campus / off-campus / virtual-drive
+    # jobs among today's matches, highlighted so instant-apply roles are
+    # unmissable.
+    drives = _hiring_drives(sections)
+    if drives:
+        drive_rows = []
+        for d_label, dscore, djob in drives:
+            d_title = _esc(djob.get("title") or "Untitled")
+            d_company = _esc(str(djob.get("company") or ""))
+            d_loc = _esc(str(djob.get("location") or ""))
+            d_url = _esc(djob.get("url") or "")
+            d_meta = " · ".join(bit for bit in (d_company, d_loc) if bit)
+            d_score_txt = f"{dscore:.0f}%" if dscore is not None else "—"
+            d_link = ""
+            if d_url:
+                d_link = (
+                    f"<a href='{d_url}' style='background:#db2777;color:#fff;"
+                    "text-decoration:none;border-radius:6px;padding:7px 14px;"
+                    "font-size:12px;font-weight:700;'>Apply</a>"
+                )
+            drive_rows.append(
+                "<div style='display:flex;justify-content:space-between;"
+                "align-items:center;border-bottom:1px dashed #f9a8d4;"
+                "padding:10px 0;'>"
+                f"<div><b style='font-size:14px;'>{d_title}</b>"
+                f"<div style='color:#9d174d;font-size:12px;'>{_esc(d_label)}"
+                + (f" · {d_meta}" if d_meta else "")
+                + f" · match {d_score_txt}</div></div>"
+                + d_link
+                + "</div>"
+            )
+        parts.append(
+            "<div style='margin-top:24px;background:#fdf2f8;"
+            "border:1px solid #fbcfe8;border-radius:12px;padding:16px 18px;'>"
+            "<div style='font-size:12px;font-weight:800;color:#be185d;"
+            "letter-spacing:.6px;'>🚶 HIRING DRIVES TODAY</div>"
+            f"{''.join(drive_rows)}</div>"
+        )
+
     # 🗓️ Interview-stage applications section (email) with calendar links.
     interviews = report.get("upcoming_interviews") or []
     if interviews:
@@ -4048,6 +4087,23 @@ def _hiring_signal_badge(job: dict) -> str:
     )
 
 
+def _hiring_drives(sections, cap: int = 5) -> list[tuple[str, float | None, dict]]:
+    """Instant-apply drive jobs (walk-in / campus / off-campus / virtual)
+    pulled out of the digest sections, capped for the highlight section.
+
+    Returns ``[(signal_label, score, job), ...]`` in section order.
+    """
+    drives: list[tuple[str, float | None, dict]] = []
+    for _domain, items in sections:
+        for score, job in items:
+            label = _hiring_signal(job) or ""
+            if any(k in label for k in ("Walk-in", "Campus", "Off-campus", "Virtual")):
+                drives.append((label, score, job))
+                if len(drives) >= cap:
+                    return drives
+    return drives
+
+
 # Red-flag groups used to catch fake / scam postings aimed at freshers.
 # These are deliberately conservative: money-transfer or guaranteed-income
 # phrases are common scam tells; single matches are flagged (⚠️) on the
@@ -4449,6 +4505,22 @@ def _query_already_located(q: str) -> bool:
     return bool(words and words[-1] in _BASE_QUERY_CITIES)
 
 
+def _fresher_only(prefs: dict) -> bool:
+    """True when the user's saved experience levels mean fresher-only.
+
+    Empty / unset experience_levels means "all levels", and any mid/senior
+    level means mixed — neither is fresher-only.
+    """
+    levels = {
+        str(x).strip().lower()
+        for x in (prefs.get("experience_levels") or [])
+        if str(x).strip()
+    }
+    if not levels:
+        return False
+    return levels.issubset({"entry", "junior", "intern", "fresher"})
+
+
 def discovery_queries_for(prefs: dict, user=None, limit: int = 4) -> list[str]:
     """Search queries matching a user's alert domains + resume skills.
 
@@ -4501,6 +4573,17 @@ def discovery_queries_for(prefs: dict, user=None, limit: int = 4) -> list[str]:
         if not _query_already_located(q) and city.lower() not in q.lower():
             located_queries.append(f"{q} {city}")
     queries = located_queries + list(queries)
+    # Fresher-only members (experience_levels = ["entry", "junior"]) get
+    # fresher-flavored searches so discovery finds fresher roles instead of
+    # finding mid/senior roles that the experience gate then has to drop.
+    # Only the first ``limit // 2`` queries are fresher-suffixed — the rest
+    # stay plain so postings that don't literally say "fresher" still get
+    # discovered (the experience gate filters the rest downstream).
+    if _fresher_only(prefs) and queries:
+        fresher_count = max(1, min(limit // 2, len(queries)))
+        queries = [f"{q} fresher" for q in queries[:fresher_count]] + queries[
+            fresher_count:
+        ]
     seen: set[str] = set()
     unique: list[str] = []
     for query in queries:
