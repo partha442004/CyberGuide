@@ -2,7 +2,9 @@
 InternTrack Dashboard - Streamlit Application
 """
 
+import contextlib
 import os
+import pathlib
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta, timezone
 from html import escape
@@ -107,6 +109,13 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# Brand logo in the Streamlit header (best-effort: missing file or old
+# Streamlit without st.logo just skips it).
+_logo_path = pathlib.Path(__file__).resolve().parent / "static" / "logo.png"
+if _logo_path.is_file() and hasattr(st, "logo"):
+    with contextlib.suppress(Exception):
+        st.logo(str(_logo_path), size="large")
 
 # ---------------------------------------------------------------------------
 # Design system (professional theme, adapts to light/dark)

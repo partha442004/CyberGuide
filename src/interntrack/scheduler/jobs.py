@@ -3286,6 +3286,7 @@ async def build_daily_report_html(
         (
             f"<div style='background:linear-gradient(135deg,#667eea,#764ba2);"
             "color:#fff;border-radius:14px;padding:22px 26px;'>"
+            f"{_email_logo_html()}"
             f"<div style='font-size:20px;font-weight:800;'>{_esc(title)}</div>"
             f"<div style='opacity:.85;font-size:13px;'>{_esc(generated)}</div>"
             f"<div style='margin-top:10px;font-size:14px;'>"
@@ -3685,6 +3686,33 @@ async def build_daily_report_html(
         parts.append(footer)
     parts.append("</div>")
     return "".join(parts)
+
+
+def _email_logo_html() -> str:
+    """Brand logo <img> for the email header, or '' when no public URL.
+
+    Uses the same API base the PWA is served from (``api_base_url``),
+    appending ``/static/logo.png`` — the logo is mounted on the API at
+    ``/static`` so emails can hotlink it. Falls back to '' so a missing
+    URL never breaks the digest; the header keeps its title alone.
+    """
+    try:
+        from interntrack.config import get_settings
+
+        settings = get_settings()
+        base = (
+            (settings.api_base_url or settings.dashboard_url or "").strip().rstrip("/")
+        )
+    except Exception:  # noqa: BLE001, S110 - logo must never break email
+        return ""
+    if not base:
+        return ""
+    return (
+        "<div style='text-align:center;margin-bottom:14px;'>"
+        f"<img src='{_esc(base)}/static/logo.png' alt='InternTrack' "
+        "width='110' height='84' style='border-radius:10px;"
+        "background:#fff;padding:6px 10px;' /></div>"
+    )
 
 
 def _digest_footer_html() -> str:

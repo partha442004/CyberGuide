@@ -184,6 +184,51 @@ class TestJobLinesMarkers:
         assert not any("Matches:" in line for line in lines)
 
 
+class TestEmailLogoHtml:
+    def test_returns_logo_img_with_api_base(self, monkeypatch):
+        from interntrack.scheduler.jobs import _email_logo_html
+
+        class _S:
+            api_base_url = "https://cyberguide-api.vercel.app"
+            dashboard_url = None
+
+        monkeypatch.setattr(
+            "interntrack.config.get_settings",
+            lambda: _S(),
+        )
+        html = _email_logo_html()
+        assert "/static/logo.png" in html
+        assert "https://cyberguide-api.vercel.app/static/logo.png" in html
+        assert "<img" in html
+
+    def test_falls_back_to_dashboard_url(self, monkeypatch):
+        from interntrack.scheduler.jobs import _email_logo_html
+
+        class _S:
+            api_base_url = None
+            dashboard_url = "https://dash.example.com"
+
+        monkeypatch.setattr(
+            "interntrack.config.get_settings",
+            lambda: _S(),
+        )
+        html = _email_logo_html()
+        assert "https://dash.example.com/static/logo.png" in html
+
+    def test_returns_empty_when_no_url(self, monkeypatch):
+        from interntrack.scheduler.jobs import _email_logo_html
+
+        class _S:
+            api_base_url = None
+            dashboard_url = None
+
+        monkeypatch.setattr(
+            "interntrack.config.get_settings",
+            lambda: _S(),
+        )
+        assert _email_logo_html() == ""
+
+
 class TestApiPutPrefs:
     """PUT /notifications/preferences/{user_id} persists the new fields."""
 
