@@ -39,6 +39,7 @@ class TestRSSFeedScraper:
         assert "sarkarijobfind" in DEFAULT_FEEDS
         assert "virtualvocations" in DEFAULT_FEEDS
         assert "authenticjobs" in DEFAULT_FEEDS
+        assert "rojgarresult" in DEFAULT_FEEDS
 
     def test_extract_company_from_title_hiring(self):
         from interntrack.scrapers.rss_feeds import RSSFeedScraper

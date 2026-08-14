@@ -169,6 +169,52 @@ class TestSearchEngineQueries:
             "site:cybersecpeople.com",
             "site:cybersec4u.com",
             "site:dice.com",
+            # More India boards + govt portals.
+            "site:careernet.co.in",
+            "site:iimjobs.com",
+            "site:aasaanjobs.com",
+            "site:rojgarresult.com",
+            "site:employmentnews.gov.in",
+            "site:apprenticeshipindia.gov.in",
+            # Global boards.
+            "site:themuse.com",
+            "site:builtin.com",
+            "site:jobrapido.com",
+            "site:jobserve.com",
+            # Startup / tech boards.
+            "site:workatastartup.com",
+            "site:otta.com",
+            "site:landing.jobs",
+            "site:turing.com",
+            "site:gun.io",
+            "site:usebraintrust.com",
+            # Bug bounty / security communities.
+            "site:hackerone.com",
+            "site:bugcrowd.com",
+            "site:intigriti.com",
+            "site:isc2.org",
+            "site:sans.org",
+            # Research / academic.
+            "site:researchgate.net",
+            "site:nature.com/naturecareers",
+            "site:jobs.ac.uk",
+            "site:acm.org",
+            # More remote boards.
+            "site:jobicy.com",
+            "site:remotejobs.com",
+            "site:skipthedrive.com",
+            # ATS career portals.
+            "site:myworkdayjobs.com",
+            "site:icims.com/jobs",
+            "site:jobvite.com",
+            "site:taleo.net",
+            "site:successfactors.eu",
+            "site:recruitee.com",
+            "site:pinpoint.world",
+            "site:teamtailor.com",
+            "site:jazzhr.com",
+            "site:breezy.hr",
+            "site:bamboohr.com/jobs",
         ):
             assert host in joined, f"missing {host} in search queries"
 
