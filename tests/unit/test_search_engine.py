@@ -49,6 +49,55 @@ class TestSearchEngineScraper:
         assert not s._is_job_url("https://en.wikipedia.org/wiki/Cybersecurity")
         assert not s._is_job_url("https://www.youtube.com/watch?v=abc")
 
+    def test_is_job_url_accepts_pdf_notices(self):
+        """Recruitment-notice PDFs (govt / university / walk-in drives) are
+        individual documents, not listing pages."""
+        s = self._scraper()
+        assert s._is_job_url("https://www.isro.gov.in/Recruitment_2026.pdf")
+        assert s._is_job_url("https://university.edu/careers/Walk-in_Interview.pdf")
+        assert not s._is_job_url("https://en.wikipedia.org/wiki/guide.pdf")
+
+    def test_parse_pdf_extracts_notice(self):
+        """A readable recruitment PDF becomes a RawJob (title + description)."""
+        from unittest.mock import patch
+
+        from interntrack.scrapers.search_engine import SearchEngineScraper
+
+        class _FakePage:
+            def extract_text(self):
+                return (
+                    "WALK-IN INTERVIEW\n"
+                    "Cyber Security Internship - Off-campus drive\n"
+                    "Send resume to hr@example.com before 30 Aug"
+                )
+
+        class _FakeReader:
+            pages = [_FakePage()]
+
+        s = SearchEngineScraper()
+        with patch("pypdf.PdfReader", return_value=_FakeReader()):
+            job = s._parse_pdf(
+                "https://university.edu/recruitment.pdf", b"%PDF-1.4 fake"
+            )
+        assert job is not None
+        assert job.url.endswith(".pdf")
+        assert "WALK-IN INTERVIEW" in job.title.upper()
+        assert "Cyber Security Internship" in job.description
+        assert job.company  # host-derived
+
+    def test_parse_pdf_unreadable_returns_none(self):
+        """Binary garbage / encrypted PDFs never raise."""
+        from unittest.mock import patch
+
+        from interntrack.scrapers.search_engine import SearchEngineScraper
+
+        def boom(*args, **kwargs):  # noqa: ARG001
+            raise ValueError("bad pdf")
+
+        s = SearchEngineScraper()
+        with patch("pypdf.PdfReader", side_effect=boom):
+            assert s._parse_pdf("https://x.edu/n.pdf", b"garbage") is None
+
     def test_is_job_url_rejects_listing_pages(self):
         """Board search pages are listings, not postings — rejected."""
         s = self._scraper()

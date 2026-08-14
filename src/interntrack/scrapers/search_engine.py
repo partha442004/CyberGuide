@@ -229,6 +229,13 @@ _JOB_HOSTS = (
     "cert-in.org.in",
     # Apprenticeship / trainee schemes.
     "naps.gov.in",
+    # International government / public-sector job boards.
+    "usajobs.gov",
+    "civilservicejobs.service.gov.uk",
+    "jobs.nhs.uk",
+    "apsjobs.gov.au",
+    "jobs-emplois.gc.ca",
+    "epso.europa.eu",
 )
 
 # URL shapes that mean "this is a search / listing page, not a posting".
@@ -491,6 +498,10 @@ class SearchEngineScraper(BaseScraper):
         full = url.lower()
         if any(skip in host for skip in _SKIP_HOSTS):
             return False
+        # PDF recruitment notices (govt / university / walk-in drives) are
+        # individual documents, never listing pages.
+        if parsed.path.lower().endswith(".pdf"):
+            return True
         if any(marker in full for marker in _LISTING_MARKERS):
             return False
         # A bare host root (jobs.lever.co/, app landing, board homepage) is
@@ -505,6 +516,44 @@ class SearchEngineScraper(BaseScraper):
         if any(h in host for h in _JOB_HOSTS):
             return True
         return any(marker in path for marker in _POSTING_MARKERS)
+
+    def _parse_pdf(self, url: str, content: bytes) -> RawJob | None:
+        """Extract a recruitment-notice PDF into a RawJob (best-effort).
+
+        A lot of Indian internships / govt recruitment is announced as PDFs
+        (Recruitment_2026.pdf, Walk-in_Interview.pdf …). Text extraction is
+        imperfect across PDF generators, so this never raises and returns
+        ``None`` when the PDF is unreadable. Title = the first readable
+        lines of the notice; company = the serving host.
+        """
+        try:
+            from io import BytesIO
+
+            from pypdf import PdfReader
+
+            reader = PdfReader(BytesIO(content))
+            first_page = (reader.pages[0].extract_text() or "").strip()
+            pages_text = "\n".join(
+                (page.extract_text() or "") for page in reader.pages[:5]
+            )
+        except Exception:  # noqa: BLE001 - PDF generators vary wildly
+            return None
+        full = re.sub(r"\s+", " ", pages_text).strip()
+        if len(full) < 20:
+            return None
+        host = urlparse(url).netloc.replace("www.", "")
+        company = host.split(".")[0].title() if host else "Unknown"
+        lines = [ln.strip() for ln in first_page.splitlines() if ln.strip()]
+        title = (
+            " ".join(lines[:2]) or full[:120] or f"Recruitment notice — {company}"
+        )[:140]
+        return RawJob(
+            title=title,
+            company=company[:200],
+            url=url,
+            source=self.source_name,
+            description=full[:2000] or None,
+        )
 
     def _parse_page(self, url: str, html: str) -> RawJob | None:
         """Extract title/company/description from a fetched job page."""
@@ -766,6 +815,91 @@ class SearchEngineScraper(BaseScraper):
                 f"site:null.community OR site:defcon.org OR site:bsides.org "
                 f"OR site:eccouncil.org {q}"
             ),
+            # Direct security-vendor career pages (most run on Workday /
+            # Greenhouse, which are queried above; these have own portals).
+            (
+                f"site:cyberark.com/careers OR site:veracode.com/careers "
+                f"OR site:checkmarx.com/company/careers OR site:aquasec.com/careers "
+                f"OR site:sailpoint.com/company/careers "
+                f"OR site:beyondtrust.com/careers {q}"
+            ),
+            (
+                f"site:eset.com/careers OR site:sonicwall.com/company/careers "
+                f"OR site:watchguard.com/about/careers "
+                f"OR site:juniper.net/us/en/company/careers "
+                f"OR site:pingidentity.com/en/company/careers {q}"
+            ),
+            (
+                f"site:lacework.com/careers OR site:orca.security/careers "
+                f"OR site:exabeam.com/company/careers "
+                f"OR site:securonix.com/company/careers "
+                f"OR site:logrhythm.com/company/careers {q}"
+            ),
+            (
+                f"site:redcanary.com/company/careers "
+                f"OR site:bishopfox.com/company/careers "
+                f"OR site:trustedsec.com/careers OR site:netspi.com/company/careers "
+                f"OR site:horizon3.ai/careers {q}"
+            ),
+            # Staffing / recruitment agencies (India + global).
+            (
+                f"site:randstad.co.in OR site:michaelpage.co.in OR site:adecco.co.in "
+                f"OR site:teamlease.com OR site:quesscorp.com OR site:cielhr.com {q}"
+            ),
+            (
+                f"site:roberthalf.com OR site:hays.com OR site:kellyservices.com "
+                f"OR site:teksystems.com OR site:allegisgroup.com {q}"
+            ),
+            (
+                f"site:cybercoders.com OR site:jeffersonfrank.com "
+                f"OR site:harveynash.com OR site:motionrecruitment.com "
+                f"OR site:insightglobal.com OR site:experis.com "
+                f"OR site:robertwalters.com {q}"
+            ),
+            # International government / public-sector jobs.
+            (
+                f"site:usajobs.gov OR site:civilservicejobs.service.gov.uk "
+                f"OR site:jobs.nhs.uk OR site:apsjobs.gov.au {q}"
+            ),
+            (f"site:jobs-emplois.gc.ca OR site:epso.europa.eu {q}"),
+            # International student programs (IAESTE / Mitacs / AIESEC /
+            # DAAD / Erasmus+).
+            (
+                f"site:iaeste.org OR site:mitacs.ca OR site:aiesec.org "
+                f"OR site:daad.de OR site:erasmus-plus.ec.europa.eu {q}"
+            ),
+            # Hackathon / hiring-challenge platforms (opportunities, not jobs).
+            (
+                f"site:devfolio.co OR site:devpost.com OR site:hackerearth.com "
+                f"OR site:hackerrank.com OR site:kaggle.com {q}"
+            ),
+            (
+                f"site:topcoder.com OR site:codechef.com OR site:leetcode.com "
+                f"OR site:mlh.io OR site:unstop.com {q}"
+            ),
+            # Freelance / contract marketplaces.
+            (
+                f"site:upwork.com/jobs OR site:freelancer.com OR site:fiverr.com "
+                f"OR site:peopleperhour.com OR site:guru.com OR site:flexiple.com {q}"
+            ),
+            # Cybersecurity event ecosystems (career fairs / hiring villages).
+            (
+                f"site:blackhat.com OR site:defcon.org OR site:rsaconference.com "
+                f"OR site:bsides.org OR site:nullcon.net OR site:c0c0n.in {q}"
+            ),
+            # Indian cyber / startup-ecosystem orgs.
+            (
+                f"site:cybercrime.gov.in OR site:nciipc.gov.in "
+                f"OR site:startupindia.gov.in OR site:stpi.in OR site:meity.gov.in {q}"
+            ),
+            # Professional associations with career resources.
+            (
+                f"site:cloudsecurityalliance.org OR site:computer.org/careers "
+                f"OR site:isc2.org/careers OR site:isaca.org/credentialing {q}"
+            ),
+            # PDF recruitment notices (govt / university / walk-in drives).
+            (f"{q} recruitment notice filetype:pdf"),
+            (f"{q} walk-in interview filetype:pdf"),
         ]
         jobs: list[RawJob] = []
         seen: set[str] = set()
@@ -799,7 +933,10 @@ class SearchEngineScraper(BaseScraper):
                             continue
                         if page.status_code != 200:
                             continue
-                        job = self._parse_page(link, page.text)
+                        if link.lower().endswith(".pdf"):
+                            job = self._parse_pdf(link, page.content)
+                        else:
+                            job = self._parse_page(link, page.text)
                         if job:
                             jobs.append(job)
                     # Only move on to the next query when this engine

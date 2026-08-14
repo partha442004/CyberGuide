@@ -6,6 +6,31 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Direct hiring signals + PDF recruitment notices + ~70 more sources.**
+  Digest job cards now surface **hiring-signal badges** — walk-in interview /
+  campus / off-campus drive, immediate hiring, referral, send-resume,
+  virtual drive, research-intern — detected from the job title & description,
+  so members spot instant-apply opportunities at a glance. The search net
+  now also **parses PDF recruitment notices** (govt / university / walk-in
+  drives — `Recruitment_2026.pdf` etc.) via pypdf, with two new
+  `filetype:pdf` discovery queries. New query families cover direct
+  security-vendor career portals (CyberArk / Veracode / Checkmarx / Aqua /
+  SailPoint / BeyondTrust / ESET / SonicWall / Juniper / Lacework / Orca /
+  Exabeam / Red Canary / Bishop Fox / TrustedSec / NetSPI / Horizon3), staffing
+  & recruiting agencies (Randstad / Michael Page / Adecco / TeamLease / Quess /
+  CIEL / Robert Half / Hays / Kelly / TEKsystems / CyberCoders / Jefferson
+  Frank / Harvey Nash / Motion / Insight Global / Experis / Robert Walters),
+  international govt jobs (USAJOBS / UK Civil Service / NHS / APS / Canada /
+  EU Careers — host-trusted), student programs (IAESTE / Mitacs / AIESEC /
+  DAAD / Erasmus+), hackathon platforms (Devfolio / Devpost / HackerEarth /
+  HackerRank / Kaggle / Topcoder / CodeChef / LeetCode), freelance
+  marketplaces (Upwork / Freelancer / Fiverr / PeoplePerHour / Guru / Flexiple),
+  event ecosystems (Black Hat / RSA / Nullcon / c0c0n), Indian cyber & startup
+  orgs (I4C / NCIIPC / Startup India / STPI / MeitY) and professional
+  associations (CSA / IEEE CS / ISC2 / ISACA careers).
+
+### Added
+
 - **Career-portal URL shapes + another ~45 job sources.** The search net
   now recognizes posting URLs directly on company/university career portals
   (`/careers/<role>`, `/jobs/<role>`, `/internships/<role>`,
