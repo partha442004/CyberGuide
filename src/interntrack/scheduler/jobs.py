@@ -616,6 +616,20 @@ async def _deliver_alert(
             "telegram_chat_id": getattr(user, "telegram_chat_id", None),
             "phone_number": getattr(user, "phone_number", None),
         }
+    # Dashboard links (and the "manage alerts" footer) are owner-only:
+    # members asked for job digests, not an account/dashboard to manage.
+    # The legacy path (``user`` is None — the default ``user1`` account)
+    # is the owner's own digest, so it keeps the link.
+    show_dashboard_link = True
+    if user is not None:
+        try:
+            owner_email = await _owner_email(session)
+            member_email = str(getattr(user, "email", "") or "").strip().lower()
+            show_dashboard_link = bool(
+                owner_email and member_email == str(owner_email).strip().lower()
+            )
+        except Exception:  # noqa: BLE001, S110 - best-effort gate
+            show_dashboard_link = False
     results: dict = {}
     # Preferred-location split (📍 Your area / 🌍 Other locations). Discovery
     # already searches the default location when the user hasn't set one, so
@@ -673,6 +687,7 @@ async def _deliver_alert(
             user_location=user_location,
             include_remote=include_remote,
             weekly=weekly,
+            show_dashboard_link=show_dashboard_link,
         )
         if recipient:
             results.update(
@@ -725,6 +740,7 @@ async def _deliver_alert(
             user_id=user_id,
             user_location=user_location,
             include_remote=include_remote,
+            show_dashboard_link=show_dashboard_link,
         )
         # Every chunk must deliver for the send to count as delivered.
         telegram_ok = True
@@ -2895,6 +2911,7 @@ async def build_alert_chunks(
     user_id: str | None = None,
     user_location: str | None = None,
     include_remote: bool = True,
+    show_dashboard_link: bool = True,
 ) -> list[tuple[str, list[tuple[str, str]]]]:
     """Split the alert digest into Telegram-sized chunks with Apply buttons.
 
@@ -3103,9 +3120,10 @@ async def build_alert_chunks(
                     gap_buttons.append((f"📚 Learn {_esc(g['skill'])}", url))
             chunks.append(("\n".join(gap_lines), gap_buttons))
 
-    footer_txt = _digest_footer_text()
-    if footer_txt:
-        chunks.append((footer_txt, []))
+    if show_dashboard_link:
+        footer_txt = _digest_footer_text()
+        if footer_txt:
+            chunks.append((footer_txt, []))
     return chunks
 
 
@@ -3239,6 +3257,7 @@ async def build_daily_report_html(
     user_location: str | None = None,
     include_remote: bool = True,
     weekly: bool = False,
+    show_dashboard_link: bool = True,
 ) -> str:
     """Styled HTML digest for email delivery.
 
@@ -3681,9 +3700,10 @@ async def build_daily_report_html(
         "Match % = how well your uploaded resume fits each job · "
         "✅/⬜ = applied / not applied.</p>"
     )
-    footer = _digest_footer_html()
-    if footer:
-        parts.append(footer)
+    if show_dashboard_link:
+        footer = _digest_footer_html()
+        if footer:
+            parts.append(footer)
     parts.append("</div>")
     return "".join(parts)
 
