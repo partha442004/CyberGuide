@@ -6,6 +6,18 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **RSS article-title guard.** The RSS feed rotation now rejects listicle /
+  article titles ("Remote Cybersecurity Jobs: 10 Companies Hiring", "How to
+  Become a SOC Analyst", salary guides) before the query matcher can accept
+  them — a keyword appearing in an article title no longer lands the article
+  in member digests. Genuine postings with numbers in the title ("SOC
+  Analyst L2 — 24/7 Shift") still pass. Probed several more candidate feeds
+  live (remote.co, Working Nomads, SkipTheDrive, CareerJet/Jooble/Indeed
+  query-RSS, Remotive, RemoteOK): all were bot-gated, dead, or article-mix
+  feeds, so the curated rotation stays as-is.
+
+### Added
+
 - **Personalized digest subjects.** Every member's email subject now carries
   the digest contents at a glance — e.g. `🎯 4 security jobs in Bangalore`
   (daily) or `📅 12 jobs this week (data, coding)` (Sunday weekly) — instead
