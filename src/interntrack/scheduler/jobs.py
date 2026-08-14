@@ -590,6 +590,26 @@ async def send_team_recap() -> dict:
             return {"sent": False, "reason": str(e)}
 
 
+def _digest_subject(
+    report: dict,
+    domains: list | None,
+    user_location: str | None,
+    weekly: bool = False,
+) -> str:
+    """Per-recipient email subject: job count + domains + location.
+
+    Members see e.g. "🎯 4 security jobs in Bangalore" instead of the
+    generic "Daily Report" — the inbox line already tells them whether
+    the digest is worth opening.
+    """
+    count = len(report.get("new_jobs") or [])
+    domain_txt = ", ".join(domains) if domains else "matching"
+    loc_txt = (user_location or "").strip() or DEFAULT_LOCATION
+    if weekly:
+        return f"📅 {count} jobs this week ({domain_txt})"
+    return f"🎯 {count} {domain_txt} jobs in {loc_txt}"
+
+
 async def _deliver_alert(
     manager,
     channels: list | None,
@@ -1544,9 +1564,7 @@ async def _send_alert_for(
         return
 
     manager = NotificationManager(session)
-    subject = "Weekly Digest" if weekly else "Daily Report"
-    if domains:
-        subject += f" ({', '.join(domains)})"
+    subject = _digest_subject(report, domains, user_location, weekly=weekly)
     # Members are email + SMS only for now (no Telegram) — the owner keeps
     # Telegram on their own digest.
     owner_email = await _owner_email(session)

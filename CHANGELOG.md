@@ -6,6 +6,14 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Personalized digest subjects.** Every member's email subject now carries
+  the digest contents at a glance — e.g. `🎯 4 security jobs in Bangalore`
+  (daily) or `📅 12 jobs this week (data, coding)` (Sunday weekly) — instead
+  of the generic "Daily Report". Falls back to the default location and
+  "matching" when a profile has no location or domains.
+
+### Added
+
 - **Fresher-aware discovery + hiring-drives section.** Discovery queries are
   now fresher-aware: members whose saved experience levels are fresher-only
   (entry/junior) get fresher-flavored searches (`<role> fresher`) for the

@@ -326,6 +326,35 @@ class TestScamDetection:
         assert "Legit SOC Analyst" in titles
         assert "Fake Guaranteed Job" not in titles
 
+    def test_digest_subject_personalized_daily(self):
+        """Daily subject carries job count + domains + location."""
+        from interntrack.scheduler.jobs import _digest_subject
+
+        subject = _digest_subject(
+            {"new_jobs": [{"title": "a"}, {"title": "b"}, {"title": "c"}]},
+            ["security"],
+            "Bangalore",
+        )
+        assert subject == "🎯 3 security jobs in Bangalore"
+
+    def test_digest_subject_weekly(self):
+        from interntrack.scheduler.jobs import _digest_subject
+
+        subject = _digest_subject(
+            {"new_jobs": [{"title": "a"}]},
+            ["data", "coding"],
+            "Chennai",
+            weekly=True,
+        )
+        assert subject == "📅 1 jobs this week (data, coding)"
+
+    def test_digest_subject_falls_back_without_domains_or_location(self):
+        from interntrack.scheduler.jobs import _digest_subject
+
+        subject = _digest_subject({"new_jobs": []}, None, "")
+        assert "0 matching jobs" in subject
+        assert "Bangalore" in subject  # DEFAULT_LOCATION fallback
+
     def test_hiring_drives_collects_instant_apply_roles(self):
         """Walk-in / campus / off-campus / virtual drives are pulled out of
         the digest sections; plain postings stay behind."""
@@ -1361,7 +1390,7 @@ class TestGenerateDailyReport:
         mock_manager.notify.assert_awaited_once_with(
             ["telegram"],
             "chunk",
-            subject="Daily Report",
+            subject="🎯 1 matching jobs in Bangalore",
             buttons=[("Apply", "https://x")],
         )
 
@@ -2092,7 +2121,8 @@ class TestWeeklyDigest:
         )
 
         assert deliver_kwargs.get("weekly") is True
-        assert deliver_kwargs.get("subject", "").startswith("Weekly Digest")
+        assert "jobs this week" in deliver_kwargs.get("subject", "")
+        assert "security" in deliver_kwargs.get("subject", "")
 
     @pytest.mark.asyncio
     async def test_weekly_top_engaged_formula(
