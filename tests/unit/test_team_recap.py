@@ -49,7 +49,9 @@ def _user(uid, name, email="x@y.com", location="Bengaluru", domains=None):
     )
 
 
-def _history(uid, days_ago, job_count=1, results=None, domains=None, jobs=None):
+def _history(
+    uid, days_ago, job_count=1, results=None, domains=None, jobs=None, opened_at=None
+):
     return SimpleNamespace(
         user_id=uid,
         created_at=_dt(days_ago),
@@ -58,6 +60,7 @@ def _history(uid, days_ago, job_count=1, results=None, domains=None, jobs=None):
         results=results or {"email": True},
         domains=domains or [],
         jobs=jobs or [],
+        opened_at=opened_at,
     )
 
 
@@ -89,6 +92,7 @@ class TestTeamRecapStats:
                                 {"company": "ABB"},
                                 {"company": "Tata Elxsi"},
                             ],
+                            opened_at=_dt(1),
                         ),
                         _history("u2", 2, job_count=2, domains=["hardware"], jobs=[]),
                         _history(
@@ -120,16 +124,19 @@ class TestTeamRecapStats:
         assert jeeva["sends"] == 2
         assert jeeva["jobs"] == 5
         assert jeeva["emails_ok"] == 2
+        assert jeeva["opened"] == 1
         assert jeeva["email_applied"] == 3
         assert jeeva["top_domains"] == ["hardware"]
         assert jeeva["top_companies"] == ["ABB", "Tata Elxsi"]
-        # Boss: 1 send, 1 job, email not delivered, no email applies.
+        # Boss: 1 send, 1 job, email not delivered, never opened, no applies.
         boss = by_id["u1"]
         assert boss["sends"] == 1
         assert boss["jobs"] == 1
         assert boss["emails_ok"] == 0
+        assert boss["opened"] == 0
         assert boss["email_applied"] == 0
         assert stats["total_email_applied"] == 3
+        assert stats["total_opened"] == 1
         # Sorted by jobs desc — Jeeva first.
         assert stats["users"][0]["user_id"] == "u2"
 
@@ -164,7 +171,9 @@ class TestTeamRecapStats:
         assert stats["users"][0]["sends"] == 1
         assert stats["users"][0]["jobs"] == 2
         assert stats["users"][0]["email_applied"] == 0
+        assert stats["users"][0]["opened"] == 0
         assert stats["total_email_applied"] == 0
+        assert stats["total_opened"] == 0
 
 
 class TestBuildTeamRecapHtml:

@@ -6,6 +6,16 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Email open tracking.** Each digest email now embeds a 1x1 transparent
+  signed pixel (`GET /api/v1/email/open`, HMAC-scoped so it can never be
+  confused with an apply link) that stamps the member's latest digest send
+  (`NotificationHistory.opened_at`, new nullable column auto-synced to
+  live tables). The owner's weekly team recap gains a **👀 Opened** column
+  per member and a "member(s) opened a digest this week" summary line —
+  answering "did my friend actually read the mail?". The pixel never
+  raises on DB trouble and always answers a GIF so email clients never
+  error.
+
 - **Email-apply visibility in the owner recap + member digest footer.**
   Applications recorded from the signed digest Apply links are now tagged
   `source="email"` (new nullable `Application.source` column, auto-added

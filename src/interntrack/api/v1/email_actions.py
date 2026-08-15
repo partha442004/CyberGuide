@@ -7,7 +7,7 @@ in applications" recap for them.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.config import get_settings
@@ -15,9 +15,16 @@ from interntrack.database.session import get_db
 from interntrack.domain.enums import ApplicationStatus
 from interntrack.services.application_service import ApplicationService
 from interntrack.services.job_service import JobService
-from interntrack.utils.helpers import verify_apply_token
+from interntrack.utils.helpers import verify_apply_token, verify_open_token
 
 router = APIRouter()
+
+# 1x1 transparent GIF served by the open-tracking pixel.
+_TRANSPARENT_GIF = (
+    b"GIF89a\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff"
+    b"!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00"
+    b"\x00\x02\x02D\x01\x00;"
+)
 
 
 @router.get("/apply", include_in_schema=False)
@@ -54,3 +61,46 @@ async def email_apply(
         return RedirectResponse(str(job.url), status_code=302)
     base = (get_settings().api_base_url or "").strip().rstrip("/")
     return RedirectResponse(base or "/", status_code=302)
+
+
+@router.get("/open", include_in_schema=False)
+async def email_open(
+    u: str = Query(..., min_length=1, max_length=200),
+    t: str = Query(..., min_length=32, max_length=128),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Record that a member opened a digest email (tracking pixel).
+
+    The digest HTML embeds a 1x1 transparent image pointing here; loading
+    it stamps ``opened_at`` on the member's most recent digest send from
+    the last 48h. Always answers with the transparent GIF so email
+    clients never error, and never raises on DB trouble (a failed pixel
+    must not break rendering of the email).
+    """
+    from datetime import UTC, datetime, timedelta
+
+    if not verify_open_token(u, t):
+        raise HTTPException(status_code=400, detail="Invalid or expired open link")
+
+    try:
+        from sqlalchemy import select
+
+        from interntrack.domain.models import NotificationHistory
+
+        since = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=48)
+        result = await db.execute(
+            select(NotificationHistory)
+            .where(
+                NotificationHistory.user_id == u,
+                NotificationHistory.created_at >= since,
+            )
+            .order_by(NotificationHistory.created_at.desc())
+            .limit(1)
+        )
+        row = result.scalars().first()
+        if row is not None and getattr(row, "opened_at", None) is None:
+            row.opened_at = datetime.now(UTC).replace(tzinfo=None)  # type: ignore[assignment]
+            await db.flush()
+    except Exception:  # noqa: BLE001, S110 - the pixel must never error
+        pass
+    return Response(content=_TRANSPARENT_GIF, media_type="image/gif")

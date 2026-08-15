@@ -361,6 +361,7 @@ async def team_recap_stats(session, days: int = 7) -> dict:
                 for r in rows_for
                 if bool((getattr(r, "results", None) or {}).get("email"))
             )
+            opened = sum(1 for r in rows_for if getattr(r, "opened_at", None))
             domain_counter: Counter = Counter()
             company_counter: Counter = Counter()
             for r in rows_for:
@@ -381,6 +382,7 @@ async def team_recap_stats(session, days: int = 7) -> dict:
                     "sends": sends,
                     "jobs": jobs,
                     "emails_ok": emails_ok,
+                    "opened": opened,
                     "email_applied": email_applied.get(uid, 0),
                     "top_domains": [d for d, _ in domain_counter.most_common(3)],
                     "top_companies": [c for c, _ in company_counter.most_common(5)],
@@ -391,6 +393,7 @@ async def team_recap_stats(session, days: int = 7) -> dict:
             "days": window,
             "total_sends": sum(r["sends"] for r in out),
             "total_jobs": sum(r["jobs"] for r in out),
+            "total_opened": sum(r["opened"] for r in out),
             "total_email_applied": sum(email_applied.values()),
             "users": out,
         }
@@ -399,6 +402,7 @@ async def team_recap_stats(session, days: int = 7) -> dict:
             "days": int(days or 7),
             "total_sends": 0,
             "total_jobs": 0,
+            "total_opened": 0,
             "total_email_applied": 0,
             "users": [],
         }
@@ -416,11 +420,13 @@ def _build_team_recap_html(stats: dict, owner_name) -> str:
     users = stats.get("users") or []
     total_jobs = int(stats.get("total_jobs") or 0)
     total_sends = int(stats.get("total_sends") or 0)
+    total_opened = int(stats.get("total_opened") or 0)
     total_email_applied = int(stats.get("total_email_applied") or 0)
     rows: list[str] = []
     for u in users:
         domains = ", ".join(u.get("top_domains") or u.get("domains") or []) or "all"
         companies = ", ".join(u.get("top_companies") or []) or "—"
+        opened_txt = "✓" if int(u.get("opened", 0) or 0) else "—"
         rows.append(
             "<tr>"
             "<td style='padding:8px 10px;border-bottom:1px solid #e2e8f0;'>"
@@ -434,6 +440,8 @@ def _build_team_recap_html(stats: dict, owner_name) -> str:
             f"text-align:center;'>{u.get('jobs', 0)}</td>"
             f"<td style='padding:8px 10px;border-bottom:1px solid #e2e8f0;"
             f"text-align:center;'>{u.get('emails_ok', 0)}</td>"
+            f"<td style='padding:8px 10px;border-bottom:1px solid #e2e8f0;"
+            f"text-align:center;'>{opened_txt}</td>"
             f"<td style='padding:8px 10px;border-bottom:1px solid #e2e8f0;"
             f"text-align:center;'>{u.get('email_applied', 0)}</td>"
             "<td style='padding:8px 10px;border-bottom:1px solid #e2e8f0;'>"
@@ -449,6 +457,12 @@ def _build_team_recap_html(stats: dict, owner_name) -> str:
             "application(s) recorded straight from digest Apply clicks — "
             "members applying without ever opening the dashboard.</p>"
         )
+    opened_line = ""
+    if total_opened:
+        opened_line = (
+            f"<p style='color:#64748b;font-size:13px;'>👀 <b>{total_opened}</b> "
+            "member(s) opened a digest this week (tracking pixel).</p>"
+        )
     return (
         "<div style='font-family:Inter,Arial,sans-serif;max-width:640px;"
         "margin:0 auto;'>"
@@ -462,6 +476,7 @@ def _build_team_recap_html(stats: dict, owner_name) -> str:
         "<th style='padding:8px 10px;'>Digests</th>"
         "<th style='padding:8px 10px;'>Jobs</th>"
         "<th style='padding:8px 10px;'>Emails ✓</th>"
+        "<th style='padding:8px 10px;'>👀 Opened</th>"
         "<th style='padding:8px 10px;'>📨 Applied</th>"
         "<th style='padding:8px 10px;text-align:left;'>Top roles & companies</th>"
         "</tr>" + "".join(rows) + "</table>"
@@ -469,6 +484,7 @@ def _build_team_recap_html(stats: dict, owner_name) -> str:
         f"<b>{total_sends}</b> digest sends for <b>{len(users)}</b> member(s). "
         "Each person still receives only their own role + city — nothing mixed.</p>"
         + email_applied_line
+        + opened_line
         + "</div>"
     )
 
@@ -3834,8 +3850,33 @@ async def build_daily_report_html(
             parts.append(footer)
     else:
         parts.append(_member_footer_html())
+    pixel = _open_pixel_html(api_base, user_id)
+    if pixel:
+        parts.append(pixel)
     parts.append("</div>")
     return "".join(parts)
+
+
+def _open_pixel_html(api_base: str, user_id: str | None) -> str:
+    """1x1 transparent open-tracking pixel for one digest email, or ''.
+
+    When the deployment has an ``api_base_url`` and the digest knows the
+    member, the email's HTML embeds a tiny signed image that records when
+    the member opens the email (``NotificationHistory.opened_at``) — the
+    owner recap's open column. Never raises.
+    """
+    if not api_base or not user_id:
+        return ""
+    from urllib.parse import quote
+
+    from interntrack.utils.helpers import open_token
+
+    base = api_base.strip().rstrip("/")
+    token = open_token(str(user_id))
+    return (
+        f"<img src='{_esc(base)}/api/v1/email/open?u={quote(str(user_id))}"
+        f"&t={token}' width='1' height='1' alt='' style='display:none;' />"
+    )
 
 
 def _member_footer_html() -> str:
