@@ -520,6 +520,24 @@ async def send_team_recap_now():
     return result
 
 
+@router.post("/daily-summary")
+async def send_daily_summary_now():
+    """Send the owner today's delivery summary email right now.
+
+    Vercel is serverless, so the APScheduler worker never executes there;
+    the GitHub Actions cron hits this endpoint after the evening digest
+    slot so the owner gets a daily "what went out today" email. Never
+    raises: returns the job's status dict in every case.
+    """
+    from interntrack.scheduler.jobs import send_daily_owner_summary
+
+    try:
+        result = await send_daily_owner_summary()
+    except Exception as e:  # pragma: no cover - defensive
+        return {"sent": False, "reason": str(e)}
+    return result
+
+
 @router.post("/closing-soon")
 async def run_closing_soon_sweep():
     """Run the closing-soon sweep now and return per-user job counts.

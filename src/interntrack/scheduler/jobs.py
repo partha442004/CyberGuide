@@ -642,6 +642,123 @@ async def send_team_recap() -> dict:
             return {"sent": False, "reason": str(e)}
 
 
+def _build_daily_summary_html(stats: dict) -> str:
+    """Compact HTML body for the owner's daily delivery summary email."""
+    from html import escape
+
+    users = stats.get("users") or []
+    rows: list[str] = []
+    for u in users:
+        rows.append(
+            "<tr>"
+            "<td style='padding:6px 10px;border-bottom:1px solid #e2e8f0;'>"
+            f"<b>{escape(str(u.get('name') or ''))}</b></td>"
+            f"<td style='padding:6px 10px;border-bottom:1px solid #e2e8f0;"
+            f"text-align:center;'>{u.get('sends', 0)}</td>"
+            f"<td style='padding:6px 10px;border-bottom:1px solid #e2e8f0;"
+            f"text-align:center;'>{u.get('jobs', 0)}</td>"
+            f"<td style='padding:6px 10px;border-bottom:1px solid #e2e8f0;"
+            f"text-align:center;'>{u.get('opened', 0)}</td>"
+            f"<td style='padding:6px 10px;border-bottom:1px solid #e2e8f0;"
+            f"text-align:center;'>{u.get('email_applied', 0)}</td>"
+            "</tr>"
+        )
+    return (
+        "<div style='font-family:Inter,Arial,sans-serif;max-width:640px;"
+        "margin:0 auto;'>"
+        "<h2 style='margin-bottom:4px;'>📊 Today's delivery</h2>"
+        f"<p style='color:#64748b;margin-top:0;'>"
+        f"{stats.get('total_sends', 0)} digest sends · "
+        f"{stats.get('total_jobs', 0)} jobs · "
+        f"{stats.get('total_opened', 0)} opened · "
+        f"{stats.get('total_email_applied', 0)} applied from email.</p>"
+        "<table style='width:100%;border-collapse:collapse;'>"
+        "<tr style='background:#f1f5f9;'>"
+        "<th style='padding:6px 10px;text-align:left;'>Member</th>"
+        "<th style='padding:6px 10px;'>Digests</th>"
+        "<th style='padding:6px 10px;'>Jobs</th>"
+        "<th style='padding:6px 10px;'>👀 Opened</th>"
+        "<th style='padding:6px 10px;'>📨 Applied</th>"
+        "</tr>" + "".join(rows) + "</table>"
+        "<p style='color:#94a3b8;font-size:12px;'>Automatic daily summary — "
+        "no action needed.</p>"
+        "</div>"
+    )
+
+
+async def send_daily_owner_summary() -> dict:
+    """Daily owner email: today's per-member delivery + engagement.
+
+    One compact summary each evening (after the last digest slot) so the
+    owner knows digests went out, who opened them and who applied — without
+    logging in. Reuses ``team_recap_stats(days=1)``. Skips quietly when
+    email is not configured, the owner has no email, or nothing was sent in
+    the window. Never raises.
+    """
+    async with get_db_session() as session:
+        try:
+            from sqlalchemy import select
+
+            from interntrack.config import get_settings
+            from interntrack.domain.models import User
+            from interntrack.services.notification_service import EmailChannel
+
+            settings = get_settings()
+            if not settings.is_email_configured:
+                return {"sent": False, "reason": "email not configured"}
+
+            result = await session.execute(select(User).order_by(User.created_at.asc()))
+            users = list(result.scalars().all())
+            if not users:
+                return {"sent": False, "reason": "no accounts"}
+
+            override = str(settings.team_owner_email or "").strip().lower()
+            owner = users[0]
+            if override:
+                matched = [
+                    u
+                    for u in users
+                    if str(getattr(u, "email", "") or "").strip().lower() == override
+                ]
+                if matched:
+                    owner = matched[0]
+            owner_email = str(getattr(owner, "email", "") or "").strip()
+            if not owner_email:
+                return {"sent": False, "reason": "owner has no email"}
+
+            stats = await team_recap_stats(session, days=1)
+            if not stats.get("users") or not stats.get("total_sends"):
+                return {"sent": False, "reason": "nothing sent in window"}
+
+            subject = (
+                f"📊 Today's delivery — {stats['total_jobs']} jobs, "
+                f"{stats['total_opened']} opened, "
+                f"{stats['total_email_applied']} applied"
+            )
+            channel = EmailChannel(
+                host=settings.smtp_host,
+                port=settings.smtp_port,
+                user=settings.smtp_user or "",
+                password=settings.smtp_password or "",
+                from_email=settings.email_from,
+                to_email=owner_email,
+            )
+            await channel.send(
+                _build_daily_summary_html(stats),
+                subject=subject,
+            )
+            print(f"[{datetime.now(UTC)}] Daily owner summary sent to {owner_email}")
+            return {
+                "sent": True,
+                "to": owner_email,
+                "members": len(stats.get("users") or []),
+                "jobs": int(stats.get("total_jobs") or 0),
+            }
+        except Exception as e:  # noqa: BLE001 - never crash the worker
+            print(f"[{datetime.now(UTC)}] Daily owner summary failed: {e}")
+            return {"sent": False, "reason": str(e)}
+
+
 def _digest_subject(
     report: dict,
     domains: list | None,
@@ -1073,6 +1190,13 @@ async def _send_closing_soon_sweep(session) -> dict:
                     "telegram_chat_id": getattr(user, "telegram_chat_id", None),
                     "phone_number": getattr(user, "phone_number", None),
                 }
+            # Personalized subject: job count + the member's city (when
+            # known), like the daily digest subjects.
+            closing_subject = (
+                f"🚨 {len(matches)} job{'s' if len(matches) != 1 else ''} closing soon"
+            )
+            if user_loc:
+                closing_subject += f" in {user_loc.title()}"
             # Email members get the styled HTML cards (with signed
             # apply-tracking links); Telegram keeps the inline buttons.
             non_telegram = [c for c in channel_list if c != "telegram"]
@@ -1084,7 +1208,7 @@ async def _send_closing_soon_sweep(session) -> dict:
                     await manager.notify(
                         email_targets,
                         _closing_soon_html(matches, user_id, api_base),
-                        subject="🚨 Closing soon — apply now!",
+                        subject=closing_subject,
                         recipient=recipient,
                     )
                 )
@@ -1093,7 +1217,7 @@ async def _send_closing_soon_sweep(session) -> dict:
                     await manager.notify(
                         text_targets,
                         "\n".join(lines),
-                        subject="🚨 Closing soon — apply now!",
+                        subject=closing_subject,
                         buttons=buttons or None,
                         recipient=recipient,
                     )
