@@ -13,6 +13,7 @@ from interntrack.scheduler.jobs import (
     record_match_snapshots,
     run_job_discovery,
     send_closing_soon_alerts,
+    send_daily_owner_summary,
     send_follow_up_nudges,
     send_interview_reminders,
     verify_job_links,
@@ -119,6 +120,18 @@ def setup_scheduler():
         CronTrigger(hour=9, minute=0),
         id="follow_up_nudges",
         name="Follow-up Nudges",
+        replace_existing=True,
+    )
+
+    # Daily owner delivery summary at 14:30 UTC (20:00 IST) — after the
+    # evening digest slot, so the owner sees what went out today without
+    # logging in. On serverless the GitHub Actions cron hits the endpoint
+    # instead.
+    scheduler.add_job(
+        send_daily_owner_summary,
+        CronTrigger(hour=14, minute=30),
+        id="daily_owner_summary",
+        name="Daily Owner Summary",
         replace_existing=True,
     )
 

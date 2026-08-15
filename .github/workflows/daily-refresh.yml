@@ -59,6 +59,18 @@ jobs:
             && echo "closing-soon sweep ran OK" \
             || echo "closing-soon sweep failed or timed out"
 
+      # Daily owner summary: after the evening slot (19:00 IST) the owner
+      # gets one compact email — sends, jobs, opens and email-applies for
+      # the day — so "did everyone get their mail today?" is answered
+      # automatically instead of needing the dashboard.
+      - name: Owner daily delivery summary
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 13 * * *'
+        run: |
+          curl -sSf --max-time 120 -X POST \
+            "$API_BASE/api/v1/notifications/daily-summary" \
+            && echo "daily owner summary OK" \
+            || echo "daily owner summary failed or timed out"
+
       - name: Generate daily report (morning slot — security)
         if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *'
         run: |

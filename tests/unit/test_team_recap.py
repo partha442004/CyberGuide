@@ -593,6 +593,142 @@ class TestSendTeamRecap:
         assert "smtp down" in result["reason"]
 
 
+class TestDailyOwnerSummary:
+    """Daily owner delivery summary (scheduler/jobs.py)."""
+
+    def _settings(self, configured=True):
+        class _Settings:
+            smtp_host = "smtp.test"
+            smtp_port = 587
+            smtp_user = "me@test"
+            smtp_password = "pw"
+            email_from = "InternTrack <noreply@test>"
+            team_owner_email = ""
+
+            @property
+            def is_email_configured(self):
+                return configured
+
+        return _Settings()
+
+    def _ctx(self, users):
+        class _FakeSession:
+            async def execute(self, stmt):  # noqa: ARG002
+                return _FakeResult(users)
+
+        class _Ctx:
+            async def __aenter__(self):
+                return _FakeSession()
+
+            async def __aexit__(self, *args):
+                return False
+
+        return _Ctx()
+
+    def _canned_stats(self):
+        return {
+            "days": 1,
+            "total_sends": 2,
+            "total_jobs": 5,
+            "total_opened": 1,
+            "total_email_applied": 0,
+            "users": [
+                {
+                    "name": "Jeeva",
+                    "email": "jeeva@x.com",
+                    "location": "Chennai",
+                    "domains": ["hardware"],
+                    "sends": 2,
+                    "jobs": 5,
+                    "emails_ok": 2,
+                    "opened": 1,
+                    "email_applied": 0,
+                }
+            ],
+        }
+
+    def test_build_html_renders_totals_and_rows(self):
+        from interntrack.scheduler.jobs import _build_daily_summary_html
+
+        html = _build_daily_summary_html(self._canned_stats())
+        assert "Today's delivery" in html
+        assert "2 digest sends · 5 jobs · 1 opened · 0 applied" in html
+        assert "Jeeva" in html
+
+    @pytest.mark.asyncio
+    async def test_skips_when_email_not_configured(self, monkeypatch):
+        from interntrack.scheduler import jobs as jobs_mod
+
+        monkeypatch.setattr(jobs_mod, "get_db_session", lambda: self._ctx([]))
+        monkeypatch.setattr(
+            "interntrack.config.get_settings", lambda: self._settings(configured=False)
+        )
+
+        result = await jobs_mod.send_daily_owner_summary()
+
+        assert result["sent"] is False
+        assert "email not configured" in result["reason"]
+
+    @pytest.mark.asyncio
+    async def test_skips_when_nothing_sent(self, monkeypatch):
+        from interntrack.scheduler import jobs as jobs_mod
+
+        monkeypatch.setattr(
+            jobs_mod,
+            "get_db_session",
+            lambda: self._ctx([_user("u1", "Boss", email="boss@x.com")]),
+        )
+        monkeypatch.setattr("interntrack.config.get_settings", lambda: self._settings())
+        monkeypatch.setattr(
+            jobs_mod,
+            "team_recap_stats",
+            AsyncMock(return_value={"days": 1, "total_sends": 0, "users": []}),
+        )
+
+        result = await jobs_mod.send_daily_owner_summary()
+
+        assert result["sent"] is False
+        assert "nothing sent" in result["reason"]
+
+    @pytest.mark.asyncio
+    async def test_sends_summary_to_owner(self, monkeypatch):
+        from interntrack.scheduler import jobs as jobs_mod
+
+        sent = []
+
+        class _FakeEmailChannel:
+            def __init__(self, **kwargs):
+                sent.append(kwargs.get("to_email"))
+
+            async def send(self, message, subject=None):
+                sent.append({"subject": subject, "html": message})
+
+        monkeypatch.setattr(
+            jobs_mod,
+            "get_db_session",
+            lambda: self._ctx([_user("u1", "Boss", email="boss@x.com")]),
+        )
+        monkeypatch.setattr(
+            "interntrack.services.notification_service.EmailChannel",
+            _FakeEmailChannel,
+        )
+        monkeypatch.setattr("interntrack.config.get_settings", lambda: self._settings())
+        monkeypatch.setattr(
+            jobs_mod,
+            "team_recap_stats",
+            AsyncMock(return_value=self._canned_stats()),
+        )
+
+        result = await jobs_mod.send_daily_owner_summary()
+
+        assert result["sent"] is True
+        assert result["to"] == "boss@x.com"
+        assert result["jobs"] == 5
+        assert sent[0] == "boss@x.com"
+        assert "Today's delivery" in sent[1]["subject"]
+        assert "Jeeva" in sent[1]["html"]
+
+
 class TestOwnerEndpoint:
     """GET /notifications/owner resolves the admin account."""
 
@@ -685,6 +821,35 @@ class TestTeamRecapEndpoint:
         await get_team_recap(days=999, db=AsyncMock())
 
         assert captured["days"] == 30
+
+    @pytest.mark.asyncio
+    async def test_daily_summary_endpoint_delegates(self, monkeypatch):
+        from interntrack.api.v1.notifications import send_daily_summary_now
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs.send_daily_owner_summary",
+            AsyncMock(return_value={"sent": True, "jobs": 5}),
+        )
+
+        result = await send_daily_summary_now()
+
+        assert result == {"sent": True, "jobs": 5}
+
+    @pytest.mark.asyncio
+    async def test_daily_summary_endpoint_never_raises(self, monkeypatch):
+        from interntrack.api.v1.notifications import send_daily_summary_now
+
+        async def _boom():
+            raise RuntimeError("smtp down")
+
+        monkeypatch.setattr(
+            "interntrack.scheduler.jobs.send_daily_owner_summary", _boom
+        )
+
+        result = await send_daily_summary_now()
+
+        assert result["sent"] is False
+        assert "smtp down" in result["reason"]
 
 
 class TestDeliveryOverview:
