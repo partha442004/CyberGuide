@@ -96,16 +96,20 @@ async def _send_welcome(user: User, db: AsyncSession) -> None:
         name = _esc_html(str(user.name or "there"))
         domains = list(user.domains or [])
         domains_txt = ", ".join(_esc_html(d) for d in domains)
+        loc = _esc_html(str(user.location or "").strip())
         message = (
             f"<b>Hey {name} 👋</b><br/><br/>"
             "Your account is ready and your <b>personalized job alerts are ON</b>.<br/>"
-            "Every day at 8:00 / 13:00 / 19:00 IST we'll send jobs"
-            + (f" in <b>{domains_txt}</b>" if domains_txt else "")
+            "Every day at 8:00 / 13:00 / 19:00 IST we'll send"
+            + (f" <b>{domains_txt}</b>" if domains_txt else " matching")
+            + " jobs"
+            + (f" for <b>{loc}</b>" if loc else "")
             + " to this inbox"
             + (" and your Telegram" if user.telegram_chat_id else "")
             + ".<br/><br/>"
-            "Upload your resume for match %, track applications, and invite "
-            "friends from the dashboard.<br/>Good luck! 🚀"
+            "Everything arrives by email — no login or dashboard needed. "
+            "To change your roles, location, or pause alerts, contact your "
+            "admin.<br/>Good luck! 🚀"
         )
         await manager.notify(
             channels,

@@ -361,6 +361,11 @@ async def team_recap_stats(session, days: int = 7) -> dict:
                 for r in rows_for
                 if bool((getattr(r, "results", None) or {}).get("email"))
             )
+            email_failed = sum(
+                1
+                for r in rows_for
+                if (getattr(r, "results", None) or {}).get("email") is False
+            )
             opened = sum(1 for r in rows_for if getattr(r, "opened_at", None))
             domain_counter: Counter = Counter()
             company_counter: Counter = Counter()
@@ -382,6 +387,7 @@ async def team_recap_stats(session, days: int = 7) -> dict:
                     "sends": sends,
                     "jobs": jobs,
                     "emails_ok": emails_ok,
+                    "email_failed": email_failed,
                     "opened": opened,
                     "email_applied": email_applied.get(uid, 0),
                     "top_domains": [d for d, _ in domain_counter.most_common(3)],
@@ -394,6 +400,7 @@ async def team_recap_stats(session, days: int = 7) -> dict:
             "total_sends": sum(r["sends"] for r in out),
             "total_jobs": sum(r["jobs"] for r in out),
             "total_opened": sum(r["opened"] for r in out),
+            "total_email_failed": sum(r["email_failed"] for r in out),
             "total_email_applied": sum(email_applied.values()),
             "users": out,
         }
@@ -403,6 +410,7 @@ async def team_recap_stats(session, days: int = 7) -> dict:
             "total_sends": 0,
             "total_jobs": 0,
             "total_opened": 0,
+            "total_email_failed": 0,
             "total_email_applied": 0,
             "users": [],
         }
@@ -421,6 +429,7 @@ def _build_team_recap_html(stats: dict, owner_name) -> str:
     total_jobs = int(stats.get("total_jobs") or 0)
     total_sends = int(stats.get("total_sends") or 0)
     total_opened = int(stats.get("total_opened") or 0)
+    total_email_failed = int(stats.get("total_email_failed") or 0)
     total_email_applied = int(stats.get("total_email_applied") or 0)
     rows: list[str] = []
     for u in users:
@@ -463,6 +472,13 @@ def _build_team_recap_html(stats: dict, owner_name) -> str:
             f"<p style='color:#64748b;font-size:13px;'>👀 <b>{total_opened}</b> "
             "member(s) opened a digest this week (tracking pixel).</p>"
         )
+    failed_line = ""
+    if total_email_failed:
+        failed_line = (
+            f"<p style='color:#b91c1c;font-size:13px;'>⚠️ <b>{total_email_failed}</b> "
+            "email(s) failed to deliver this week — check the member's "
+            "address or SMTP settings.</p>"
+        )
     return (
         "<div style='font-family:Inter,Arial,sans-serif;max-width:640px;"
         "margin:0 auto;'>"
@@ -485,6 +501,7 @@ def _build_team_recap_html(stats: dict, owner_name) -> str:
         "Each person still receives only their own role + city — nothing mixed.</p>"
         + email_applied_line
         + opened_line
+        + failed_line
         + "</div>"
     )
 
@@ -663,6 +680,13 @@ def _build_daily_summary_html(stats: dict) -> str:
             f"text-align:center;'>{u.get('email_applied', 0)}</td>"
             "</tr>"
         )
+    failed_line = ""
+    if stats.get("total_email_failed"):
+        failed_line = (
+            f"<p style='color:#b91c1c;font-size:13px;'>⚠️ <b>"
+            f"{stats['total_email_failed']}</b> email(s) failed to deliver — "
+            "check the member's address or SMTP settings.</p>"
+        )
     return (
         "<div style='font-family:Inter,Arial,sans-serif;max-width:640px;"
         "margin:0 auto;'>"
@@ -679,8 +703,11 @@ def _build_daily_summary_html(stats: dict) -> str:
         "<th style='padding:6px 10px;'>Jobs</th>"
         "<th style='padding:6px 10px;'>👀 Opened</th>"
         "<th style='padding:6px 10px;'>📨 Applied</th>"
-        "</tr>" + "".join(rows) + "</table>"
-        "<p style='color:#94a3b8;font-size:12px;'>Automatic daily summary — "
+        "</tr>"
+        + "".join(rows)
+        + "</table>"
+        + failed_line
+        + "<p style='color:#94a3b8;font-size:12px;'>Automatic daily summary — "
         "no action needed.</p>"
         "</div>"
     )
