@@ -108,6 +108,7 @@ def get_default_registry() -> ScraperRegistry:
     from interntrack.scrapers.apna import ApnaScraper
     from interntrack.scrapers.cutshort import CutshortScraper
     from interntrack.scrapers.foundit import FounditScraper
+    from interntrack.scrapers.freshersworld import FreshersworldScraper
     from interntrack.scrapers.glassdoor import GlassdoorScraper
     from interntrack.scrapers.glassdoor_india import GlassdoorIndiaScraper
     from interntrack.scrapers.google_jobs import GoogleJobsScraper
@@ -142,6 +143,7 @@ def get_default_registry() -> ScraperRegistry:
     # Foundit direct is bot-gated from datacenter IPs (returns [] there);
     # its posting URLs still arrive via SearchEngineScraper's Bing path.
     registry.register(FounditScraper())
+    registry.register(FreshersworldScraper())
     registry.register(SearchEngineScraper())
     registry.register(LinkedInIndiaScraper())
     registry.register(GlassdoorIndiaScraper())
@@ -163,26 +165,25 @@ def get_default_registry() -> ScraperRegistry:
     # in the cybershield scraper library; adapt them into the same pipeline so
     # the daily discovery also covers internship sites and vendor career pages.
     try:
-        from cybershield.scrapers.india.freshersworld import FreshersworldScraper
         from cybershield.scrapers.india.naukri import NaukriScraper
         from cybershield.scrapers.india.unstop import UnstopScraper
         from interntrack.scrapers.cybershield_adapter import CybershieldScraperAdapter
 
         internship_sources = {
-            # "internshala" intentionally omitted: the direct HTML scraper
-            # registered above (InternshalaDirectScraper) is more reliable
-            # than the cybershield JSON-API adapter and would otherwise be
-            # overwritten here.
+            # "internshala" and "freshersworld" intentionally omitted: the
+            # direct HTML scrapers registered above (InternshalaDirectScraper,
+            # FreshersworldScraper) are more reliable than the cybershield
+            # JSON-API adapters, whose /search endpoints return the generic
+            # SPA page instead of JSON and would otherwise be overwritten here.
             "unstop": UnstopScraper,
             "naukri": NaukriScraper,
-            "freshersworld": FreshersworldScraper,
         }
         for source, scraper_cls in internship_sources.items():
             try:
                 registry.register(
                     CybershieldScraperAdapter(
                         source,
-                        scraper_cls(),  # type: ignore[abstract]
+                        scraper_cls(),
                     ),
                 )
             except Exception as e:
