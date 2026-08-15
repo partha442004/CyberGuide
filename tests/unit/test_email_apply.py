@@ -233,6 +233,54 @@ class TestEmailOpenPixel:
         assert resp.status_code == 400
 
 
+class TestClosingSoonHtml:
+    """Closing-soon emails reuse the styled card with tracked Apply links."""
+
+    def test_tracking_links_when_api_base_known(self):
+        from interntrack.scheduler.jobs import _closing_soon_html
+        from interntrack.utils.helpers import verify_apply_token
+
+        html = _closing_soon_html(
+            [
+                {
+                    "id": "cj-1",
+                    "title": "SOC Analyst",
+                    "company": "Acme",
+                    "location": "Bangalore",
+                    "url": "https://jobs.acme.com/1",
+                    "expires_at": "2026-08-20T12:00:00",
+                }
+            ],
+            "u-cj",
+            "https://api.example.com",
+        )
+        assert "Closing soon" in html
+        assert "SOC Analyst" in html
+        assert "api/v1/email/apply?u=u-cj&amp;j=cj-1&amp;t=" in html
+        token = html.split("&amp;t=")[-1].split("'")[0]
+        assert verify_apply_token("u-cj", "cj-1", token)
+
+    def test_plain_url_without_api_base(self):
+        from interntrack.scheduler.jobs import _closing_soon_html
+
+        html = _closing_soon_html(
+            [
+                {
+                    "id": "cj-2",
+                    "title": "VAPT",
+                    "company": "Acme",
+                    "location": "Remote",
+                    "url": "https://jobs.acme.com/2",
+                    "expires_at": None,
+                }
+            ],
+            None,
+            "",
+        )
+        assert "href='https://jobs.acme.com/2'" in html
+        assert "api/v1/email/apply" not in html
+
+
 class TestEmailStatusEndpoint:
     """GET /api/v1/email/status — one-click nudge status buttons."""
 

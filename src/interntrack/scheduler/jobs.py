@@ -976,6 +976,13 @@ async def _send_closing_soon_sweep(session) -> dict:
         from interntrack.utils.helpers import job_experience_ok, location_allows
 
         owner_email = await _owner_email(session)
+        api_base = ""
+        try:
+            from interntrack.config import get_settings
+
+            api_base = (get_settings().api_base_url or "").strip().rstrip("/")
+        except Exception:  # noqa: BLE001, S110 - best-effort
+            api_base = ""
         targets = await _enabled_alert_targets(session)
         if not targets:
             return {}
@@ -1066,13 +1073,31 @@ async def _send_closing_soon_sweep(session) -> dict:
                     "telegram_chat_id": getattr(user, "telegram_chat_id", None),
                     "phone_number": getattr(user, "phone_number", None),
                 }
-            results = await manager.notify(
-                channel_list,
-                "\n".join(lines),
-                subject="🚨 Closing soon — apply now!",
-                buttons=buttons or None,
-                recipient=recipient,
-            )
+            # Email members get the styled HTML cards (with signed
+            # apply-tracking links); Telegram keeps the inline buttons.
+            non_telegram = [c for c in channel_list if c != "telegram"]
+            email_targets = [c for c in non_telegram if c == "email"]
+            text_targets = [c for c in non_telegram if c != "email"]
+            results: dict = {}
+            if email_targets:
+                results.update(
+                    await manager.notify(
+                        email_targets,
+                        _closing_soon_html(matches, user_id, api_base),
+                        subject="🚨 Closing soon — apply now!",
+                        recipient=recipient,
+                    )
+                )
+            if text_targets:
+                results.update(
+                    await manager.notify(
+                        text_targets,
+                        "\n".join(lines),
+                        subject="🚨 Closing soon — apply now!",
+                        buttons=buttons or None,
+                        recipient=recipient,
+                    )
+                )
             await _record_alert_history(
                 session,
                 user_id=user_id,
@@ -4359,6 +4384,32 @@ def _apply_link(api_base: str, user_id: str | None, job_id: str | None) -> str |
     return (
         f"{base}/api/v1/email/apply?u={quote(str(user_id))}"
         f"&j={quote(str(job_id))}&t={token}"
+    )
+
+
+def _closing_soon_html(matches: list[dict], user_id: str | None, api_base: str) -> str:
+    """Styled HTML for the closing-soon email, with tracked Apply buttons.
+
+    Reuses the standard job card so closing-soon emails look like the
+    daily digest and — when ``api_base`` + ``user_id`` are known — carry
+    signed apply-tracking links, so members who never open the dashboard
+    record these applications too.
+    """
+    cards = [
+        _job_html_card(
+            None,
+            cj,
+            "#e5484d",
+            apply_link=_apply_link(api_base, user_id, cj.get("id")),
+        )
+        for cj in matches[:5]
+    ]
+    return (
+        "<div style='font-family:Inter,Arial,sans-serif;max-width:640px;"
+        "margin:0 auto;'>"
+        "<h2 style='margin-bottom:4px;'>🚨 Closing soon — apply now!</h2>"
+        "<p style='color:#64748b;margin-top:0;'>These jobs close within "
+        "48 hours.</p>" + "".join(cards) + _member_footer_html() + "</div>"
     )
 
 
