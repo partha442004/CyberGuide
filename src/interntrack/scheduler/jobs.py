@@ -366,6 +366,11 @@ async def team_recap_stats(session, days: int = 7) -> dict:
                 for r in rows_for
                 if (getattr(r, "results", None) or {}).get("email") is False
             )
+            # Digests that went out but carried zero jobs — the "member got
+            # an email but no roles" signal the owner summary flags.
+            zero_sends = sum(
+                1 for r in rows_for if not int(getattr(r, "job_count", 0) or 0)
+            )
             opened = sum(1 for r in rows_for if getattr(r, "opened_at", None))
             domain_counter: Counter = Counter()
             company_counter: Counter = Counter()
@@ -388,6 +393,7 @@ async def team_recap_stats(session, days: int = 7) -> dict:
                     "jobs": jobs,
                     "emails_ok": emails_ok,
                     "email_failed": email_failed,
+                    "zero_sends": zero_sends,
                     "opened": opened,
                     "email_applied": email_applied.get(uid, 0),
                     "top_domains": [d for d, _ in domain_counter.most_common(3)],
@@ -479,6 +485,22 @@ def _build_team_recap_html(stats: dict, owner_name) -> str:
             "email(s) failed to deliver this week — check the member's "
             "address or SMTP settings.</p>"
         )
+    # Members whose digests mostly arrived empty this week (3+ zero-job
+    # sends) — their filters are likely too narrow to feed real jobs.
+    empty_members = [
+        u
+        for u in users
+        if int(u.get("zero_sends", 0) or 0) >= 3 and int(u.get("sends", 0) or 0) >= 3
+    ]
+    empty_line = ""
+    if empty_members:
+        names = ", ".join(escape(str(u.get("name") or "")) for u in empty_members[:5])
+        empty_line = (
+            f"<p style='color:#b45309;font-size:13px;'>⚠️ <b>"
+            f"{len(empty_members)}</b> member(s) got mostly empty digests "
+            f"this week ({names}) — their role/location filters may be too "
+            "narrow to find fresh roles.</p>"
+        )
     return (
         "<div style='font-family:Inter,Arial,sans-serif;max-width:640px;"
         "margin:0 auto;'>"
@@ -502,6 +524,7 @@ def _build_team_recap_html(stats: dict, owner_name) -> str:
         + email_applied_line
         + opened_line
         + failed_line
+        + empty_line
         + "</div>"
     )
 
@@ -687,6 +710,39 @@ def _build_daily_summary_html(stats: dict) -> str:
             f"{stats['total_email_failed']}</b> email(s) failed to deliver — "
             "check the member's address or SMTP settings.</p>"
         )
+    # Members who got a digest but zero jobs (filters too narrow) or no
+    # digest at all (paused / no configured channels) — the "did they get
+    # mail?" answer at a glance.
+    attention: list[str] = []
+    for u in users:
+        name = escape(str(u.get("name") or ""))
+        sends = int(u.get("sends", 0) or 0)
+        zero = int(u.get("zero_sends", 0) or 0)
+        if sends and zero:
+            detail = escape(
+                f"{str(u.get('location') or '—')} · "
+                f"{', '.join(u.get('domains') or []) or 'all'}"
+            )
+            attention.append(
+                f"<li><b>{name}</b> — {zero} empty digest(s) "
+                f"<span style='color:#78716c;'>({detail})</span></li>"
+            )
+        elif not sends:
+            attention.append(f"<li><b>{name}</b> — no digest sent today</li>")
+    attention_html = ""
+    if attention:
+        attention_html = (
+            "<div style='background:#fff7ed;border:1px solid #fed7aa;"
+            "border-radius:10px;padding:10px 14px;margin-top:14px;'>"
+            "<p style='margin:0 0 4px;color:#9a3412;font-weight:700;'>"
+            "⚠️ Needs attention</p>"
+            "<ul style='margin:0;padding-left:18px;color:#7c2d12;"
+            "font-size:13px;'>" + "".join(attention) + "</ul>"
+            "<p style='margin:6px 0 0;color:#9a3412;font-size:12px;'>"
+            "Empty digests usually mean the member's role/location filters "
+            "are too narrow — widen the domains or city to get them real "
+            "jobs again.</p></div>"
+        )
     return (
         "<div style='font-family:Inter,Arial,sans-serif;max-width:640px;"
         "margin:0 auto;'>"
@@ -706,6 +762,7 @@ def _build_daily_summary_html(stats: dict) -> str:
         "</tr>"
         + "".join(rows)
         + "</table>"
+        + attention_html
         + failed_line
         + "<p style='color:#94a3b8;font-size:12px;'>Automatic daily summary — "
         "no action needed.</p>"

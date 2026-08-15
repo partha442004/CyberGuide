@@ -139,8 +139,37 @@ class TestTeamRecapStats:
         assert stats["total_email_applied"] == 3
         assert stats["total_opened"] == 1
         assert stats["total_email_failed"] == 1
+        # Neither member had an empty (zero-job) digest in the window.
+        assert jeeva["zero_sends"] == 0
+        assert boss["zero_sends"] == 0
         # Sorted by jobs desc — Jeeva first.
         assert stats["users"][0]["user_id"] == "u2"
+
+    @pytest.mark.asyncio
+    async def test_counts_empty_digests(self):
+        from interntrack.scheduler.jobs import team_recap_stats
+
+        session = AsyncMock()
+        session.execute = AsyncMock(
+            side_effect=[
+                _FakeResult([_user("u1", "Jeeva", email="jeeva@x.com")]),
+                _FakeResult(
+                    [
+                        _history("u1", 1, job_count=3),
+                        _history("u1", 2, job_count=0),
+                        _history("u1", 3, job_count=0),
+                    ]
+                ),
+                _FakeResult([]),
+            ]
+        )
+
+        stats = await team_recap_stats(session, days=7)
+
+        member = stats["users"][0]
+        assert member["sends"] == 3
+        assert member["jobs"] == 3
+        assert member["zero_sends"] == 2
 
     @pytest.mark.asyncio
     async def test_never_raises_on_bad_session(self):
@@ -252,6 +281,47 @@ class TestBuildTeamRecapHtml:
         assert "&lt;script&gt;" in html
         assert "<img src=x>" not in html
         assert "&lt;img" in html
+
+    def test_flags_members_with_mostly_empty_week(self):
+        from interntrack.scheduler.jobs import _build_team_recap_html
+
+        stats = {
+            "total_jobs": 0,
+            "total_sends": 6,
+            "users": [
+                {
+                    "name": "Jeeva",
+                    "email": "jeeva@x.com",
+                    "location": "Chennai",
+                    "domains": ["hardware"],
+                    "top_domains": [],
+                    "top_companies": [],
+                    "sends": 4,
+                    "jobs": 0,
+                    "zero_sends": 4,
+                    "emails_ok": 4,
+                },
+                {
+                    "name": "Boss",
+                    "email": "boss@x.com",
+                    "location": "Bengaluru",
+                    "domains": ["security"],
+                    "top_domains": [],
+                    "top_companies": [],
+                    "sends": 2,
+                    "jobs": 8,
+                    "zero_sends": 0,
+                    "emails_ok": 2,
+                },
+            ],
+        }
+
+        html = _build_team_recap_html(stats, "Boss")
+
+        assert "1</b> member(s) got mostly empty digests" in html
+        assert "Jeeva" in html
+        # Boss got real jobs — not flagged.
+        assert "too narrow" in html
 
 
 class TestSendTeamRecap:
@@ -666,6 +736,42 @@ class TestDailyOwnerSummary:
         stats["total_email_failed"] = 2
         html = _build_daily_summary_html(stats)
         assert "2</b> email(s) failed to deliver" in html
+
+    def test_build_html_flags_empty_digests(self):
+        from interntrack.scheduler.jobs import _build_daily_summary_html
+
+        stats = self._canned_stats()
+        stats["users"] = [
+            {
+                "name": "Jeeva",
+                "email": "jeeva@x.com",
+                "location": "Chennai, Coimbatore",
+                "domains": ["hardware"],
+                "sends": 2,
+                "jobs": 0,
+                "zero_sends": 2,
+                "emails_ok": 2,
+                "opened": 0,
+                "email_applied": 0,
+            },
+            {
+                "name": "Newbie",
+                "email": "new@x.com",
+                "location": "Pune",
+                "domains": ["data"],
+                "sends": 0,
+                "jobs": 0,
+                "zero_sends": 0,
+                "emails_ok": 0,
+                "opened": 0,
+                "email_applied": 0,
+            },
+        ]
+        html = _build_daily_summary_html(stats)
+        assert "Needs attention" in html
+        assert "Jeeva</b> — 2 empty digest(s)" in html
+        assert "Newbie</b> — no digest sent today" in html
+        assert "too narrow" in html
 
     @pytest.mark.asyncio
     async def test_skips_when_email_not_configured(self, monkeypatch):
