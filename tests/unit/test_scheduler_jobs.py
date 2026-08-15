@@ -1762,6 +1762,48 @@ class TestJobOfDay:
         assert "MATCH 61%" in html
         assert "Pen Tester" in html
 
+    @pytest.mark.asyncio
+    async def test_member_footer_shown_only_without_dashboard_link(self):
+        from interntrack.scheduler.jobs import (
+            _member_footer_html,
+            build_daily_report_html,
+        )
+
+        report = {
+            "summary": {"new_jobs": 1, "new_applications": 0},
+            "new_jobs": [
+                {
+                    "title": "Pen Tester",
+                    "company": "Acme",
+                    "url": "https://x.com/pen",
+                    "domain": "security",
+                }
+            ],
+            "closing_soon": [],
+            "follow_up": [],
+        }
+        with (
+            patch(
+                "interntrack.scheduler.jobs._score_and_group_jobs",
+                new=AsyncMock(
+                    return_value=[("security", [(61.0, report["new_jobs"][0])])]
+                ),
+            ),
+            patch(
+                "interntrack.scheduler.jobs._watched_company_names",
+                new=AsyncMock(return_value=[]),
+            ),
+        ):
+            member_html = await build_daily_report_html(
+                report, AsyncMock(), show_dashboard_link=False
+            )
+            owner_html = await build_daily_report_html(
+                report, AsyncMock(), show_dashboard_link=True
+            )
+        assert "ask your admin" in member_html
+        assert "ask your admin" not in owner_html
+        assert "8 AM, 1 PM & 7 PM IST" in _member_footer_html()
+
     def test_prefers_local_job_when_user_has_location(self):
         from interntrack.scheduler.jobs import _job_of_day
 

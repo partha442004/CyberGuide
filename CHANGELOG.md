@@ -6,6 +6,17 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Email-apply visibility in the owner recap + member digest footer.**
+  Applications recorded from the signed digest Apply links are now tagged
+  `source="email"` (new nullable `Application.source` column, auto-added
+  to live tables), and the owner's weekly team recap gains a **📨 Applied**
+  column per member plus a summary line counting applications recorded
+  straight from digest emails — so the owner sees member activity even
+  though members never open the dashboard. Member digests also gain a
+  small no-dashboard footer ("You get these every day at 8 AM, 1 PM &
+  7 PM IST… ask your admin") when the dashboard link is suppressed;
+  the owner keeps the dashboard footer.
+
 - **Email apply-tracking links.** Every member digest's Apply button now
   points at a signed `GET /api/v1/email/apply` link (HMAC of user + job
   with the server secret) that records the application as **applied** —

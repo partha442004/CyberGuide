@@ -42,8 +42,11 @@ async def email_apply(
     existing = await service.get_application_for_job(j, user_id=u)
     if existing is None:
         created = await service.create_application(j, user_id=u)
+        created.source = "email"  # type: ignore[assignment]
         await service.update_status(str(created.id), ApplicationStatus.APPLIED)
     elif existing.status != ApplicationStatus.APPLIED:
+        if not getattr(existing, "source", None):
+            existing.source = "email"  # type: ignore[assignment]
         await service.update_status(str(existing.id), ApplicationStatus.APPLIED)
 
     job = await JobService(db).get_job(j)

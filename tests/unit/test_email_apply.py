@@ -120,6 +120,19 @@ class TestEmailApplyEndpoint:
         assert mine[0]["job_id"] == "job-apply-1"
         assert mine[0]["status"] == "applied"
 
+        # The row is tagged source="email" so the owner recap can count
+        # member activity recorded straight from digest emails.
+        from sqlalchemy import select
+
+        from interntrack.domain.models import Application
+
+        result = await db_session.execute(
+            select(Application).where(Application.user_id == "user-apply-1")
+        )
+        app = result.scalars().first()
+        assert app is not None
+        assert app.source == "email"
+
     @pytest.mark.asyncio
     async def test_second_click_is_idempotent(self, client, db_session):
         db_session.add(

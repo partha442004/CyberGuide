@@ -34,6 +34,9 @@ class _FakeResult:
     def scalars(self):
         return _FakeScalars(self._items)
 
+    def all(self):
+        return self._items
+
 
 def _user(uid, name, email="x@y.com", location="Bengaluru", domains=None):
     return SimpleNamespace(
@@ -100,6 +103,9 @@ class TestTeamRecapStats:
                         _history("u2", 30, job_count=99, jobs=[]),
                     ]
                 ),
+                # Email apply clicks (user_id, count) — Jeeva applied to 3
+                # jobs straight from her digest emails this week.
+                _FakeResult([("u2", 3)]),
             ]
         )
 
@@ -114,13 +120,16 @@ class TestTeamRecapStats:
         assert jeeva["sends"] == 2
         assert jeeva["jobs"] == 5
         assert jeeva["emails_ok"] == 2
+        assert jeeva["email_applied"] == 3
         assert jeeva["top_domains"] == ["hardware"]
         assert jeeva["top_companies"] == ["ABB", "Tata Elxsi"]
-        # Boss: 1 send, 1 job, email not delivered.
+        # Boss: 1 send, 1 job, email not delivered, no email applies.
         boss = by_id["u1"]
         assert boss["sends"] == 1
         assert boss["jobs"] == 1
         assert boss["emails_ok"] == 0
+        assert boss["email_applied"] == 0
+        assert stats["total_email_applied"] == 3
         # Sorted by jobs desc — Jeeva first.
         assert stats["users"][0]["user_id"] == "u2"
 
@@ -145,6 +154,7 @@ class TestTeamRecapStats:
             side_effect=[
                 _FakeResult([_user("u1", "Boss")]),
                 _FakeResult([_history("u1", 1, job_count=2)]),
+                _FakeResult([]),
             ]
         )
 
@@ -153,6 +163,8 @@ class TestTeamRecapStats:
         assert len(stats["users"]) == 1
         assert stats["users"][0]["sends"] == 1
         assert stats["users"][0]["jobs"] == 2
+        assert stats["users"][0]["email_applied"] == 0
+        assert stats["total_email_applied"] == 0
 
 
 class TestBuildTeamRecapHtml:
