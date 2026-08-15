@@ -564,6 +564,10 @@ class NotificationHistory(Base, TimestampMixin):
     job_count = Column(Integer, default=0)
     results = Column(JSON, nullable=True)
     jobs = Column(JSON, nullable=True)
+    # When the member's email client loaded the digest's tracking pixel
+    # (naive UTC; NULL = never opened). Drives the owner recap's open
+    # column. Auto-added to live tables by ``_sync_missing_columns``.
+    opened_at = Column(DateTime, nullable=True)
     # ``jobs``: compact list of the jobs actually sent — title, company,
     # location, url, domain, match_score — so the dashboard can show
     # exactly what each digest delivered (answers "did the mail match my

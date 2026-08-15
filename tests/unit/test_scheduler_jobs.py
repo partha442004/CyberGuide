@@ -1762,6 +1762,60 @@ class TestJobOfDay:
         assert "MATCH 61%" in html
         assert "Pen Tester" in html
 
+    def test_open_pixel_embeds_signed_token(self):
+        from interntrack.scheduler.jobs import _open_pixel_html
+        from interntrack.utils.helpers import verify_open_token
+
+        pixel = _open_pixel_html("https://api.example.com", "u-pix")
+        assert pixel.startswith(
+            "<img src='https://api.example.com/api/v1/email/open?u=u-pix&t="
+        )
+        token = pixel.split("&t=")[-1].split("'")[0]
+        assert verify_open_token("u-pix", token)
+        assert _open_pixel_html("", "u-pix") == ""
+        assert _open_pixel_html("https://api.example.com", None) == ""
+
+    @pytest.mark.asyncio
+    async def test_html_embeds_open_pixel_when_api_base_set(self, monkeypatch):
+        from types import SimpleNamespace
+
+        from interntrack.scheduler.jobs import build_daily_report_html
+
+        monkeypatch.setattr(
+            "interntrack.config.get_settings",
+            lambda: SimpleNamespace(
+                api_base_url="https://api.example.com",
+                secret_key="test-secret",  # noqa: S106 (test fixture)
+            ),
+        )
+        report = {
+            "summary": {"new_jobs": 1, "new_applications": 0},
+            "new_jobs": [
+                {
+                    "title": "Pen Tester",
+                    "company": "Acme",
+                    "url": "https://x.com/pen",
+                    "domain": "security",
+                }
+            ],
+            "closing_soon": [],
+            "follow_up": [],
+        }
+        with (
+            patch(
+                "interntrack.scheduler.jobs._score_and_group_jobs",
+                new=AsyncMock(
+                    return_value=[("security", [(61.0, report["new_jobs"][0])])]
+                ),
+            ),
+            patch(
+                "interntrack.scheduler.jobs._watched_company_names",
+                new=AsyncMock(return_value=[]),
+            ),
+        ):
+            html = await build_daily_report_html(report, AsyncMock(), user_id="u-pix")
+        assert "/api/v1/email/open?u=u-pix&t=" in html
+
     @pytest.mark.asyncio
     async def test_member_footer_shown_only_without_dashboard_link(self):
         from interntrack.scheduler.jobs import (

@@ -781,14 +781,7 @@ def apply_token(user_id: str, job_id: str) -> str:
     Binds ``user_id`` + ``job_id`` to the server secret, so only links we
     actually emailed can record an application. Never raises.
     """
-    import hashlib
-    import hmac
-
-    from interntrack.config import get_settings
-
-    secret = str(get_settings().secret_key).encode()
-    message = f"{user_id}|{job_id}".encode()
-    return hmac.new(secret, message, hashlib.sha256).hexdigest()
+    return _email_token("apply", user_id, job_id)
 
 
 def verify_apply_token(user_id: str, job_id: str, token: str) -> bool:
@@ -799,3 +792,34 @@ def verify_apply_token(user_id: str, job_id: str, token: str) -> bool:
         return False
     expected = apply_token(user_id, job_id)
     return hmac.compare_digest(expected, token)
+
+
+def open_token(user_id: str) -> str:
+    """HMAC token for the digest open-tracking pixel.
+
+    Binds ``user_id`` (with an ``open`` scope so it can never be confused
+    with an apply link) to the server secret. Never raises.
+    """
+    return _email_token("open", user_id)
+
+
+def verify_open_token(user_id: str, token: str) -> bool:
+    """Constant-time check of an open-pixel token."""
+    import hmac
+
+    if not token:
+        return False
+    expected = open_token(user_id)
+    return hmac.compare_digest(expected, token)
+
+
+def _email_token(scope: str, *parts: str) -> str:
+    """Shared HMAC token builder for signed email-action links."""
+    import hashlib
+    import hmac
+
+    from interntrack.config import get_settings
+
+    secret = str(get_settings().secret_key).encode()
+    message = "|".join([scope, *parts]).encode()
+    return hmac.new(secret, message, hashlib.sha256).hexdigest()
