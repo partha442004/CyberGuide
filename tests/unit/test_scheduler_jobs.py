@@ -3275,6 +3275,51 @@ class TestFollowUpNudges:
         )
         assert "1 day?" in text
 
+    def test_nudge_text_with_status_links(self):
+        """With status links the nudge offers one-click updates, no dashboard."""
+        from interntrack.scheduler.jobs import _follow_up_nudge_text
+
+        links = {
+            "interview": "https://api.example.com/status?u=u&a=a1&s=interview&t=tok",
+            "rejected": "https://api.example.com/status?u=u&a=a1&s=rejected&t=tok",
+            "offer": "https://api.example.com/status?u=u&a=a1&s=offer&t=tok",
+        }
+        text, buttons = _follow_up_nudge_text(
+            {
+                "application_id": "a1",
+                "job_title": "Security Engineer",
+                "company": "Acme Corp",
+                "job_url": "https://acme.example/job",
+                "days_since": 8,
+            },
+            status_links=links,
+        )
+        assert "Update your status right from this email" in text
+        assert "update the status on your dashboard" not in text
+        # _esc escapes the & in query strings inside the plain-text email.
+        assert links["interview"].replace("&", "&amp;") in text
+        assert links["offer"].replace("&", "&amp;") in text
+        assert buttons[0] == ("🔗 View job", "https://acme.example/job")
+        assert ("🗓️ Interview", links["interview"]) in buttons
+        assert ("🎉 Offer", links["offer"]) in buttons
+
+    def test_status_links_build_signed_urls(self):
+        """Nudge status URLs are HMAC-bound to member + application + status."""
+        from interntrack.scheduler.jobs import _status_links
+        from interntrack.utils.helpers import verify_status_token
+
+        links = _status_links("https://api.example.com", "u-1", "a-1")
+        assert links is not None
+        for key in ("interview", "rejected", "offer"):
+            assert links[key].startswith(
+                f"https://api.example.com/api/v1/email/status?u=u-1&a=a-1&s={key}&t="
+            )
+            token = links[key].split("&t=")[-1]
+            assert verify_status_token("u-1", "a-1", key, token)
+        assert _status_links("", "u-1", "a-1") is None
+        assert _status_links("https://api.example.com", "", "a-1") is None
+        assert _status_links("https://api.example.com", "u-1", "") is None
+
     @pytest.mark.asyncio
     async def test_sweep_never_raises_on_broken_session(self):
         """A DB failure yields an empty result, never an exception."""

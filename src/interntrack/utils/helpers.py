@@ -794,6 +794,28 @@ def verify_apply_token(user_id: str, job_id: str, token: str) -> bool:
     return hmac.compare_digest(expected, token)
 
 
+def status_token(user_id: str, application_id: str, new_status: str) -> str:
+    """HMAC token for one nudge-email status-update button.
+
+    Binds the member, the application and the target status to the server
+    secret, so only status links we actually emailed can move an
+    application. Never raises.
+    """
+    return _email_token("status", user_id, application_id, new_status)
+
+
+def verify_status_token(
+    user_id: str, application_id: str, new_status: str, token: str
+) -> bool:
+    """Constant-time check of a status-update button token."""
+    import hmac
+
+    if not token:
+        return False
+    expected = status_token(user_id, application_id, new_status)
+    return hmac.compare_digest(expected, token)
+
+
 def open_token(user_id: str) -> str:
     """HMAC token for the digest open-tracking pixel.
 
