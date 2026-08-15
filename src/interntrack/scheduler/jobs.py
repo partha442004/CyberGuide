@@ -1111,13 +1111,42 @@ async def send_closing_soon_alerts() -> dict:
         return await _send_closing_soon_sweep(session)
 
 
-def _follow_up_nudge_text(item: dict) -> tuple[str, list[tuple[str, str]]]:
+def _status_links(
+    api_base: str, user_id: str, application_id: str
+) -> dict[str, str] | None:
+    """Signed nudge status-update URLs (interview/rejected/offer), or None.
+
+    Only when the deployment has an ``api_base_url`` and both ids are
+    known — the same best-effort rule as the apply-tracking links.
+    """
+    if not api_base or not user_id or not application_id:
+        return None
+    from urllib.parse import quote
+
+    from interntrack.utils.helpers import status_token
+
+    base = api_base.strip().rstrip("/")
+    out: dict[str, str] = {}
+    for key in ("interview", "rejected", "offer"):
+        token = status_token(str(user_id), str(application_id), key)
+        out[key] = (
+            f"{base}/api/v1/email/status?u={quote(str(user_id))}"
+            f"&a={quote(str(application_id))}&s={key}&t={token}"
+        )
+    return out
+
+
+def _follow_up_nudge_text(
+    item: dict, status_links: dict[str, str] | None = None
+) -> tuple[str, list[tuple[str, str]]]:
     """Message + buttons for one stale-application follow-up nudge.
 
     ``item`` carries application_id / job_title / company / job_url /
     days_since. Renders a short message with a copy-paste follow-up
     template the user can send the recruiter, plus a View-job button.
-    Pure and testable.
+    When ``status_links`` is given, the message ends with one-click
+    interview / rejected / offer links so email-only members can update
+    their application without the dashboard. Pure and testable.
     """
     title = str(item.get("job_title") or "the role")
     company = str(item.get("company") or "the company")
@@ -1137,14 +1166,26 @@ def _follow_up_nudge_text(item: dict) -> tuple[str, list[tuple[str, str]]]:
             'Thank you!"'
         ),
         "",
-        (
-            "Send it on LinkedIn or email, then update the status on your "
-            "dashboard when you hear back."
-        ),
     ]
+    if status_links:
+        lines.append(
+            "⬇️ Update your status right from this email (no dashboard needed):"
+        )
+        lines.append(f"   🗓️ Interview → {_esc(status_links['interview'])}")
+        lines.append(f"   ❌ Rejected → {_esc(status_links['rejected'])}")
+        lines.append(f"   🎉 Offer → {_esc(status_links['offer'])}")
+    else:
+        lines.append("Update the status on your dashboard when you hear back.")
     buttons: list[tuple[str, str]] = []
     if item.get("job_url"):
         buttons.append(("🔗 View job", str(item["job_url"])))
+    if status_links:
+        for key, label in (
+            ("interview", "🗓️ Interview"),
+            ("rejected", "❌ Rejected"),
+            ("offer", "🎉 Offer"),
+        ):
+            buttons.append((label, status_links[key]))
     return "\n".join(lines), buttons
 
 
@@ -1167,6 +1208,13 @@ async def _send_follow_up_nudges(session, days: int = 7) -> dict:
         from interntrack.domain.models import Application, Job
 
         owner_email = await _owner_email(session)
+        api_base = ""
+        try:
+            from interntrack.config import get_settings
+
+            api_base = (get_settings().api_base_url or "").strip().rstrip("/")
+        except Exception:  # noqa: BLE001, S110 - best-effort
+            api_base = ""
         now = datetime.now(UTC).replace(tzinfo=None)
         cutoff = (now - timedelta(days=days)).strftime("%Y-%m-%d %H:%M:%S")
         result = await session.execute(
@@ -1218,7 +1266,8 @@ async def _send_follow_up_nudges(session, days: int = 7) -> dict:
                 user,
                 owner_email,
             )
-            text, buttons = _follow_up_nudge_text(item)
+            status_links = _status_links(api_base, uid, item["application_id"])
+            text, buttons = _follow_up_nudge_text(item, status_links)
             recipient = None
             if user is not None:
                 recipient = {

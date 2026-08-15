@@ -231,3 +231,94 @@ class TestEmailOpenPixel:
             params={"u": "u-open-2", "t": "f" * 64},
         )
         assert resp.status_code == 400
+
+
+class TestEmailStatusEndpoint:
+    """GET /api/v1/email/status — one-click nudge status buttons."""
+
+    @pytest.mark.asyncio
+    async def test_updates_application_and_confirms(self, client, db_session):
+        from datetime import UTC, datetime, timedelta
+
+        from sqlalchemy import select
+
+        from interntrack.domain.enums import ApplicationStatus
+        from interntrack.domain.models import Application, Job
+        from interntrack.utils.helpers import status_token
+
+        db_session.add(
+            Job(
+                id="job-st-1",
+                title="SOC Analyst",
+                company="Acme",
+                url="https://x.com/1",
+            )
+        )
+        db_session.add(
+            Application(
+                id="app-st-1",
+                job_id="job-st-1",
+                user_id="u-st-1",
+                status=ApplicationStatus.APPLIED,
+                applied_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=9),
+            )
+        )
+        await db_session.flush()
+
+        token = status_token("u-st-1", "app-st-1", "interview")
+        resp = await client.get(
+            "/api/v1/email/status",
+            params={"u": "u-st-1", "a": "app-st-1", "s": "interview", "t": token},
+        )
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("text/html")
+        assert "Status updated" in resp.text
+
+        result = await db_session.execute(
+            select(Application).where(Application.id == "app-st-1")
+        )
+        app = result.scalars().first()
+        assert app is not None
+        assert app.status == ApplicationStatus.INTERVIEW
+
+    @pytest.mark.asyncio
+    async def test_other_users_application_rejected(self, client, db_session):
+        from datetime import UTC, datetime, timedelta
+
+        from interntrack.domain.enums import ApplicationStatus
+        from interntrack.domain.models import Application, Job
+        from interntrack.utils.helpers import status_token
+
+        db_session.add(
+            Job(id="job-st-2", title="Analyst", company="Acme", url="https://x.com/2")
+        )
+        db_session.add(
+            Application(
+                id="app-st-2",
+                job_id="job-st-2",
+                user_id="u-other",
+                status=ApplicationStatus.APPLIED,
+                applied_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=9),
+            )
+        )
+        await db_session.flush()
+
+        token = status_token("u-st-2", "app-st-2", "offer")
+        resp = await client.get(
+            "/api/v1/email/status",
+            params={"u": "u-st-2", "a": "app-st-2", "s": "offer", "t": token},
+        )
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_invalid_token_and_status_rejected(self, client):
+        bad_token = await client.get(
+            "/api/v1/email/status",
+            params={"u": "u", "a": "a", "s": "interview", "t": "f" * 64},
+        )
+        assert bad_token.status_code == 400
+        bad_status = await client.get(
+            "/api/v1/email/status",
+            params={"u": "u", "a": "a", "s": "hacked", "t": "f" * 64},
+        )
+        assert bad_status.status_code == 400

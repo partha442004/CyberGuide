@@ -15,9 +15,20 @@ from interntrack.database.session import get_db
 from interntrack.domain.enums import ApplicationStatus
 from interntrack.services.application_service import ApplicationService
 from interntrack.services.job_service import JobService
-from interntrack.utils.helpers import verify_apply_token, verify_open_token
+from interntrack.utils.helpers import (
+    verify_apply_token,
+    verify_open_token,
+    verify_status_token,
+)
 
 router = APIRouter()
+
+# Statuses the nudge-email buttons can set (member-facing labels).
+_STATUS_BUTTONS = {
+    "interview": (ApplicationStatus.INTERVIEW, "🗓️ Interview"),
+    "rejected": (ApplicationStatus.REJECTED, "❌ Rejected"),
+    "offer": (ApplicationStatus.OFFER, "🎉 Offer"),
+}
 
 # 1x1 transparent GIF served by the open-tracking pixel.
 _TRANSPARENT_GIF = (
@@ -104,3 +115,52 @@ async def email_open(
     except Exception:  # noqa: BLE001, S110 - the pixel must never error
         pass
     return Response(content=_TRANSPARENT_GIF, media_type="image/gif")
+
+
+@router.get("/status", include_in_schema=False)
+async def email_status(
+    u: str = Query(..., min_length=1, max_length=200),
+    a: str = Query(..., min_length=1, max_length=200),
+    s: str = Query(..., min_length=1, max_length=20),
+    t: str = Query(..., min_length=32, max_length=128),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Update an application's status from a nudge-email button link.
+
+    The follow-up nudge email offers signed one-click buttons so members
+    who never open the dashboard can record "interview / rejected / offer"
+    — which then feeds the interview reminders, the weekly recap and the
+    dashboard pipeline. The link is HMAC-bound to the member + application
+    + status, and the application must actually belong to the member.
+    Responds with a small confirmation page.
+    """
+    from sqlalchemy import select
+
+    from interntrack.domain.models import Application
+
+    entry = _STATUS_BUTTONS.get(s)
+    if entry is None or not verify_status_token(u, a, s, t):
+        raise HTTPException(status_code=400, detail="Invalid or expired status link")
+    new_status, label = entry
+
+    result = await db.execute(select(Application).where(Application.id == a))
+    app = result.scalars().first()
+    if app is None or str(getattr(app, "user_id", "") or "") != u:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    service = ApplicationService(db)
+    await service.update_status(str(app.id), new_status)
+
+    html = (
+        "<html><body style='font-family:Inter,Arial,sans-serif;"
+        "text-align:center;padding:48px 16px;'>"
+        "<div style='max-width:420px;margin:0 auto;'>"
+        "<div style='font-size:40px;'>✅</div>"
+        "<h2 style='margin:8px 0;'>Status updated</h2>"
+        f"<p style='color:#475569;'>Marked as <b>{label}</b>. Your next "
+        "digest and the weekly recap will reflect it.</p>"
+        "<p style='color:#94a3b8;font-size:13px;'>Need to change it? "
+        "Ask your admin.</p>"
+        "</div></body></html>"
+    )
+    return Response(content=html, media_type="text/html")
