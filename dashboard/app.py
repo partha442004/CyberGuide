@@ -1109,6 +1109,45 @@ def _current_user_id() -> str:
     return user["id"] if user else "user1"
 
 
+def _dashboard_password() -> str:
+    """Admin password from env (``DASHBOARD_PASSWORD``), or '' when unset.
+
+    When set, the whole dashboard is locked behind this password. When
+    unset (local dev), the owner-email check below still applies.
+    """
+    return str(os.getenv("DASHBOARD_PASSWORD", "") or "").strip()
+
+
+def _password_matches(candidate: str) -> bool:
+    """Constant-time check against ``DASHBOARD_PASSWORD``.
+
+    Unset password = no gate (returns True) so local dev without the env
+    var keeps working.
+    """
+    import hmac
+
+    expected = _dashboard_password()
+    if not expected:
+        return True
+    return bool(candidate) and hmac.compare_digest(expected, candidate)
+
+
+def _email_is_owner(email: str, owner_email: str) -> bool:
+    """Whether ``email`` equals the team owner's account email."""
+    return (
+        bool(owner_email)
+        and str(email or "").strip().lower() == str(owner_email).strip().lower()
+    )
+
+
+def _is_owner_email(email: str) -> bool:
+    """Whether ``email`` is the team owner's account (API lookup)."""
+    if not email:
+        return False
+    owner = fetch_data("/notifications/owner") or {}
+    return _email_is_owner(email, str(owner.get("email") or ""))
+
+
 def _is_owner() -> bool:
     """Whether the signed-in user is the owner (admin) account.
 
@@ -1118,9 +1157,7 @@ def _is_owner() -> bool:
     user = _current_user()
     if not user or not user.get("email"):
         return False
-    owner = fetch_data("/notifications/owner") or {}
-    owner_email = str(owner.get("email") or "").strip().lower()
-    return bool(owner_email) and str(user["email"]).strip().lower() == owner_email
+    return _is_owner_email(str(user.get("email") or ""))
 
 
 def _track_application(job_id: Any, title: str, status: str | None = None) -> None:
@@ -1764,146 +1801,45 @@ def show_account() -> None:
     if st.session_state.pop("account_deleted", False):
         st.success("Your account and all its data were deleted. Sorry to see you go!")
 
-    # ── Not signed in: register or log in ─────────────────────────────
+    # ── Not signed in: admin-only login ───────────────────────────────
     st.markdown(
-        "Create a free account to get **personalized job alerts** — your own "
-        "categories, your own resume match %, and delivery to *your* email / "
-        "Telegram. Login is by email only (no password)."
+        "🔒 This dashboard is **admin-only** — members receive their alerts "
+        "by email and don't log in here."
     )
-    tab_register, tab_login = st.tabs(["✨ Create account", "🔑 Log in"])
-
-    with tab_register:
-        _invite = _invite_params()
-        _invite_caption = invite_caption(_invite)
-        if _invite_caption:
-            st.info(_invite_caption)
-        _telegram_finder_block()
-        with st.form("register_form"):
-            name = st.text_input("Full name *")
-            email = st.text_input("Email *")
-            location = st.text_input(
-                "Location",
-                value=_invite.get("location", ""),
-                placeholder="e.g. Bengaluru, India",
+    with st.form("login_form"):
+        email = st.text_input("Your email")
+        password = st.text_input("Admin password", type="password")
+        submitted = st.form_submit_button("🔑 Log in", type="primary")
+    if submitted:
+        if "@" not in email:
+            st.error("Please enter your email.")
+            return
+        if not _password_matches(password):
+            st.error("Incorrect admin password.")
+            return
+        resp = _api_raw(
+            "/users/login",
+            method="POST",
+            json_data={"email": email.strip()},
+            timeout=30,
+        )
+        if resp is None:
+            st.error("Could not reach the API — is it running?")
+            return
+        if resp.status_code != 200:
+            st.error("No account found with this email — create one first.")
+            return
+        profile = resp.json()
+        if not _is_owner_email(profile.get("email")):
+            _logout_user()
+            st.error(
+                "This dashboard is admin-only — members receive their "
+                "alerts by email and don't need to log in here."
             )
-            experience = st.selectbox(
-                "Experience level",
-                ["", "fresher", "intern", "junior", "senior"],
-                format_func=lambda v: {
-                    "": "Select...",
-                    "fresher": "🎓 Fresher",
-                    "intern": "🧪 Intern",
-                    "junior": "🚀 Junior",
-                    "senior": "💼 Senior",
-                }.get(v, v),
-            )
-            telegram_chat_id = st.text_input(
-                "Telegram chat ID (optional)",
-                value=st.session_state.pop("found_telegram_chat_id", ""),
-                help="Message @userinfobot on Telegram to see your chat ID — "
-                "alerts then reach *your* Telegram instead of the shared chat. "
-                "Tip: use the 'Find my Telegram chat ID' button above.",
-            )
-            phone_number = st.text_input(
-                "Phone number for SMS alerts (optional)",
-                placeholder="+919876543210",
-                help="Include the country code (e.g. +91 for India) — your "
-                "daily digest can also arrive by SMS.",
-            )
-            default_domains = _invite.get("domains", ["security"])
-            domains = _category_picker_multi("🏷 Preferred categories", default_domains)
-            skills = st.text_input(
-                "Skills (comma-separated)",
-                placeholder="e.g. python, burp suite, nmap, linux",
-            )
-            resume_file = st.file_uploader(
-                "Upload your resume (PDF) — optional at signup",
-                type=["pdf"],
-            )
-            submitted = st.form_submit_button("🚀 Create my account", type="primary")
-
-        if submitted:
-            if not name.strip() or "@" not in email:
-                st.error("Please fill in your name and a valid email.")
-                return
-            payload = {
-                "name": name.strip(),
-                "email": email.strip(),
-                "location": location.strip() or None,
-                "experience_level": experience or None,
-                "telegram_chat_id": telegram_chat_id.strip() or None,
-                "phone_number": phone_number.strip() or None,
-                "domains": [] if "all" in domains else domains,
-                "skills": [s.strip() for s in skills.split(",") if s.strip()],
-                "referred_by": _invite.get("invite") or None,
-            }
-            resp = _api_raw(
-                "/users/register", method="POST", json_data=payload, timeout=30
-            )
-            if resp is None:
-                st.error("Could not reach the API — is it running?")
-                return
-            if resp.status_code in (200, 201):
-                profile = resp.json()
-                _login_user(profile)
-                if resume_file is not None:
-                    files = {
-                        "file": (
-                            resume_file.name,
-                            resume_file.getvalue(),
-                            "application/pdf",
-                        )
-                    }
-                    upload = _api(
-                        f"/resumes/upload?user_id={profile['id']}",
-                        method="POST",
-                        files=files,
-                        timeout=30,
-                    )
-                    if upload:
-                        st.success(
-                            f"✅ Account created and resume parsed — "
-                            f"{len(upload.get('skills', []))} skills extracted!"
-                        )
-                    else:
-                        st.warning(
-                            "Account created, but resume parsing failed — "
-                            "re-upload it from the Resume Match page."
-                        )
-                else:
-                    st.success(
-                        "✅ Account created! Your personalized daily alerts are on."
-                    )
-                st.rerun()
-            else:
-                try:
-                    detail = resp.json().get("detail", resp.text)
-                except Exception:
-                    detail = resp.text
-                st.error(f"Registration failed: {detail}")
-
-    with tab_login:
-        with st.form("login_form"):
-            email = st.text_input("Your email")
-            submitted = st.form_submit_button("🔑 Log in", type="primary")
-        if submitted:
-            if "@" not in email:
-                st.error("Please enter your email.")
-                return
-            resp = _api_raw(
-                "/users/login",
-                method="POST",
-                json_data={"email": email.strip()},
-                timeout=30,
-            )
-            if resp is None:
-                st.error("Could not reach the API — is it running?")
-            elif resp.status_code == 200:
-                _login_user(resp.json())
-                st.success("Logged in!")
-                st.rerun()
-            else:
-                st.error("No account found with this email — create one first.")
+            return
+        _login_user(profile)
+        st.success("Logged in!")
+        st.rerun()
 
 
 # ---------------------------------------------------------------------------
@@ -2465,8 +2401,31 @@ def show_my_matches() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _show_dashboard_lock() -> None:
+    """Password lock screen shown before anything else when enabled.
+
+    Rendered by ``main()`` when ``DASHBOARD_PASSWORD`` is set and this
+    browser session hasn't unlocked yet. Nothing else renders until the
+    correct password is entered.
+    """
+    st.title("🔒 Dashboard locked")
+    st.markdown("This dashboard is private. Enter the admin password to continue.")
+    with st.form("dashboard_lock"):
+        pw = st.text_input("Admin password", type="password")
+        submitted = st.form_submit_button("🔓 Unlock", type="primary")
+    if submitted:
+        if _password_matches(pw):
+            st.session_state["dashboard_authed"] = True
+            st.rerun()
+        else:
+            st.error("Incorrect admin password.")
+
+
 def main() -> None:
     """Main dashboard function."""
+    if _dashboard_password() and not st.session_state.get("dashboard_authed"):
+        _show_dashboard_lock()
+        return
     st.title("📊 InternTrack Dashboard")
     st.markdown("Your internship and job tracking command center")
 
