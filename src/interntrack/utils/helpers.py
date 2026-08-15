@@ -773,3 +773,29 @@ def salary_band_txt(
     if high is not None:
         return f"{symbol}{fmt(high)}"
     return ""
+
+
+def apply_token(user_id: str, job_id: str) -> str:
+    """HMAC token authenticating one digest-email apply link.
+
+    Binds ``user_id`` + ``job_id`` to the server secret, so only links we
+    actually emailed can record an application. Never raises.
+    """
+    import hashlib
+    import hmac
+
+    from interntrack.config import get_settings
+
+    secret = str(get_settings().secret_key).encode()
+    message = f"{user_id}|{job_id}".encode()
+    return hmac.new(secret, message, hashlib.sha256).hexdigest()
+
+
+def verify_apply_token(user_id: str, job_id: str, token: str) -> bool:
+    """Constant-time check of an apply-link token."""
+    import hmac
+
+    if not token:
+        return False
+    expected = apply_token(user_id, job_id)
+    return hmac.compare_digest(expected, token)
