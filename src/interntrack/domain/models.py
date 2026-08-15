@@ -299,6 +299,11 @@ class Application(Base, TimestampMixin):
     cover_letter = Column(Text, nullable=True)
     priority = Column(Integer, default=0)
     reminded = Column(Boolean, default=False)
+    # How this application was created: "email" for the signed digest Apply
+    # links (so the owner recap can show member activity recorded straight
+    # from email), NULL for dashboard entries. Auto-added to live tables by
+    # ``_sync_missing_columns``.
+    source = Column(String(20), nullable=True)
     # When the "🗓️ Interview soon" reminder was last sent for this
     # application (NULL = never) so a scheduled interview is nudged at
     # most once. Auto-added to live tables by ``_sync_missing_columns``.

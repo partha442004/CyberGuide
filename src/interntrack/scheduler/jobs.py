@@ -306,9 +306,9 @@ async def team_recap_stats(session, days: int = 7) -> dict:
     try:
         from collections import Counter
 
-        from sqlalchemy import select
+        from sqlalchemy import func, select
 
-        from interntrack.domain.models import NotificationHistory, User
+        from interntrack.domain.models import Application, NotificationHistory, User
         from interntrack.utils.helpers import to_naive_utc
 
         window = max(1, int(days or 7))
@@ -319,6 +319,22 @@ async def team_recap_stats(session, days: int = 7) -> dict:
         users = list(users_result.scalars().all())
         hist_result = await session.execute(select(NotificationHistory))
         rows = list(hist_result.scalars().all())
+
+        # Applications recorded straight from the signed digest Apply links
+        # (``source="email"``), per member, within the window — the recap's
+        # "member activity without the dashboard" signal.
+        email_applied: dict[str, int] = {}
+        applied_result = await session.execute(
+            select(Application.user_id, func.count(Application.id))
+            .where(
+                Application.source == "email",
+                Application.applied_at >= since,
+            )
+            .group_by(Application.user_id)
+        )
+        for uid, count in applied_result.all():
+            if uid:
+                email_applied[str(uid)] = int(count)
 
         by_user: dict[str, list] = {}
         for row in rows:
@@ -365,6 +381,7 @@ async def team_recap_stats(session, days: int = 7) -> dict:
                     "sends": sends,
                     "jobs": jobs,
                     "emails_ok": emails_ok,
+                    "email_applied": email_applied.get(uid, 0),
                     "top_domains": [d for d, _ in domain_counter.most_common(3)],
                     "top_companies": [c for c, _ in company_counter.most_common(5)],
                 }
@@ -374,10 +391,17 @@ async def team_recap_stats(session, days: int = 7) -> dict:
             "days": window,
             "total_sends": sum(r["sends"] for r in out),
             "total_jobs": sum(r["jobs"] for r in out),
+            "total_email_applied": sum(email_applied.values()),
             "users": out,
         }
     except Exception:  # noqa: BLE001 - a recap must never break the worker
-        return {"days": int(days or 7), "total_sends": 0, "total_jobs": 0, "users": []}
+        return {
+            "days": int(days or 7),
+            "total_sends": 0,
+            "total_jobs": 0,
+            "total_email_applied": 0,
+            "users": [],
+        }
 
 
 def _build_team_recap_html(stats: dict, owner_name) -> str:
@@ -392,6 +416,7 @@ def _build_team_recap_html(stats: dict, owner_name) -> str:
     users = stats.get("users") or []
     total_jobs = int(stats.get("total_jobs") or 0)
     total_sends = int(stats.get("total_sends") or 0)
+    total_email_applied = int(stats.get("total_email_applied") or 0)
     rows: list[str] = []
     for u in users:
         domains = ", ".join(u.get("top_domains") or u.get("domains") or []) or "all"
@@ -409,11 +434,20 @@ def _build_team_recap_html(stats: dict, owner_name) -> str:
             f"text-align:center;'>{u.get('jobs', 0)}</td>"
             f"<td style='padding:8px 10px;border-bottom:1px solid #e2e8f0;"
             f"text-align:center;'>{u.get('emails_ok', 0)}</td>"
+            f"<td style='padding:8px 10px;border-bottom:1px solid #e2e8f0;"
+            f"text-align:center;'>{u.get('email_applied', 0)}</td>"
             "<td style='padding:8px 10px;border-bottom:1px solid #e2e8f0;'>"
             f"{escape(domains)}<br/>"
             f"<span style='color:#64748b;font-size:12px;'>🏢 "
             f"{escape(companies)}</span></td>"
             "</tr>"
+        )
+    email_applied_line = ""
+    if total_email_applied:
+        email_applied_line = (
+            f"<p style='color:#64748b;font-size:13px;'>📨 <b>{total_email_applied}</b> "
+            "application(s) recorded straight from digest Apply clicks — "
+            "members applying without ever opening the dashboard.</p>"
         )
     return (
         "<div style='font-family:Inter,Arial,sans-serif;max-width:640px;"
@@ -428,12 +462,14 @@ def _build_team_recap_html(stats: dict, owner_name) -> str:
         "<th style='padding:8px 10px;'>Digests</th>"
         "<th style='padding:8px 10px;'>Jobs</th>"
         "<th style='padding:8px 10px;'>Emails ✓</th>"
+        "<th style='padding:8px 10px;'>📨 Applied</th>"
         "<th style='padding:8px 10px;text-align:left;'>Top roles & companies</th>"
         "</tr>" + "".join(rows) + "</table>"
         f"<p style='color:#64748b;font-size:13px;'><b>{total_jobs}</b> jobs across "
         f"<b>{total_sends}</b> digest sends for <b>{len(users)}</b> member(s). "
         "Each person still receives only their own role + city — nothing mixed.</p>"
-        "</div>"
+        + email_applied_line
+        + "</div>"
     )
 
 
@@ -3796,8 +3832,26 @@ async def build_daily_report_html(
         footer = _digest_footer_html()
         if footer:
             parts.append(footer)
+    else:
+        parts.append(_member_footer_html())
     parts.append("</div>")
     return "".join(parts)
+
+
+def _member_footer_html() -> str:
+    """Short no-dashboard footer for member digests.
+
+    Members get everything from email, so the footer tells them what they
+    receive and how to make changes — without pointing at the dashboard
+    (which is owner-only). Rendered only when ``show_dashboard_link`` is
+    False; the owner keeps the dashboard footer instead.
+    """
+    return (
+        "<div style='margin-top:24px;padding-top:16px;border-top:1px solid "
+        "#e2e8f0;font-size:12px;color:#94a3b8;'>"
+        "You get these every day at 8 AM, 1 PM & 7 PM IST. To change your "
+        "roles, location, or pause alerts, ask your admin.</div>"
+    )
 
 
 def _email_logo_html() -> str:
