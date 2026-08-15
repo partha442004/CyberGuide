@@ -1949,9 +1949,12 @@ class TestClosingSoonSweep:
 
         assert sent == {"u1": 1}
         manager.notify.assert_awaited_once()
-        _, kwargs = manager.notify.await_args
-        assert kwargs["recipient"]["email"] == "u@x.com"
-        assert kwargs["buttons"]  # Apply button present
+        call = manager.notify.await_args
+        assert call.kwargs["recipient"]["email"] == "u@x.com"
+        # Email-only member gets the styled HTML card with an Apply button
+        # (the ``buttons`` kwarg is Telegram-only).
+        assert "SOC Analyst" in call.args[1]
+        assert "Apply now" in call.args[1]
         # Dedup bookkeeping persisted.
         assert pref.closing_soon_sent == ["j1"]
 

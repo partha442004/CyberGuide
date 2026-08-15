@@ -1562,6 +1562,10 @@ def _team_recap_block() -> None:
             f"📨 {u.get('sends', 0)} digests · 💼 {u.get('jobs', 0)} jobs · "
             f"📧 {u.get('emails_ok', 0)} emails ✓ · 🏷 {escape(domain_txt)}"
         )
+        if u.get("opened"):
+            recap += f" · 👀 opened {u.get('opened')}"
+        if u.get("email_applied"):
+            recap += f" · 📨 applied {u.get('email_applied')}"
         if u.get("top_companies"):
             recap += f" · 🏢 {escape(', '.join(u.get('top_companies')))}"
         st.caption(recap)
