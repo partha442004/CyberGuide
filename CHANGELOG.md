@@ -6,6 +6,19 @@ All notable changes to the InternTrack project will be documented in this file.
 
 ### Added
 
+- **Email apply-tracking links.** Every member digest's Apply button now
+  points at a signed `GET /api/v1/email/apply` link (HMAC of user + job
+  with the server secret) that records the application as **applied** —
+  with `applied_at` + status history — then redirects to the job. Members
+  who never open the dashboard now populate their applications from the
+  email itself, which is what powers the follow-up nudges and the weekly
+  "Your week in applications" recap for them. Clicking twice is
+  idempotent (no duplicate rows), tampered/expired tokens are rejected
+  (400), and when `api_base_url` isn't configured the button falls back
+  to the plain job link. New router `api/v1/email_actions.py`; token
+  helpers in `utils/helpers.py`; the card Apply button gains an optional
+  `apply_link` param wired through all four HTML card call sites.
+
 - **RSS article-title guard.** The RSS feed rotation now rejects listicle /
   article titles ("Remote Cybersecurity Jobs: 10 Companies Hiring", "How to
   Become a SOC Analyst", salary guides) before the query matcher can accept

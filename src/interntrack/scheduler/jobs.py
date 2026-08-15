@@ -3312,6 +3312,16 @@ async def build_daily_report_html(
     # The member's resume skills drive the ✅ requirements checklist on every
     # job card (same source as the match %). Loaded once, never raises.
     resume_skills = await _latest_resume_skill_names(session, user_id=user_id)
+    # When the deployment exposes an API base URL, member Apply buttons
+    # become signed tracking links (records the application, then opens
+    # the job). Best-effort: a missing URL just keeps plain Apply links.
+    api_base = ""
+    try:
+        from interntrack.config import get_settings
+
+        api_base = (get_settings().api_base_url or "").strip().rstrip("/")
+    except Exception:  # noqa: BLE001, S110 - tracking links must never break email
+        api_base = ""
     summary = report.get("summary") or {}
     generated = report.get("generated_at") or ""
 
@@ -3523,6 +3533,7 @@ async def build_daily_report_html(
                     target_salary=report.get("target_salary"),
                     keywords=report.get("keywords") or [],
                     resume_skills=resume_skills,
+                    apply_link=_apply_link(api_base, user_id, job.get("id")),
                 )
             )
 
@@ -3544,6 +3555,7 @@ async def build_daily_report_html(
                     target_salary=report.get("target_salary"),
                     keywords=report.get("keywords") or [],
                     resume_skills=resume_skills,
+                    apply_link=_apply_link(api_base, user_id, job.get("id")),
                 )
             )
 
@@ -3561,6 +3573,7 @@ async def build_daily_report_html(
                         target_salary=report.get("target_salary"),
                         keywords=report.get("keywords") or [],
                         resume_skills=resume_skills,
+                        apply_link=_apply_link(api_base, user_id, job.get("id")),
                     )
                 )
             parts.append(
@@ -3646,6 +3659,7 @@ async def build_daily_report_html(
                         target_salary=report.get("target_salary"),
                         keywords=report.get("keywords") or [],
                         resume_skills=resume_skills,
+                        apply_link=_apply_link(api_base, user_id, job.get("id")),
                     )
                 )
 
@@ -4182,6 +4196,28 @@ def _is_likely_scam(job: dict) -> bool:
     return len(_scam_signals(job)) >= 2
 
 
+def _apply_link(api_base: str, user_id: str | None, job_id: str | None) -> str | None:
+    """Signed 'Apply now' tracking URL for one digest email card, or None.
+
+    When the digest knows the member (``user_id``) and the deployment has an
+    ``api_base_url``, the card's Apply button becomes a tracking link that
+    records the application (so follow-up nudges and the weekly recap work
+    for members who never open the dashboard) before opening the job.
+    """
+    if not api_base or not user_id or not job_id:
+        return None
+    from urllib.parse import quote
+
+    from interntrack.utils.helpers import apply_token
+
+    base = api_base.strip().rstrip("/")
+    token = apply_token(str(user_id), str(job_id))
+    return (
+        f"{base}/api/v1/email/apply?u={quote(str(user_id))}"
+        f"&j={quote(str(job_id))}&t={token}"
+    )
+
+
 def _job_html_card(
     score,
     job: dict,
@@ -4189,6 +4225,7 @@ def _job_html_card(
     target_salary: int | None = None,
     keywords: list | None = None,
     resume_skills: set | None = None,
+    apply_link: str | None = None,
 ) -> str:
     """One job as an HTML card with an Apply button.
 
@@ -4197,6 +4234,10 @@ def _job_html_card(
     resume — ✅ matched, 🟡 related (same skill family), ⬜ missing — so
     the member sees at a glance exactly what the role expects vs. what
     they already have.
+
+    When ``apply_link`` is given, the Apply button points at the signed
+    tracking URL (records the application, then opens the job) instead of
+    the raw job URL.
     """
     title = _esc(job.get("title") or "Untitled")
     company = _esc(job.get("company") or "")
@@ -4286,10 +4327,16 @@ def _job_html_card(
             "10px;background:#f1f5f9;border-radius:6px;color:#475569;"
             "font-size:13px;line-height:1.5;'>" + full_desc + "</div></details>"
         )
-    if url:
+    href = apply_link or url
+    if href:
+        track_hint = (
+            " title='Opens the job and tracks it in your applications'"
+            if apply_link
+            else ""
+        )
         card += (
             "<div style='margin-top:10px;'>"
-            f"<a href='{url}' style='background:{accent};color:#fff;"
+            f"<a href='{_esc(href)}'{track_hint} style='background:{accent};color:#fff;"
             "text-decoration:none;border-radius:8px;padding:8px 18px;"
             "font-weight:600;font-size:13px;display:inline-block;'>Apply now</a>"
             "</div>"
