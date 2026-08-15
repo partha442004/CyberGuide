@@ -39,6 +39,25 @@ assert app._password_matches("wrong") is False
 assert app._password_matches("") is False
 del os.environ["DASHBOARD_PASSWORD"]
 
+# Env var wins over st.secrets.
+class _Secrets:
+    def get(self, key, default=None):
+        return {"DASHBOARD_PASSWORD": "from-secrets"}.get(key, default)
+
+class _FakeSt:
+    secrets = _Secrets()
+
+_real_st = app.st
+app.st = _FakeSt()  # type: ignore[assignment]
+assert app._dashboard_password() == "from-secrets"
+assert app._password_matches("from-secrets") is True
+assert app._password_matches("wrong") is False
+os.environ["DASHBOARD_PASSWORD"] = "env-wins"
+assert app._dashboard_password() == "env-wins"
+del os.environ["DASHBOARD_PASSWORD"]
+assert app._dashboard_password() == "from-secrets"
+app.st = _real_st  # type: ignore[assignment]
+
 # Owner-email lookup against the API.
 app.fetch_data = lambda path: {"email": "partha@x.com"}  # type: ignore[assignment]
 assert app._is_owner_email("partha@x.com") is True

@@ -1110,12 +1110,20 @@ def _current_user_id() -> str:
 
 
 def _dashboard_password() -> str:
-    """Admin password from env (``DASHBOARD_PASSWORD``), or '' when unset.
+    """Admin password from ``DASHBOARD_PASSWORD`` env var or Streamlit secrets.
 
-    When set, the whole dashboard is locked behind this password. When
-    unset (local dev), the owner-email check below still applies.
+    Read from the environment first (local dev / Docker), then fall back to
+    ``st.secrets`` so a value set in Streamlit Community Cloud's Settings →
+    Secrets page is honoured even if the platform does not inject it as an
+    env var. When unset (local dev), the owner-email check still applies.
     """
-    return str(os.getenv("DASHBOARD_PASSWORD", "") or "").strip()
+    value = str(os.getenv("DASHBOARD_PASSWORD", "") or "").strip()
+    if value:
+        return value
+    try:
+        return str(st.secrets.get("DASHBOARD_PASSWORD", "") or "").strip()
+    except Exception:  # noqa: BLE001, S110 - secrets lookup must never crash the app
+        return ""
 
 
 def _password_matches(candidate: str) -> bool:
