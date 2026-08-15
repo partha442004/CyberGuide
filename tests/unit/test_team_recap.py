@@ -128,15 +128,17 @@ class TestTeamRecapStats:
         assert jeeva["email_applied"] == 3
         assert jeeva["top_domains"] == ["hardware"]
         assert jeeva["top_companies"] == ["ABB", "Tata Elxsi"]
-        # Boss: 1 send, 1 job, email not delivered, never opened, no applies.
+        # Boss: 1 send, 1 job, email delivery failed, never opened.
         boss = by_id["u1"]
         assert boss["sends"] == 1
         assert boss["jobs"] == 1
         assert boss["emails_ok"] == 0
+        assert boss["email_failed"] == 1
         assert boss["opened"] == 0
         assert boss["email_applied"] == 0
         assert stats["total_email_applied"] == 3
         assert stats["total_opened"] == 1
+        assert stats["total_email_failed"] == 1
         # Sorted by jobs desc — Jeeva first.
         assert stats["users"][0]["user_id"] == "u2"
 
@@ -172,8 +174,10 @@ class TestTeamRecapStats:
         assert stats["users"][0]["jobs"] == 2
         assert stats["users"][0]["email_applied"] == 0
         assert stats["users"][0]["opened"] == 0
+        assert stats["users"][0]["email_failed"] == 0
         assert stats["total_email_applied"] == 0
         assert stats["total_opened"] == 0
+        assert stats["total_email_failed"] == 0
 
 
 class TestBuildTeamRecapHtml:
@@ -654,6 +658,14 @@ class TestDailyOwnerSummary:
         assert "Today's delivery" in html
         assert "2 digest sends · 5 jobs · 1 opened · 0 applied" in html
         assert "Jeeva" in html
+
+    def test_build_html_flags_failed_deliveries(self):
+        from interntrack.scheduler.jobs import _build_daily_summary_html
+
+        stats = self._canned_stats()
+        stats["total_email_failed"] = 2
+        html = _build_daily_summary_html(stats)
+        assert "2</b> email(s) failed to deliver" in html
 
     @pytest.mark.asyncio
     async def test_skips_when_email_not_configured(self, monkeypatch):

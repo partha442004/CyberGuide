@@ -229,6 +229,9 @@ class TestWelcomeMessage:
         # Untrusted name is HTML-escaped before embedding.
         assert "Ada &lt;script&gt;" in message
         assert "security, coding" in message
+        # Email-only model: no dashboard invitation.
+        assert "no login or dashboard needed" in message
+        assert "contact your admin" in message
         assert kwargs["recipient"] == {
             "email": "ada@example.com",
             "telegram_chat_id": "123",
