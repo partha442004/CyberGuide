@@ -994,20 +994,42 @@ class TestAlertWindow:
                 "interntrack.scheduler.jobs.NotificationManager",
                 return_value=mock_manager,
             ),
+            patch(
+                "interntrack.scheduler.jobs._enabled_alert_targets",
+                new=AsyncMock(
+                    return_value=[
+                        {
+                            "user_id": "u1",
+                            "prefs": {
+                                "domains": ["security"],
+                                "channels": [],
+                                "min_match_score": None,
+                                "is_enabled": True,
+                                "last_alert_at": None,
+                            },
+                            "user": None,
+                        }
+                    ]
+                ),
+            ),
+            patch(
+                "interntrack.scheduler.jobs._sent_urls_for",
+                new=AsyncMock(return_value=set()),
+            ),
         ):
             mock_db.return_value.__aenter__ = AsyncMock(return_value=mock_session)
             mock_db.return_value.__aexit__ = AsyncMock(return_value=False)
 
             await generate_daily_report()
 
-        mock_report_service.generate_daily_report.assert_called_once_with(
-            domains=["security"],
-            min_match_score=None,
-            since=None,
-            location="Bangalore",
-            include_remote=True,
-            experience_levels=None,
-        )
+        # Empty report → _send_alert_for auto-widens: city window first,
+        # then a wider window, then all-India (location=None) before giving
+        # up. No notification is sent when even the widened search is empty.
+        locations = [
+            c.kwargs.get("location")
+            for c in mock_report_service.generate_daily_report.call_args_list
+        ]
+        assert locations == ["Bangalore", "Bangalore", None]
         mock_manager.notify_all.assert_not_called()
         mock_manager.notify.assert_not_called()
 
@@ -1424,6 +1446,71 @@ class TestPauseGatesDelivery:
             await generate_daily_report()
 
         mock_report_service.generate_daily_report.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_scheduler_skips_send_when_no_new_jobs(self):
+        from interntrack.scheduler.jobs import generate_daily_report
+
+        mock_session = AsyncMock()
+        mock_report_service = MagicMock()
+        mock_report_service.generate_daily_report = AsyncMock(
+            return_value={
+                "summary": {
+                    "new_jobs": 0,
+                    "new_applications": 0,
+                    "total_applications": 0,
+                },
+                "new_jobs": [],
+            }
+        )
+        mock_manager = MagicMock()
+        mock_manager.notify_all = AsyncMock(return_value={"telegram": True})
+
+        with (
+            patch("interntrack.scheduler.jobs.get_db_session") as mock_db,
+            patch(
+                "interntrack.scheduler.jobs._load_alert_preferences",
+                new=AsyncMock(
+                    return_value={
+                        "domains": ["security"],
+                        "channels": [],
+                        "min_match_score": None,
+                        "is_enabled": True,
+                        "last_alert_at": None,
+                    }
+                ),
+            ),
+            patch(
+                "interntrack.scheduler.jobs._enabled_alert_targets",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "interntrack.scheduler.jobs.ReportService",
+                return_value=mock_report_service,
+            ),
+            patch(
+                "interntrack.scheduler.jobs.NotificationManager",
+                return_value=mock_manager,
+            ),
+            patch(
+                "interntrack.scheduler.jobs._sent_urls_for",
+                new=AsyncMock(return_value=set()),
+            ),
+        ):
+            mock_db.return_value.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_db.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            await generate_daily_report()
+
+        # Initial call is the member's normal window; the empty result then
+        # auto-widens (wider window, then all-India) before giving up.
+        locations = [
+            c.kwargs.get("location")
+            for c in mock_report_service.generate_daily_report.call_args_list
+        ]
+        assert locations == ["Bangalore", "Bangalore", None]
+        mock_manager.notify_all.assert_not_called()
+        mock_manager.notify.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_send_alert_digest_skipped_when_paused(self):
