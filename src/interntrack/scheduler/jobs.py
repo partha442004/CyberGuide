@@ -308,7 +308,12 @@ async def team_recap_stats(session, days: int = 7) -> dict:
 
         from sqlalchemy import func, select
 
-        from interntrack.domain.models import Application, NotificationHistory, User
+        from interntrack.domain.models import (
+            Application,
+            Job,
+            NotificationHistory,
+            User,
+        )
         from interntrack.utils.helpers import to_naive_utc
 
         window = max(1, int(days or 7))
@@ -401,6 +406,20 @@ async def team_recap_stats(session, days: int = 7) -> dict:
                 }
             )
         out.sort(key=lambda r: (-r["jobs"], r["name"].lower()))
+        # Source coverage for the window — which sources actually produced
+        # jobs (vs. being blocked or quiet). Aggregated from the jobs table
+        # so it is reliable even though the scraper metrics are in-memory
+        # only (they reset on every serverless invocation).
+        source_result = await session.execute(
+            select(Job.source, func.count(Job.id))
+            .where(Job.created_at >= since)
+            .group_by(Job.source)
+            .order_by(func.count(Job.id).desc())
+        )
+        sources = [
+            {"source": _source_label(src), "jobs": int(count)}
+            for src, count in source_result.all()
+        ]
         return {
             "days": window,
             "total_sends": sum(r["sends"] for r in out),
@@ -408,6 +427,7 @@ async def team_recap_stats(session, days: int = 7) -> dict:
             "total_opened": sum(r["opened"] for r in out),
             "total_email_failed": sum(r["email_failed"] for r in out),
             "total_email_applied": sum(email_applied.values()),
+            "sources": sources,
             "users": out,
         }
     except Exception:  # noqa: BLE001 - a recap must never break the worker
@@ -703,6 +723,22 @@ def _build_daily_summary_html(stats: dict) -> str:
             f"text-align:center;'>{u.get('email_applied', 0)}</td>"
             "</tr>"
         )
+    # Source coverage: which boards actually produced jobs in the window.
+    # Shown as the top sources plus a quiet-count so the owner sees coverage
+    # at a glance (blocked/quiet sources mean fewer fresh roles that day).
+    sources = stats.get("sources") or []
+    sources_line = ""
+    if sources:
+        top = " · ".join(
+            f"{escape(str(s.get('source') or 'unknown'))} {s.get('jobs', 0)}"
+            for s in sources[:5]
+        )
+        quiet = len(sources) - 5
+        quiet_txt = f" (+{quiet} quiet)" if quiet > 0 else ""
+        sources_line = (
+            f"<p style='color:#64748b;font-size:12px;'>🗂️ Sources today: "
+            f"{top}{quiet_txt}</p>"
+        )
     failed_line = ""
     if stats.get("total_email_failed"):
         failed_line = (
@@ -762,6 +798,7 @@ def _build_daily_summary_html(stats: dict) -> str:
         "</tr>"
         + "".join(rows)
         + "</table>"
+        + sources_line
         + attention_html
         + failed_line
         + "<p style='color:#94a3b8;font-size:12px;'>Automatic daily summary — "
@@ -858,9 +895,12 @@ def _digest_subject(
     count = len(report.get("new_jobs") or [])
     domain_txt = ", ".join(domains) if domains else "matching"
     loc_txt = (user_location or "").strip() or DEFAULT_LOCATION
+    # Widened (best-of / all-India fallback) digests carry a 🌟 so the
+    # member knows this email is a wider sweep, not their usual city window.
+    star = "🌟 " if report.get("widen_note") else ""
     if weekly:
-        return f"📅 {count} jobs this week ({domain_txt})"
-    return f"🎯 {count} {domain_txt} jobs in {loc_txt}"
+        return f"{star}📅 {count} jobs this week ({domain_txt})"
+    return f"{star}🎯 {count} {domain_txt} jobs in {loc_txt}"
 
 
 async def _deliver_alert(
@@ -1835,6 +1875,77 @@ def _without_telegram_for_members(
     return [c for c in channels if c != "telegram"]
 
 
+async def _sent_urls_for(session, user_id: str) -> set[str]:
+    """URLs of jobs already delivered to a member (from history snapshots).
+
+    The auto-widen fallback filters these out so a wider window or all-India
+    sweep never re-sends a job the member already received. Reads the compact
+    ``jobs`` list each digest stores; never raises (an empty set on failure
+    only means the fallback may repeat a URL the member already saw once).
+    """
+    try:
+        from sqlalchemy import select
+
+        from interntrack.domain.models import NotificationHistory
+
+        result = await session.execute(select(NotificationHistory))
+        urls: set[str] = set()
+        for row in result.scalars().all():
+            if str(getattr(row, "user_id", "") or "") != user_id:
+                continue
+            for job in getattr(row, "jobs", None) or []:
+                url = str((job or {}).get("url") or "").strip()
+                if url:
+                    urls.add(url)
+        return urls
+    except Exception:  # noqa: BLE001, S110 - widening must never break the send
+        return set()
+
+
+async def _widened_report(
+    service,
+    domains: list | None,
+    prefs: dict,
+    user_location: str | None,
+    include_remote: bool,
+    seen_urls: set[str],
+) -> dict | None:
+    """Broader fallback report (window → all-India) or None when nothing matches.
+
+    Called only when a member's normal digest had zero (or, for the weekly
+    recap, fewer than two) jobs. First retries the last 5 days — catching
+    listings scraped just after the user's previous alert that fell through
+    the dedup window — then drops the city filter for all-India matches.
+    Already-delivered URLs are filtered out so the fallback never repeats a
+    job. Marks the result with ``widen_note`` (``"window"`` / ``"location"``)
+    so the subject can show a 🌟. Never raises; returns ``None`` when even
+    the widened search finds nothing.
+    """
+    try:
+        since = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=5)
+        for location in (user_location, None):
+            wide = await service.generate_daily_report(
+                domains=domains,
+                min_match_score=prefs.get("min_match_score"),
+                since=since,
+                location=location,
+                include_remote=include_remote,
+                experience_levels=prefs.get("experience_levels") or None,
+            )
+            jobs = [
+                job
+                for job in (wide.get("new_jobs") or [])
+                if str(job.get("url") or "").strip() not in seen_urls
+            ]
+            if jobs:
+                wide["new_jobs"] = jobs
+                wide["widen_note"] = "location" if location is None else "window"
+                return dict(wide)
+        return None
+    except Exception:  # noqa: BLE001, S110 - widening must never break the send
+        return None
+
+
 async def _send_alert_for(
     session,
     user_id: str,
@@ -1875,6 +1986,25 @@ async def _send_alert_for(
         include_remote=include_remote,
         experience_levels=prefs.get("experience_levels") or None,
     )
+    # Auto-widen: when a member's digest would be empty (daily) or nearly
+    # empty (weekly light member with fewer than 2 jobs), retry with a wider
+    # window and then all-India so they still get real jobs instead of
+    # silence. URLs already delivered are excluded — nothing is ever
+    # re-sent. The subject marks widened digests with 🌟.
+    if not (report.get("new_jobs") or []) or (
+        weekly and len(report.get("new_jobs") or []) < 2
+    ):
+        seen_urls = await _sent_urls_for(session, user_id)
+        widened = await _widened_report(
+            service,
+            domains=domains,
+            prefs=prefs,
+            user_location=user_location,
+            include_remote=include_remote,
+            seen_urls=seen_urls,
+        )
+        if widened is not None:
+            report = widened
     if weekly:
         report["report_type"] = "weekly"
         # The week's most-engaged jobs (apps + bookmarks + views) lead the
@@ -1894,7 +2024,9 @@ async def _send_alert_for(
     await _mark_alert_sent(session, user_id)
     if not (report.get("new_jobs") or []):
         kind = "Weekly digest" if weekly else "Daily report"
-        print(f"[{datetime.now(UTC)}] {kind} for {user_id}: no new jobs in window")
+        print(
+            f"[{datetime.now(UTC)}] {kind} for {user_id}: no jobs even after widening"
+        )
         return
 
     manager = NotificationManager(session)

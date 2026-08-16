@@ -110,6 +110,8 @@ class TestTeamRecapStats:
                 # Email apply clicks (user_id, count) — Jeeva applied to 3
                 # jobs straight from her digest emails this week.
                 _FakeResult([("u2", 3)]),
+                # Source coverage query — no jobs rows in this fixture.
+                _FakeResult([]),
             ]
         )
 
@@ -161,6 +163,7 @@ class TestTeamRecapStats:
                     ]
                 ),
                 _FakeResult([]),
+                _FakeResult([]),
             ]
         )
 
@@ -170,6 +173,31 @@ class TestTeamRecapStats:
         assert member["sends"] == 3
         assert member["jobs"] == 3
         assert member["zero_sends"] == 2
+
+    @pytest.mark.asyncio
+    async def test_sources_breakdown(self):
+        from interntrack.scheduler.jobs import team_recap_stats
+
+        session = AsyncMock()
+        session.execute = AsyncMock(
+            side_effect=[
+                _FakeResult([_user("u1", "Boss", email="boss@x.com")]),
+                _FakeResult([_history("u1", 1, job_count=1)]),
+                _FakeResult([]),
+                # (source, count) rows from the jobs-table aggregation.
+                _FakeResult([("JobSource.INTERNSHALA", 11), ("rss_feed", 4)]),
+            ]
+        )
+
+        stats = await team_recap_stats(session, days=7)
+
+        assert stats["sources"] == [
+            {"source": "🎓 Internshala", "jobs": 11},
+            {"source": "📰 RSS feeds", "jobs": 4},
+        ]
+        # Never raises: a failed source query degrades to no sources line.
+        session.execute = AsyncMock(side_effect=RuntimeError("db down"))
+        assert (await team_recap_stats(session, days=7))["users"] == []
 
     @pytest.mark.asyncio
     async def test_never_raises_on_bad_session(self):
@@ -192,6 +220,7 @@ class TestTeamRecapStats:
             side_effect=[
                 _FakeResult([_user("u1", "Boss")]),
                 _FakeResult([_history("u1", 1, job_count=2)]),
+                _FakeResult([]),
                 _FakeResult([]),
             ]
         )

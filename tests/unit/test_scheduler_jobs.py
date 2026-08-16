@@ -355,6 +355,29 @@ class TestScamDetection:
         assert "0 matching jobs" in subject
         assert "Bangalore" in subject  # DEFAULT_LOCATION fallback
 
+    def test_digest_subject_widened_daily_gets_star(self):
+        """Auto-widened digests (widen_note set) carry a 🌟 so members
+        know the email is a broader sweep, not their usual city window."""
+        from interntrack.scheduler.jobs import _digest_subject
+
+        subject = _digest_subject(
+            {"new_jobs": [{"title": "a"}], "widen_note": "location"},
+            ["security"],
+            "Chennai",
+        )
+        assert subject == "🌟 🎯 1 security jobs in Chennai"
+
+    def test_digest_subject_widened_weekly_gets_star(self):
+        from interntrack.scheduler.jobs import _digest_subject
+
+        subject = _digest_subject(
+            {"new_jobs": [{"title": "a"}], "widen_note": "window"},
+            ["govt"],
+            "Pune",
+            weekly=True,
+        )
+        assert subject == "🌟 📅 1 jobs this week (govt)"
+
     def test_hiring_drives_collects_instant_apply_roles(self):
         """Walk-in / campus / off-campus / virtual drives are pulled out of
         the digest sections; plain postings stay behind."""
@@ -2222,6 +2245,114 @@ class TestWeeklyDigest:
         assert deliver_kwargs.get("weekly") is True
         assert "jobs this week" in deliver_kwargs.get("subject", "")
         assert "security" in deliver_kwargs.get("subject", "")
+
+    @pytest.mark.asyncio
+    async def test_sent_urls_for_aggregates_user_history(self):
+        """_sent_urls_for collects job URLs from a member's stored digest
+        snapshots so the auto-widen fallback never re-sends what they
+        already received. Other users' histories are ignored."""
+        from interntrack.scheduler.jobs import _sent_urls_for
+
+        class _Job:
+            def __init__(self, url):
+                self.url = url
+
+        class _Row:
+            def __init__(self, user_id, jobs):
+                self.user_id = user_id
+                self.jobs = jobs
+
+        session = AsyncMock()
+        session.execute = AsyncMock(
+            return_value=MagicMock(
+                scalars=MagicMock(
+                    return_value=MagicMock(
+                        all=lambda: [
+                            _Row("u1", [{"url": "https://a"}, {"url": ""}]),
+                            _Row("u1", [{"url": "https://b"}]),
+                            _Row("u2", [{"url": "https://other"}]),
+                            _Row("u1", None),
+                        ]
+                    )
+                )
+            )
+        )
+
+        urls = await _sent_urls_for(session, "u1")
+        assert urls == {"https://a", "https://b"}
+
+        # Never raises on a broken session.
+        session.execute = AsyncMock(side_effect=RuntimeError("db down"))
+        assert await _sent_urls_for(session, "u1") == set()
+
+    @pytest.mark.asyncio
+    async def test_widened_report_falls_back_to_all_india(self):
+        """When the city window yields nothing (or only already-sent URLs),
+        the fallback retries a wider window and then all-India, filtering
+        out every URL the member already received."""
+        from interntrack.scheduler.jobs import _widened_report
+
+        calls: list[dict] = []
+
+        class _FakeService:
+            async def generate_daily_report(self, **kwargs):
+                calls.append(kwargs)
+                location = kwargs.get("location")
+                if location == "Chennai":
+                    # Only an already-seen URL in the city window.
+                    return {"new_jobs": [{"title": "Old", "url": "https://seen"}]}
+                # All-India: fresh job.
+                return {"new_jobs": [{"title": "Remote SOC", "url": "https://fresh"}]}
+
+        report = await _widened_report(
+            _FakeService(),
+            domains=["security"],
+            prefs={"min_match_score": None},
+            user_location="Chennai",
+            include_remote=True,
+            seen_urls={"https://seen"},
+        )
+
+        assert report is not None
+        assert [j["url"] for j in report["new_jobs"]] == ["https://fresh"]
+        assert report["widen_note"] == "location"
+        assert calls[0]["location"] == "Chennai"  # city first
+        assert calls[1]["location"] is None  # then all-India
+
+    @pytest.mark.asyncio
+    async def test_widened_report_returns_none_when_nothing_matches(self):
+        from interntrack.scheduler.jobs import _widened_report
+
+        class _Empty:
+            async def generate_daily_report(self, **kwargs):
+                return {"new_jobs": []}
+
+        report = await _widened_report(
+            _Empty(),
+            domains=["security"],
+            prefs={},
+            user_location="Chennai",
+            include_remote=False,
+            seen_urls=set(),
+        )
+        assert report is None
+
+        # Never raises on a broken service.
+        class _Broken:
+            async def generate_daily_report(self, **kwargs):
+                raise RuntimeError("boom")
+
+        assert (
+            await _widened_report(
+                _Broken(),
+                domains=["security"],
+                prefs={},
+                user_location=None,
+                include_remote=False,
+                seen_urls=set(),
+            )
+            is None
+        )
 
     @pytest.mark.asyncio
     async def test_weekly_top_engaged_formula(
