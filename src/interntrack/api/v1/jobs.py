@@ -351,7 +351,9 @@ async def verify_job_links(
                         "status_code": status,
                     }
                 )
-            else:
+            elif 200 <= status < 300:
+                # Confirmed alive — bump verified_at so the next sweep
+                # moves on to other rows.
                 await repo.mark_link_verified(job.id, is_alive=True)
                 checked += 1
                 results.append(
@@ -359,6 +361,20 @@ async def verify_job_links(
                         "title": job.title,
                         "url": url,
                         "status": "alive",
+                        "status_code": status,
+                    }
+                )
+            else:
+                # 403/429/5xx from the server IP says nothing about the
+                # actual posting (bot-blocked, rate-limited, temp error).
+                # Leave active and DON'T bump verified_at so the next sweep
+                # retries this row.
+                skipped += 1
+                results.append(
+                    {
+                        "title": job.title,
+                        "url": url,
+                        "status": "skipped",
                         "status_code": status,
                     }
                 )
