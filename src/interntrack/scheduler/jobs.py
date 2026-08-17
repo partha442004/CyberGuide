@@ -4844,8 +4844,16 @@ def _job_html_card(
             f"⚠️ Review carefully — red flags: {_esc(', '.join(scam_flags))}. "
             "Legit employers never ask for money.</div>"
         )
-    if fresher_badge:
-        card += "<div style='margin-top:8px;'>" + fresher_badge + "</div>"
+    fresh_badge = (
+        "<span style='background:#fef9c3;color:#854d0e;border-radius:999px;"
+        "padding:2px 9px;font-size:11px;font-weight:700;margin-right:6px;'>"
+        "🆕 New today</span>"
+        if int(job.get("age_days", 0) or 0) == 0
+        else ""
+    )
+    badges = [b for b in (fresher_badge, fresh_badge) if b]
+    if badges:
+        card += "<div style='margin-top:8px;'>" + "".join(badges) + "</div>"
     desc = _esc(_job_desc_snippet(job, limit=240))
     full_desc = _esc(_job_desc_full(job))
     if desc:
