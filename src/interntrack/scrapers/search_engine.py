@@ -16,11 +16,18 @@ engine never rate-limits us.
 import base64
 import logging
 import re
+import time
 from urllib.parse import parse_qs, parse_qsl, urlparse
 
 from interntrack.scrapers.base import BaseScraper, RawJob
 
 logger = logging.getLogger(__name__)
+
+# Wall-clock budget for one ``fetch`` call (seconds). Bounds the search
+# engine so the daily discovery slot's shared 38s serverless budget is
+# split across every member's queries instead of being consumed by the
+# first query's ~90 site: searches.
+_SEARCH_ENGINE_FETCH_BUDGET_SECONDS = 8
 
 # Query sent to DuckDuckGo per keyword (HTML endpoint, no key).
 _SEARCH_URL = "https://html.duckduckgo.com/html/?q={query}"
@@ -908,12 +915,24 @@ class SearchEngineScraper(BaseScraper):
         # eat the whole budget — otherwise the LinkedIn / Naukri / cyber-board
         # ``site:`` queries that surface fresh postings never actually run.
         budget = max(1, limit // len(queries))
+        # Hard wall-clock budget for ONE fetch call. The discovery loop gives
+        # every user's queries a shared 38s serverless slot; without a cap
+        # here the ~90 site: queries × 3 engines × 10s timeouts burned the
+        # entire slot on the first user's query, so the other members' jobs
+        # were never discovered and their digests arrived empty ("no new
+        # security jobs today"). Returning partial results after ~8s lets the
+        # next user's query start instead of starving everyone else.
+        deadline = time.monotonic() + _SEARCH_ENGINE_FETCH_BUDGET_SECONDS
         try:
             for search in queries:
+                if time.monotonic() > deadline:
+                    break
                 query_cap = len(jobs) + budget
                 # DuckDuckGo first; Bing covers the datacenter-IP cases
                 # where DDG serves an anomaly page with no result links.
                 for engine in ("duckduckgo", "bing", "brave"):
+                    if time.monotonic() > deadline:
+                        break
                     before = len(jobs)
                     try:
                         found = await self._search_links(engine, search)
@@ -921,6 +940,8 @@ class SearchEngineScraper(BaseScraper):
                         logger.warning("%s search failed for %r: %s", engine, q, e)
                         continue
                     for link in found:
+                        if time.monotonic() > deadline:
+                            break
                         if not self._is_job_url(link) or link in seen:
                             continue
                         seen.add(link)
