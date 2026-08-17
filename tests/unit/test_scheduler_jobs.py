@@ -512,6 +512,34 @@ class TestScamDetection:
         assert _job_fresher_rank({"experience_level": "intern"}) == 0
         assert _job_fresher_rank({"experience_level": "0-2 years"}) == 1
 
+    def test_card_new_today_badge_only_for_today(self):
+        """Postings seen today get a 🆕 New today chip; older ones don't."""
+        from interntrack.scheduler.jobs import _job_html_card
+
+        fresh = _job_html_card(
+            80.0,
+            {
+                "title": "SOC Analyst",
+                "company": "SecureCo",
+                "location": "Bengaluru",
+                "age_days": 0,
+            },
+            "#e5484d",
+        )
+        assert "🆕 New today" in fresh
+
+        older = _job_html_card(
+            80.0,
+            {
+                "title": "SOC Analyst",
+                "company": "SecureCo",
+                "location": "Bengaluru",
+                "age_days": 3,
+            },
+            "#e5484d",
+        )
+        assert "🆕 New today" not in older
+
     def test_sections_sort_fresher_first_then_freshest(self, monkeypatch):
         """Within a section, fresher roles lead, then newer postings come
         before older ones at the same score."""

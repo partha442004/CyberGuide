@@ -281,6 +281,105 @@ async def archive_expired(days: int = 30, db: AsyncSession = Depends(get_db)):
     }
 
 
+# Hosts that block datacenter/server IPs (403/429) even when the posting is
+# perfectly alive. A HEAD from the Vercel IP gets rejected, so treating those
+# responses as "dead" would wrongly hide good jobs. Only definitive 404/410
+# (page genuinely gone) counts as dead for these; everything else is skipped.
+_BOT_BLOCKED_HOSTS = (
+    "indeed.com",
+    "naukri.com",
+    "internshala.com",
+    "apna.co",
+    "foundit.in",
+    "timesjobs.com",
+    "instahyre.com",
+    "cutshort.io",
+    "freshersworld.com",
+    "monsterindia.com",
+)
+
+
+def _host_is_bot_blocked(url: str) -> bool:
+    """True when the URL's host is known to reject server-side requests."""
+    host = (url or "").lower()
+    return any(h in host for h in _BOT_BLOCKED_HOSTS)
+
+
+@router.post("/verify-links")
+async def verify_job_links(
+    limit: int = Query(12, ge=1, le=25),
+    db: AsyncSession = Depends(get_db),
+):
+    """Bounded dead-link sweep: check active job URLs and deactivate gone ones.
+
+    Vercel is serverless, so the APScheduler worker's nightly link
+    verification never runs there; the free GitHub Actions cron calls this
+    endpoint instead. Picks the least-recently-verified active jobs, skips
+    hosts known to block server IPs (a 403 there says nothing about the
+    job), and only deactivates on a definitive 404/410. Bounded by ``limit``
+    and a total time budget so the batch always finishes inside the
+    platform's request timeout.
+    """
+    import httpx
+
+    repo = JobRepository(db)
+    jobs = await repo.get_jobs_needing_verification(limit=limit)
+    checked = dead = skipped = 0
+    started = time.monotonic()
+    results: list[dict] = []
+    for job in jobs:
+        if time.monotonic() - started > 35:
+            skipped += len(jobs) - checked - dead - skipped
+            break
+        url = str(job.url or "")
+        if not url or _host_is_bot_blocked(url):
+            skipped += 1
+            results.append({"title": job.title, "url": url, "status": "skipped"})
+            continue
+        try:
+            async with httpx.AsyncClient(timeout=8, follow_redirects=True) as client:
+                resp = await client.head(url)
+                status = resp.status_code
+            if status in (404, 410):
+                await repo.mark_link_verified(job.id, is_alive=False)
+                dead += 1
+                results.append(
+                    {
+                        "title": job.title,
+                        "url": url,
+                        "status": "dead",
+                        "status_code": status,
+                    }
+                )
+            else:
+                await repo.mark_link_verified(job.id, is_alive=True)
+                checked += 1
+                results.append(
+                    {
+                        "title": job.title,
+                        "url": url,
+                        "status": "alive",
+                        "status_code": status,
+                    }
+                )
+        except Exception:
+            # Timeout / network error from the server IP is not proof the
+            # job is gone — leave it active, just skip the check this round.
+            skipped += 1
+            results.append({"title": job.title, "url": url, "status": "skipped"})
+    await db.commit()
+    return {
+        "checked": checked,
+        "dead": dead,
+        "skipped": skipped,
+        "results": results,
+        "message": (
+            f"Verified {checked} live · deactivated {dead} dead · "
+            f"skipped {skipped} (bot-blocked/timeout)"
+        ),
+    }
+
+
 @router.get("/expired")
 async def list_expired(limit: int = 50, db: AsyncSession = Depends(get_db)):
     """List archived expired jobs."""

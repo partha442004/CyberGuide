@@ -598,6 +598,46 @@ class JobRepository(BaseRepository[Job]):
         )
         return int(value) + 1
 
+    async def get_jobs_needing_verification(self, limit: int = 15) -> list[Job]:
+        """Active jobs whose links haven't been verified recently.
+
+        Picks the least-recently-verified active jobs (never-verified first)
+        so repeated cron runs slowly walk the whole table instead of always
+        checking the same newest rows. Bounded by ``limit`` so the batch
+        fits inside the platform's request timeout.
+        """
+        cutoff = utcnow() - timedelta(days=7)
+        result = await self.session.execute(
+            select(Job)
+            .where(
+                and_(
+                    Job.is_active,
+                    Job.url.isnot(None),
+                    or_(
+                        Job.last_verified_at.is_(None),
+                        Job.last_verified_at < cutoff,
+                    ),
+                ),
+            )
+            .order_by(Job.last_verified_at.asc().nullsfirst(), Job.created_at.asc())
+            .limit(limit),
+        )
+        return list(result.scalars().all())
+
+    async def mark_link_verified(self, job_id, is_alive: bool) -> None:
+        """Record a link check: update last_verified_at (and deactivate dead).
+
+        Alive jobs just get their ``last_verified_at`` bumped so the next
+        sweep moves on to other rows. Dead jobs (definitive 404/410) are
+        deactivated so they stop appearing in digests and dashboards.
+        """
+        values: dict = {"last_verified_at": utcnow()}
+        if not is_alive:
+            values["is_active"] = False
+        await self.session.execute(
+            update(Job).where(Job.id == job_id).values(**values),
+        )
+
     async def get_fresh_jobs(self, limit: int = 100) -> list[Job]:
         """Get only fresh jobs (not expired, not stale)."""
         from datetime import timedelta
