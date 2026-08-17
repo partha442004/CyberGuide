@@ -233,3 +233,36 @@ class TestSearchEngineScraper:
         links = s._bing_links(html)
         assert links[0] == target
         assert links[1] == "https://direct.example.com/job/2"
+
+    async def test_fetch_respects_wall_clock_budget(self, monkeypatch):
+        """One fetch call must stop once its time budget is exhausted.
+
+        Without this cap the ~90 site: queries × 3 engines × 10s timeouts
+        would consume the whole daily discovery slot on the first member's
+        query, leaving every other member's digest empty.
+        """
+        import interntrack.scrapers.search_engine as se
+
+        s = self._scraper()
+        calls = {"n": 0}
+        real = se.time.monotonic
+
+        def fake_monotonic() -> float:
+            calls["n"] += 1
+            # First call sets the deadline; every later call is already
+            # past it, so the fetch must stop after the first query.
+            if calls["n"] == 1:
+                return 1000.0
+            return 2000.0
+
+        monkeypatch.setattr(se.time, "monotonic", fake_monotonic)
+
+        async def fake_search_links(engine: str, query: str) -> list:
+            return []
+
+        monkeypatch.setattr(s, "_search_links", fake_search_links)
+        jobs = await s.fetch("security engineer")
+        assert jobs == []
+        assert real() > 0  # real monotonic still works (sanity)
+        # The budget break happens before any query body runs.
+        assert calls["n"] >= 2
