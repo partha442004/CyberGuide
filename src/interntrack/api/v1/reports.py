@@ -303,6 +303,28 @@ async def get_daily_report(
             user_id=target["user_id"],
             experience_levels=prefs.get("experience_levels") or None,
         )
+        # Auto-widen: when a member's digest would be empty, retry with a
+        # wider window and then all-India so they still get real jobs
+        # instead of a "no new jobs" email. This is the production path —
+        # the GitHub Actions cron calls this endpoint, not the APScheduler
+        # worker (which never runs on Vercel), so the widen fallback must
+        # live here too. URLs already delivered are excluded; widened
+        # digests get a 🌟 in the subject via ``_send_alert_digest``.
+        if not (report.get("new_jobs") or []):
+            from interntrack.scheduler.jobs import _sent_urls_for, _widened_report
+
+            with contextlib.suppress(Exception):
+                seen_urls = await _sent_urls_for(db, target["user_id"])
+                widened = await _widened_report(
+                    service,
+                    domains=domains,
+                    prefs=prefs,
+                    user_location=user_location,
+                    include_remote=include_remote,
+                    seen_urls=seen_urls,
+                )
+                if widened is not None:
+                    report = widened
         # Per-user digest smartening (salary target + keyword highlights)
         # rides along on the report so the builders mark the same jobs in
         # previews and real sends alike.
