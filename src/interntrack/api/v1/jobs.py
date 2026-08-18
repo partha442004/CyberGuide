@@ -42,6 +42,8 @@ _DISCOVERY_SOURCES: list[str] = [
     "indeed_india",
     "linkedin",
     "linkedin_india",
+    "linkedin_jobs_api",
+    "jobdexo",
     "timesjobs",
     "apna",
     "naukri",
