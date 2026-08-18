@@ -385,7 +385,10 @@ _JUNK_TITLE_RE = re.compile(
     r"to master|to succeed|check out|watch out for)\b"
     r"|\b(ultimate guide|beginner'?s? guide|how to (become|get|learn|land|"
     r"break into))\b"
-    r"|\b(here'?s? (how|what|why)|why you should|the best way)\b",
+    r"|\b(here'?s? (how|what|why)|why you should|the best way)\b"
+    r"|\bwhat does (a|an|the)?\s*[a-z]+\s*(do|mean)\b"
+    r"|\bwhat (is|are) (a|an|the)?\s*[a-z]+\b"
+    r"|\b(day in the life|career (explorer|path|profile|outlook))\b",
     re.IGNORECASE,
 )
 
@@ -547,6 +550,17 @@ class SearchEngineScraper(BaseScraper):
             return None
         full = re.sub(r"\s+", " ", pages_text).strip()
         if len(full) < 20:
+            return None
+        # Product guides / whitepapers / credit-scheme PDFs are documents,
+        # not recruitment notices — a notice talks about a role/eligibility.
+        # The generic junk-title rules catch listicles; add document-y
+        # markers here so a guide PDF never becomes a "job".
+        if _JUNK_TITLE_RE.search(full[:300]) or re.search(
+            r"\b(credits? guide|whitepaper|white paper|product guide|user guide|"
+            r"terms? of service|privacy policy|brochure)\b",
+            full[:300],
+            re.IGNORECASE,
+        ):
             return None
         host = urlparse(url).netloc.replace("www.", "")
         company = host.split(".")[0].title() if host else "Unknown"
