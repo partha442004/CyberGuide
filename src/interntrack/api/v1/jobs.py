@@ -29,13 +29,18 @@ router = APIRouter()
 
 # Vercel serverless functions are killed at maxDuration (60s on Hobby), so
 # discovery must stay well under that. Running every registered scraper per
-# query is too slow — the US geo-locked guest APIs (linkedin, indeed,
-# glassdoor, hired, angellist, the *_api scrapers) carry 15-30s timeouts and
-# dominate wall time. Discovery instead runs this curated set of fast /
-# India-relevant sources; users still get US/global roles via the digest's
-# RSS feeds, Greenhouse vendor boards and the share endpoint.
+# query is too slow — the US geo-locked guest APIs (indeed, glassdoor,
+# hired, angellist, the *_api scrapers) carry 15-30s timeouts and dominate
+# wall time. Discovery instead runs this curated set of fast / India-relevant
+# sources; users still get US/global roles via the digest's RSS feeds,
+# Greenhouse vendor boards and the share endpoint. ``linkedin`` is included
+# even though it hits the US guest API: it is verified live from the Vercel
+# IP (returns fresh date-sorted postings in ~4s, unlike linkedin_india which
+# keeps re-finding the same 7-day window) and LinkedIn is a top source, so
+# dropping it made the whole LINKEDIN bucket go stale (0 jobs in 7 days).
 _DISCOVERY_SOURCES: list[str] = [
     "indeed_india",
+    "linkedin",
     "linkedin_india",
     "timesjobs",
     "apna",
