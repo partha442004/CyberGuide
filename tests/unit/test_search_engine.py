@@ -2,6 +2,8 @@
 Unit tests for the search-engine discovery scraper.
 """
 
+import re
+
 
 class TestSearchEngineScraper:
     def _scraper(self):
@@ -11,6 +13,49 @@ class TestSearchEngineScraper:
 
     def test_source_name(self):
         assert self._scraper().source_name == "search_engine"
+
+    def test_junk_title_rejects_articles_and_guides(self):
+        """Article-style titles never become jobs (content, not postings)."""
+        from interntrack.scrapers import search_engine as se
+
+        junk = [
+            "What does a nuclear reactor operator do? - Career Explorer",
+            "15 Best Companies Hiring Cybersecurity Analysts",
+            "Top 10 Ways to Land a Security Job",
+            "Day in the life of a SOC analyst",
+            "Cybersecurity Career Path: What Is a Security Engineer?",
+        ]
+        for title in junk:
+            assert se._JUNK_TITLE_RE.search(title), f"expected junk: {title}"
+
+    def test_junk_title_keeps_real_postings(self):
+        """Legit job titles must not be caught by the article filter."""
+        from interntrack.scrapers import search_engine as se
+
+        real = [
+            "SOC Analyst - Bengaluru",
+            "Cyber Security Engineer",
+            "Frontend Developer (React) - Chennai",
+            "Whatfix - Senior Security Engineer",
+        ]
+        for title in real:
+            assert not se._JUNK_TITLE_RE.search(title), f"rejected real: {title}"
+
+    def test_pdf_guide_rejected_as_document(self):
+        """Product-guide PDFs are documents, not recruitment notices."""
+        from interntrack.scrapers import search_engine as se
+
+        # A guide PDF must not be parsed into a job; the generic junk regex
+        # plus the document markers drop it before RawJob is built.
+        guide_text = (
+            "Microsoft Copilot Credits Guide | August 2026 Page 1 "
+            "Copilot Credits: How to use your monthly credits"
+        )
+        assert se._JUNK_TITLE_RE.search(guide_text[:300]) or re.search(
+            r"\b(credits? guide|whitepaper|product guide|user guide)\b",
+            guide_text[:300],
+            re.IGNORECASE,
+        )
 
     def test_result_links_decodes_ddg_redirect(self):
         s = self._scraper()
