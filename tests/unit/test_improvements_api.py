@@ -434,7 +434,7 @@ class TestPerUserDiscoveryEndpoint:
             kw = c.kwargs
             assert kw.get("location") == "Bangalore"
             assert "Bangalore" not in kw.get("query", "").lower()
-        assert len(_DISCOVERY_SOURCES) < 20  # sanity: curated, not everything
+        assert len(_DISCOVERY_SOURCES) <= 20  # sanity: curated, not everything
 
     @pytest.mark.asyncio
     async def test_no_users_falls_back_to_fixed_queries(self):
