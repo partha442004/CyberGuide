@@ -5189,17 +5189,25 @@ def discovery_queries_for(prefs: dict, user=None, limit: int = 4) -> list[str]:
     # Split them and cycle round-robin over the base queries so EVERY city
     # gets a search within the limit — mashing them into one
     # "engineer chennai, bangalore, coimbatore" blob made every scraper miss.
+    # "All India" (and other pan-India phrases) must NOT become a query
+    # suffix: the leftover word "All" turned into an AND-token that
+    # matches_query demands in every posting, so HN/RSS matched nothing and
+    # the query slot was wasted. A city-less user searches the plain query.
+    _pan_india = {"all india", "anywhere in india", "across india", "pan india",
+                  "india wide", "throughout india", "all"}
     cities = [
         part.strip() for part in re.split(r"\s*[,/]\s*", location) if part.strip()
     ] or [location]
+    cities = [c for c in cities if c.lower() not in _pan_india]
     located_queries: list[str] = []
-    for idx, q in enumerate(list(queries)):
-        city = cities[idx % len(cities)]
-        # Skip base queries that already end in a city (e.g.
-        # "frontend developer bangalore") so a profile city never produces
-        # a double-city query like "frontend developer bangalore chennai".
-        if not _query_already_located(q) and city.lower() not in q.lower():
-            located_queries.append(f"{q} {city}")
+    if cities:
+        for idx, q in enumerate(list(queries)):
+            city = cities[idx % len(cities)]
+            # Skip base queries that already end in a city (e.g.
+            # "frontend developer bangalore") so a profile city never produces
+            # a double-city query like "frontend developer bangalore chennai".
+            if not _query_already_located(q) and city.lower() not in q.lower():
+                located_queries.append(f"{q} {city}")
     queries = located_queries + list(queries)
     # Fresher-only members (experience_levels = ["entry", "junior"]) get
     # entry-level-flavored searches so discovery finds fresher roles instead of

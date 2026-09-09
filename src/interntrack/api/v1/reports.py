@@ -273,10 +273,20 @@ async def get_daily_report(
     )
 
     targets = await _load_digest_targets(db)
-    # Vercel Hobby kills functions at ~10s.  DB queries are fast (< 1s)
-    # but SMTP hangs can eat the entire budget.  We budget 8s for report
-    # generation + delivery so the function always returns cleanly.
-    _deadline = time.monotonic() + 8
+    # Serve the users whose digest is most overdue FIRST: iteration order is
+    # DB order, so without this the same tail users (e.g. those created
+    # last) were the ones skipped whenever the budget ran out — Jeeva and
+    # LOKIVASAN went days without a digest while others got theirs.
+    targets.sort(
+        key=lambda t: (
+            (t.get("prefs") or {}).get("last_alert_at") is not None,
+            (t.get("prefs") or {}).get("last_alert_at") or "",
+        )
+    )
+    # maxDuration=60 (vercel.json) applies to this Python function.  Cold
+    # start eats ~3-5s; budget 45s for all users' report + delivery so the
+    # response always returns cleanly.
+    _deadline = time.monotonic() + 45
     last_report = None
     for target in targets:
         if time.monotonic() > _deadline:
