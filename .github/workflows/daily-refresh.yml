@@ -7,15 +7,14 @@ name: Daily refresh (Vercel auto-refresh)
 # EMAIL DIGEST is sent ONCE per day (08:00 IST): members asked for a single
 # daily mail, not three. The slot-less /reports/daily call applies each
 # user's own saved domains (a GRC user gets GRC, a data user gets data) and
-# the no-duplicates window prevents repeats. A Sunday cron also sends the
-# weekly digest recap.
+# the no-duplicates window prevents repeats. No weekly recap — one mail a
+# day is the whole deal.
 # Vercel auto-deploys every push, so this always targets the latest code.
 on:
   schedule:
     - cron: '30 2 * * *'   # 08:00 IST — discovery + cleanup + THE daily digest
     - cron: '30 7 * * *'   # 13:00 IST — discovery + cleanup only (no email)
     - cron: '30 13 * * *'  # 19:00 IST — discovery + cleanup + owner summary
-    - cron: '30 3 * * 0'   # Sunday 09:00 IST — weekly digest recap
   workflow_dispatch:      # allow manual "Run workflow" from the Actions tab
 
 jobs:
@@ -88,16 +87,6 @@ jobs:
       # THE daily digest — sent once per day (08:00 IST / manual triggers).
       # No ``?slot=`` parameter: each member's own saved domains apply
       # (security, grc, coding, data, ...), which is what they signed up for.
-      - name: Generate the daily digest (per-user domains)
-        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *'
-        run: |
-          curl -sSf --max-time 290 "$API_BASE/api/v1/reports/daily" > /dev/null \
-            && echo "daily digest generated + sent OK" \
-            || echo "daily digest failed or timed out"
-
-      - name: Generate weekly digest (Sunday recap)
-        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 3 * * 0'
-        run: |
-          curl -sSf --max-time 290 "$API_BASE/api/v1/reports/weekly-alert" > /dev/null \
-            && echo "weekly digest generated OK" \
-            || echo "weekly digest failed or timed out"
+      # The weekly recap was removed: one mail per day is the deal (Resend
+      # free tier = 3,000/month; /reports/weekly-alert stays available for
+      # manual runs from the dashboard or Actions dispatch).
