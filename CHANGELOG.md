@@ -1758,7 +1758,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - **Git author identity corrected** — local + global git config now set to
-  ** RAVIB** / `ravi.kumar@example.com` (was
+  **PARTHASARATHI B** / `ravi.kumar@example.com` (was
   `PARTHASARATHI B`). Verified on GitHub: commit `02bb826` shows the
   correct author name.
 - **Stale `C:\internship-tracker` deleted** — the empty leftover folder has
@@ -1842,7 +1842,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `desktop-v2.db` cache remains until the app is closed.
 - **Git author identity corrected** — the local git config was set to
   `PARTHASARATHI B` / `member-redacted@example.com`; now set to
-  ** RAVIB** / `ravi.kumar@example.com` so new commits are
+  **PARTHASARATHI B** / `ravi.kumar@example.com` so new commits are
   credited to the correct owner (old commits keep their original author).
 
 ## [1.20.8] - 2026-08-03
@@ -3227,7 +3227,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 #### Security Updates
 - Contact email updated to ravi.kumar@example.com
-- Creator name added:  RAVIB
+- Creator name added: PARTHASARATHI B
 - Fixed datetime.utcnow() deprecation warnings (5 files)
 
 ### Fixed

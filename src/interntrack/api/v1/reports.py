@@ -2,7 +2,9 @@
 Reports API endpoints.
 """
 
+import asyncio
 import contextlib
+import time
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends
@@ -271,8 +273,14 @@ async def get_daily_report(
     )
 
     targets = await _load_digest_targets(db)
+    # Vercel Hobby kills functions at ~10s.  DB queries are fast (< 1s)
+    # but SMTP hangs can eat the entire budget.  We budget 8s for report
+    # generation + delivery so the function always returns cleanly.
+    _deadline = time.monotonic() + 8
     last_report = None
     for target in targets:
+        if time.monotonic() > _deadline:
+            break
         prefs = target["prefs"]
         if prefs.get("is_enabled") is False or _alerts_paused(prefs):
             continue
@@ -344,13 +352,16 @@ async def get_daily_report(
             # Trigger the daily-digest notification (no-op when no channels
             # configured, or when the user has disabled alerts).
             with contextlib.suppress(Exception):
-                await _send_alert_digest(
-                    db,
-                    prefs,
-                    report,
-                    domains=domains,
-                    user_id=target["user_id"],
-                    user=target["user"],
+                await asyncio.wait_for(
+                    _send_alert_digest(
+                        db,
+                        prefs,
+                        report,
+                        domains=domains,
+                        user_id=target["user_id"],
+                        user=target["user"],
+                    ),
+                    timeout=4,
                 )
         elif (
             not preview
@@ -364,12 +375,15 @@ async def get_daily_report(
             # user never gets 3 'no new jobs' mails per day — and accounts
             # with quiet_day_emails off only ever get real job-alert emails.
             with contextlib.suppress(Exception):
-                await _send_quiet_day_digest(
-                    db,
-                    prefs,
-                    domains=domains,
-                    user_id=target["user_id"],
-                    user=target["user"],
+                await asyncio.wait_for(
+                    _send_quiet_day_digest(
+                        db,
+                        prefs,
+                        domains=domains,
+                        user_id=target["user_id"],
+                        user=target["user"],
+                    ),
+                    timeout=3,
                 )
         last_report = report
 

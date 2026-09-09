@@ -419,6 +419,6 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) for deta
 
 ## 📧 Contact
 
-** RAVIB** - ravi.kumar@example.com
+**PARTHASARATHI B** - ravi.kumar@example.com
 
 Project Link: https://github.com/partha442004/CyberGuide

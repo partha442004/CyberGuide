@@ -13,7 +13,7 @@ from urllib.parse import quote
 
 # Domain keys understood by the API (mirrors the dashboard's _DOMAIN_ORDER).
 KNOWN_DOMAINS = frozenset(
-    {"security", "coding", "data", "design", "finance", "marketing", "other"}
+    {"security", "grc", "coding", "data", "design", "finance", "marketing", "other"}
 )
 
 DEFAULT_DASHBOARD_URL = "https://cyberguide2026aug.streamlit.app/"
@@ -297,7 +297,7 @@ def team_rows(users: list, me_email: str | None = None) -> list[dict]:
 def invite_caption(invite: dict) -> str | None:
     """One-line caption for the register tab, or None when no invite.
 
-    Example: ``"Invited by Parthasarathi — security"``. The referrer text
+    Example: ``"Invited by Ravi — security"``. The referrer text
     is sanitized (markdown characters stripped) before embedding.
     """
     if not invite:

@@ -52,12 +52,12 @@ class TestRegisterUser:
                 "name": "Friend One",
                 "email": "friend1@example.com",
                 "domains": ["data"],
-                "referred_by": "PARTHASARATHI@Example.com",
+                "referred_by": "RAVI@Example.com",
             },
         )
         assert response.status_code == 201, response.text
         data = response.json()
-        assert data["referred_by"] == "parthasarathi@example.com"
+        assert data["referred_by"] == "ravi@example.com"
 
     @pytest.mark.asyncio
     async def test_register_ignores_invalid_referrer(self, client):

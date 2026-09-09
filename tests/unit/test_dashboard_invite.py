@@ -24,16 +24,16 @@ from dashboard.invite import (
 class TestBuildInviteLink:
     def test_builds_link_with_all_fields(self):
         url = build_invite_link(
-            email="Parthasarathi@Gmail.com",
-            name="Parthasarathi B",
+            email="ravi.kumar@example.com",
+            name="Ravi Kumar",
             domains=["security", "coding"],
             location="Bengaluru, India",
         )
         parsed = urlparse(url)
         assert parsed.netloc == "cyberguide2026aug.streamlit.app"
         query = parse_qs(parsed.query)
-        assert query["invite"][0] == "Parthasarathi@Gmail.com"
-        assert query["ref"][0] == "Parthasarathi B"
+        assert query["invite"][0] == "ravi.kumar@example.com"
+        assert query["ref"][0] == "Ravi Kumar"
         assert query["domains"][0] == "security,coding"
         assert query["loc"][0] == "Bengaluru, India"
 
@@ -62,14 +62,14 @@ class TestParseInviteParams:
         result = parse_invite_params(
             {
                 "invite": "friend@mail.com",
-                "ref": "Parthasarathi B",
+                "ref": "Ravi Kumar",
                 "domains": "security,coding",
                 "loc": "Bengaluru",
             }
         )
         assert result == {
             "invite": "friend@mail.com",
-            "ref": "Parthasarathi B",
+            "ref": "Ravi Kumar",
             "domains": ["security", "coding"],
             "location": "Bengaluru",
         }
@@ -114,10 +114,10 @@ class TestParseInviteParams:
 class TestInviteCaption:
     def test_with_referrer_and_domains(self):
         caption = invite_caption(
-            {"ref": "Parthasarathi B", "domains": ["security", "coding"]}
+            {"ref": "Ravi Kumar", "domains": ["security", "coding"]}
         )
         assert caption is not None
-        assert "Parthasarathi B" in caption
+        assert "Ravi Kumar" in caption
         assert "security, coding" in caption
 
     def test_all_domains_omit_list(self):

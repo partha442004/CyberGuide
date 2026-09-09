@@ -596,15 +596,15 @@ class TestResumeParserPdfFallback:
 
 
 # Real resume (VAPT fresher) text — the exact content extracted from the
-# user's "Parthasarathi_B_VAPT_Resume_Final" PDF. Used to lock in detection
+# user's "Ravi_Kumar_VAPT_Resume_Final" PDF. Used to lock in detection
 # quality regressions.
 REAL_RESUME_TEXT = """\
- RAVIB
+RAVI KUMAR
 ravi.kumar@example.com
 +91 9876543210
 Bangalore, Karnataka
-https://linkedin.com/in/ravi-kumar-fake123
-https://tryhackme.com/p/ravikumar-fake
+https://linkedin.com/in/ravi-kumar-fake
+https://tryhackme.com/p/ravikumar123
 PROFESSIONAL SUMMARY
 Disciplined and motivated IT graduate with NCC background and CEH/CSA training.
 Strong interest in cybersecurity with proficiency in vulnerability assessment,
@@ -764,10 +764,10 @@ PROJECTS
 
     def test_custom_portfolio_domain_still_detected(self):
         """A genuine custom domain is still detected as portfolio."""
-        text = "Portfolio: https://parthasarathi.dev"
+        text = "Portfolio: https://ravi-kumar.dev"
         links = self.parser._extract_links(text)
         assert "portfolio" in links
-        assert "parthasarathi.dev" in links["portfolio"]
+        assert "ravi-kumar.dev" in links["portfolio"]
 
     def test_experience_word_boundary_no_false_positives(self):
         """Role keywords must not match inside other words or 'X Training'."""

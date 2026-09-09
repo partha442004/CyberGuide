@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     # Telegram Notifications
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None
+    # Secret token set via Telegram Bot API's setWebhook parameter; the bot
+    # sends it as X-Telegram-Bot-Api-Secret-Token on every webhook call so
+    # we can reject spoofed requests.
+    telegram_webhook_secret: str | None = None
 
     # Discord Notifications
     discord_webhook_url: str | None = None
@@ -191,6 +195,25 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return not self.debug
 
+    @property
+    def is_vercel(self) -> bool:
+        """Detect if we're running on Vercel serverless."""
+        import os
+        return bool(os.environ.get("VERCEL"))
+
+    @property
+    def effective_email_provider(self) -> str:
+        """Best email provider for current environment.
+
+        On Vercel, SMTP is blocked so Resend is strongly preferred.
+        Locally, SMTP works fine.
+        """
+        if self.is_resend_configured:
+            return "resend"
+        if self.is_vercel and not self.is_resend_configured:
+            return "smtp-warning"  # will be warned in validate_security
+        return "smtp"
+
     def validate_security(self) -> list[str]:
         """Return a list of security configuration warnings."""
         warnings: list[str] = []
@@ -201,6 +224,11 @@ class Settings(BaseSettings):
         if self.cors_allow_all and self.cors_origins == ["*"]:
             warnings.append(
                 "CORS allows all origins. Restrict CORS_ORIGINS in production.",
+            )
+        if self.is_vercel and self.effective_email_provider == "smtp-warning":
+            warnings.append(
+                "SMTP is blocked on Vercel serverless. "
+                "Add RESEND_API_KEY to Vercel env vars for reliable email delivery.",
             )
         return warnings
 

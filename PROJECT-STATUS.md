@@ -634,7 +634,7 @@ uvicorn interntrack.main:app --reload
 ## 🔐 Security Updates
 
 - ✅ Contact email updated to: ravi.kumar@example.com
-- ✅ Creator:  RAVIB
+- ✅ Creator: PARTHASARATHI B
 - ✅ SECURITY.md created with vulnerability reporting guidelines
 - ✅ datetime.utcnow() deprecation warnings fixed (5 files)
 - ✅ All secrets managed via environment variables
@@ -644,7 +644,7 @@ uvicorn interntrack.main:app --reload
 
 ## 👤 Credits
 
-- **Creator**:  RAVIB
+- **Creator**: PARTHASARATHI B
 - **Email**: ravi.kumar@example.com
 
 ---
@@ -691,9 +691,9 @@ uvicorn interntrack.main:app --reload
 #### ✅ 2026-08-04 Git Identity & Streamlit Dashboard
 
 - ✅ **Git author identity corrected** — local config was set to `Member
-  Vanjari` / `member-redacted@example.com`; now ** RAVIB** /
+  Vanjari` / `member-redacted@example.com`; now **PARTHASARATHI B** /
   `ravi.kumar@example.com` (both local + global). Test commit `02bb826`
-  verified on GitHub: author shows ** RAVIB**.
+  verified on GitHub: author shows **PARTHASARATHI B**.
 - ✅ **Vercel auto-deploy proven working** — push `5ba427e` triggered an
   automatic deployment (`cyberguide-b51a0gh6e` via `-git-master-` integration
   URL) without any manual `vercel deploy` command. Live API returns version

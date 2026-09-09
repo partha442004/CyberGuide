@@ -64,8 +64,8 @@ class TestBuildCoverLetter:
         assert "your company" in letter
 
     def test_resume_name_in_signoff(self):
-        letter = build_cover_letter(["x"], "R", "C", None, resume_name="Parthasarathi B")
-        assert letter.rstrip().endswith("Parthasarathi B")
+        letter = build_cover_letter(["x"], "R", "C", None, resume_name="Ravi Kumar")
+        assert letter.rstrip().endswith("Ravi Kumar")
 
 
 class TestCoverLetterEndpoint:

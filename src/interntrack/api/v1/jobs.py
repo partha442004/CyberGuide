@@ -39,31 +39,15 @@ router = APIRouter()
 # keeps re-finding the same 7-day window) and LinkedIn is a top source, so
 # dropping it made the whole LINKEDIN bucket go stale (0 jobs in 7 days).
 _DISCOVERY_SOURCES: list[str] = [
-    "indeed_india",
+    # Fast sources that reliably return results on Vercel serverless.
+    # Most job boards (Indeed, Internshala, Foundit, Apna, etc.) bot-gate
+    # datacenter IPs and return 0 results — listing them just wastes the
+    # function's 10-second budget on failed HTTP requests.  These were
+    # verified to return results from Vercel on 2026-08-27.
     "linkedin",
-    "linkedin_india",
-    "linkedin_jobs_api",
-    "jobdexo",
-    "timesjobs",
-    "apna",
-    "naukri",
-    "glassdoor_india",
-    "internshala",
-    "google_jobs",
-    "wellfound",
-    "unstop",
-    "freshersworld",
-    "cutshort",
-    "foundit",
+    "search_engine",
     "rss_feed",
     "hackernews",
-    "company",
-    # Direct vendor career boards that verified working. CrowdStrike, Palo
-    # Alto, Fortinet, Check Point and McAfee block automated clients (0
-    # results / Workday 422s), so only the live sources below are wired in.
-    "symantec",
-    "trendmicro",
-    "search_engine",
 ]
 
 # Total wall-clock budget (seconds) for one discovery request. Vercel Hobby
@@ -73,7 +57,10 @@ _DISCOVERY_SOURCES: list[str] = [
 # returns a (possibly partial) result instead of dying with
 # FUNCTION_INVOCATION_TIMEOUT — which previously 504'd every run and left
 # the daily digests empty.
-_DISCOVERY_DEADLINE_SECONDS = 38
+# Vercel Hobby functions are killed after ~10s.  Cold starts eat ~3s,
+# and the save + instant-alert tail needs ~1s, so we budget 8s for
+# scraper I/O.  With only fast sources listed above this is plenty.
+_DISCOVERY_DEADLINE_SECONDS = 8
 
 
 # Indian cities (plus common aliases) recognized inside discovery queries so

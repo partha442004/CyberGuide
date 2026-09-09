@@ -4,4 +4,4 @@ AI-powered cybersecurity career intelligence platform
 """
 
 __version__ = "1.21.0"
-__author__ = " RAVIB"
+__author__ = "PARTHASARATHI B"

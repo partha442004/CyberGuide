@@ -3,6 +3,7 @@ Report service for generating daily, weekly, and monthly reports.
 """
 
 import contextlib
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -52,11 +53,9 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "blue team",
             "ethical hack",
             "information security",
-            "grc",
-            "compliance",
-            "iso 27001",
-            "nist",
-            "risk",
+            # grc / compliance / nist / risk now classify as "grc" (the grc
+            # entry runs first) — removed here so a "GRC Analyst" never gets
+            # rescued back into security by this bucket.
             "osint",
             "dfir",
             "forensic",
@@ -80,6 +79,38 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "csrf",
             "cyber defense",
             "security operations",
+        ),
+    ),
+    (
+        # GRC right after security: a title with an explicit security token
+        # ("GRC & SOC Analyst", "Compliance Pentester") is claimed by the
+        # security bucket above, while pure governance/risk/compliance roles
+        # ("GRC Analyst", "ISO 27001 Auditor") land here instead of the
+        # generic coding/data buckets. Bare "nist" would substring-match
+        # "admi**nist**rator" / "mi**nist**ry", so only compound forms.
+        "grc",
+        (
+            "grc",
+            "governance",
+            "risk and compliance",
+            "risk & compliance",
+            "compliance",
+            "iso 27001",
+            "soc 2",
+            "iso 9001",
+            "nist framework",
+            "nist csf",
+            "audit",
+            "regulatory",
+            "policy analyst",
+            "third-party risk",
+            "vendor risk",
+            "it risk",
+            "risk management",
+            "privacy",
+            "gdpr",
+            "dpo",
+            "data protection",
         ),
     ),
     (
@@ -267,9 +298,20 @@ def classify_domain(title: str, tags: list | None = None) -> str:
     text = role.lower()
     if tags:
         text += " " + " ".join(str(t).lower() for t in tags)
+    # "SOC 2" is the compliance framework, not a Security Operations Center
+    # role — blank it before matching so "SOC 2 Compliance Specialist"
+    # classifies as grc instead of being claimed by security's "soc" token.
+    text = text.replace("soc 2", " ")
+    # Short tokens ("soc", "risk", ...) substring-match innocent words
+    # ("as**soc**iate", "admi**nist**rator"). Multi-word and >4-letter tokens
+    # are safe as substrings; short ones require word boundaries.
     for domain, keywords in _DOMAIN_KEYWORDS:
-        if any(k in text for k in keywords):
-            return domain
+        for k in keywords:
+            if len(k) <= 4:
+                if re.search(rf"\b{re.escape(k)}\b", text):
+                    return domain
+            elif k in text:
+                return domain
     return "other"
 
 

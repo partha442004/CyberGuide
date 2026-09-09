@@ -2,7 +2,7 @@
 Notifications API endpoints.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.api.schemas.notification import (
@@ -35,6 +35,7 @@ router = APIRouter()
 # Domain keys supported by the alert classifier (matches report_service).
 _ALERT_DOMAINS = (
     "security",
+    "grc",
     "frontend",
     "coding",
     "data",
@@ -938,3 +939,171 @@ async def preview_digest(
         "jobs": preview_jobs,
         "job_count": len(preview_jobs),
     }
+
+
+# ---------------------------------------------------------------------------
+# Telegram Webhook Endpoint
+# ---------------------------------------------------------------------------
+# Handles incoming Telegram updates (messages from users). When a user sends
+# ``/start`` or ``/start <email>``, we look up their account and save the
+# ``telegram_chat_id`` so future digests and instant alerts deliver to TG.
+
+
+@router.post("/telegram/webhook")
+async def telegram_webhook(request: Request) -> dict[str, str]:
+    """Handle Telegram Bot webhook updates.
+
+    Set the webhook via:
+        https://api.telegram.org/bot<TOKEN>/setWebhook?url=.../telegram/webhook
+    """
+    settings = get_settings()
+
+    body = await request.json()
+    message = body.get("message") or body.get("edited_message")
+    if not message:
+        return {"ok": "true"}
+
+    # Validate webhook secret if configured.
+    secret_token = request.headers.get(
+        "X-Telegram-Bot-Api-Secret-Token", ""
+    )
+    if (
+        settings.telegram_webhook_secret
+        and secret_token != settings.telegram_webhook_secret
+    ):
+        return {"ok": "false", "error": "invalid secret"}
+
+    chat_id = message.get("chat", {}).get("id")
+    text = (message.get("text") or "").strip()
+    user = message.get("from", {})
+    first_name = user.get("first_name", "there")
+
+    if not chat_id or not text:
+        return {"ok": "true"}
+
+    cmd = text.lower().split("@", maxsplit=1)[0]  # strip @botname suffix
+
+    # /help
+    if cmd == "/help":
+        await _send_tg(chat_id, (
+            "👋 I'm InternTrack Bot!\n\n"
+            "• /start — link your Telegram\n"
+            "• /start email@x.com — link with email\n"
+            "• /stop — unlink\n\n"
+            "Once linked, you'll get alerts and digests here!"
+        ))
+        return {"ok": "true"}
+
+    # /stop — unlink
+    if cmd == "/stop":
+        from sqlalchemy import select
+
+        from interntrack.database.session import get_db_session
+        from interntrack.domain.models import User
+
+        async with get_db_session() as session:
+            stmt = select(User).where(
+                User.telegram_chat_id == str(chat_id)
+            )
+            result = await session.execute(stmt)
+            user_obj = result.scalar_one_or_none()
+            if user_obj:
+                user_obj.telegram_chat_id = None  # type: ignore[assignment]
+                await session.commit()
+                await _send_tg(
+                    chat_id,
+                    "✅ Unlinked. Send /start to re-link.",
+                )
+            else:
+                await _send_tg(
+                    chat_id, "You weren't linked. Send /start."
+                )
+        return {"ok": "true"}
+
+    # /start — link account
+    if cmd == "/start":
+        from sqlalchemy import or_, select
+
+        from interntrack.database.session import get_db_session
+        from interntrack.domain.models import User
+
+        # Extract optional email: /start user@email.com
+        parts = text.split(maxsplit=1)
+        email = (
+            parts[1].strip() if len(parts) > 1 else None
+        )
+
+        # If no email, try the Telegram username.
+        if not email:
+            username = user.get("username") or ""
+            if not username:
+                await _send_tg(chat_id, (
+                    f"Hi {first_name}! 👋\n\n"
+                    "Send /start your@email.com to link."
+                ))
+                return {"ok": "true"}
+            email = f"{username}@telegram.local"
+
+        # Look up user by email.
+        async with get_db_session() as session:
+            stmt = select(User).where(
+                or_(
+                    User.email.ilike(email),
+                    User.name.ilike(
+                        email.split("@")[0]
+                    ),
+                )
+            )
+            result = await session.execute(stmt)
+            user_obj = result.scalar_one_or_none()
+
+            if not user_obj:
+                await _send_tg(chat_id, (
+                    f"Hi {first_name}! "
+                    f"No account found for {email}. "
+                    "Sign up on the dashboard first."
+                ))
+                return {"ok": "true"}
+
+            user_obj.telegram_chat_id = str(chat_id)  # type: ignore[assignment]
+            await session.commit()
+
+            display_name = (
+                user_obj.name or email.split("@")[0]
+            )
+            await _send_tg(chat_id, (
+                f"✅ Hi {display_name}! Linked.\n\n"
+                "You'll get:\n"
+                "• 🚀 Instant high-match alerts\n"
+                "• 📬 Daily digests (8, 13, 19 IST)\n\n"
+                "Use /stop to unlink."
+            ))
+        return {"ok": "true"}
+
+    return {"ok": "true"}
+
+
+async def _send_tg(chat_id: int, text: str) -> None:
+    """Send a plain-text message to a Telegram chat."""
+    import logging
+
+    import httpx
+
+    from interntrack.config import get_settings
+
+    settings = get_settings()
+    token = settings.telegram_bot_token
+    if not token:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            await client.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={
+                    "chat_id": chat_id,
+                    "text": text,
+                    "parse_mode": "Markdown",
+                },
+            )
+    except Exception:  # noqa: BLE001
+        logging.exception("Telegram send failed for chat %s", chat_id)

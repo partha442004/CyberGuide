@@ -10,10 +10,13 @@ fake ``streamlit`` module into ``sys.modules``; importing the real
 collection order.
 """
 
+import importlib.util
 import os
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 _REPO = str(Path(__file__).resolve().parents[2])
 
@@ -83,6 +86,17 @@ def _run_script() -> tuple[str, str, int]:
     return proc.stdout, proc.stderr, proc.returncode
 
 
+try:
+    _has_streamlit = importlib.util.find_spec("streamlit") is not None
+except ValueError:
+    # find_spec can raise when fake streamlit modules are in sys.modules
+    _has_streamlit = False
+
+
+@pytest.mark.skipif(
+    not _has_streamlit,
+    reason="streamlit is not installed (optional dependency)",
+)
 def test_dashboard_access_helpers():
     out, err, rc = _run_script()
     assert rc == 0, f"subprocess failed ({rc}):\n{err}\n{out}"

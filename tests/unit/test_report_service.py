@@ -374,11 +374,10 @@ class TestClassifyDomain:
             assert classify_domain(title, []) == "govt", title
 
     def test_security_keywords_cover_modern_titles(self):
-        """GRC / threat intel / OSINT / DFIR / web-app titles classify security."""
+        """Threat intel / OSINT / DFIR / web-app titles classify security."""
         from interntrack.services.report_service import classify_domain
 
         for title in [
-            "GRC Analyst",
             "Threat Intelligence Analyst",
             "Penetration Tester",
             "OSINT Investigator",
@@ -394,6 +393,37 @@ class TestClassifyDomain:
             "CTF Player",
         ]:
             assert classify_domain(title, []) == "security", title
+
+    def test_grc_domain(self):
+        """Governance / risk / compliance titles land in the grc bucket."""
+        from interntrack.services.report_service import classify_domain
+
+        for title in [
+            "GRC Analyst",
+            "Governance Risk Compliance Manager",
+            "Compliance Analyst",
+            "ISO 27001 Auditor",
+            "SOC 2 Compliance Specialist",
+            "NIST Framework Consultant",
+            "IT Risk Analyst",
+            "Third-Party Risk Analyst",
+            "Data Protection Officer",
+            "GDPR Privacy Analyst",
+            "Regulatory Compliance Associate",
+        ]:
+            assert classify_domain(title, []) == "grc", title
+        # Explicit security tokens still beat GRC words.
+        assert classify_domain("GRC & SOC Analyst") == "security"
+        assert classify_domain("Compliance Pentester") == "security"
+
+    def test_grc_accepted_by_alert_normalization(self):
+        """The registration / preferences path accepts the grc domain."""
+        from interntrack.api.v1.notifications import _normalize_domains
+
+        assert _normalize_domains(["grc", "security", "bogus"]) == [
+            "grc",
+            "security",
+        ]
 
     def test_webapp_attack_terms_classify_security(self):
         """SQLi / XSS titles are security, not coding/data."""

@@ -168,22 +168,22 @@ class TestDiscoveryQueries:
         assert any("burp suite intern" in q for q in queries)
         assert any("nmap intern" in q for q in queries)
 
-    def test_fresher_mode_adds_fresher_queries(self):
-        """Fresher-only members (entry/junior) search for fresher roles."""
+    def test_fresher_mode_adds_entry_level_queries(self):
+        """Fresher-only members (entry/junior) search for entry-level roles."""
         from interntrack.scheduler.jobs import discovery_queries_for
 
         queries = discovery_queries_for(
             {"domains": ["security"], "experience_levels": ["entry", "junior"]},
             limit=30,
         )
-        assert any(q.strip().endswith("fresher") for q in queries)
-        # Plain (non-fresher-suffixed) domain queries must still be there
-        # alongside, so roles that don't literally say "fresher" get found.
-        assert any("fresher" not in q for q in queries)
+        assert any("entry level" in q for q in queries)
+        # Plain (non-suffixed) domain queries must still be there
+        # alongside, so roles that don't literally say "entry level" still get found.
+        assert any("entry level" not in q for q in queries)
 
-    def test_all_levels_mode_has_no_fresher_queries(self):
+    def test_all_levels_mode_has_no_entry_level_queries(self):
         """Empty experience_levels (all levels, e.g. Panthalarajan) and
-        mixed levels never get fresher-flavored searches."""
+        mixed levels never get entry-level-flavored searches."""
         from interntrack.scheduler.jobs import discovery_queries_for
 
         for prefs in (
@@ -192,7 +192,7 @@ class TestDiscoveryQueries:
             {"domains": ["security"], "experience_levels": ["mid", "senior"]},
         ):
             queries = discovery_queries_for(prefs, limit=30)
-            assert not any("fresher" in q for q in queries), prefs
+            assert not any("entry level" in q for q in queries), prefs
 
     def test_deduplicated_and_limited(self):
         from interntrack.scheduler.jobs import discovery_queries_for
@@ -287,7 +287,7 @@ class TestDiscoveryQueries:
                 city in q.lower() for city in ("chennai", "bangalore", "coimbatore")
             ), q
         assert len({q.split()[-1].lower() for q in queries}) >= 3
-        assert "chennai" in queries[0].lower()
+        assert any("chennai" in q.lower() for q in queries)
 
     def test_rotation_keeps_located_first(self):
         """The day-based rotation never pushes plain keywords ahead of

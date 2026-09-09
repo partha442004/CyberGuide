@@ -536,6 +536,7 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
 
 _DOMAIN_LABELS = {
     "security": "🔐 Cybersecurity / VAPT / SOC",
+    "grc": "📋 GRC / Compliance / Risk",
     "frontend": "🖥️ Frontend / UI",
     "hardware": "🔧 Hardware / Embedded / PCB",
     "coding": "💻 Coding / Software",
@@ -549,6 +550,7 @@ _DOMAIN_LABELS = {
 
 _DOMAIN_ORDER = [
     "security",
+    "grc",
     "frontend",
     "hardware",
     "coding",
@@ -567,6 +569,11 @@ _CATEGORY_STYLE = {
         "color": "#e5484d",
         "grad": "linear-gradient(135deg,#ff6b6b,#c0392b)",
         "icon": "🔐",
+    },
+    "grc": {
+        "color": "#a16207",
+        "grad": "linear-gradient(135deg,#d3a625,#713f12)",
+        "icon": "📋",
     },
     "frontend": {
         "color": "#06b6d4",

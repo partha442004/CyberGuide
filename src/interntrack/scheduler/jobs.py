@@ -2651,6 +2651,7 @@ def _expiry_note(job: dict) -> str:
 
 _DOMAIN_ICONS = {
     "security": "🔐 Cybersecurity / VAPT / SOC",
+    "grc": "📋 GRC / Compliance / Risk",
     "frontend": "🖥️ Frontend / UI",
     "coding": "💻 Coding / Software",
     "data": "📊 Data & Analytics",
@@ -4915,6 +4916,25 @@ DOMAIN_QUERIES = {
         "cloud security bangalore",
         "security operations bangalore",
     ],
+    # Governance / Risk / Compliance — its own domain so users who only want
+    # GRC roles never see pentest/SOC noise. The classifier (report_service)
+    # has a matching "grc" bucket that runs before security.
+    "grc": [
+        "grc analyst",
+        "governance risk compliance",
+        "risk compliance",
+        "compliance analyst",
+        "information security compliance",
+        "iso 27001",
+        "security audit",
+        "it risk",
+        "grc analyst bangalore",
+        "governance risk compliance bangalore",
+        "compliance analyst bangalore",
+        "security audit bangalore",
+        "third party risk",
+        "policy compliance",
+    ],
     "frontend": [
         "frontend developer",
         "frontend engineer",
@@ -5182,14 +5202,15 @@ def discovery_queries_for(prefs: dict, user=None, limit: int = 4) -> list[str]:
             located_queries.append(f"{q} {city}")
     queries = located_queries + list(queries)
     # Fresher-only members (experience_levels = ["entry", "junior"]) get
-    # fresher-flavored searches so discovery finds fresher roles instead of
+    # entry-level-flavored searches so discovery finds fresher roles instead of
     # finding mid/senior roles that the experience gate then has to drop.
-    # Only the first ``limit // 2`` queries are fresher-suffixed — the rest
-    # stay plain so postings that don't literally say "fresher" still get
-    # discovered (the experience gate filters the rest downstream).
+    # Only the first ``limit // 2`` queries are suffixed — the rest stay plain
+    # so postings that don't literally say "entry level" still get discovered
+    # (the experience gate filters the rest downstream).  "entry level" is used
+    # instead of "fresher" because it's the standard term in job postings.
     if _fresher_only(prefs) and queries:
         fresher_count = max(1, min(limit // 2, len(queries)))
-        queries = [f"{q} fresher" for q in queries[:fresher_count]] + queries[
+        queries = [f"{q} entry level" for q in queries[:fresher_count]] + queries[
             fresher_count:
         ]
     seen: set[str] = set()

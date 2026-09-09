@@ -9,7 +9,7 @@ description = "AI-powered Cybersecurity Career Intelligence Platform"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = " RAVIB", email = "partha442004@gmail.com"}
+    {name = "PARTHASARATHI B", email = "partha442004@gmail.com"}
 ]
 requires-python = ">=3.10"
 keywords = ["cybersecurity", "career", "jobs", "internships", "ai", "scraper"]
