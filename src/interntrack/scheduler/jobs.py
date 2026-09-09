@@ -4305,7 +4305,7 @@ def _member_footer_html() -> str:
     return (
         "<div style='margin-top:24px;padding-top:16px;border-top:1px solid "
         "#e2e8f0;font-size:12px;color:#94a3b8;'>"
-        "You get these every day at 8 AM, 1 PM & 7 PM IST. To change your "
+        "You get one job digest every morning at 8 AM IST. To change your "
         "roles, location, or pause alerts, ask your admin.</div>"
     )
 
