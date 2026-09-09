@@ -50,17 +50,13 @@ _DISCOVERY_SOURCES: list[str] = [
     "hackernews",
 ]
 
-# Total wall-clock budget (seconds) for one discovery request. Vercel Hobby
-# maxDuration is 60s and cold starts eat ~3-6s of that, so the loop stops
-# early enough that the save step and the best-effort Telegram instant-alert
-# tail (both bounded) always finish before the serverless kill. Discovery
-# returns a (possibly partial) result instead of dying with
-# FUNCTION_INVOCATION_TIMEOUT — which previously 504'd every run and left
-# the daily digests empty.
-# Vercel Hobby functions are killed after ~10s.  Cold starts eat ~3s,
-# and the save + instant-alert tail needs ~1s, so we budget 8s for
-# scraper I/O.  With only fast sources listed above this is plenty.
-_DISCOVERY_DEADLINE_SECONDS = 8
+# Total wall-clock budget (seconds) for one discovery request. vercel.json
+# sets maxDuration=60; cold start eats ~3-5s and the save + instant-alert
+# tail needs ~2s, so 45s of scraper budget leaves a safety margin. Each
+# query's fetch_all is bounded by the per-source cap (10s, registry.py) so
+# one query costs at most ~10s — this budget fits 3-4 queries per run,
+# enough for the round-robin interleave to reach most users' top queries.
+_DISCOVERY_DEADLINE_SECONDS = 45
 
 
 # Indian cities (plus common aliases) recognized inside discovery queries so

@@ -61,20 +61,42 @@ class HackerNewsScraper(BaseScraper):
         return None
 
     async def _get_thread_comments(self, story_id: str) -> list[dict]:
-        """Get comments from a thread."""
+        """Get comments from a thread.
+
+        Comments are fetched concurrently in bounded batches — the old
+        sequential loop did 100 round-trips × ~200ms = ~20s per query,
+        which alone blew the whole Vercel discovery budget (only one
+        query per run completed).
+        """
+        import asyncio
+
         url = f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json"
         response = await self._get(url)
         story = response.json()
 
-        comments = []
-        kids = story.get("kids", [])
+        kids = story.get("kids", [])[:100]
 
-        for kid_id in kids[:100]:
-            comment_url = f"https://hacker-news.firebaseio.com/v0/item/{kid_id}.json"
-            comment_response = await self._get(comment_url)
-            comment = comment_response.json()
-            if comment and not comment.get("deleted"):
-                comments.append(comment)
+        async def fetch_comment(kid_id: int) -> dict | None:
+            try:
+                comment_url = (
+                    f"https://hacker-news.firebaseio.com/v0/item/{kid_id}.json"
+                )
+                comment_response = await self._get(comment_url)
+                comment: dict | None = comment_response.json()
+                if comment and not comment.get("deleted"):
+                    return comment
+            except Exception:  # noqa: BLE001 - skip bad comments
+                return None
+            return None
+
+        # Batches of 20: fast like full concurrency but never 100 in-flight
+        # requests against the Firebase API at once.
+        comments: list[dict] = []
+        for i in range(0, len(kids), 20):
+            batch = await asyncio.gather(
+                *(fetch_comment(kid_id) for kid_id in kids[i : i + 20])
+            )
+            comments.extend(c for c in batch if c)
 
         return comments
 

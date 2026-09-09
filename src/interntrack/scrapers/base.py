@@ -194,16 +194,21 @@ class BaseScraper(ABC):
         await self.client.aclose()
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=4, max=10),
+        stop=stop_after_attempt(2),
+        wait=wait_exponential(multiplier=1, min=2, max=4),
     )
     async def _get(self, url: str, **kwargs) -> httpx.Response:
-        """Make HTTP GET request with retry."""
+        """Make HTTP GET request with retry.
+
+        2 attempts with short waits — the old 3-attempt/4-10s-wait config
+        could burn ~20s on one dead endpoint and starve the discovery
+        budget for everyone else.
+        """
         return await self.client.get(url, **kwargs)
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=4, max=10),
+        stop=stop_after_attempt(2),
+        wait=wait_exponential(multiplier=1, min=2, max=4),
     )
     async def _post(self, url: str, **kwargs) -> httpx.Response:
         """Make HTTP POST request with retry."""

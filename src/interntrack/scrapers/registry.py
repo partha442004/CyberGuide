@@ -12,6 +12,10 @@ logger = logging.getLogger(__name__)
 # Bound concurrent source fetches so dozens of bridged scrapers cannot
 # exhaust connections or exceed the serverless function timeout.
 _MAX_CONCURRENT = 5
+# Wall-clock cap for ONE source's fetch(). 10s covers every healthy source
+# (LinkedIn guest API, RSS, search-engine JSON endpoints); a source that
+# needs longer is either rate-limited or down and its batch is skipped.
+_PER_SOURCE_TIMEOUT_SECONDS = 10
 
 
 class ScraperRegistry:
@@ -70,7 +74,13 @@ class ScraperRegistry:
         async def fetch_one(scraper: BaseScraper) -> list[dict]:
             async with semaphore:
                 try:
-                    jobs = await scraper.fetch(query, location, limit)
+                    # Per-source wall-clock cap: one hung source (slow site,
+                    # retry loop) must not eat the whole discovery budget —
+                    # the other sources' results still land.
+                    jobs = await asyncio.wait_for(
+                        scraper.fetch(query, location, limit),
+                        timeout=_PER_SOURCE_TIMEOUT_SECONDS,
+                    )
                     business_metrics_store.record_scraper_run(
                         scraper.source_name,
                         success=True,

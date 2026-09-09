@@ -1907,7 +1907,7 @@ class TestJobOfDay:
             )
         assert "ask your admin" in member_html
         assert "ask your admin" not in owner_html
-        assert "8 AM, 1 PM & 7 PM IST" in _member_footer_html()
+        assert "every morning at 8 AM IST" in _member_footer_html()
 
     def test_prefers_local_job_when_user_has_location(self):
         from interntrack.scheduler.jobs import _job_of_day
