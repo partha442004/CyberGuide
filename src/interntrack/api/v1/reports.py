@@ -305,7 +305,7 @@ async def get_daily_report(
         # one user leaves the session rollback-pending (the helper swallows
         # the exception but not the session state), and without this every
         # subsequent user fails too and the whole endpoint 500s.
-        if not db.is_active:
+        if db is not None and not db.is_active:
             with contextlib.suppress(Exception):
                 await db.rollback()
         prefs = target["prefs"]
