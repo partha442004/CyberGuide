@@ -13,7 +13,7 @@ services:
     container_name: cybershield-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-cybershield}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cybershield_secret}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-production}
       POSTGRES_DB: ${POSTGRES_DB:-cybershield}
     ports:
       - "5432:5432"
@@ -82,7 +82,7 @@ services:
       - "8000:8000"
     environment:
       - ENVIRONMENT=production
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-cybershield}:${POSTGRES_PASSWORD:-cybershield_secret}@postgres:5432/${POSTGRES_DB:-cybershield}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-cybershield}:${POSTGRES_PASSWORD:-change-me-in-production}@postgres:5432/${POSTGRES_DB:-cybershield}
       - REDIS_URL=redis://redis:6379/0
       - ELASTICSEARCH_URL=http://elasticsearch:9200
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
@@ -143,7 +143,7 @@ services:
     container_name: cybershield-scheduler
     environment:
       - ENVIRONMENT=production
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-cybershield}:${POSTGRES_PASSWORD:-cybershield_secret}@postgres:5432/${POSTGRES_DB:-cybershield}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-cybershield}:${POSTGRES_PASSWORD:-change-me-in-production}@postgres:5432/${POSTGRES_DB:-cybershield}
       - REDIS_URL=redis://redis:6379/0
     volumes:
       - app_logs:/app/logs

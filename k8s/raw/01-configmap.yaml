@@ -9,7 +9,7 @@ data:
   ENVIRONMENT: "production"
   API_HOST: "0.0.0.0"
   API_PORT: "8000"
-  DATABASE_URL: "postgresql+asyncpg://cybershield:cybershield_secret@cybershield-postgres:5432/cybershield"
+  DATABASE_URL: "postgresql+asyncpg://cybershield:change-me-in-production@cybershield-postgres:5432/cybershield"
   REDIS_URL: "redis://cybershield-redis:6379/0"
   ELASTICSEARCH_URL: "http://cybershield-elasticsearch:9200"
   SMTP_HOST: "smtp.gmail.com"

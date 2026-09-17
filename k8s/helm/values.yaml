@@ -128,7 +128,7 @@ networkPolicy:
 
 # Secrets (override via --set or secrets.yaml)
 secrets:
-  postgresPassword: "cybershield_secret"
+  postgresPassword: "change-me-in-production"
   secretKey: "change-me-in-production"
   telegramBotToken: ""
   telegramChatId: ""
