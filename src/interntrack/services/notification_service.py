@@ -343,6 +343,12 @@ class BrevoEmailChannel(NotificationChannel):
                         "htmlContent": message,
                     },
                 )
+                if response.status_code not in (200, 201, 202):
+                    logging.getLogger(__name__).error(
+                        "brevo send rejected (%s): %s",
+                        response.status_code,
+                        response.text[:300],
+                    )
                 return response.status_code in (200, 201, 202)
         except Exception as e:
             raise NotificationError("email", str(e)) from e
