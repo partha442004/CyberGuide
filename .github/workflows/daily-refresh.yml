@@ -90,3 +90,9 @@ jobs:
       # The weekly recap was removed: one mail per day is the deal (Resend
       # free tier = 3,000/month; /reports/weekly-alert stays available for
       # manual runs from the dashboard or Actions dispatch).
+      - name: Generate the daily digest (per-user domains)
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *'
+        run: |
+          curl -sSf --max-time 290 "$API_BASE/api/v1/reports/daily" > /dev/null \
+            && echo "daily digest generated + sent OK" \
+            || echo "daily digest failed or timed out"
