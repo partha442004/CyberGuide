@@ -291,6 +291,12 @@ async def get_daily_report(
     for target in targets:
         if time.monotonic() > _deadline:
             break
+        # Heal the shared session before each user: a send-path failure for
+        # one user leaves the session rollback-pending (the helper swallows
+        # the exception but not the session state), and without this every
+        # subsequent user fails too and the whole endpoint 500s.
+        with contextlib.suppress(Exception):
+            await db.rollback()
         prefs = target["prefs"]
         if prefs.get("is_enabled") is False or _alerts_paused(prefs):
             continue
