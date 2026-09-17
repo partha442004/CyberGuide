@@ -363,6 +363,7 @@ async def get_daily_report(
         if report.get("new_jobs") or []:
             # Trigger the daily-digest notification (no-op when no channels
             # configured, or when the user has disabled alerts).
+            results: dict = {}
             with contextlib.suppress(Exception):
                 results = await asyncio.wait_for(
                     _send_alert_digest(
