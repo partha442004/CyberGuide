@@ -2,6 +2,7 @@
 Notification service for multi-channel notifications.
 """
 
+import logging
 from email.utils import formatdate, make_msgid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -507,6 +508,9 @@ class NotificationManager:
                         message, subject, buttons
                     )
                 except Exception:
+                    logging.getLogger(__name__).exception(
+                        "email channel send failed (%s)", channel_name
+                    )
                     results[channel_name] = False
                 business_metrics_store.record_notification(
                     channel_name,
