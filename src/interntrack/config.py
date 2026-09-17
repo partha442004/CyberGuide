@@ -89,6 +89,13 @@ class Settings(BaseSettings):
     # Sender for Resend; falls back to ``email_from`` when unset.
     resend_from: str | None = None
 
+    # Email - Brevo (HTTP API; beats Resend while the Resend sender is
+    # limited to the account owner's inbox on the free tier).
+    brevo_api_key: str | None = None
+    # Sender for Brevo (e.g. "InternTrack <you@gmail.com>"); falls back to
+    # ``email_from`` when unset. The address must be verified in Brevo.
+    brevo_from: str | None = None
+
     # Email - SMTP
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587

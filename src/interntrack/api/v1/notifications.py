@@ -112,17 +112,27 @@ async def get_email_status():
     (SPF/DKIM). Lets the dashboard explain — and fix — Spam-folder issues.
     """
     settings = get_settings()
-    effective_from = settings.effective_email_from
+    effective_from = (
+        settings.brevo_from
+        if settings.brevo_api_key and settings.brevo_from
+        else settings.effective_email_from
+    )
     domain = email_domain(effective_from)
     routable = _domain_is_routable(domain)
     provider = "none"
-    if settings.resend_api_key:
+    if settings.brevo_api_key:
+        provider = "brevo"
+    elif settings.resend_api_key:
         provider = "resend"
     elif settings.is_email_configured:
         provider = "smtp"
     return {
         "provider": provider,
-        "configured": settings.is_email_configured or bool(settings.resend_api_key),
+        "configured": (
+            settings.is_email_configured
+            or bool(settings.resend_api_key)
+            or bool(settings.brevo_api_key)
+        ),
         "from": effective_from,
         "domain": domain or None,
         "routable": routable,

@@ -239,6 +239,8 @@ class TestNotificationManager:
             mock_settings.is_resend_configured = False
             mock_settings.resend_api_key = None
             mock_settings.resend_from = None
+            mock_settings.brevo_api_key = None
+            mock_settings.brevo_from = None
             return NotificationManager(mock_session)
 
     def test_init_no_channels(self, manager):

@@ -18,6 +18,20 @@ from interntrack.utils.helpers import (
 settings = get_settings()
 
 
+def _split_from(from_email: str) -> tuple[str, str]:
+    """Split "Name <addr@x>" into ("Name", "addr@x").
+
+    A bare address maps to ("InternTrack", addr). Brevo's API takes the
+    sender name and address as separate JSON fields.
+    """
+    raw = str(from_email or "").strip()
+    if "<" in raw and ">" in raw:
+        name = raw.split("<", 1)[0].strip().strip('"') or "InternTrack"
+        addr = raw.split("<", 1)[1].split(">", 1)[0].strip()
+        return name, addr
+    return "InternTrack", raw
+
+
 class NotificationChannel:
     """Base notification channel interface."""
 
@@ -289,6 +303,50 @@ class ResendEmailChannel(NotificationChannel):
             raise NotificationError("email", str(e)) from e
 
 
+class BrevoEmailChannel(NotificationChannel):
+    """Email via the Brevo HTTP API (free tier: 300 emails/day, no domain).
+
+    One POST to https://api.brevo.com/v3/smtp/email with the api-key header —
+    works cleanly from Vercel serverless. Takes precedence over Resend when
+    ``BREVO_API_KEY`` is set: Resend's sandbox sender can only reach the
+    account owner's inbox until a custom domain is verified, while Brevo
+    delivers to any recipient once the *sender* address is confirmed.
+    """
+
+    def __init__(self, api_key: str, from_email: str, to_email: str | None = None):
+        self.api_key = api_key
+        self.from_email = from_email
+        self.to_email = to_email
+
+    async def send(
+        self,
+        message: str,
+        subject: str | None = None,
+        buttons: list[tuple[str, str]] | None = None,  # noqa: ARG002 (interface)
+    ) -> bool:
+        """Send an HTML email through Brevo."""
+        if not self.to_email:
+            return False
+        try:
+            import httpx
+
+            name, addr = _split_from(self.from_email)
+            async with httpx.AsyncClient(timeout=15) as client:
+                response = await client.post(
+                    "https://api.brevo.com/v3/smtp/email",
+                    headers={"api-key": self.api_key},
+                    json={
+                        "sender": {"name": name, "email": addr},
+                        "to": [{"email": self.to_email}],
+                        "subject": subject or "InternTrack",
+                        "htmlContent": message,
+                    },
+                )
+                return response.status_code in (200, 201, 202)
+        except Exception as e:
+            raise NotificationError("email", str(e)) from e
+
+
 class DiscordChannel(NotificationChannel):
     """Discord webhook notification channel."""
 
@@ -398,9 +456,18 @@ class NotificationManager:
             if sid and token and number:
                 self._channels["whatsapp"] = WhatsAppChannel(sid, token, number)
 
+        # Brevo HTTP API beats Resend/SMTP when configured: Brevo's verified
+        # sender reaches ANY recipient on the free tier, while Resend's
+        # sandbox sender is limited to the account owner's inbox.
+        if settings.brevo_api_key:
+            self._channels["email"] = BrevoEmailChannel(
+                settings.brevo_api_key,
+                settings.brevo_from or settings.effective_email_from,
+            )
+
         # Resend HTTP API beats SMTP for deliverability when configured.
         api_key = settings.resend_api_key
-        if api_key:
+        if api_key and not settings.brevo_api_key:
             self._channels["email"] = ResendEmailChannel(
                 api_key,
                 settings.resend_from or settings.effective_email_from,
@@ -472,6 +539,12 @@ class NotificationManager:
             if not email:
                 return None
             api_key = settings.resend_api_key
+            if settings.brevo_api_key:
+                return BrevoEmailChannel(
+                    settings.brevo_api_key,
+                    settings.brevo_from or settings.effective_email_from,
+                    to_email=email,
+                )
             if api_key:
                 return ResendEmailChannel(
                     api_key,

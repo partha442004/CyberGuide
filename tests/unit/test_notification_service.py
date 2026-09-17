@@ -216,6 +216,8 @@ class TestNotificationManager:
         mock_settings.is_resend_configured = False
         mock_settings.resend_api_key = None
         mock_settings.resend_from = None
+        mock_settings.brevo_api_key = None
+        mock_settings.brevo_from = None
 
         session = AsyncMock()
         manager = NotificationManager(session)
