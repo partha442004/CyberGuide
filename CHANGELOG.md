@@ -1759,7 +1759,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - **Git author identity corrected** — local + global git config now set to
   **PARTHASARATHI B** / `ravi.kumar@example.com` (was
-  `PARTHASARATHI B`). Verified on GitHub: commit `02bb826` shows the
+  (a member's name, redacted for privacy). Verified on GitHub: commit `02bb826` shows the
   correct author name.
 - **Stale `C:\internship-tracker` deleted** — the empty leftover folder has
   been fully removed from disk.
@@ -1840,8 +1840,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The stale `C:\internship-tracker` copy was deleted from disk (SSH keys
   preserved in the real project first); only the Freebuff app's own
   `desktop-v2.db` cache remains until the app is closed.
-- **Git author identity corrected** — the local git config was set to
-  `PARTHASARATHI B` / `member-redacted@example.com`; now set to
+- **Git author identity corrected** — the local git config was set to a
+  member's personal identity (email redacted for privacy); now set to
   **PARTHASARATHI B** / `ravi.kumar@example.com` so new commits are
   credited to the correct owner (old commits keep their original author).
 
@@ -3351,7 +3351,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   detail + plain-title layouts; education GPA prefers scaled values
   ("6.75/10") and decimals ("8.65"), and year/institution extraction works
   whether the school name precedes or follows the degree. Validated on the
-  real PARTHASARATHI B resume (15 skills, 2 projects, clean education,
+  real member resume (name redacted) (15 skills, 2 projects, clean education,
   4 certificates, LinkedIn detected).
 
 ### Fixed (job → resume matching on the live app)
@@ -3380,7 +3380,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **PDF extraction on Vercel (no pymupdf)** — added `pypdf` (pure-Python,
   installs in any sandbox) as the second extractor in the chain
   (`pymupdf` → `pypdf` → regex fallback). Verified: with pymupdf hidden,
-  the Member resume still parses to 15 skills, 2 projects, clean
+  the redacted member resume still parses to 15 skills, 2 projects, clean
   education (GPA 8.65), 4 certifications and a detected LinkedIn URL —
   previously the regex fallback garbled this PDF (848 chars extracted vs
   2692 with pypdf). `pypdf` pinned in `requirements.txt`,

@@ -859,9 +859,9 @@ Certificate of SQL Mastery
 
     def test_linkedin_www_prefix(self):
         """www.linkedin.com URLs are detected."""
-        text = "LinkedIn: https://www.linkedin.com/in/redacted-member"
+        text = "LinkedIn: https://www.linkedin.com/in/jane-doe-example"
         links = self.parser._extract_links(text)
-        assert links.get("linkedin") == "https://www.linkedin.com/in/redacted-member"
+        assert links.get("linkedin") == "https://www.linkedin.com/in/jane-doe-example"
 
     def test_certificate_of_generic_lines(self):
         """'Certificate of X' lines are captured for non-security resumes."""

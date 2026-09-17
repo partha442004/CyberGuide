@@ -690,8 +690,8 @@ uvicorn interntrack.main:app --reload
 
 #### ✅ 2026-08-04 Git Identity & Streamlit Dashboard
 
-- ✅ **Git author identity corrected** — local config was set to `Member
-  Vanjari` / `member-redacted@example.com`; now **PARTHASARATHI B** /
+- ✅ **Git author identity corrected** — local config was set to a member's
+  personal identity (email redacted for privacy); now **PARTHASARATHI B** /
   `ravi.kumar@example.com` (both local + global). Test commit `02bb826`
   verified on GitHub: author shows **PARTHASARATHI B**.
 - ✅ **Vercel auto-deploy proven working** — push `5ba427e` triggered an
