@@ -273,6 +273,16 @@ async def get_daily_report(
     )
 
     targets = await _load_digest_targets(db)
+    # Detach the per-target ORM user objects: the loop below may roll the
+    # shared session back after a failed send, and a rollback expires the
+    # identity map — any later attribute access on those users would try a
+    # lazy refresh and die with MissingGreenlet. Detached instances keep
+    # their loaded values and never touch the DB again.
+    for _t in targets:
+        _u = _t.get("user")
+        if _u is not None:
+            with contextlib.suppress(Exception):
+                db.sync_session.expunge(_u)
     # Serve the users whose digest is most overdue FIRST: iteration order is
     # DB order, so without this the same tail users (e.g. those created
     # last) were the ones skipped whenever the budget ran out — Jeeva and
@@ -295,8 +305,9 @@ async def get_daily_report(
         # one user leaves the session rollback-pending (the helper swallows
         # the exception but not the session state), and without this every
         # subsequent user fails too and the whole endpoint 500s.
-        with contextlib.suppress(Exception):
-            await db.rollback()
+        if not db.is_active:
+            with contextlib.suppress(Exception):
+                await db.rollback()
         prefs = target["prefs"]
         if prefs.get("is_enabled") is False or _alerts_paused(prefs):
             continue
