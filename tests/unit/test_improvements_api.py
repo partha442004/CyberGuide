@@ -423,6 +423,14 @@ class TestPerUserDiscoveryEndpoint:
 
         assert registry.fetch_all.called
         call_kwargs = registry.fetch_all.call_args.kwargs
+        # The company-board sweep (sources=["company"], query="") is not a
+        # user query — skip it when inspecting the per-user fetch calls.
+        user_calls = [
+            c for c in registry.fetch_all.call_args_list
+            if c.kwargs.get("sources") != ["company"]
+        ]
+        assert user_calls
+        call_kwargs = user_calls[0].kwargs
         assert call_kwargs.get("sources") == _DISCOVERY_SOURCES
         # The city lives in ``location``, not inside the keyword, so
         # vendor/RSS/HN scrapers match against role titles.
@@ -430,7 +438,8 @@ class TestPerUserDiscoveryEndpoint:
         assert "Bangalore" not in call_kwargs.get("query", "").lower()
         # Every fetch_all call followed the same contract (discovery loops
         # over several queries, so check them all, not just the last).
-        for c in registry.fetch_all.call_args_list:
+        # The company-board sweep (sources=["company"]) is not a user query.
+        for c in user_calls:
             kw = c.kwargs
             assert kw.get("location") == "Bangalore"
             assert "Bangalore" not in kw.get("query", "").lower()
@@ -548,8 +557,11 @@ class TestPerUserDiscoveryEndpoint:
             job_cls.return_value.save_jobs = AsyncMock(return_value=[])
             await run_discovery_for_users(db=AsyncMock(), limit=4)
 
+        # The company-board sweep (query="") is not a user query — skip it
+        # when checking user-query coverage/order.
         locations = [
             str(c.kwargs.get("location", "")) for c in registry.fetch_all.call_args_list
+            if c.kwargs.get("sources") != ["company"]
         ]
         # First two queries must cover both users (A1, B1 order).
         assert locations[0] in ("Bangalore", "Chennai")

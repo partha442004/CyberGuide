@@ -1060,6 +1060,7 @@ async def run_discovery_for_users(
     import time
 
     deadline = time.monotonic() + _DISCOVERY_DEADLINE_SECONDS
+
     for query, location in unique:
         if time.monotonic() > deadline:
             break
@@ -1076,6 +1077,31 @@ async def run_discovery_for_users(
         total_saved += len(saved)
         saved_all.extend(saved)
         details.append({"query": query, "found": len(jobs), "saved": len(saved)})
+
+    # Direct company career boards (Greenhouse) once per run, unfiltered,
+    # with whatever budget the user queries left over: these boards list
+    # every open role, so one empty-query sweep feeds ALL roles through
+    # save_jobs -> domain classification, and each user's digest picks up
+    # the ones matching their domains.  Filtering per query would re-fetch
+    # the same boards every iteration and burn the serverless budget on
+    # duplicate HTTP calls.
+    if time.monotonic() < deadline:
+        try:
+            board_jobs = await registry.fetch_all(query="", sources=["company"])
+            if board_jobs:
+                saved_boards = await service.save_jobs(board_jobs)
+                total_found += len(board_jobs)
+                total_saved += len(saved_boards)
+                saved_all.extend(saved_boards)
+                details.append(
+                    {
+                        "query": "(company boards)",
+                        "found": len(board_jobs),
+                        "saved": len(saved_boards),
+                    }
+                )
+        except Exception as e:  # noqa: BLE001 - board sweep must not break discovery
+            print(f"Company-board sweep failed: {e}")
     # Ping users on Telegram the moment a high-match job lands (instead of
     # waiting for the next daily slot). One consolidated pass after all
     # queries so a user gets a single ping per run, not one per query.
@@ -1119,7 +1145,11 @@ async def run_discovery(
     # "cybersecurity bangalore" -> query="cybersecurity", location="Bangalore"
     # so the India scrapers target Bangalore instead of US geo-locked APIs.
     location = _extract_location_from_query(query)
-    sources = [source] if source else _DISCOVERY_SOURCES
+    # Manual/dashboard runs are single-query: adding "company" here means
+    # the boards are fetched once, filtered to the typed query (the daily
+    # per-user endpoint instead sweeps boards once unfiltered — see
+    # run-for-users).
+    sources = [source] if source else [*_DISCOVERY_SOURCES, "company"]
     jobs = await registry.fetch_all(
         query=_strip_location_from_query(query),
         location=location,

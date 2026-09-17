@@ -60,14 +60,30 @@ class GreenhouseBoardScraper(BaseScraper):
         location: str | None = None,  # noqa: ARG002 (interface contract)
         limit: int = 100,
     ) -> list[RawJob]:
-        """Fetch and filter jobs from all configured company boards."""
+        """Fetch and filter jobs from all configured company boards.
+
+        Boards are fetched concurrently (bounded) so the whole sweep fits
+        inside the registry's per-source wall-clock cap when this scraper
+        runs in discovery's parallel source fan-out.
+        """
+        import asyncio
+
+        semaphore = asyncio.Semaphore(6)
+
+        async def fetch_company(company: str) -> list[RawJob]:
+            async with semaphore:
+                try:
+                    return await self._fetch_company(company, query, limit)
+                except Exception as e:  # noqa: BLE001 - one bad board must not kill the sweep
+                    print(f"Error fetching Greenhouse board {company}: {e}")
+                    return []
+
+        chunks = await asyncio.gather(*(fetch_company(c) for c in self.companies))
         jobs: list[RawJob] = []
-        for company in self.companies:
-            try:
-                jobs.extend(await self._fetch_company(company, query, limit))
-            except Exception as e:
-                print(f"Error fetching Greenhouse board {company}: {e}")
-                continue
+        for chunk in chunks:
+            jobs.extend(chunk)
+            if len(jobs) >= limit:
+                break
         return jobs[:limit]
 
     async def _fetch_company(

@@ -275,10 +275,12 @@ class TestJobsAPIUnit:
         assert result["discovered"] == 1
         from interntrack.api.v1.jobs import _DISCOVERY_SOURCES
 
+        # Dashboard/manual runs include the direct company-career-boards
+        # source alongside the always-on fast sources.
         mock_registry.fetch_all.assert_awaited_once_with(
             query="data science internship",
             location=None,
-            sources=_DISCOVERY_SOURCES,
+            sources=[*_DISCOVERY_SOURCES, "company"],
         )
 
     @pytest.mark.asyncio
@@ -311,7 +313,7 @@ class TestJobsAPIUnit:
         mock_registry.fetch_all.assert_awaited_once_with(
             query="python developer",
             location=None,
-            sources=_DISCOVERY_SOURCES,
+            sources=[*_DISCOVERY_SOURCES, "company"],
         )
 
 
