@@ -355,14 +355,16 @@ async def get_daily_report(
         if preview:
             last_report = report
             continue
-        # Advance the no-duplicates window regardless of whether anything
-        # new was found, then skip the send when there are no new jobs.
-        await _mark_alert_sent(db, target["user_id"])
+        # Advance the no-duplicates window ONLY on actual delivery. Stamping
+        # before the send meant a failed delivery permanently swallowed that
+        # user's jobs: the next digest's ``since=last_alert_at`` window had
+        # already moved past them, so they were never re-sent. On failure the
+        # window stays put and the same jobs go out on the next run.
         if report.get("new_jobs") or []:
             # Trigger the daily-digest notification (no-op when no channels
             # configured, or when the user has disabled alerts).
             with contextlib.suppress(Exception):
-                await asyncio.wait_for(
+                results = await asyncio.wait_for(
                     _send_alert_digest(
                         db,
                         prefs,
@@ -373,6 +375,8 @@ async def get_daily_report(
                     ),
                     timeout=4,
                 )
+            if results.get("email") is True or (results and "email" not in results):
+                await _mark_alert_sent(db, target["user_id"])
         elif (
             not preview
             and (slot is None or slot == "morning")
