@@ -3130,16 +3130,11 @@ async def _score_and_group_jobs(
             continue
         grouped.setdefault(domain, []).append((score, job))
 
-    domain_order = [
-        "security",
-        "coding",
-        "data",
-        "design",
-        "marketing",
-        "finance",
-        "govt",
-        "other",
-    ]
+    # Derive the render order from _DOMAIN_ICONS — the canonical 10-domain
+    # display order. A hardcoded subset here silently DROPPED whole sections:
+    # "grc" (and "frontend") weren't listed, so a GRC member's digest showed
+    # "New jobs: 1" in the header with zero job cards below it.
+    domain_order = list(_DOMAIN_ICONS)
     sections: list[tuple[str, list[tuple[float | None, dict]]]] = []
     for domain in domain_order:
         items = grouped.get(domain)
@@ -3677,16 +3672,7 @@ def _telegram_breakdown(
     top_locs = [loc for loc, _ in loc_totals.most_common(6)]
     if not top_locs:
         return ""
-    d_order = [
-        "security",
-        "coding",
-        "data",
-        "design",
-        "finance",
-        "marketing",
-        "govt",
-        "other",
-    ]
+    d_order = list(_DOMAIN_ICONS)  # canonical order; see _score_and_group_jobs
     rows = []
     td = "padding:4px 8px;border:1px solid #e2e8f0;text-align:center;"
     for d in d_order:
@@ -4400,16 +4386,7 @@ def _location_breakdown_table(sections, other_sections):
     top_locs = [loc for loc, _ in loc_totals.most_common(6)]
     if not top_locs:
         return ""
-    d_order = [
-        "security",
-        "coding",
-        "data",
-        "design",
-        "finance",
-        "marketing",
-        "govt",
-        "other",
-    ]
+    d_order = list(_DOMAIN_ICONS)  # canonical order; see _score_and_group_jobs
     rows = []
     td = "padding:6px 10px;border:1px solid #e2e8f0;"
     for d in d_order:

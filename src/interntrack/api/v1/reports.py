@@ -395,28 +395,30 @@ async def get_daily_report(
                 )
             if results.get("email") is True or (results and "email" not in results):
                 await _mark_alert_sent(db, target["user_id"])
-        elif (
-            not preview
-            and (slot is None or slot == "morning")
-            and prefs.get("quiet_day_emails", True)
-        ):
-            # Quiet day: still send a compact email so the user knows the
-            # system checked in and didn't break (no Telegram/SMS spam).
-            # Only the morning slot (and manual triggers) sends it — the
-            # afternoon/evening cron slots stay silent on empty days so a
-            # user never gets 3 'no new jobs' mails per day — and accounts
-            # with quiet_day_emails off only ever get real job-alert emails.
+        elif not preview:
+            # Quiet day: no jobs to lose, so the no-duplicates window always
+            # advances — without this every later run re-evaluates the same
+            # empty window forever. Real sends above stamp only on delivery
+            # success instead, so a failed send never swallows a member's
+            # jobs. The compact check-in email itself is morning/manual-slot
+            # only (afternoon/evening stay silent so nobody gets 3 "no new
+            # jobs" mails a day) and respects quiet_day_emails off.
+            if (slot is None or slot == "morning") and prefs.get(
+                "quiet_day_emails", True
+            ):
+                with contextlib.suppress(Exception):
+                    await asyncio.wait_for(
+                        _send_quiet_day_digest(
+                            db,
+                            prefs,
+                            domains=domains,
+                            user_id=target["user_id"],
+                            user=target["user"],
+                        ),
+                        timeout=3,
+                    )
             with contextlib.suppress(Exception):
-                await asyncio.wait_for(
-                    _send_quiet_day_digest(
-                        db,
-                        prefs,
-                        domains=domains,
-                        user_id=target["user_id"],
-                        user=target["user"],
-                    ),
-                    timeout=3,
-                )
+                await _mark_alert_sent(db, target["user_id"])
         last_report = report
 
     if last_report is None:
