@@ -5170,8 +5170,15 @@ def discovery_queries_for(prefs: dict, user=None, limit: int = 4) -> list[str]:
     # suffix: the leftover word "All" turned into an AND-token that
     # matches_query demands in every posting, so HN/RSS matched nothing and
     # the query slot was wasted. A city-less user searches the plain query.
-    _pan_india = {"all india", "anywhere in india", "across india", "pan india",
-                  "india wide", "throughout india", "all"}
+    _pan_india = {
+        "all india",
+        "anywhere in india",
+        "across india",
+        "pan india",
+        "india wide",
+        "throughout india",
+        "all",
+    }
     cities = [
         part.strip() for part in re.split(r"\s*[,/]\s*", location) if part.strip()
     ] or [location]

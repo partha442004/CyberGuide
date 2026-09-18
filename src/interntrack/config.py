@@ -212,6 +212,7 @@ class Settings(BaseSettings):
     def is_vercel(self) -> bool:
         """Detect if we're running on Vercel serverless."""
         import os
+
         return bool(os.environ.get("VERCEL"))
 
     @property

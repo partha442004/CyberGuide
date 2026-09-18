@@ -426,7 +426,8 @@ class TestPerUserDiscoveryEndpoint:
         # The company-board sweep (sources=["company"], query="") is not a
         # user query — skip it when inspecting the per-user fetch calls.
         user_calls = [
-            c for c in registry.fetch_all.call_args_list
+            c
+            for c in registry.fetch_all.call_args_list
             if c.kwargs.get("sources") != ["company"]
         ]
         assert user_calls
@@ -560,7 +561,8 @@ class TestPerUserDiscoveryEndpoint:
         # The company-board sweep (query="") is not a user query — skip it
         # when checking user-query coverage/order.
         locations = [
-            str(c.kwargs.get("location", "")) for c in registry.fetch_all.call_args_list
+            str(c.kwargs.get("location", ""))
+            for c in registry.fetch_all.call_args_list
             if c.kwargs.get("sources") != ["company"]
         ]
         # First two queries must cover both users (A1, B1 order).

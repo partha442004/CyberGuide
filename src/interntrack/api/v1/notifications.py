@@ -975,9 +975,7 @@ async def telegram_webhook(request: Request) -> dict[str, str]:
         return {"ok": "true"}
 
     # Validate webhook secret if configured.
-    secret_token = request.headers.get(
-        "X-Telegram-Bot-Api-Secret-Token", ""
-    )
+    secret_token = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
     if (
         settings.telegram_webhook_secret
         and secret_token != settings.telegram_webhook_secret
@@ -996,13 +994,16 @@ async def telegram_webhook(request: Request) -> dict[str, str]:
 
     # /help
     if cmd == "/help":
-        await _send_tg(chat_id, (
-            "👋 I'm InternTrack Bot!\n\n"
-            "• /start — link your Telegram\n"
-            "• /start email@x.com — link with email\n"
-            "• /stop — unlink\n\n"
-            "Once linked, you'll get alerts and digests here!"
-        ))
+        await _send_tg(
+            chat_id,
+            (
+                "👋 I'm InternTrack Bot!\n\n"
+                "• /start — link your Telegram\n"
+                "• /start email@x.com — link with email\n"
+                "• /stop — unlink\n\n"
+                "Once linked, you'll get alerts and digests here!"
+            ),
+        )
         return {"ok": "true"}
 
     # /stop — unlink
@@ -1013,9 +1014,7 @@ async def telegram_webhook(request: Request) -> dict[str, str]:
         from interntrack.domain.models import User
 
         async with get_db_session() as session:
-            stmt = select(User).where(
-                User.telegram_chat_id == str(chat_id)
-            )
+            stmt = select(User).where(User.telegram_chat_id == str(chat_id))
             result = await session.execute(stmt)
             user_obj = result.scalar_one_or_none()
             if user_obj:
@@ -1026,9 +1025,7 @@ async def telegram_webhook(request: Request) -> dict[str, str]:
                     "✅ Unlinked. Send /start to re-link.",
                 )
             else:
-                await _send_tg(
-                    chat_id, "You weren't linked. Send /start."
-                )
+                await _send_tg(chat_id, "You weren't linked. Send /start.")
         return {"ok": "true"}
 
     # /start — link account
@@ -1040,18 +1037,16 @@ async def telegram_webhook(request: Request) -> dict[str, str]:
 
         # Extract optional email: /start user@email.com
         parts = text.split(maxsplit=1)
-        email = (
-            parts[1].strip() if len(parts) > 1 else None
-        )
+        email = parts[1].strip() if len(parts) > 1 else None
 
         # If no email, try the Telegram username.
         if not email:
             username = user.get("username") or ""
             if not username:
-                await _send_tg(chat_id, (
-                    f"Hi {first_name}! 👋\n\n"
-                    "Send /start your@email.com to link."
-                ))
+                await _send_tg(
+                    chat_id,
+                    (f"Hi {first_name}! 👋\n\nSend /start your@email.com to link."),
+                )
                 return {"ok": "true"}
             email = f"{username}@telegram.local"
 
@@ -1060,35 +1055,37 @@ async def telegram_webhook(request: Request) -> dict[str, str]:
             stmt = select(User).where(
                 or_(
                     User.email.ilike(email),
-                    User.name.ilike(
-                        email.split("@")[0]
-                    ),
+                    User.name.ilike(email.split("@")[0]),
                 )
             )
             result = await session.execute(stmt)
             user_obj = result.scalar_one_or_none()
 
             if not user_obj:
-                await _send_tg(chat_id, (
-                    f"Hi {first_name}! "
-                    f"No account found for {email}. "
-                    "Sign up on the dashboard first."
-                ))
+                await _send_tg(
+                    chat_id,
+                    (
+                        f"Hi {first_name}! "
+                        f"No account found for {email}. "
+                        "Sign up on the dashboard first."
+                    ),
+                )
                 return {"ok": "true"}
 
             user_obj.telegram_chat_id = str(chat_id)  # type: ignore[assignment]
             await session.commit()
 
-            display_name = (
-                user_obj.name or email.split("@")[0]
+            display_name = user_obj.name or email.split("@")[0]
+            await _send_tg(
+                chat_id,
+                (
+                    f"✅ Hi {display_name}! Linked.\n\n"
+                    "You'll get:\n"
+                    "• 🚀 Instant high-match alerts\n"
+                    "• 📬 Daily digests (8, 13, 19 IST)\n\n"
+                    "Use /stop to unlink."
+                ),
             )
-            await _send_tg(chat_id, (
-                f"✅ Hi {display_name}! Linked.\n\n"
-                "You'll get:\n"
-                "• 🚀 Instant high-match alerts\n"
-                "• 📬 Daily digests (8, 13, 19 IST)\n\n"
-                "Use /stop to unlink."
-            ))
         return {"ok": "true"}
 
     return {"ok": "true"}
