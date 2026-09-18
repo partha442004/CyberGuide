@@ -426,6 +426,64 @@ async def get_daily_report(
     return last_report
 
 
+@router.get("/catch-up-status")
+async def get_catch_up_status(
+    db: AsyncSession = Depends(get_db),
+    stale_hours: float = 12,
+):
+    """Report whether the daily digest missed any enabled member today.
+
+    GitHub's cron scheduler occasionally skips a slot entirely; when the
+    08:00 IST run never fires, members get NO mail that day. The workflow's
+    13:00/19:00 slots call this endpoint and trigger a catch-up digest when
+    any enabled member's ``last_alert_at`` is older than ``stale_hours``
+    (12h cleanly separates "digest went this morning" from "digest never
+    went"). Paused/disabled accounts are excluded — they get no mail by
+    design. Read-only, never raises.
+    """
+    from interntrack.scheduler.jobs import _alerts_paused
+
+    try:
+        targets = await _load_digest_targets(db)
+        now = datetime.now(UTC)
+        stale: list[dict] = []
+        for target in targets:
+            prefs = target.get("prefs") or {}
+            if prefs.get("is_enabled") is False or _alerts_paused(prefs):
+                continue
+            last = prefs.get("last_alert_at")
+            if last is None:
+                stale.append({"user_id": target["user_id"], "last_alert_at": None})
+                continue
+            # The prefs loader returns the raw ORM value (a datetime) but the
+            # JSON layer can round-trip it as a string — accept both.
+            last_dt = last if isinstance(last, datetime) else None
+            if last_dt is None:
+                try:
+                    last_dt = datetime.fromisoformat(str(last))
+                except ValueError:
+                    stale.append({"user_id": target["user_id"], "last_alert_at": str(last)})
+                    continue
+            if last_dt.tzinfo is None:
+                last_dt = last_dt.replace(tzinfo=UTC)
+            hours = (now - last_dt).total_seconds() / 3600
+            if hours > stale_hours:
+                stale.append(
+                    {
+                        "user_id": target["user_id"],
+                        "last_alert_at": last_dt.isoformat(),
+                        "hours_since": round(hours, 1),
+                    }
+                )
+        return {
+            "needs_catch_up": bool(stale),
+            "stale_users": stale,
+            "checked": len(targets),
+        }
+    except Exception as e:  # noqa: BLE001 - status must never 500 the cron
+        return {"needs_catch_up": False, "stale_users": [], "error": str(e)}
+
+
 @router.get("/weekly-alert")
 async def get_weekly_alert(
     db: AsyncSession = Depends(get_db),

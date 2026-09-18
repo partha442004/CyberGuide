@@ -96,3 +96,28 @@ jobs:
           curl -sSf --max-time 290 "$API_BASE/api/v1/reports/daily" > /dev/null \
             && echo "daily digest generated + sent OK" \
             || echo "daily digest failed or timed out"
+
+      # SELF-HEAL: GitHub's cron scheduler occasionally skips a slot entirely
+      # (it dropped the 08:00 IST run once). When the morning digest step
+      # never executes, members get NO mail that day and the only recovery
+      # was the owner manually curling the endpoint. On the two afternoon
+      # slots this step asks the API whether any enabled member's digest is
+      # stale (>12h since their last send) and fires /reports/daily only
+      # then. It is a no-op on normal days — the status endpoint is read-only
+      # and "no" means zero extra emails — and a failed status check skips
+      # the catch-up instead of spamming.
+      - name: Catch-up digest if the morning run was skipped
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 7 * * *' || github.event.schedule == '30 13 * * *'
+        run: |
+          STATUS=$(curl -sS --max-time 30 \
+            "$API_BASE/api/v1/reports/catch-up-status" \
+            || echo '{"needs_catch_up": false}')
+          echo "catch-up status: $STATUS"
+          if echo "$STATUS" | grep -q '"needs_catch_up": *true'; then
+            echo "missed digest detected — firing catch-up"
+            curl -sSf --max-time 290 "$API_BASE/api/v1/reports/daily" > /dev/null \
+              && echo "catch-up digest sent OK" \
+              || echo "catch-up digest failed or timed out"
+          else
+            echo "all members got their digest — no catch-up needed"
+          fi
