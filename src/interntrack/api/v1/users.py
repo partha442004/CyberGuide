@@ -249,6 +249,42 @@ async def list_users(
     )
 
 
+@router.get("/export")
+async def export_member_data(
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_cron_secret),
+):
+    """Export every member's profile and alert preferences as JSON.
+
+    Powers the weekly GitHub Actions backup: the Neon free tier has no
+    automated backups, and jobs are re-fetchable — member profiles, saved
+    domains, channels and preferences are not. The payload is the raw
+    column data for ``user_profiles`` and ``alert_preferences`` and is
+    enough to rebuild both tables after any data loss. Guarded by the
+    cron secret like the other maintenance endpoints (401 when unset,
+    open — as before — for deployments without a configured secret).
+    """
+    from datetime import UTC, date, datetime
+
+    user_rows = (await db.execute(select(User))).scalars().all()
+    pref_rows = (await db.execute(select(AlertPreferences))).scalars().all()
+
+    def _dump(value):
+        if isinstance(value, (datetime, date)):
+            return value.isoformat()
+        return value
+
+    return {
+        "exported_at": datetime.now(UTC).isoformat(),
+        "users": [
+            {c.name: _dump(getattr(u, c.name)) for c in User.__table__.columns}
+            for u in user_rows
+        ],
+        "alert_preferences": [
+            {c.name: _dump(getattr(p, c.name)) for c in AlertPreferences.__table__.columns}
+            for p in pref_rows
+        ],
+    }
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
     user_id: str,
@@ -369,39 +405,3 @@ async def update_user(
     return UserResponse.model_validate(user)
 
 
-@router.get("/export")
-async def export_member_data(
-    db: AsyncSession = Depends(get_db),
-    _: None = Depends(require_cron_secret),
-):
-    """Export every member's profile and alert preferences as JSON.
-
-    Powers the weekly GitHub Actions backup: the Neon free tier has no
-    automated backups, and jobs are re-fetchable — member profiles, saved
-    domains, channels and preferences are not. The payload is the raw
-    column data for ``user_profiles`` and ``alert_preferences`` and is
-    enough to rebuild both tables after any data loss. Guarded by the
-    cron secret like the other maintenance endpoints (401 when unset,
-    open — as before — for deployments without a configured secret).
-    """
-    from datetime import UTC, date, datetime
-
-    user_rows = (await db.execute(select(User))).scalars().all()
-    pref_rows = (await db.execute(select(AlertPreferences))).scalars().all()
-
-    def _dump(value):
-        if isinstance(value, (datetime, date)):
-            return value.isoformat()
-        return value
-
-    return {
-        "exported_at": datetime.now(UTC).isoformat(),
-        "users": [
-            {c.name: _dump(getattr(u, c.name)) for c in User.__table__.columns}
-            for u in user_rows
-        ],
-        "alert_preferences": [
-            {c.name: _dump(getattr(p, c.name)) for c in AlertPreferences.__table__.columns}
-            for p in pref_rows
-        ],
-    }
