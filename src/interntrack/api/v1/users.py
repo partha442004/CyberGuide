@@ -15,6 +15,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from interntrack.api.deps import require_cron_secret
 from interntrack.api.schemas.user import (
     UserAuthResponse,
     UserCreate,
@@ -23,7 +24,6 @@ from interntrack.api.schemas.user import (
     UserResponse,
     UserUpdate,
 )
-from interntrack.api.deps import require_cron_secret
 from interntrack.api.v1.notifications import _normalize_domains
 from interntrack.config import get_settings
 from interntrack.database.session import get_db
@@ -281,10 +281,15 @@ async def export_member_data(
             for u in user_rows
         ],
         "alert_preferences": [
-            {c.name: _dump(getattr(p, c.name)) for c in AlertPreferences.__table__.columns}
+            {
+                c.name: _dump(getattr(p, c.name))
+                for c in AlertPreferences.__table__.columns
+            }
             for p in pref_rows
         ],
     }
+
+
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
     user_id: str,
@@ -403,5 +408,3 @@ async def update_user(
     await db.commit()
     await db.refresh(user)
     return UserResponse.model_validate(user)
-
-

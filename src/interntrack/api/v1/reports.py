@@ -465,7 +465,9 @@ async def get_catch_up_status(
                 try:
                     last_dt = datetime.fromisoformat(str(last))
                 except ValueError:
-                    stale.append({"user_id": target["user_id"], "last_alert_at": str(last)})
+                    stale.append(
+                        {"user_id": target["user_id"], "last_alert_at": str(last)}
+                    )
                     continue
             if last_dt.tzinfo is None:
                 last_dt = last_dt.replace(tzinfo=UTC)
