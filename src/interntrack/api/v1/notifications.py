@@ -5,6 +5,7 @@ Notifications API endpoints.
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from interntrack.api.deps import require_cron_secret
 from interntrack.api.schemas.notification import (
     AlertPreferencesResponse,
     AlertPreferencesUpdate,
@@ -532,7 +533,7 @@ async def send_team_recap_now():
 
 
 @router.post("/daily-summary")
-async def send_daily_summary_now():
+async def send_daily_summary_now(_: None = Depends(require_cron_secret)):
     """Send the owner today's delivery summary email right now.
 
     Vercel is serverless, so the APScheduler worker never executes there;
@@ -550,7 +551,7 @@ async def send_daily_summary_now():
 
 
 @router.post("/closing-soon")
-async def run_closing_soon_sweep():
+async def run_closing_soon_sweep(_: None = Depends(require_cron_secret)):
     """Run the closing-soon sweep now and return per-user job counts.
 
     Vercel is serverless, so the APScheduler worker never executes there;

@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     # sends it as X-Telegram-Bot-Api-Secret-Token on every webhook call so
     # we can reject spoofed requests.
     telegram_webhook_secret: str | None = None
+    # Shared secret for the scheduled-maintenance endpoints (discovery, daily
+    # digest, archive, ...). When set, those endpoints reject requests without
+    # a matching ``X-Cron-Secret`` header — stops strangers from triggering
+    # pipeline runs or burning the email quota. Unset (the default) keeps the
+    # endpoints open so local dev and pre-secret deployments behave as before.
+    cron_secret: str | None = None
 
     # Discord Notifications
     discord_webhook_url: str | None = None

@@ -10,6 +10,7 @@ import time
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from interntrack.api.deps import require_cron_secret
 from interntrack.api.schemas.job import (
     JobCreate,
     JobImportLinksRequest,
@@ -261,7 +262,11 @@ async def run_skill_enrichment(
 
 
 @router.post("/archive-expired")
-async def archive_expired(days: int = 30, db: AsyncSession = Depends(get_db)):
+async def archive_expired(
+    days: int = 30,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_cron_secret),
+):
     """Archive jobs older than N days to keep the database lean."""
     repo = JobRepository(db)
     count = await repo.archive_expired_jobs(days=days)
@@ -299,6 +304,7 @@ def _host_is_bot_blocked(url: str) -> bool:
 async def verify_job_links(
     limit: int = Query(12, ge=1, le=25),
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_cron_secret),
 ):
     """Bounded dead-link sweep: check active job URLs and deactivate gone ones.
 
@@ -986,6 +992,7 @@ async def get_closing_soon(
 async def run_discovery_for_users(
     limit: int = Query(6, ge=1, le=8),
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_cron_secret),
 ):
     """Run discovery with queries derived from every enabled user's profile.
 

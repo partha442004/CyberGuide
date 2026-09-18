@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from interntrack.api.deps import require_cron_secret
 from interntrack.api.schemas.report import ReportResponse
 from interntrack.database.session import get_db
 from interntrack.services.application_service import ApplicationService
@@ -252,6 +253,7 @@ async def _empty_report(report_type: str, note: str) -> dict:
 @router.get("/daily", response_model=ReportResponse)
 async def get_daily_report(
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_cron_secret),
     slot: str | None = None,
     preview: bool = False,
 ):
@@ -429,6 +431,7 @@ async def get_daily_report(
 @router.get("/catch-up-status")
 async def get_catch_up_status(
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_cron_secret),
     stale_hours: float = 12,
 ):
     """Report whether the daily digest missed any enabled member today.

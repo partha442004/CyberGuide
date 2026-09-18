@@ -1,0 +1,43 @@
+name: Weekly member-data backup
+
+# The Neon free tier keeps no automated backups. Jobs are re-fetchable from
+# their sources, but member profiles, saved domains, channels and alert
+# preferences are not — losing the database would mean asking every member
+# to sign up again. Every Monday this workflow dumps the two people-tables
+# from the API's export endpoint and stores the JSON as a workflow artifact
+# (private to this repo, kept 90 days). Refuses to upload an empty export.
+on:
+  schedule:
+    - cron: '0 1 * * 1'   # Mondays 01:00 UTC = 06:30 IST
+  workflow_dispatch:      # allow manual "Run workflow" from the Actions tab
+
+jobs:
+  backup:
+    name: Export member profiles + preferences
+    runs-on: ubuntu-latest
+    env:
+      API_BASE: https://cyberguide-api.vercel.app
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: Fetch member-data export
+        run: |
+          HTTP=$(curl -sS --max-time 60 -w '%{http_code}' -o member-backup.json \
+            -H "X-Cron-Secret: $CRON_SECRET" \
+            "$API_BASE/api/v1/users/export")
+          if [ "$HTTP" != "200" ]; then
+            echo "::error::export failed with HTTP $HTTP"
+            exit 1
+          fi
+          COUNT=$(python3 -c "import json;print(len(json.load(open('member-backup.json'))['users']))")
+          echo "exported users: $COUNT"
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::export contains zero users — refusing to upload an empty backup"
+            exit 1
+          fi
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: member-backup
+          path: member-backup.json
+          retention-days: 90

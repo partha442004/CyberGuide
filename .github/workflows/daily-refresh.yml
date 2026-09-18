@@ -23,6 +23,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       API_BASE: https://cyberguide-api.vercel.app
+      # Shared secret the API requires on every maintenance endpoint
+      # (X-Cron-Secret). Set in BOTH GitHub Actions secrets and Vercel env.
+      # Unset on either side → API keeps the endpoints open (no breakage).
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
     steps:
       # Per-user discovery: the API derives search queries from every enabled
       # account's preferred domains + skills (e.g. a cybersecurity user gets
@@ -31,6 +35,7 @@ jobs:
       - name: Run job discovery (per-user queries)
         run: |
           curl -sSf --max-time 290 -X POST \
+            -H "X-Cron-Secret: $CRON_SECRET" \
             "$API_BASE/api/v1/jobs/discovery/run-for-users" \
             || echo "per-user discovery failed or timed out"
 
@@ -42,6 +47,7 @@ jobs:
       - name: Archive expired jobs (keep listings fresh)
         run: |
           curl -sSf --max-time 120 -X POST \
+            -H "X-Cron-Secret: $CRON_SECRET" \
             "$API_BASE/api/v1/jobs/archive-expired?days=14" \
             && echo "expired jobs archived OK" \
             || echo "archive step failed or timed out"
@@ -61,6 +67,7 @@ jobs:
       - name: Verify job links (deactivate dead postings)
         run: |
           curl -sSf --max-time 120 -X POST \
+            -H "X-Cron-Secret: $CRON_SECRET" \
             "$API_BASE/api/v1/jobs/verify-links" \
             && echo "link verification OK" \
             || echo "link verification failed or timed out"
@@ -69,6 +76,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *'
         run: |
           curl -sSf --max-time 120 -X POST \
+            -H "X-Cron-Secret: $CRON_SECRET" \
             "$API_BASE/api/v1/notifications/closing-soon" \
             && echo "closing-soon sweep ran OK" \
             || echo "closing-soon sweep failed or timed out"
@@ -80,6 +88,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 13 * * *'
         run: |
           curl -sSf --max-time 120 -X POST \
+            -H "X-Cron-Secret: $CRON_SECRET" \
             "$API_BASE/api/v1/notifications/daily-summary" \
             && echo "daily owner summary OK" \
             || echo "daily owner summary failed or timed out"
@@ -93,7 +102,8 @@ jobs:
       - name: Generate the daily digest (per-user domains)
         if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *'
         run: |
-          curl -sSf --max-time 290 "$API_BASE/api/v1/reports/daily" > /dev/null \
+          curl -sSf --max-time 290 -H "X-Cron-Secret: $CRON_SECRET" \
+            "$API_BASE/api/v1/reports/daily" > /dev/null \
             && echo "daily digest generated + sent OK" \
             || echo "daily digest failed or timed out"
 
@@ -110,12 +120,14 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 7 * * *' || github.event.schedule == '30 13 * * *'
         run: |
           STATUS=$(curl -sS --max-time 30 \
+            -H "X-Cron-Secret: $CRON_SECRET" \
             "$API_BASE/api/v1/reports/catch-up-status" \
             || echo '{"needs_catch_up": false}')
           echo "catch-up status: $STATUS"
           if echo "$STATUS" | grep -q '"needs_catch_up": *true'; then
             echo "missed digest detected — firing catch-up"
-            curl -sSf --max-time 290 "$API_BASE/api/v1/reports/daily" > /dev/null \
+            curl -sSf --max-time 290 -H "X-Cron-Secret: $CRON_SECRET" \
+            "$API_BASE/api/v1/reports/daily" > /dev/null \
               && echo "catch-up digest sent OK" \
               || echo "catch-up digest failed or timed out"
           else
