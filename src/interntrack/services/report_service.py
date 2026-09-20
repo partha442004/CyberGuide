@@ -166,6 +166,16 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "next.js developer",
             "nextjs developer",
             "react native developer",
+            # Mobile-UI roles (Flutter/Android) are frontend-family: without
+            # these they fall into the broad "coding" bucket and frontend-
+            # only members never see them.
+            "flutter",
+            "android developer",
+            "android engineer",
+            "kotlin developer",
+            "mobile app developer",
+            "mobile developer",
+            "ios developer",
         ),
     ),
     (

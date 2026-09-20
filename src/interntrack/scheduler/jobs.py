@@ -4932,6 +4932,14 @@ DOMAIN_QUERIES = {
         "next.js developer",
         "typescript developer",
         "react native developer",
+        # Mobile-UI roles (Flutter/Android members).
+        "flutter developer",
+        "flutter developer chennai",
+        "flutter developer bangalore",
+        "android developer",
+        "android developer chennai",
+        "android developer bangalore",
+        "mobile app developer",
     ],
     "hardware": [
         "hardware engineer",
