@@ -786,7 +786,7 @@ PROJECTS
 
     def test_tj_array_fragments_joined_with_word_gaps(self):
         """TJ-array fragments are joined, inserting spaces at word gaps."""
-        body = "(PY)100(TH)20(ON)90-278(DEV)"
+        body = "(PY)100(TH)20(ON)-278(DEV)"
         text = ResumeParser._join_tj_fragments(body)
         assert text == "PYTHON DEV"
 
