@@ -341,6 +341,15 @@ class BrevoEmailChannel(NotificationChannel):
                         "to": [{"email": self.to_email}],
                         "subject": subject or "InternTrack",
                         "htmlContent": message,
+                        # Parity with the SMTP channel's spam-hygiene: a
+                        # plain-text alternative and List-Unsubscribe headers
+                        # are heavily rewarded by Gmail/Outlook filters, and
+                        # Brevo's API supports both.
+                        "textContent": html_to_text(message),
+                        "headers": {
+                            "List-Unsubscribe": f"<mailto:{addr}>",
+                            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+                        },
                     },
                 )
                 if response.status_code not in (200, 201, 202):

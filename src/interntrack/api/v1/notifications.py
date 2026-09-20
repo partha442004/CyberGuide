@@ -1172,6 +1172,16 @@ async def brevo_bounce_webhook(request: Request, db: AsyncSession = Depends(get_
             db.add(prefs)
         prefs.bounce_count = int(prefs.bounce_count or 0) + 1  # type: ignore[assignment]
         prefs.last_bounce_at = datetime.now(UTC).replace(tzinfo=None)  # type: ignore[assignment]
+        # 3+ hard bounces = the address is dead (full inbox, wrong address,
+        # abandoned account). Auto-pause so Brevo stops sending to it — every
+        # additional bounce actively damages deliverability for ALL members.
+        if int(prefs.bounce_count) >= 3 and prefs.is_enabled:
+            prefs.is_enabled = False  # type: ignore[assignment]
+            logging.getLogger(__name__).warning(
+                "Member %s auto-disabled after %s bounces",
+                email,
+                prefs.bounce_count,
+            )
         await db.commit()
         logging.getLogger(__name__).warning(
             "Email bounce recorded: %s (event=%s, total=%s)",
