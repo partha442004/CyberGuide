@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     # sends it as X-Telegram-Bot-Api-Secret-Token on every webhook call so
     # we can reject spoofed requests.
     telegram_webhook_secret: str | None = None
+    # Shared secret for the Brevo bounce webhook: Brevo appends it to the
+    # webhook URL we register (?secret=...), and the endpoint rejects calls
+    # without it when set. Unset = open endpoint (local dev).
+    brevo_webhook_secret: str | None = None
     # Sentry error tracking (free tier). When unset the app runs exactly as
     # before — errors only hit the logs. Set SENTRY_DSN to enable instant
     # exception alerts (https://sentry.io → create project → copy DSN).

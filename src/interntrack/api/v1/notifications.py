@@ -1115,3 +1115,70 @@ async def _send_tg(chat_id: int, text: str) -> None:
             )
     except Exception:  # noqa: BLE001
         logging.exception("Telegram send failed for chat %s", chat_id)
+
+
+@router.post("/brevo/bounce-webhook")
+async def brevo_bounce_webhook(request: Request, db: AsyncSession = Depends(get_db)):
+    """Record email bounces that Brevo reports via its transactional webhook.
+
+    Register in Brevo → Senders, Domains & Webhooks → Transactional →
+    "Webhook for hard bounces" (and soft bounces) with::
+
+        https://<api-base>/api/v1/notifications/brevo/bounce-webhook?secret=<BREVO_WEBHOOK_SECRET>
+
+    Brevo POSTs the message; we match the recipient email to a member and
+    bump their ``bounce_count`` (AlertPreferences, auto-migrated) so the
+    owner recap flags the bad address — repeated bounces hurt deliverability
+    for every member, not just the bounced one. Always returns 200 so Brevo
+    does not retry a failed parse forever.
+    """
+    import logging
+    from datetime import UTC, datetime
+
+    from sqlalchemy import select
+
+    from interntrack.domain.models import AlertPreferences, User
+
+    settings = get_settings()
+    expected = settings.brevo_webhook_secret
+    if expected and request.query_params.get("secret") != expected:
+        return {"ok": False, "error": "invalid secret"}
+
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001 - malformed webhook payloads are ignored
+        return {"ok": True}
+
+    email = str(body.get("email") or "").strip().lower()
+    if not email:
+        return {"ok": True}
+    # Brevo sends one event per call; "hard_bounce" / "soft_bounce" / "blocked"
+    event = str(body.get("event") or "")
+
+    try:
+        row = await db.execute(select(User).where(User.email == email))
+        user = row.scalar_one_or_none()
+        if user is None:
+            logging.getLogger(__name__).info(
+                "Brevo bounce for unknown address %s (event=%s)", email, event
+            )
+            return {"ok": True}
+        prefs_row = await db.execute(
+            select(AlertPreferences).where(AlertPreferences.user_id == user.id)
+        )
+        prefs = prefs_row.scalar_one_or_none()
+        if prefs is None:
+            prefs = AlertPreferences(user_id=user.id, is_enabled=True)
+            db.add(prefs)
+        prefs.bounce_count = int(prefs.bounce_count or 0) + 1  # type: ignore[assignment]
+        prefs.last_bounce_at = datetime.now(UTC).replace(tzinfo=None)  # type: ignore[assignment]
+        await db.commit()
+        logging.getLogger(__name__).warning(
+            "Email bounce recorded: %s (event=%s, total=%s)",
+            email,
+            event,
+            prefs.bounce_count,
+        )
+    except Exception:  # noqa: BLE001 - never fail the webhook
+        await db.rollback()
+    return {"ok": True}

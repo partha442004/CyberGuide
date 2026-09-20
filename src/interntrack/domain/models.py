@@ -511,6 +511,12 @@ class AlertPreferences(Base, TimestampMixin):
     # instant) are suppressed until this timestamp. Auto-added to existing
     # live tables by init_db's ``_sync_missing_columns`` step.
     paused_until = Column(DateTime, nullable=True)
+    # Email bounce tracking (Brevo webhook): count of hard bounces and the
+    # most recent one. A member with bounces is flagged in the owner recap
+    # so the bad address gets fixed before repeated bounces drag the shared
+    # sender reputation down. Auto-added to existing live tables.
+    bounce_count = Column(Integer, nullable=True, default=0)
+    last_bounce_at = Column(DateTime, nullable=True)
     # Job ids already flagged in a "Closing soon" alert, so each expiring
     # posting nudges the user exactly once (pruned after the job closes).
     # Auto-added to existing live tables by ``_sync_missing_columns``.
