@@ -17,7 +17,11 @@ remote-opted-in members (include_remote default True) and are excluded
 from city-scoped members' digests otherwise.
 """
 
+import logging
+
 from interntrack.scrapers.base import BaseScraper, RawJob, matches_query
+
+logger = logging.getLogger(__name__)
 
 
 def _strip_html(html: str | None, cap: int = 1200) -> str | None:
@@ -100,6 +104,7 @@ class RemotiveScraper(_BoardSweepScraper):
                     )
                 )
             except Exception:  # noqa: BLE001 - one bad row must not kill the batch
+                logger.debug("remotive row skipped", exc_info=True)
                 continue
         return [j for j in jobs if j.url]
 
@@ -124,13 +129,16 @@ class ArbeitnowScraper(_BoardSweepScraper):
                         company=str(j.get("company_name") or "Unknown"),
                         url=str(j.get("url") or ""),
                         description=_strip_html(j.get("description")),
-                        location=("Remote" if remote else str(j.get("location") or "Germany")),
+                        location=(
+                            "Remote" if remote else str(j.get("location") or "Germany")
+                        ),
                         is_remote=remote,
                         tags=[str(t) for t in (j.get("tags") or [])][:10],
                         source=self.source_name,
                     )
                 )
             except Exception:  # noqa: BLE001
+                logger.debug("%s row skipped", self.source_name, exc_info=True)
                 continue
         return [j for j in jobs if j.url]
 
@@ -164,5 +172,6 @@ class JobicyScraper(_BoardSweepScraper):
                     )
                 )
             except Exception:  # noqa: BLE001
+                logger.debug("%s row skipped", self.source_name, exc_info=True)
                 continue
         return [j for j in jobs if j.url]
