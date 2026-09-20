@@ -65,6 +65,11 @@ class Settings(BaseSettings):
     # sends it as X-Telegram-Bot-Api-Secret-Token on every webhook call so
     # we can reject spoofed requests.
     telegram_webhook_secret: str | None = None
+    # Sentry error tracking (free tier). When unset the app runs exactly as
+    # before — errors only hit the logs. Set SENTRY_DSN to enable instant
+    # exception alerts (https://sentry.io → create project → copy DSN).
+    sentry_dsn: str | None = None
+    sentry_traces_sample_rate: float = 0.0
     # Shared secret for the scheduled-maintenance endpoints (discovery, daily
     # digest, archive, ...). When set, those endpoints reject requests without
     # a matching ``X-Cron-Secret`` header — stops strangers from triggering

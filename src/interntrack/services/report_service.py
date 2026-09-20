@@ -467,6 +467,24 @@ class ReportService:
         age = (utcnow() - posted).total_seconds() / 86400
         return max(0, int(age))
 
+    @staticmethod
+    def _job_age_hours(job) -> int | None:
+        """Whole hours since the job was posted, or ``None`` when unknown.
+
+        Gives the digest's freshness badge hour granularity inside the first
+        day ("🆕 3h ago") instead of collapsing everything to "today".
+        """
+        posted = ReportService._as_datetime(
+            getattr(job, "posted_at", None) or getattr(job, "created_at", None)
+        )
+        if posted is None:
+            return None
+        posted = to_naive_utc(posted)
+        if posted is None:
+            return None
+        hours = (utcnow() - posted).total_seconds() / 3600
+        return max(0, int(hours))
+
     async def generate_daily_report(
         self,
         domains: list[str] | None = None,
@@ -538,6 +556,7 @@ class ReportService:
                     list(getattr(job, "tags", None) or []),
                 ),
                 "age_days": self._job_age_days(job),
+                "age_hours": self._job_age_hours(job),
                 "salary_min": getattr(job, "salary_min", None),
                 "salary_max": getattr(job, "salary_max", None),
                 "salary_currency": getattr(job, "salary_currency", None),

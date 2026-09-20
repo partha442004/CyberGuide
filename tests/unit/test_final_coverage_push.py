@@ -27,6 +27,9 @@ class TestNotificationServiceExtended:
             mock_settings.twilio_auth_token = None
             mock_settings.twilio_phone_number = None
             mock_settings.resend_api_key = None
+            # Brevo HTTP channel (added later) must be off too, else the
+            # manager registers an email channel the assertion can't see.
+            mock_settings.brevo_api_key = None
             mock_settings.is_whatsapp_configured = False
             manager = NotificationManager(session)
         assert manager.get_configured_channels() == []
@@ -45,6 +48,9 @@ class TestNotificationServiceExtended:
             mock_settings.discord_webhook_url = "https://discord.com/webhook"
             mock_settings.slack_webhook_url = None
             mock_settings.resend_api_key = None
+            # Brevo HTTP channel (added later) must be off too, else the
+            # manager registers an email channel the assertion can't see.
+            mock_settings.brevo_api_key = None
             mock_settings.is_whatsapp_configured = False
             manager = NotificationManager(session)
         channels = manager.get_configured_channels()
@@ -66,6 +72,9 @@ class TestNotificationServiceExtended:
             mock_settings.discord_webhook_url = None
             mock_settings.slack_webhook_url = None
             mock_settings.resend_api_key = None
+            # Brevo HTTP channel (added later) must be off too, else the
+            # manager registers an email channel the assertion can't see.
+            mock_settings.brevo_api_key = None
             mock_settings.is_whatsapp_configured = False
             manager = NotificationManager(session)
         results = await manager.notify(["email"], "test message")

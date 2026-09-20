@@ -2663,7 +2663,19 @@ _DOMAIN_ICONS = {
 }
 
 
-def _age_badge(age: int) -> str:
+def _age_badge(age: int, age_hours: int | None = None) -> str:
+    """Freshness chip: hour-level inside the first day, then day-level.
+
+    ``age_hours`` (when known) upgrades the old day-only badge — a job
+    discovered 2 hours ago shows "🆕 2h ago" instead of the opaque
+    "🟢 today", making the "only live jobs" promise visible at a glance.
+    Older jobs keep the day badges exactly as before.
+    """
+    if age <= 0 and age_hours is not None:
+        if age_hours < 2:
+            return "🆕 just in"
+        if age_hours < 24:
+            return f"🆕 {age_hours}h ago"
     if age <= 0:
         return "🟢 today"
     if age == 1:
@@ -2818,7 +2830,8 @@ def _job_lines(
         head += f" — {company}"
     applied = job.get("is_applied", False)
     head += " ✅ Applied" if applied else " ⬜ Not applied"
-    head += f" · {_age_badge(int(job.get('age_days', 0) or 0))}"
+    age = _age_badge(int(job.get("age_days", 0) or 0), age_hours=job.get("age_hours"))
+    head += f" · {age}"
     lines = [head]
     salary = _salary_txt(job)
     if salary:
@@ -4759,7 +4772,10 @@ def _job_html_card(
     score_txt = f"{score:.0f}%" if score is not None else "—"
     applied = job.get("is_applied", False)
     status_txt = "✅ Applied" if applied else "⬜ Not applied"
-    age = _age_badge(int(job.get("age_days", 0) or 0))
+    age = _age_badge(
+        int(job.get("age_days", 0) or 0),
+        age_hours=job.get("age_hours"),
+    )
     expiry = _esc(_expiry_note(job).strip())
     salary = _esc(_salary_txt(job))
     exp_level = _esc(str(job.get("experience_level") or "").strip())

@@ -191,6 +191,9 @@ class TestNotifyRecipientChannels:
             settings.telegram_chat_id = "shared-chat"
             # Keep Resend out so the patched EmailChannel handles the send.
             settings.resend_api_key = None
+            # Brevo takes priority over SMTP — with the mock's truthy
+            # auto-attribute it would bypass the patched EmailChannel.
+            settings.brevo_api_key = None
             settings.is_whatsapp_configured = False
             email_cls.return_value.send = AsyncMock(return_value=True)
             tg_cls.return_value.send = AsyncMock(return_value=True)

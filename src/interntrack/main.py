@@ -28,6 +28,22 @@ from interntrack.utils.logger import get_logger
 settings = get_settings()
 logger = get_logger("interntrack.main")
 
+# Sentry error tracking — active only when SENTRY_DSN is configured. Installed
+# BEFORE the app is built so startup errors are captured too. A failure here
+# must never block the app (a broken monitoring SDK is not a business error).
+if settings.sentry_dsn:
+    try:
+        import sentry_sdk
+
+        sentry_sdk.init(
+            dsn=str(settings.sentry_dsn),
+            traces_sample_rate=settings.sentry_traces_sample_rate,
+            send_default_pii=False,
+        )
+        logger.info("Sentry error tracking enabled")
+    except Exception:  # noqa: BLE001 - monitoring must never break the app
+        logger.warning("Sentry initialization failed; continuing without it")
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):

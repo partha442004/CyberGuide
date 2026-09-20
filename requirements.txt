@@ -22,3 +22,4 @@ asyncpg>=0.29.0
 plotly>=5.18.0
 streamlit>=1.29.0
 pypdf>=4.0.0
+sentry-sdk>=2.0.0
