@@ -786,9 +786,9 @@ PROJECTS
 
     def test_tj_array_fragments_joined_with_word_gaps(self):
         """TJ-array fragments are joined, inserting spaces at word gaps."""
-        body = "(P)100(AR)20(THASARA)90(THI)-278(B)"
+        body = "(PY)100(TH)20(ON)90-278(DEV)"
         text = ResumeParser._join_tj_fragments(body)
-        assert text == " RAVIB"
+        assert text == "PYTHON DEV"
 
     def test_tj_array_pdf_escapes_unescaped(self):
         """PDF octal/backslash escapes inside TJ fragments are unescaped."""
