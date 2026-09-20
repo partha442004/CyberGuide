@@ -368,6 +368,9 @@ def _get_setting(name: str, default: str) -> str:
 # Base URLs for the InternTrack API.
 API_URL = _get_setting("API_URL", "https://cyberguide-api.vercel.app/api/v1")
 HEALTH_URL = _get_setting("HEALTH_URL", "https://cyberguide-api.vercel.app/health")
+# Owner-only cron secret: lets the dashboard read the cron-guarded
+# catch-up-status endpoint for the member delivery-health page.
+CRON_SECRET = _get_setting("CRON_SECRET", "")
 DEFAULT_VERSION = "1.20.0"
 
 
@@ -1862,6 +1865,67 @@ def show_account() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Page: Delivery Health (owner view: who got today's digest, who's stale)
+# ---------------------------------------------------------------------------
+
+
+def show_delivery_health() -> None:
+    """Owner page: per-member digest delivery status at a glance.
+
+    Reads the cron-guarded catch-up-status endpoint (which already computes
+    staleness from each member's last_alert_at) and renders stale members
+    first, so a skipped cron or failed send is visible before anyone has to
+    complain about missing mail.
+    """
+    st.header("🩺 Delivery Health")
+    st.markdown(
+        "Who received their digest and when. A member is **stale** when no "
+        "digest reached them in the last 12 hours — the 13:00/19:00 catch-up "
+        "self-heals those automatically, but this page makes the state visible."
+    )
+    if not CRON_SECRET:
+        st.warning(
+            "Set the CRON_SECRET secret (Streamlit) or env var to read the "
+            "delivery status endpoint."
+        )
+        return
+    with suppress(Exception):
+        resp = httpx.get(
+            f"{API_URL}/reports/catch-up-status",
+            headers={"X-Cron-Secret": CRON_SECRET},
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            st.error(f"Status endpoint returned {resp.status_code}")
+            return
+        data = resp.json()
+    if data.get("needs_catch_up"):
+        st.error(
+            "⚠️ Some members have not received a digest recently — the next cron slot will self-heal."
+        )
+    else:
+        st.success(
+            "✅ Every enabled member received their digest within the last 12 hours."
+        )
+    stale = data.get("stale_users") or []
+    checked = data.get("checked", 0)
+    st.metric("Members checked", checked, f"stale: {len(stale)}")
+    if stale:
+        st.subheader("Stale members")
+        for s in stale:
+            last = s.get("last_alert_at") or "never"
+            hours = s.get("hours_since")
+            hours_txt = (
+                f" · {hours:.0f}h ago" if isinstance(hours, (int, float)) else ""
+            )
+            st.markdown(f"- `{s.get('user_id')}` — last digest: **{last}**{hours_txt}")
+    st.caption(
+        "Staleness window: 12h. The legacy default account (user1) may show as "
+        "stale when its saved filters match no new jobs — that is expected."
+    )
+
+
+# ---------------------------------------------------------------------------
 # Page: Team & Users (admin onboarding — add friends with role + location)
 # ---------------------------------------------------------------------------
 
@@ -2464,6 +2528,7 @@ def main() -> None:
                 "Expired Jobs",
                 "Analytics",
                 "Alerts",
+                "Delivery Health",
                 "Digest Archive",
                 "Resume Match",
                 "My Matches",
@@ -2501,6 +2566,7 @@ def main() -> None:
         "Expired Jobs": show_expired,
         "Analytics": show_analytics,
         "Alerts": show_alerts,
+        "Delivery Health": show_delivery_health,
         "Digest Archive": show_digest_archive,
         "Resume Match": show_resume_match,
         "My Matches": show_my_matches,
