@@ -99,6 +99,9 @@ DEFAULT_DOMAINS = ["security"]  # Default alert domain when no user prefs
 DEFAULT_LOCATION = "Bangalore"  # Default discovery location
 
 # The three daily send slots (see .github/workflows/daily-refresh.yml).
+# Cap for a member's FIRST-ever digest (no last_alert_at yet): the initial
+# 7-day window can otherwise dump 50 jobs into one welcome email.
+_FIRST_DIGEST_MAX_JOBS = 12
 # Default categories per slot, used when the user hasn't customized
 # ``slot_domains``. The workflow discovers cybersecurity / software
 # engineering / python developer jobs respectively at these times.
@@ -2010,6 +2013,21 @@ async def _send_alert_for(
         # The week's most-engaged jobs (apps + bookmarks + views) lead the
         # recap. Defensive: a stats failure must never break the digest.
         report["top_engaged"] = await _weekly_top_engaged(session)
+    # First-digest cap: a member's very first send can carry 50 jobs (the
+    # full 7-day window), which reads as spam and gets skimmed. Cap it to
+    # the 12 freshest and say so in the subject area via a report note;
+    # from the second send on, the normal 24h window is naturally small.
+    if (
+        not weekly
+        and prefs.get("last_alert_at") is None
+        and len(report.get("new_jobs") or []) > _FIRST_DIGEST_MAX_JOBS
+    ):
+        report["new_jobs"] = report["new_jobs"][:_FIRST_DIGEST_MAX_JOBS]
+        report["summary"]["new_jobs"] = len(report["new_jobs"])
+        report["first_digest_note"] = (
+            f"Showing your top {_FIRST_DIGEST_MAX_JOBS} freshest matches — "
+            "the rest arrive in your daily digest from tomorrow."
+        )
     # Per-user digest smartening: salary target + keyword highlights ride
     # along on the report so every builder sees the same numbers.
     report["target_salary"] = prefs.get("min_salary") or None
@@ -3825,7 +3843,14 @@ async def build_daily_report_html(
             f"<div style='opacity:.85;font-size:13px;'>{_esc(generated)}</div>"
             f"<div style='margin-top:10px;font-size:14px;'>"
             f"New jobs: <b>{summary.get('new_jobs', 0)}</b> · "
-            f"New applications: <b>{summary.get('new_applications', 0)}</b></div></div>"
+            f"New applications: <b>{summary.get('new_applications', 0)}</b></div>"
+            + (
+                "<div style='margin-top:6px;font-size:12px;opacity:.9;'>"
+                f"{_esc(report['first_digest_note'])}</div>"
+                if report.get("first_digest_note")
+                else ""
+            )
+            + "</div>"
         ),
     ]
 
