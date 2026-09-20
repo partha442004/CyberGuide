@@ -162,6 +162,22 @@ def get_default_registry() -> ScraperRegistry:
     registry.register(LinkedInJobsAPIScraper())
     registry.register(IndeedAPIScraper())
 
+    # Free public board APIs (official JSON, no keys, no bot-gating):
+    # Remotive / Arbeitnow / Jobicy widen the net with remote-heavy software,
+    # data and design roles that never appear on the India boards.
+    try:
+        from interntrack.scrapers.board_apis import (
+            ArbeitnowScraper,
+            JobicyScraper,
+            RemotiveScraper,
+        )
+
+        registry.register(RemotiveScraper())
+        registry.register(ArbeitnowScraper())
+        registry.register(JobicyScraper())
+    except Exception as e:
+        logger.warning("Board API scrapers unavailable: %s", e)
+
     # Direct security-company Greenhouse career boards (no API key, never
     # blocks) - the most reliable source of real vendor security roles.
     try:

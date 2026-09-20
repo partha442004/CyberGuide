@@ -49,6 +49,11 @@ _DISCOVERY_SOURCES: list[str] = [
     "search_engine",
     "rss_feed",
     "hackernews",
+    # Free public board APIs (official JSON, verified returning results from
+    # datacenter IPs on 2026-09-20): remote-heavy software/data/design roles.
+    "remotive",
+    "arbeitnow",
+    "jobicy",
 ]
 
 # Total wall-clock budget (seconds) for one discovery request. vercel.json
