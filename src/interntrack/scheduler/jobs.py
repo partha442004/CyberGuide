@@ -622,9 +622,8 @@ def _email_delivery_configured(settings) -> bool:
     the Brevo HTTP API.  Falls back to that property for partial settings
     stubs (tests) that simulate SMTP-only configuration.
     """
-    if (
-        getattr(settings, "brevo_api_key", None)
-        or getattr(settings, "resend_api_key", None)
+    if getattr(settings, "brevo_api_key", None) or getattr(
+        settings, "resend_api_key", None
     ):
         return True
     return bool(getattr(settings, "is_email_configured", False))
