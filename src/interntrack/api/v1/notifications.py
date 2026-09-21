@@ -390,7 +390,10 @@ async def get_notification_stats(
     from interntrack.domain.models import NotificationHistory
 
     window = max(1, min(int(days), 90))
-    since = datetime.now(UTC) - timedelta(days=window)
+    # DB timestamps are naive UTC (codebase-wide convention); an aware
+    # datetime here makes asyncpg raise on Postgres (worked on SQLite,
+    # which is why CI missed it) — strip tzinfo to match.
+    since = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=window)
     result = await db.execute(
         select(NotificationHistory)
         .where(NotificationHistory.created_at >= since)
@@ -428,7 +431,16 @@ async def get_notification_stats(
         t["sends"] += 1
         t["jobs"] += job_count
 
-        for ch, ok in (row.results or {}).items():
+        results: object = row.results or {}
+        # Legacy rows may hold list/str shapes; treat them as unknown outcomes
+        # rather than crashing the aggregation ("pure read — never raises").
+        if isinstance(results, dict):
+            channel_results = list(results.items())
+        elif isinstance(results, (list, tuple)):
+            channel_results = [(c, True) for c in results if isinstance(c, str)]
+        else:
+            channel_results = []
+        for ch, ok in channel_results:
             bucket = per_channel.setdefault(str(ch), {"delivered": 0, "failed": 0})
             if ok:
                 bucket["delivered"] += 1
