@@ -110,6 +110,49 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# ---------------------------------------------------------------------------
+# Owner password gate — the dashboard exposes member PII + admin actions, so
+# "obscure URL" is not access control. Set DASHBOARD_PASSWORD in Streamlit
+# Cloud (Manage app → Settings → Secrets):  passwords = {owner = "..."}
+# or a plain DASHBOARD_PASSWORD entry. Session state remembers the unlock
+# for the browser session; a wrong password just re-prompts.
+# ---------------------------------------------------------------------------
+
+
+def _dashboard_unlocked() -> bool:
+    """Check the gate once per session; render the login form when locked."""
+    if st.session_state.get("_dash_auth"):
+        return True
+    secrets_map = getattr(st, "secrets", {}) or {}
+    expected = ""
+    with suppress(Exception):
+        try:
+            expected = str(secrets_map["passwords"]["owner"])
+        except Exception:  # noqa: BLE001, S110 - fall through to flat key
+            expected = str(secrets_map.get("DASHBOARD_PASSWORD", ""))
+    if not expected:
+        # No password configured — behave exactly as before (local dev,
+        # fresh deployments). Configure the secret to lock it down.
+        return True
+    with st.container(border=True):
+        st.markdown("### 🔐 InternTrack owner login")
+        st.caption("This dashboard shows member data — sign in to continue.")
+        password = st.text_input("Password", type="password", key="_dash_pw")
+        if st.button("Sign in", type="primary", use_container_width=True):
+            import hmac
+
+            if hmac.compare_digest(str(password), expected):
+                st.session_state["_dash_auth"] = True
+                st.rerun()
+            else:
+                st.error("Wrong password — try again.")
+    return False
+
+
+if not _dashboard_unlocked():
+    st.stop()
+
+
 # Brand logo in the Streamlit header (best-effort: missing file or old
 # Streamlit without st.logo just skips it).
 _logo_path = pathlib.Path(__file__).resolve().parent / "static" / "logo.png"

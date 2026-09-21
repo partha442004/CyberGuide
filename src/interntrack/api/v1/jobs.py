@@ -287,6 +287,31 @@ async def archive_expired(
     }
 
 
+@router.post("/purge-archived")
+async def purge_archived(
+    days: int = 30,
+    db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_cron_secret),
+):
+    """DELETE long-archived jobs from both tables (free-tier storage cap).
+
+    Runs after archive-expired in the daily maintenance cron: archives
+    mark jobs inactive and copy them to ``expired_jobs``, but Neon free
+    tier has hard storage limits and both tables grow forever. Deletion
+    is safe — re-send protection comes from NotificationHistory URL
+    snapshots, not from the archive tables.
+    """
+    repo = JobRepository(db)
+    counts = await repo.purge_archived_jobs(days=days)
+    return {
+        **counts,
+        "message": (
+            f"Purged {counts['jobs_purged']} archived jobs rows and "
+            f"{counts['expired_purged']} expired_jobs rows older than {days} days"
+        ),
+    }
+
+
 # Hosts that block datacenter/server IPs (403/429) even when the posting is
 # perfectly alive. A HEAD from the Vercel IP gets rejected, so treating those
 # responses as "dead" would wrongly hide good jobs. Only definitive 404/410

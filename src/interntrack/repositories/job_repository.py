@@ -6,7 +6,7 @@ import re
 from datetime import timedelta
 from uuid import uuid4
 
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.domain.enums import JobSource, JobType
@@ -573,6 +573,45 @@ class JobRepository(BaseRepository[Job]):
 
         await self.session.commit()
         return archived
+
+    async def purge_archived_jobs(self, days: int = 30) -> dict:
+        """DELETE archived jobs to keep free-tier Postgres storage bounded.
+
+        Neon's free tier has hard storage limits, and two tables grow
+        forever without this: inactive rows left in ``jobs`` after
+        :meth:`archive_expired_jobs`, and their full copies in
+        ``expired_jobs``. Both are older than the re-send protection
+        (dedup uses the NotificationHistory URL snapshots, not the
+        archive), so deletion is safe:
+
+        - ``jobs`` rows: inactive AND not updated for ``days`` days
+        - ``expired_jobs`` rows: archived more than ``days`` days ago
+
+        Returns counts so the cron log shows what was reclaimed.
+        """
+        from datetime import timedelta
+
+        from interntrack.domain.models import ExpiredJob
+
+        cutoff = utcnow() - timedelta(days=days)
+
+        jobs_result = await self.session.execute(
+            delete(Job).where(
+                and_(
+                    Job.is_active.is_(False),
+                    Job.updated_at < cutoff,
+                )
+            )
+        )
+        jobs_purged = int(getattr(jobs_result, "rowcount", 0) or 0)
+
+        expired_result = await self.session.execute(
+            delete(ExpiredJob).where(ExpiredJob.expired_at < cutoff)
+        )
+        expired_purged = int(getattr(expired_result, "rowcount", 0) or 0)
+
+        await self.session.commit()
+        return {"jobs_purged": jobs_purged, "expired_purged": expired_purged}
 
     async def get_expired_jobs(self, limit: int = 50) -> list:
         """Get archived expired jobs."""

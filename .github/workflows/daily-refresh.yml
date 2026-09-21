@@ -52,6 +52,18 @@ jobs:
             && echo "expired jobs archived OK" \
             || echo "archive step failed or timed out"
 
+      # Archiving only deactivates + copies; rows stay forever and Neon's
+      # free tier has hard storage limits. This deletes jobs rows that have
+      # been inactive for 30+ days and their expired_jobs copies. Safe:
+      # re-send protection comes from NotificationHistory URL snapshots.
+      - name: Purge long-archived jobs (free-tier storage cap)
+        run: |
+          curl -sSf --max-time 120 -X POST \
+            -H "X-Cron-Secret: $CRON_SECRET" \
+            "$API_BASE/api/v1/jobs/purge-archived?days=30" \
+            && echo "archived jobs purged OK" \
+            || echo "purge step failed or timed out"
+
       # Same serverless story as above: the scheduler's closing-soon sweep
       # only runs inside APScheduler, which never executes on Vercel. This
       # curl fires the identical sweep through the public API (morning +
