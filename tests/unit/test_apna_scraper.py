@@ -255,15 +255,14 @@ class TestApnaInRegistry:
         assert "apna" in registry.list_sources()
 
     def test_discovery_sources_include_apna(self):
-        """Apna stays registered and callable via the per-source discovery
-        endpoint. It is NOT in the default _DISCOVERY_SOURCES list: the Apna
-        board bot-gates Vercel datacenter IPs, so including it in the cron's
-        default source list only burned the 10-second function budget on
-        requests that always returned 0 results (see jobs.py comment)."""
+        """Apna IS in the default _DISCOVERY_SOURCES list: a 2026-09-21 live
+        test from Vercel datacenter IPs returned 9 saved jobs, disproving
+        the earlier bot-gating assumption. The scraper stays registered and
+        callable via the per-source discovery endpoint as well."""
         from interntrack.api.v1.jobs import _DISCOVERY_SOURCES
         from interntrack.scrapers.registry import get_default_registry
 
-        assert "apna" not in _DISCOVERY_SOURCES
+        assert "apna" in _DISCOVERY_SOURCES
 
         registry = get_default_registry()
         assert "apna" in registry.list_sources()

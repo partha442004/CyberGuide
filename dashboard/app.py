@@ -697,21 +697,30 @@ def _api_raw(
 
     Unlike ``_api`` (which only returns JSON on 200), this returns the full
     httpx response so callers can distinguish 201, 404 and 409, or None when
-    the API is unreachable.
+    the API is unreachable. Carries the ``X-Cron-Secret`` header when the
+    secret is configured so guarded endpoints (observability, cron ops)
+    keep working from the owner dashboard.
     """
     url = f"{API_URL}{endpoint}"
+    headers = {"X-Cron-Secret": CRON_SECRET} if CRON_SECRET else None
     with suppress(Exception):
         if method == "POST":
             if files:
                 return httpx.post(url, files=files, timeout=timeout)
-            return httpx.post(url, json=json_data or {}, timeout=timeout)
+            return httpx.post(
+                url, json=json_data or {}, headers=headers, timeout=timeout
+            )
         if method == "PUT":
-            return httpx.put(url, json=json_data or {}, timeout=timeout)
+            return httpx.put(
+                url, json=json_data or {}, headers=headers, timeout=timeout
+            )
         if method == "PATCH":
-            return httpx.patch(url, json=json_data or {}, timeout=timeout)
+            return httpx.patch(
+                url, json=json_data or {}, headers=headers, timeout=timeout
+            )
         if method == "DELETE":
-            return httpx.delete(url, timeout=timeout)
-        return httpx.get(url, timeout=timeout)
+            return httpx.delete(url, headers=headers, timeout=timeout)
+        return httpx.get(url, headers=headers, timeout=timeout)
     return None
 
 

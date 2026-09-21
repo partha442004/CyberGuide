@@ -10,10 +10,15 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from interntrack.api.deps import require_cron_secret
 from interntrack.database.session import get_db
 from interntrack.domain.models import Job, NotificationHistory
 
-router = APIRouter()
+# These endpoints expose operational details (scraper yields, discovery
+# history, member match trends) — useful to the owner, a recon gift to
+# strangers. Guarded like the other cron/ops endpoints; the Streamlit
+# dashboard sends the same X-Cron-Secret header.
+router = APIRouter(dependencies=[Depends(require_cron_secret)])
 
 
 @router.get("/discovery-history")

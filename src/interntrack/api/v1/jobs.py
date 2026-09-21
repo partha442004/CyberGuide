@@ -41,19 +41,25 @@ router = APIRouter()
 # dropping it made the whole LINKEDIN bucket go stale (0 jobs in 7 days).
 _DISCOVERY_SOURCES: list[str] = [
     # Fast sources that reliably return results on Vercel serverless.
-    # Most job boards (Indeed, Internshala, Foundit, Apna, etc.) bot-gate
-    # datacenter IPs and return 0 results — listing them just wastes the
-    # function's 10-second budget on failed HTTP requests.  These were
-    # verified to return results from Vercel on 2026-08-27.
+    # Most job boards (Indeed, Internshala, Foundit, Cutshort, etc.)
+    # bot-gate datacenter IPs and return 0 results — listing them just
+    # wastes the function's 10-second budget on failed HTTP requests.
+    # Verified from Vercel: linkedin/search_engine/rss/hn 2026-08-27,
+    # remotive/arbeitnow/jobicy 2026-09-20, apna 2026-09-21 (9 saved),
+    # jobdexo 2026-09-21 (2 saved in 3s).
     "linkedin",
     "search_engine",
     "rss_feed",
     "hackernews",
     # Free public board APIs (official JSON, verified returning results from
-    # datacenter IPs on 2026-09-20): remote-heavy software/data/design roles.
+    # datacenter IPs): remote-heavy software/data/design roles.
     "remotive",
     "arbeitnow",
     "jobicy",
+    # India boards verified working from Vercel datacenter IPs (2026-09-21):
+    # entry-level heavy — exactly the audience for this tracker.
+    "apna",
+    "jobdexo",
 ]
 
 # Total wall-clock budget (seconds) for one discovery request. vercel.json
