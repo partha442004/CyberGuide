@@ -64,6 +64,12 @@ _DISCOVERY_SOURCES: list[str] = [
 # enough for the round-robin interleave to reach most users' top queries.
 _DISCOVERY_DEADLINE_SECONDS = 45
 
+# Reserved wall-clock slice (seconds) for the company-career-board sweep
+# that runs BEFORE the per-user queries (see run_for_users).  Measured
+# 2026-09-21: the full sweep takes ~15-20s across Greenhouse + the vendor
+# career portals.
+_COMPANY_BOARD_BUDGET_SECONDS = 20
+
 
 # Indian cities (plus common aliases) recognized inside discovery queries so
 # the right scrapers target them. e.g. "cybersecurity bangalore" resolves to
@@ -1073,6 +1079,36 @@ async def run_discovery_for_users(
 
     deadline = time.monotonic() + _DISCOVERY_DEADLINE_SECONDS
 
+    # Direct company career boards (Greenhouse + vendor career portals) run
+    # FIRST with a reserved slice of the budget, once per run, unfiltered:
+    # these boards list every open role, so one empty-query sweep feeds ALL
+    # roles through save_jobs -> domain classification, and each user's
+    # digest picks up the ones matching their domains.  Measured 2026-09-21:
+    # the sweep yields ~80 NEW jobs vs ~4 from the keyword queries (which
+    # mostly re-find already-known postings), and when it ran *after* the
+    # queries it was starved to zero budget on every scheduled run — it
+    # never appeared in the cron logs.  wait_for hard-bounds the sweep so a
+    # slow board can't eat the whole budget.
+    try:
+        board_jobs = await asyncio.wait_for(
+            registry.fetch_all(query="", sources=["company"]),
+            timeout=_COMPANY_BOARD_BUDGET_SECONDS,
+        )
+        if board_jobs:
+            saved_boards = await service.save_jobs(board_jobs)
+            total_found += len(board_jobs)
+            total_saved += len(saved_boards)
+            saved_all.extend(saved_boards)
+            details.append(
+                {
+                    "query": "(company boards)",
+                    "found": len(board_jobs),
+                    "saved": len(saved_boards),
+                }
+            )
+    except Exception as e:  # noqa: BLE001 - board sweep must not break discovery
+        print(f"Company-board sweep failed: {e}")
+
     for query, location in unique:
         if time.monotonic() > deadline:
             break
@@ -1090,30 +1126,6 @@ async def run_discovery_for_users(
         saved_all.extend(saved)
         details.append({"query": query, "found": len(jobs), "saved": len(saved)})
 
-    # Direct company career boards (Greenhouse) once per run, unfiltered,
-    # with whatever budget the user queries left over: these boards list
-    # every open role, so one empty-query sweep feeds ALL roles through
-    # save_jobs -> domain classification, and each user's digest picks up
-    # the ones matching their domains.  Filtering per query would re-fetch
-    # the same boards every iteration and burn the serverless budget on
-    # duplicate HTTP calls.
-    if time.monotonic() < deadline:
-        try:
-            board_jobs = await registry.fetch_all(query="", sources=["company"])
-            if board_jobs:
-                saved_boards = await service.save_jobs(board_jobs)
-                total_found += len(board_jobs)
-                total_saved += len(saved_boards)
-                saved_all.extend(saved_boards)
-                details.append(
-                    {
-                        "query": "(company boards)",
-                        "found": len(board_jobs),
-                        "saved": len(saved_boards),
-                    }
-                )
-        except Exception as e:  # noqa: BLE001 - board sweep must not break discovery
-            print(f"Company-board sweep failed: {e}")
     # Ping users on Telegram the moment a high-match job lands (instead of
     # waiting for the next daily slot). One consolidated pass after all
     # queries so a user gets a single ping per run, not one per query.
