@@ -614,6 +614,60 @@ async def _notify_owner_of_failure(
         return False
 
 
+def _email_delivery_configured(settings) -> bool:
+    """True when ANY email provider is configured (Brevo > Resend > SMTP).
+
+    The owner-facing senders used to gate on ``is_email_configured`` (SMTP
+    creds only) and silently skipped owner mail once production moved to
+    the Brevo HTTP API.  Falls back to that property for partial settings
+    stubs (tests) that simulate SMTP-only configuration.
+    """
+    if (
+        getattr(settings, "brevo_api_key", None)
+        or getattr(settings, "resend_api_key", None)
+    ):
+        return True
+    return bool(getattr(settings, "is_email_configured", False))
+
+
+def _owner_email_channel(settings, to_email: str):
+    """Email channel for owner-facing mail (summary, team recap).
+
+    Mirrors the member digest delivery order — Brevo HTTP API first, then
+    Resend, then raw SMTP.  The owner summary/recap used to construct the
+    SMTP channel unconditionally, so after the Brevo migration every daily
+    owner email died with Gmail 535 BadCredentials.  ``getattr`` keeps
+    partial settings stubs (tests, older configs) working.
+    """
+    from interntrack.services.notification_service import (
+        BrevoEmailChannel,
+        EmailChannel,
+        ResendEmailChannel,
+    )
+
+    from_email = (
+        getattr(settings, "brevo_from", None)
+        or getattr(settings, "resend_from", None)
+        or getattr(settings, "effective_email_from", None)
+        or getattr(settings, "email_from", "")
+        or ""
+    )
+    brevo_key = getattr(settings, "brevo_api_key", None)
+    if brevo_key:
+        return BrevoEmailChannel(brevo_key, from_email, to_email=to_email)
+    resend_key = getattr(settings, "resend_api_key", None)
+    if resend_key:
+        return ResendEmailChannel(resend_key, from_email, to_email=to_email)
+    return EmailChannel(
+        host=getattr(settings, "smtp_host", "smtp.gmail.com"),
+        port=getattr(settings, "smtp_port", 587),
+        user=getattr(settings, "smtp_user", "") or "",
+        password=getattr(settings, "smtp_password", "") or "",
+        from_email=from_email,
+        to_email=to_email,
+    )
+
+
 async def send_team_recap() -> dict:
     """Weekly owner email: what each team member's alerts delivered.
 
@@ -635,7 +689,6 @@ async def send_team_recap() -> dict:
 
             from interntrack.config import get_settings
             from interntrack.domain.models import User
-            from interntrack.services.notification_service import EmailChannel
 
             settings = get_settings()
             if not settings.team_recap_enabled:
@@ -668,7 +721,7 @@ async def send_team_recap() -> dict:
                 reason = "owner has no email"
                 print(f"[{datetime.now(UTC)}] Team recap skipped — {reason}")
                 return {"sent": False, "reason": reason}
-            if not settings.is_email_configured:
+            if not _email_delivery_configured(settings):
                 reason = "email not configured"
                 print(f"[{datetime.now(UTC)}] Team recap skipped — {reason}")
                 return {"sent": False, "reason": reason}
@@ -681,14 +734,7 @@ async def send_team_recap() -> dict:
                 f"📬 Team alerts recap — {len(stats['users'])} members, "
                 f"{stats['total_jobs']} jobs this week"
             )
-            channel = EmailChannel(
-                host=settings.smtp_host,
-                port=settings.smtp_port,
-                user=settings.smtp_user or "",
-                password=settings.smtp_password or "",
-                from_email=settings.email_from,
-                to_email=owner_email,
-            )
+            channel = _owner_email_channel(settings, owner_email)
             await channel.send(
                 _build_team_recap_html(stats, getattr(owner, "name", None)),
                 subject=subject,
@@ -825,10 +871,9 @@ async def send_daily_owner_summary() -> dict:
 
             from interntrack.config import get_settings
             from interntrack.domain.models import User
-            from interntrack.services.notification_service import EmailChannel
 
             settings = get_settings()
-            if not settings.is_email_configured:
+            if not _email_delivery_configured(settings):
                 return {"sent": False, "reason": "email not configured"}
 
             result = await session.execute(select(User).order_by(User.created_at.asc()))
@@ -859,14 +904,7 @@ async def send_daily_owner_summary() -> dict:
                 f"{stats['total_opened']} opened, "
                 f"{stats['total_email_applied']} applied"
             )
-            channel = EmailChannel(
-                host=settings.smtp_host,
-                port=settings.smtp_port,
-                user=settings.smtp_user or "",
-                password=settings.smtp_password or "",
-                from_email=settings.email_from,
-                to_email=owner_email,
-            )
+            channel = _owner_email_channel(settings, owner_email)
             await channel.send(
                 _build_daily_summary_html(stats),
                 subject=subject,
