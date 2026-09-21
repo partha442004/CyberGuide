@@ -6,11 +6,30 @@ name: Diagnostics (manual)
 
 on:
   workflow_dispatch:
+    inputs:
+      disable_user1:
+        description: "One-time remediation: disable the legacy user1 ghost account (stops daily catch-up spam)"
+        type: boolean
+        default: false
 
 jobs:
   diag:
     runs-on: ubuntu-latest
     steps:
+      - name: Disable legacy user1 (remediation)
+        if: ${{ inputs.disable_user1 }}
+        env:
+          API_BASE: https://cyberguide-api.vercel.app
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          echo "disabling user1:"
+          curl -sS --max-time 30 -X PUT \
+            "$API_BASE/api/v1/notifications/preferences/user1" \
+            -H "X-Cron-Secret: $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{"is_enabled": false}' | head -c 300
+          echo
+
       - name: Catch-up status (who is stale)
         env:
           API_BASE: https://cyberguide-api.vercel.app
