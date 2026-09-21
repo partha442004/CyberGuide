@@ -19,6 +19,7 @@ from interntrack.api.v1.applications_v2 import router as applications_v2_router
 from interntrack.api.v1.bookmarks import router as bookmarks_router
 from interntrack.api.v1.domains import router as domains_router
 from interntrack.api.v1.email_actions import router as email_actions_router
+from interntrack.api.v1.self_service import router as self_service_router
 from interntrack.api.v1.observability import router as observability_router
 from interntrack.api.v1.resume_parser import router as resume_parser_router
 from interntrack.api.v1.salary_insights import router as salary_insights_router
@@ -34,6 +35,11 @@ api_router.include_router(
     email_actions_router,
     prefix="/v1/email",
     tags=["Email actions"],
+)
+api_router.include_router(
+    self_service_router,
+    prefix="/v1/self-service",
+    tags=["Self-service"],
 )
 api_router.include_router(
     applications.router,

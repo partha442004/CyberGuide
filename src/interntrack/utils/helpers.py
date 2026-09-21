@@ -825,6 +825,27 @@ def open_token(user_id: str) -> str:
     return _email_token("open", user_id)
 
 
+def prefs_token(user_id: str) -> str:
+    """HMAC token for one member's self-service preferences page link.
+
+    Binds ``user_id`` (with a ``prefs`` scope so it can never be confused
+    with an apply/status/open link) to the server secret. Embedded in the
+    digest footer so members manage their own alerts without the admin.
+    Never raises.
+    """
+    return _email_token("prefs", user_id)
+
+
+def verify_prefs_token(user_id: str, token: str) -> bool:
+    """Constant-time check of a preferences-page link token."""
+    import hmac
+
+    if not token:
+        return False
+    expected = prefs_token(user_id)
+    return hmac.compare_digest(expected, token)
+
+
 def verify_open_token(user_id: str, token: str) -> bool:
     """Constant-time check of an open-pixel token."""
     import hmac

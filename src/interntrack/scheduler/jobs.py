@@ -4352,7 +4352,7 @@ async def build_daily_report_html(
         if footer:
             parts.append(footer)
     else:
-        parts.append(_member_footer_html())
+        parts.append(_member_footer_html(user_id=user_id))
     pixel = _open_pixel_html(api_base, user_id)
     if pixel:
         parts.append(pixel)
@@ -4382,19 +4382,44 @@ def _open_pixel_html(api_base: str, user_id: str | None) -> str:
     )
 
 
-def _member_footer_html() -> str:
+def _member_footer_html(user_id: str | None = None) -> str:
     """Short no-dashboard footer for member digests.
 
     Members get everything from email, so the footer tells them what they
     receive and how to make changes — without pointing at the dashboard
-    (which is owner-only). Rendered only when ``show_dashboard_link`` is
-    False; the owner keeps the dashboard footer instead.
+    (which is owner-only). When ``user_id`` is known, it embeds the signed
+    self-service link so the member can change domains/cities, pause,
+    unsubscribe or delete their data directly (DPDP). Rendered only when
+    ``show_dashboard_link`` is False; the owner keeps the dashboard footer.
     """
+    manage_link = ""
+    if user_id:
+        try:
+            from interntrack.config import get_settings
+            from interntrack.utils.helpers import prefs_token
+
+            base = (get_settings().api_base_url or "").strip().rstrip("/")
+            if base:
+                from urllib.parse import quote
+
+                manage_link = (
+                    f"<a href='{_esc(base)}/api/v1/self-service/prefs"
+                    f"?u={quote(str(user_id))}&t={prefs_token(str(user_id))}' "
+                    "style='color:#4f46e5;font-weight:700;text-decoration:none;'>"
+                    "⚙️ Manage your alerts</a> · "
+                )
+        except Exception:  # noqa: BLE001, S110 - footer must never break email
+            manage_link = ""
+    change_txt = (
+        "Use the button below to change your roles, cities, pause or delete your data."
+        if manage_link
+        else "To change your roles, location, or pause alerts, ask your admin."
+    )
     return (
         "<div style='margin-top:28px;padding-top:18px;border-top:1px solid "
         "#e2e8f0;font-size:12px;color:#94a3b8;line-height:1.6;'>"
-        "You get one job digest every morning at 8 AM IST. To change your "
-        "roles, location, or pause alerts, ask your admin.</div>"
+        f"{manage_link}You get one job digest every morning at 8 AM IST. "
+        f"{change_txt}</div>"
     )
 
 
