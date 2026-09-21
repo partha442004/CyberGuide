@@ -395,7 +395,15 @@ async def get_daily_report(
                     ),
                     timeout=4,
                 )
-            if results.get("email") is True or (results and "email" not in results):
+            # Stamp when ANY configured channel actually delivered — not
+            # just email. The legacy user1 account is telegram-only in
+            # practice (its email endpoint fails daily); requiring email
+            # success meant its stamp never advanced, it stayed "stale"
+            # forever, and the catch-up step fired a redundant send every
+            # single day. Same any-channel convention as the digest sender's
+            # follow-up reminders: at least one delivered result means the
+            # member was reached.
+            if any(results.values()):
                 await _mark_alert_sent(db, target["user_id"])
         elif not preview:
             # Quiet day: no jobs to lose, so the no-duplicates window always
