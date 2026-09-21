@@ -182,8 +182,13 @@ def get_default_registry() -> ScraperRegistry:
     # blocks) - the most reliable source of real vendor security roles.
     try:
         from interntrack.scrapers.greenhouse import GreenhouseBoardScraper
+        from interntrack.scrapers.lever import LeverBoardScraper
 
         registry.register(GreenhouseBoardScraper())
+        # Lever is the other big no-key ATS (Cred, Meesho, Secureframe, ...);
+        # registered under its own "lever" source slot and included in the
+        # company-career-board sweep via the source list below.
+        registry.register(LeverBoardScraper())
     except Exception as e:
         logger.warning("Greenhouse board scraper unavailable: %s", e)
 

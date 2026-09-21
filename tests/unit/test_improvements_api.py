@@ -423,12 +423,14 @@ class TestPerUserDiscoveryEndpoint:
 
         assert registry.fetch_all.called
         call_kwargs = registry.fetch_all.call_args.kwargs
-        # The company-board sweep (sources=["company"], query="") is not a
-        # user query — skip it when inspecting the per-user fetch calls.
+        # The company-board sweep (query="") is not a user query — skip it
+        # when inspecting the per-user fetch calls.  Filter on the empty
+        # query rather than the sources list so this stays correct if the
+        # sweep's source list changes.
         user_calls = [
             c
             for c in registry.fetch_all.call_args_list
-            if c.kwargs.get("sources") != ["company"]
+            if str(c.kwargs.get("query", "")) != ""
         ]
         assert user_calls
         call_kwargs = user_calls[0].kwargs
@@ -559,11 +561,13 @@ class TestPerUserDiscoveryEndpoint:
             await run_discovery_for_users(db=AsyncMock(), limit=4)
 
         # The company-board sweep (query="") is not a user query — skip it
-        # when checking user-query coverage/order.
+        # when checking user-query coverage/order.  Filter on the empty
+        # query rather than the sources list so this stays correct if the
+        # sweep's source list changes.
         locations = [
             str(c.kwargs.get("location", ""))
             for c in registry.fetch_all.call_args_list
-            if c.kwargs.get("sources") != ["company"]
+            if str(c.kwargs.get("query", "")) != ""
         ]
         # First two queries must cover both users (A1, B1 order).
         assert locations[0] in ("Bangalore", "Chennai")

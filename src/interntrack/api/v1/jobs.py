@@ -1091,7 +1091,7 @@ async def run_discovery_for_users(
     # slow board can't eat the whole budget.
     try:
         board_jobs = await asyncio.wait_for(
-            registry.fetch_all(query="", sources=["company"]),
+            registry.fetch_all(query="", sources=["company", "lever"]),
             timeout=_COMPANY_BOARD_BUDGET_SECONDS,
         )
         if board_jobs:
