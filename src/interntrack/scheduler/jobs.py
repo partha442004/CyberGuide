@@ -102,6 +102,13 @@ DEFAULT_LOCATION = "Bangalore"  # Default discovery location
 # Cap for a member's FIRST-ever digest (no last_alert_at yet): the initial
 # 7-day window can otherwise dump 50 jobs into one welcome email.
 _FIRST_DIGEST_MAX_JOBS = 12
+# Hard freshness cap for EVERY daily digest: no listing discovered more
+# than 24h ago may appear, regardless of how the send was triggered
+# (first-ever digest, catch-up after a missed morning, auto-widen). This
+# is the "every job is TODAY's jobs" promise — old stock can never reach
+# an email even when the no-duplicates window reaches further back.
+# Weekly recaps are exempt (they deliberately span 7 days).
+_DIGEST_MAX_AGE_HOURS = 24
 # Default categories per slot, used when the user hasn't customized
 # ``slot_domains``. The workflow discovers cybersecurity / software
 # engineering / python developer jobs respectively at these times.
@@ -1962,7 +1969,13 @@ async def _widened_report(
     the widened search finds nothing.
     """
     try:
-        since = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=5)
+        # Widening relaxes the CITY scope, never the freshness promise: the
+        # window stays inside the 24h cap so a widened digest still contains
+        # only today's jobs (24h cap minus a small margin for jobs found
+        # moments ago).
+        since = datetime.now(UTC).replace(tzinfo=None) - timedelta(
+            hours=max(_DIGEST_MAX_AGE_HOURS - 1, 1)
+        )
         for location in (user_location, None):
             wide = await service.generate_daily_report(
                 domains=domains,
@@ -2050,6 +2063,30 @@ async def _send_alert_for(
         # The week's most-engaged jobs (apps + bookmarks + views) lead the
         # recap. Defensive: a stats failure must never break the digest.
         report["top_engaged"] = await _weekly_top_engaged(session)
+    elif _DIGEST_MAX_AGE_HOURS:
+        # Hard 24h freshness cap on every DAILY digest — the "today's jobs
+        # only" promise. Applies regardless of how the send was triggered
+        # (first-ever digest, catch-up, widened fallback): anything older
+        # than the cap is dropped right here, at the last gate before the
+        # email is built. Weekly recaps are exempt by design.
+        cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(
+            hours=_DIGEST_MAX_AGE_HOURS
+        )
+        cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+
+        def _is_fresh(job: dict) -> bool:
+            created = str(job.get("created_at") or "")
+            return bool(created) and created[:19] >= cutoff_str
+
+        fresh_jobs = [job for job in (report.get("new_jobs") or []) if _is_fresh(job)]
+        if len(fresh_jobs) != len(report.get("new_jobs") or []):
+            dropped = len(report.get("new_jobs") or []) - len(fresh_jobs)
+            report["new_jobs"] = fresh_jobs
+            report["summary"]["new_jobs"] = len(fresh_jobs)
+            print(
+                f"[digest] freshness cap: dropped {dropped} job(s) older "
+                f"than {_DIGEST_MAX_AGE_HOURS}h for user {user_id}"
+            )
     # First-digest cap: a member's very first send can carry 50 jobs (the
     # full 7-day window), which reads as spam and gets skimmed. Cap it to
     # the 12 freshest and say so in the subject area via a report note;

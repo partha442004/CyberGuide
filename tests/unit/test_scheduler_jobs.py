@@ -1,10 +1,12 @@
 """Unit tests for scheduler/jobs.py."""
 
 import asyncio
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+_FRESH_ISO = (datetime.now(UTC) - timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S")
 
 
 class TestFormatDailyReport:
@@ -1406,7 +1408,7 @@ class TestGenerateDailyReport:
         mock_report_service = AsyncMock()
         mock_report_service.generate_daily_report.return_value = {
             "summary": {"new_jobs": 5, "new_applications": 3, "total_applications": 10},
-            "new_jobs": [{}],
+            "new_jobs": [{"created_at": _FRESH_ISO}],
         }
         mock_report_cls.return_value = mock_report_service
 

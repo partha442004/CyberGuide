@@ -6,7 +6,9 @@ DPDP data-deletion path — through the FastAPI dependency-overrides mechanism
 so routing, form parsing and redirects are exercised for real.
 """
 
+from datetime import UTC
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -283,3 +285,104 @@ class TestFooterLink:
         html = _member_footer_html()
         assert "self-service" not in html
         assert "ask your admin" in html
+
+
+class TestFreshnessCap:
+    """The 24h freshness cap on daily digests ("today's jobs only")."""
+
+    def _report(self, ages_hours):
+        from datetime import datetime, timedelta
+
+        now = datetime.now(UTC).replace(tzinfo=None)
+        jobs = []
+        for i, h in enumerate(ages_hours):
+            jobs.append(
+                {
+                    "id": f"j{i}",
+                    "title": f"Job {i}",
+                    "company": "X",
+                    "created_at": (now - timedelta(hours=h)).strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    ),
+                }
+            )
+        return {"summary": {"new_jobs": len(jobs)}, "new_jobs": jobs}
+
+    @pytest.mark.asyncio
+    async def test_old_jobs_dropped_fresh_kept(self):
+        from interntrack.scheduler.jobs import _send_alert_for
+
+        fake_user = SimpleNamespace(id="u1", email="a@b.c", telegram_chat_id=None)
+        prefs = {"channels": ["email"]}
+        mock_session = AsyncMock()
+        mock_service = AsyncMock()
+        # 2h (fresh), 10h (fresh), 30h (old), 3 days (old)
+        mock_service.generate_daily_report.return_value = self._report([2, 10, 30, 72])
+
+        with (
+            patch(
+                "interntrack.scheduler.jobs.ReportService", return_value=mock_service
+            ),
+            patch("interntrack.scheduler.jobs._mark_alert_sent", new=AsyncMock()),
+            patch(
+                "interntrack.scheduler.jobs._deliver_alert", new=AsyncMock()
+            ) as deliver,
+            patch("interntrack.scheduler.jobs._record_alert_history", new=AsyncMock()),
+            patch("interntrack.scheduler.jobs.NotificationManager"),
+        ):
+            await _send_alert_for(mock_session, "u1", prefs, fake_user)
+
+        delivered = deliver.call_args.kwargs.get("report") or deliver.call_args[0][2]
+        kept = delivered["new_jobs"]
+        assert [j["id"] for j in kept] == ["j0", "j1"]
+
+    @pytest.mark.asyncio
+    async def test_all_old_jobs_means_no_send(self):
+        from interntrack.scheduler.jobs import _send_alert_for
+
+        fake_user = SimpleNamespace(id="u1", email="a@b.c", telegram_chat_id=None)
+        prefs = {"channels": ["email"]}
+        mock_session = AsyncMock()
+        mock_service = AsyncMock()
+        mock_service.generate_daily_report.return_value = self._report([30, 50])
+
+        with (
+            patch(
+                "interntrack.scheduler.jobs.ReportService", return_value=mock_service
+            ),
+            patch("interntrack.scheduler.jobs._mark_alert_sent", new=AsyncMock()),
+            patch(
+                "interntrack.scheduler.jobs._deliver_alert", new=AsyncMock()
+            ) as deliver,
+            patch("interntrack.scheduler.jobs._record_alert_history", new=AsyncMock()),
+            patch("interntrack.scheduler.jobs.NotificationManager"),
+        ):
+            await _send_alert_for(mock_session, "u1", prefs, fake_user)
+
+        deliver.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_weekly_digest_exempt_from_cap(self):
+        from interntrack.scheduler.jobs import _send_alert_for
+
+        fake_user = SimpleNamespace(id="u1", email="a@b.c", telegram_chat_id=None)
+        prefs = {"channels": ["email"]}
+        mock_session = AsyncMock()
+        mock_service = AsyncMock()
+        mock_service.generate_daily_report.return_value = self._report([2, 96])
+
+        with (
+            patch(
+                "interntrack.scheduler.jobs.ReportService", return_value=mock_service
+            ),
+            patch("interntrack.scheduler.jobs._mark_alert_sent", new=AsyncMock()),
+            patch(
+                "interntrack.scheduler.jobs._deliver_alert", new=AsyncMock()
+            ) as deliver,
+            patch("interntrack.scheduler.jobs._record_alert_history", new=AsyncMock()),
+            patch("interntrack.scheduler.jobs.NotificationManager"),
+        ):
+            await _send_alert_for(mock_session, "u1", prefs, fake_user, weekly=True)
+
+        delivered = deliver.call_args.kwargs.get("report") or deliver.call_args[0][2]
+        assert len(delivered["new_jobs"]) == 2  # the 96h job survives in weekly

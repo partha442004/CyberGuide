@@ -3,10 +3,13 @@ Tests for multi-user daily alerts — per-user targets, per-user resume
 scoping and per-user delivery routing.
 """
 
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+_FRESH_ISO = (datetime.now(UTC) - timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S")
 
 
 class TestEnabledAlertTargets:
@@ -265,7 +268,10 @@ class TestGenerateDailyReportMultiUser:
             mock_db.return_value.__aenter__ = AsyncMock(return_value=mock_session)
             mock_db.return_value.__aexit__ = AsyncMock(return_value=False)
             report_cls.return_value.generate_daily_report = AsyncMock(
-                return_value={"summary": {"new_jobs": 1}, "new_jobs": [{}]}
+                return_value={
+                    "summary": {"new_jobs": 1},
+                    "new_jobs": [{"created_at": _FRESH_ISO}],
+                }
             )
 
             await generate_daily_report()
@@ -320,7 +326,10 @@ class TestSendAlertForLocation:
         mock_session = AsyncMock()
         mock_service = AsyncMock()
         mock_service.generate_daily_report.return_value = {
-            "new_jobs": [{"title": "React Dev", "company": "Acme"}],
+            "new_jobs": [
+                {"title": "React Dev", "company": "Acme", "created_at": _FRESH_ISO}
+            ],
+            "summary": {"new_jobs": 1},
         }
 
         with (
@@ -356,7 +365,8 @@ class TestSendAlertForLocation:
         mock_session = AsyncMock()
         mock_service = AsyncMock()
         mock_service.generate_daily_report.return_value = {
-            "new_jobs": [{"title": "Job", "company": "X"}],
+            "new_jobs": [{"title": "Job", "company": "X", "created_at": _FRESH_ISO}],
+            "summary": {"new_jobs": 1},
         }
 
         with (
