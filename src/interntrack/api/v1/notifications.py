@@ -585,6 +585,7 @@ async def run_closing_soon_sweep(_: None = Depends(require_cron_secret)):
 async def get_alert_preferences(
     user_id: str,
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_cron_secret),
 ):
     """Get saved alert preferences (defaults when nothing is saved)."""
     prefs = await _load_alert_preferences(db, user_id=user_id)
@@ -612,6 +613,7 @@ async def update_alert_preferences(
     user_id: str,
     update: AlertPreferencesUpdate,
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_cron_secret),
 ):
     """Create or update alert preferences (upsert by user_id)."""
     from sqlalchemy import select
@@ -791,6 +793,7 @@ async def get_alert_history(
     user_id: str,
     limit: int = 20,
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_cron_secret),
 ):
     """Recent alert sends for a user, newest first."""
     from sqlalchemy import select
@@ -891,6 +894,7 @@ async def delivery_overview(db: AsyncSession = Depends(get_db)):
 async def preview_digest(
     user_id: str,
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_cron_secret),
 ):
     """Preview the next daily digest for a user WITHOUT sending anything.
 

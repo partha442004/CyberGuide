@@ -393,7 +393,7 @@ async def get_daily_report(
                         user_id=target["user_id"],
                         user=target["user"],
                     ),
-                    timeout=4,
+                    timeout=30,
                 )
             # Stamp when ANY configured channel actually delivered — not
             # just email. The legacy user1 account is telegram-only in
@@ -425,7 +425,7 @@ async def get_daily_report(
                             user_id=target["user_id"],
                             user=target["user"],
                         ),
-                        timeout=3,
+                        timeout=30,
                     )
             with contextlib.suppress(Exception):
                 await _mark_alert_sent(db, target["user_id"])
