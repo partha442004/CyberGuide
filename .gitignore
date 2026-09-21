@@ -106,3 +106,4 @@ packaging/android/.gradle/
 # Android release signing secrets (NEVER commit)
 packaging/android/cyberguide-release.keystore
 packaging/android/keystore.properties
+email_preview.html

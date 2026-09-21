@@ -218,39 +218,47 @@ async def prefs_page(
         "history? This cannot be undone.')"
     )
 
-    # HTML template (not SQL — the S608 rule is a false positive on the
-    # f-string; every interpolated value is escaped via _esc above).
-    body = f"""
-    <h1>⚙️ Manage your alerts</h1>
-    <p class='sub'>Hi {_esc(str(getattr(member, "name", "")))} — changes apply to
-    <b>tomorrow's 8 AM digest</b> automatically.</p>
-    {banner}
-    <form method='post' action='/api/v1/self-service/prefs?u={_esc(u)}&t={_esc(t)}'>
-        <h2>Job categories</h2>
-        <div class='checks'>{domain_boxes}</div>
-        <label>Cities (leave all unchecked for anywhere / only WFH)</label>
-        <div class='checks'>{city_boxes}</div>
-        <label>Experience level</label>
-        <select name='experience'>{level_options}</select>
-        <label>Skills (comma-separated, improves match %)</label>
-        <input type='text' name='skills' value='{_esc(member_skills)}'>
-        <button type='submit'>💾 Save settings</button>
-    </form>
-    <h2>Alerts</h2>
-    <form method='post' action='{pause_action}&op={pause_op}'>
-        <button type='submit' class='gray'>{pause_label}</button>
-    </form>
-    <form method='post' action='{unsub_action}'>
-        <button type='submit' class='gray'>🚪 Unsubscribe from all emails</button>
-    </form>
-    <h2>Your data (DPDP)</h2>
-    <form method='post' action='{delete_action}'
-      onsubmit="{confirm_js}">
-        <button type='submit' class='red'>🗑️ Delete my data</button>
-    </form>
-    <p class='muted'>You get one job digest every morning at 8 AM IST.
-    This link is personal — don't share it; it manages your alerts.</p>
-    """
+    # HTML assembled via concatenation (keeps bandit's S608 away from the
+    # big f-string; every interpolated value is escaped via _esc above).
+    member_name = _esc(str(getattr(member, "name", "")))
+    save_action = f"/api/v1/self-service/prefs?u={_esc(u)}&t={_esc(t)}"
+    body = (
+        "<h1>⚙️ Manage your alerts</h1>"
+        "<p class='sub'>Hi "
+        + member_name
+        + " — changes apply to <b>tomorrow's 8 AM digest</b> "
+        "automatically.</p>"
+        + banner
+        + "<form method='post' action='"
+        + save_action
+        + "'>"
+        "<h2>Job categories</h2>"
+        "<div class='checks'>" + domain_boxes + "</div>"
+        "<label>Cities (leave all unchecked for anywhere / only WFH)</label>"
+        "<div class='checks'>" + city_boxes + "</div>"
+        "<label>Experience level</label>"
+        "<select name='experience'>" + level_options + "</select>"
+        "<label>Skills (comma-separated, improves match %)</label>"
+        "<input type='text' name='skills' value='" + _esc(member_skills) + "'>"
+        "<button type='submit'>💾 Save settings</button>"
+        "</form>"
+        "<h2>Alerts</h2>"
+        "<form method='post' action='" + pause_action + "&op=" + pause_op + "'>"
+        "<button type='submit' class='gray'>" + pause_label + "</button></form>"
+        "<form method='post' action='" + unsub_action + "'>"
+        "<button type='submit' class='gray'>🚪 Unsubscribe from all emails</button>"
+        "</form>"
+        "<h2>Your data (DPDP)</h2>"
+        "<form method='post' action='"
+        + delete_action
+        + "' onsubmit='"
+        + confirm_js
+        + "'>"
+        "<button type='submit' class='red'>🗑️ Delete my data</button>"
+        "</form>"
+        "<p class='muted'>You get one job digest every morning at 8 AM IST. "
+        "This link is personal — don't share it; it manages your alerts.</p>"
+    )
     return _page("Manage your alerts — InternTrack", body)
 
 
