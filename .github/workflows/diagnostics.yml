@@ -1,0 +1,52 @@
+name: Diagnostics (manual)
+
+# On-demand authenticated health checks against the production API.
+# Runs inside GitHub Actions where CRON_SECRET exists — the secret is
+# never exposed locally or in logs (GitHub masks *** automatically).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Catch-up status (who is stale)
+        env:
+          API_BASE: https://cyberguide-api.vercel.app
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          echo "catch-up-status:"
+          curl -sS --max-time 30 "$API_BASE/api/v1/reports/catch-up-status" \
+            -H "X-Cron-Secret: $CRON_SECRET"
+          echo
+
+      - name: Email provider status
+        env:
+          API_BASE: https://cyberguide-api.vercel.app
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          echo "email-status:"
+          curl -sS --max-time 30 "$API_BASE/api/v1/notifications/email-status" \
+            -H "X-Cron-Secret: $CRON_SECRET"
+          echo
+
+      - name: Delivery stats (7 days)
+        env:
+          API_BASE: https://cyberguide-api.vercel.app
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          echo "notification stats:"
+          curl -sS --max-time 30 "$API_BASE/api/v1/notifications/stats?days=7" \
+            -H "X-Cron-Secret: $CRON_SECRET" | head -c 800
+          echo
+
+      - name: Scraper health
+        env:
+          API_BASE: https://cyberguide-api.vercel.app
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          echo "scraper-health summary:"
+          curl -sS --max-time 30 "$API_BASE/api/v1/observability/scraper-health" \
+            -H "X-Cron-Secret: $CRON_SECRET" | head -c 400
+          echo
