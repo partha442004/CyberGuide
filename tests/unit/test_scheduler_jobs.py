@@ -2641,7 +2641,7 @@ class TestJobSkillsLine:
             "age_days": 1,
         }
         html = _job_html_card(82, job, "#2563eb")
-        assert "🛠 Skills: Splunk, SIEM" in html
+        assert "🛠 Splunk, SIEM" in html
 
     def test_job_html_card_omits_skills_when_none(self):
         from interntrack.scheduler.jobs import _job_html_card
@@ -2674,7 +2674,7 @@ class TestJobSkillsLine:
         lines = _job_lines(82, job)
         assert any("🛠 Skills: C++, R&amp;D" in line for line in lines)
         html = _job_html_card(82, job, "#2563eb")
-        assert "🛠 Skills: C++, R&amp;D" in html
+        assert "🛠 C++, R&amp;D" in html
         assert "<script>" not in html
 
 

@@ -3873,16 +3873,32 @@ async def build_daily_report_html(
             "sans-serif;max-width:680px;margin:0 auto;color:#0f172a;'>"
         ),
         (
-            f"<div style='background:linear-gradient(135deg,#667eea,#764ba2);"
-            "color:#fff;border-radius:14px;padding:22px 26px;'>"
+            "<div style='background:linear-gradient(135deg,#1e1b4b 0%,"
+            "#312e81 100%);color:#fff;border-radius:16px 16px 0 0;"
+            "padding:26px 28px 22px;border-bottom:3px solid #6366f1;'>"
             f"{_email_logo_html()}"
-            f"<div style='font-size:20px;font-weight:800;'>{_esc(title)}</div>"
-            f"<div style='opacity:.85;font-size:13px;'>{_esc(generated)}</div>"
-            f"<div style='margin-top:10px;font-size:14px;'>"
-            f"New jobs: <b>{summary.get('new_jobs', 0)}</b> · "
-            f"New applications: <b>{summary.get('new_applications', 0)}</b></div>"
+            "<div style='font-size:11px;font-weight:700;letter-spacing:2px;"
+            "color:#a5b4fc;text-transform:uppercase;'>InternTrack digest</div>"
+            "<div style='font-size:24px;font-weight:800;margin-top:4px;'>"
+            f"{_esc(title)}</div>"
+            "<div style='color:#c7d2fe;font-size:13px;margin-top:2px;'>"
+            f"{_esc(generated)}</div>"
+            "<table style='margin-top:16px;border-collapse:collapse;'>"
+            "<tr>"
+            "<td style='padding-right:22px;'>"
+            "<div style='font-size:26px;font-weight:800;line-height:1;'>"
+            f"{summary.get('new_jobs', 0)}</div>"
+            "<div style='font-size:11px;font-weight:600;letter-spacing:1px;"
+            "color:#a5b4fc;margin-top:3px;'>NEW JOBS</div></td>"
+            "<td style='padding:0 22px;border-left:1px solid #4338ca;'>"
+            "<div style='font-size:26px;font-weight:800;line-height:1;'>"
+            f"{summary.get('new_applications', 0)}</div>"
+            "<div style='font-size:11px;font-weight:600;letter-spacing:1px;"
+            "color:#a5b4fc;margin-top:3px;'>NEW APPLICATIONS</div></td>"
+            "</tr></table>"
             + (
-                "<div style='margin-top:6px;font-size:12px;opacity:.9;'>"
+                "<div style='margin-top:14px;background:#4338ca;color:#e0e7ff;"
+                "border-radius:8px;padding:8px 12px;font-size:12px;'>"
                 f"{_esc(report['first_digest_note'])}</div>"
                 if report.get("first_digest_note")
                 else ""
@@ -3911,10 +3927,10 @@ async def build_daily_report_html(
         jotd_link = ""
         if jotd_url:
             jotd_link = (
-                "<div style='margin-top:12px;'><a href='"
+                "<div style='margin-top:14px;'><a href='"
                 f"{jotd_url}' style='background:#f59e0b;color:#fff;"
-                "text-decoration:none;border-radius:8px;padding:9px 18px;"
-                "font-weight:600;font-size:13px;display:inline-block;'>"
+                "text-decoration:none;border-radius:9px;padding:10px 24px;"
+                "font-weight:700;font-size:13px;display:inline-block;'>"
                 "🔥 Apply now</a></div>"
             )
         jotd_meta = " · ".join(bit for bit in (jotd_company, jotd_loc) if bit)
@@ -3932,14 +3948,14 @@ async def build_daily_report_html(
             else ""
         )
         parts.append(
-            "<div style='margin-top:24px;background:linear-gradient(135deg,"
-            "#fef3c7,#fde68a);border:1px solid #f59e0b;border-radius:12px;"
-            "padding:18px 20px;'>"
-            "<div style='font-size:12px;font-weight:800;color:#92400e;"
-            "letter-spacing:.6px;'>🔥 JOB OF THE DAY</div>"
-            f"<div style='font-size:16px;font-weight:700;margin-top:6px;'>"
+            "<div style='margin-top:24px;background:#fffbeb;"
+            "border:1px solid #f59e0b;border-left:6px solid #f59e0b;"
+            "border-radius:14px;padding:20px 22px;'>"
+            "<div style='font-size:11px;font-weight:800;color:#b45309;"
+            "letter-spacing:1.5px;'>🔥 JOB OF THE DAY</div>"
+            "<div style='font-size:18px;font-weight:800;margin-top:8px;'>"
             f"{jotd_title}</div>{jotd_meta_html}{jotd_desc_html}"
-            f"<div style='margin-top:8px;'>{jotd_score_txt}</div>{jotd_link}</div>"
+            f"<div style='margin-top:10px;'>{jotd_score_txt}</div>{jotd_link}</div>"
         )
 
     # 🚶 Hiring drives today — walk-in / campus / off-campus / virtual-drive
@@ -3963,15 +3979,16 @@ async def build_daily_report_html(
                     "font-size:12px;font-weight:700;'>Apply</a>"
                 )
             drive_rows.append(
-                "<div style='display:flex;justify-content:space-between;"
-                "align-items:center;border-bottom:1px dashed #f9a8d4;"
-                "padding:10px 0;'>"
-                f"<div><b style='font-size:14px;'>{d_title}</b>"
+                "<table style='width:100%;border-collapse:collapse;'>"
+                "<tr>"
+                "<td style='padding:10px 0;border-bottom:1px dashed #f9a8d4;'>"
+                f"<b style='font-size:14px;'>{d_title}</b>"
                 f"<div style='color:#9d174d;font-size:12px;'>{_esc(d_label)}"
                 + (f" · {d_meta}" if d_meta else "")
-                + f" · match {d_score_txt}</div></div>"
-                + d_link
-                + "</div>"
+                + f" · match {d_score_txt}</div></td>"
+                "<td style='padding:10px 0;border-bottom:1px dashed #f9a8d4;"
+                "text-align:right;vertical-align:middle;'>" + d_link + "</td>"
+                "</tr></table>"
             )
         parts.append(
             "<div style='margin-top:24px;background:#fdf2f8;"
@@ -3991,15 +4008,18 @@ async def build_daily_report_html(
             status = _esc(item.get("status") or "")
             cal = _esc(_calendar_link(title, company))
             iv_rows.append(
-                "<div style='display:flex;justify-content:space-between;"
-                "align-items:center;border-bottom:1px dashed #e2e8f0;"
-                "padding:10px 0;'>"
-                f"<div><b style='font-size:14px;'>{title}</b>"
+                "<table style='width:100%;border-collapse:collapse;'>"
+                "<tr>"
+                "<td style='padding:10px 0;border-bottom:1px dashed #e2e8f0;'>"
+                f"<b style='font-size:14px;'>{title}</b>"
                 f"<div style='color:#64748b;font-size:13px;'>"
-                f"{company} · {status}</div></div>"
+                f"{company} · {status}</div></td>"
+                f"<td style='padding:10px 0;border-bottom:1px dashed #e2e8f0;"
+                "text-align:right;vertical-align:middle;'>"
                 f"<a href='{cal}' style='background:#10b981;color:#fff;"
-                "text-decoration:none;border-radius:6px;padding:7px 14px;"
-                "font-size:12px;font-weight:700;'>📅 Add to calendar</a></div>"
+                "text-decoration:none;border-radius:7px;padding:7px 14px;"
+                "font-size:12px;font-weight:700;'>📅 Add to calendar</a></td>"
+                "</tr></table>"
             )
         parts.append(
             "<div style='margin-top:24px;background:#ecfdf5;"
@@ -4018,14 +4038,17 @@ async def build_daily_report_html(
             company = _esc(item.get("company") or "")
             status = _esc(item.get("status") or "")
             fu_rows.append(
-                "<div style='display:flex;justify-content:space-between;"
-                "align-items:center;border-bottom:1px dashed #e2e8f0;"
-                "padding:10px 0;'>"
-                f"<div><b style='font-size:14px;'>{title}</b>"
+                "<table style='width:100%;border-collapse:collapse;'>"
+                "<tr>"
+                "<td style='padding:10px 0;border-bottom:1px dashed #e2e8f0;'>"
+                f"<b style='font-size:14px;'>{title}</b>"
                 f"<div style='color:#64748b;font-size:13px;'>"
-                f"{company} · {status}</div></div>"
-                "<div style='color:#e5484d;font-size:12px;font-weight:700;'>"
-                "⏰ FOLLOW UP</div></div>"
+                f"{company} · {status}</div></td>"
+                "<td style='padding:10px 0;border-bottom:1px dashed #e2e8f0;"
+                "text-align:right;vertical-align:middle;white-space:nowrap;'>"
+                "<span style='color:#e5484d;font-size:12px;font-weight:700;'>"
+                "⏰ FOLLOW UP</span></td>"
+                "</tr></table>"
             )
         parts.append(
             "<div style='margin-top:24px;background:#fff7ed;"
@@ -4045,12 +4068,14 @@ async def build_daily_report_html(
             "marketing": "#f59e0b",
             "other": "#64748b",
         }.get(domain, "#64748b")
+        soft_bg, soft_fg = _accent_soft(style)
         parts.append(
-            f"<div style='margin:24px 0 8px;padding:12px 16px;border-radius:10px;"
-            f"background:#f1f5f9;border-left:5px solid {style};'>"
+            "<div style='margin:26px 0 10px;'>"
+            f"<span style='color:{style};font-size:15px;'>&#9679;</span> "
             f"<b style='font-size:15px;'>{_esc(label)}</b> "
-            f"<span style='background:{style};color:#fff;border-radius:999px;"
-            f"padding:2px 10px;font-size:12px;'>{len(items)}</span></div>"
+            f"<span style='background:{soft_bg};color:{soft_fg};"
+            "border-radius:999px;padding:2px 10px;font-size:12px;"
+            f"font-weight:700;'>{len(items)}</span></div>"
         )
         for score, job in items:
             parts.append(
@@ -4068,11 +4093,12 @@ async def build_daily_report_html(
     watched_jobs = _watched_jobs(report, watched)
     if watched_jobs:
         parts.append(
-            "<div style='margin:24px 0 8px;padding:12px 16px;border-radius:10px;"
-            "background:#f1f5f9;border-left:5px solid #0ea5e9;'>"
-            f"<b style='font-size:15px;'>🏢 Watched companies</b> "
-            f"<span style='background:#0ea5e9;color:#fff;border-radius:999px;"
-            f"padding:2px 10px;font-size:12px;'>{len(watched_jobs)}</span></div>"
+            "<div style='margin:26px 0 10px;'>"
+            "<span style='color:#0ea5e9;font-size:15px;'>&#9679;</span> "
+            "<b style='font-size:15px;'>🏢 Watched companies</b> "
+            "<span style='background:#e0f2fe;color:#075985;"
+            "border-radius:999px;padding:2px 10px;font-size:12px;"
+            f"font-weight:700;'>{len(watched_jobs)}</span></div>"
         )
         for job in watched_jobs:
             parts.append(
@@ -4105,14 +4131,12 @@ async def build_daily_report_html(
                     )
                 )
             parts.append(
-                "<div style='margin:26px 0 8px;padding:12px 16px;border-radius:10px;"
-                "background:#ecfdf5;border-left:5px solid #10b981;'>"
-                "<b style='font-size:15px;color:#065f46;'>"
-                "🎓 Internships & fresher roles</b> "
-                "<span style='background:#10b981;color:#fff;border-radius:999px;"
-                "padding:2px 10px;font-size:12px;'>"
-                + str(len(fresher))
-                + "</span></div>"
+                "<div style='margin:26px 0 10px;'>"
+                "<span style='color:#10b981;font-size:15px;'>&#9679;</span> "
+                "<b style='font-size:15px;'>🎓 Internships & fresher roles</b> "
+                "<span style='background:#d1fae5;color:#047857;"
+                "border-radius:999px;padding:2px 10px;font-size:12px;"
+                "font-weight:700;'>" + str(len(fresher)) + "</span></div>"
             )
             parts.extend(fresher_rows)
 
@@ -4154,11 +4178,12 @@ async def build_daily_report_html(
     if loc_lower and other_sections:
         other_count = sum(len(items) for _, items in other_sections)
         parts.append(
-            "<div style='margin:28px 0 8px;padding:12px 16px;border-radius:10px;"
-            "background:#fff7ed;border-left:5px solid #f97316;'>"
+            "<div style='margin:28px 0 10px;'>"
+            "<span style='color:#f97316;font-size:15px;'>&#9679;</span> "
             "<b style='font-size:15px;'>🌍 Other locations</b> "
-            "<span style='background:#f97316;color:#fff;border-radius:999px;"
-            "padding:2px 10px;font-size:12px;'>" + str(other_count) + "</span></div>"
+            "<span style='background:#ffedd5;color:#9a3412;"
+            "border-radius:999px;padding:2px 10px;font-size:12px;"
+            "font-weight:700;'>" + str(other_count) + "</span></div>"
         )
         for domain, items in other_sections:
             label = _DOMAIN_ICONS.get(domain, domain)
@@ -4171,12 +4196,14 @@ async def build_daily_report_html(
                 "marketing": "#f59e0b",
                 "other": "#64748b",
             }.get(domain, "#64748b")
+            soft_bg, soft_fg = _accent_soft(accent)
             parts.append(
-                "<div style='margin:16px 0 6px;padding:8px 14px;border-radius:8px;"
-                "background:#fff7ed;border-left:4px solid " + accent + ";'>"
+                "<div style='margin:16px 0 6px;'>"
+                f"<span style='color:{accent};font-size:13px;'>&#9679;</span> "
                 "<b style='font-size:13px;'>" + _esc(label) + "</b> "
-                "<span style='background:" + accent + ";color:#fff;border-radius:999px;"
-                "padding:1px 8px;font-size:11px;'>" + str(len(items)) + "</span></div>"
+                f"<span style='background:{soft_bg};color:{soft_fg};"
+                "border-radius:999px;padding:1px 8px;font-size:11px;"
+                "font-weight:700;'>" + str(len(items)) + "</span></div>"
             )
             for score, job in items:
                 parts.append(
@@ -4364,8 +4391,8 @@ def _member_footer_html() -> str:
     False; the owner keeps the dashboard footer instead.
     """
     return (
-        "<div style='margin-top:24px;padding-top:16px;border-top:1px solid "
-        "#e2e8f0;font-size:12px;color:#94a3b8;'>"
+        "<div style='margin-top:28px;padding-top:18px;border-top:1px solid "
+        "#e2e8f0;font-size:12px;color:#94a3b8;line-height:1.6;'>"
         "You get one job digest every morning at 8 AM IST. To change your "
         "roles, location, or pause alerts, ask your admin.</div>"
     )
@@ -4806,6 +4833,35 @@ def _closing_soon_html(matches: list[dict], user_id: str | None, api_base: str) 
     )
 
 
+def _accent_soft(accent: str) -> tuple[str, str]:
+    """Soft tinted (background, text) pair for a section accent color.
+
+    Used by section headers to render count pills that tint with the
+    domain color instead of solid white-on-color — lighter, more modern,
+    and consistent across light/dark mail clients.
+    """
+    return {
+        "#e5484d": ("#fee2e2", "#b91c1c"),
+        "#3b82f6": ("#dbeafe", "#1d4ed8"),
+        "#8b5cf6": ("#ede9fe", "#6d28d9"),
+        "#ec4899": ("#fce7f3", "#be185d"),
+        "#10b981": ("#d1fae5", "#047857"),
+        "#f59e0b": ("#fef3c7", "#b45309"),
+        "#0ea5e9": ("#e0f2fe", "#075985"),
+        "#f97316": ("#ffedd5", "#9a3412"),
+        "#64748b": ("#e2e8f0", "#334155"),
+    }.get(accent, ("#e2e8f0", "#334155"))
+
+
+def _chip(bg: str, fg: str, text: str) -> str:
+    """One rounded label chip with tinted background and matching text."""
+    return (
+        f"<span style='background:{bg};color:{fg};border-radius:999px;"
+        "padding:3px 10px;font-size:11px;font-weight:700;margin:0 6px 6px 0;"
+        f"display:inline-block;'>{text}</span>"
+    )
+
+
 def _job_html_card(
     score,
     job: dict,
@@ -4843,80 +4899,74 @@ def _job_html_card(
     exp_level = _esc(str(job.get("experience_level") or "").strip())
     source = _esc(_source_label(job.get("source")))
     fresher_badge = (
-        "<span style='background:#dcfce7;color:#166534;border-radius:999px;"
-        "padding:2px 9px;font-size:11px;font-weight:700;margin-right:6px;'>"
-        "🎓 Fresher</span>"
-        if _job_fresher_rank(job) == 0
-        else ""
+        _chip("#dcfce7", "#166534", "🎓 Fresher") if _job_fresher_rank(job) == 0 else ""
     )
-    meta_bits = [bit for bit in (status_txt, expiry, salary, exp_level) if bit]
+    meta_bits = [bit for bit in (expiry, salary, exp_level) if bit]
     if source:
         meta_bits.append(source)
+    meta_line = " · ".join(meta_bits)
     card = (
-        "<div style='border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;"
-        "margin:10px 0;'>"
-        "<div style='display:flex;justify-content:space-between;align-items:center;'>"
-        f"<div><b style='font-size:15px;'>{title}</b>"
-        f"<div style='color:#64748b;font-size:13px;'>"
-        f"{company} · {location} · {age}</div></div>"
-        "<div style='text-align:center;'>"
-        f"<div style='font-size:20px;font-weight:800;color:{accent};'>{score_txt}</div>"
-        "<div style='color:#94a3b8;font-size:11px;'>match</div></div></div>"
-        "<div style='margin-top:8px;font-size:13px;color:#475569;'>"
-        f"{' · '.join(meta_bits)}</div>"
+        "<div style='border:1px solid #e2e8f0;border-left:4px solid "
+        + accent
+        + ";border-radius:12px;padding:16px 18px;margin:10px 0;"
+        "background:#ffffff;'>"
+        # Score is a tinted pill (table-safe) instead of a flex row column.
+        "<table style='width:100%;border-collapse:collapse;'><tr>"
+        "<td style='vertical-align:top;'>"
+        f"<b style='font-size:15px;line-height:1.3;'>{title}</b>"
+        f"<div style='color:#64748b;font-size:13px;margin-top:3px;'>"
+        f"{company} · {location} · {age}</div></td>"
+        f"<td style='text-align:right;vertical-align:top;white-space:nowrap;'>"
+        f"<span style='background:{_accent_soft(accent)[0]};"
+        f"color:{accent};border-radius:999px;padding:5px 12px;"
+        "font-size:13px;font-weight:800;display:inline-block;'>"
+        f"{score_txt} match</span></td></tr></table>"
+        + "<div style='margin-top:8px;font-size:12px;color:#64748b;'>"
+        + _esc(status_txt)
+        + (" · " + _esc(meta_line) if meta_line else "")
+        + "</div>"
     )
     skills = _esc(_skills_txt(job, limit=5))
     if skills:
         card += (
-            "<div style='margin-top:6px;font-size:12px;color:#0f766e;'>"
-            f"🛠 Skills: {skills}</div>"
+            "<div style='margin-top:8px;font-size:12px;color:#0f766e;'>"
+            f"🛠 {skills}</div>"
         )
     checklist = _skills_checklist_html(job, resume_skills)
     if checklist:
         card += checklist
     chips = ""
     if _salary_meets_target(job, target_salary):
-        chips += (
-            "<span style='background:#d1fae5;color:#065f46;border-radius:999px;"
-            "padding:2px 9px;font-size:11px;font-weight:700;margin-right:6px;'>"
-            "💰 Meets your target</span>"
-        )
+        chips += _chip("#d1fae5", "#065f46", "💰 Meets your target")
     hiring_badge = _hiring_signal_badge(job)
     if hiring_badge:
         chips += hiring_badge
     for hit in _keyword_hits(job, keywords):
-        chips += (
-            "<span style='background:#fef3c7;color:#92400e;border-radius:999px;"
-            "padding:2px 9px;font-size:11px;font-weight:700;margin-right:6px;'>"
-            f"🎯 {_esc(hit)}</span>"
-        )
-    if chips:
-        card += "<div style='margin-top:8px;'>" + chips + "</div>"
-    scam_flags = _scam_signals(job)
-    if scam_flags:
-        card += (
-            "<div style='margin-top:8px;background:#fef2f2;border:1px solid #fecaca;"
-            "border-radius:6px;padding:6px 10px;color:#b91c1c;font-size:12px;'>"
-            f"⚠️ Review carefully — red flags: {_esc(', '.join(scam_flags))}. "
-            "Legit employers never ask for money.</div>"
-        )
+        chips += _chip("#fef3c7", "#92400e", f"🎯 {_esc(hit)}")
     fresh_badge = (
-        "<span style='background:#fef9c3;color:#854d0e;border-radius:999px;"
-        "padding:2px 9px;font-size:11px;font-weight:700;margin-right:6px;'>"
-        "🆕 New today</span>"
+        _chip("#fef9c3", "#854d0e", "🆕 New today")
         if int(job.get("age_days", 0) or 0) == 0
         else ""
     )
     badges = [b for b in (fresher_badge, fresh_badge) if b]
-    if badges:
-        card += "<div style='margin-top:8px;'>" + "".join(badges) + "</div>"
+    chips += "".join(badges)
+    if chips:
+        card += "<div style='margin-top:10px;line-height:1;'>" + chips + "</div>"
+    scam_flags = _scam_signals(job)
+    if scam_flags:
+        card += (
+            "<div style='margin-top:10px;background:#fef2f2;border:1px solid #fecaca;"
+            "border-radius:8px;padding:8px 12px;color:#b91c1c;font-size:12px;'>"
+            f"⚠️ Review carefully — red flags: {_esc(', '.join(scam_flags))}. "
+            "Legit employers never ask for money.</div>"
+        )
     desc = _esc(_job_desc_snippet(job, limit=240))
     full_desc = _esc(_job_desc_full(job))
     if desc:
         card += (
-            "<div style='margin-top:8px;padding:8px 10px;background:#f8fafc;"
-            "border-left:3px solid " + accent + ";border-radius:6px;"
-            "color:#475569;font-size:13px;line-height:1.45;'>" + desc + "</div>"
+            "<div style='margin-top:10px;padding:9px 12px;background:#f8fafc;"
+            "border-left:3px solid " + accent + ";border-radius:0 8px 8px 0;"
+            "color:#475569;font-size:13px;line-height:1.5;'>" + desc + "</div>"
         )
     if full_desc and len(full_desc) > 240:
         card += (
@@ -4934,10 +4984,10 @@ def _job_html_card(
             else ""
         )
         card += (
-            "<div style='margin-top:10px;'>"
+            "<div style='margin-top:12px;'>"
             f"<a href='{_esc(href)}'{track_hint} style='background:{accent};color:#fff;"
-            "text-decoration:none;border-radius:8px;padding:8px 18px;"
-            "font-weight:600;font-size:13px;display:inline-block;'>Apply now</a>"
+            "text-decoration:none;border-radius:9px;padding:9px 22px;"
+            "font-weight:700;font-size:13px;display:inline-block;'>Apply now</a>"
             "</div>"
         )
     card += "</div>"
