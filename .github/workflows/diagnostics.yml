@@ -41,6 +41,17 @@ jobs:
             -H "X-Cron-Secret: $CRON_SECRET" | head -c 800
           echo
 
+      - name: user1 digest history (stamp investigation)
+        env:
+          API_BASE: https://cyberguide-api.vercel.app
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          echo "user1 last 3 sends:"
+          curl -sS --max-time 30 \
+            "$API_BASE/api/v1/notifications/preferences/user1/history?limit=3" \
+            -H "X-Cron-Secret: $CRON_SECRET" | head -c 600
+          echo
+
       - name: Scraper health
         env:
           API_BASE: https://cyberguide-api.vercel.app
