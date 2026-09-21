@@ -2,6 +2,7 @@
 Notification service for multi-channel notifications.
 """
 
+import asyncio
 import logging
 from email.utils import formatdate, make_msgid
 
@@ -519,8 +520,12 @@ class NotificationManager:
                 channel = self._user_channel(channel_name, recipient)
             if channel:
                 try:
-                    results[channel_name] = await channel.send(
-                        message, subject, buttons
+                    # Per-channel timeout: one hanging SMTP/HTTP channel must
+                    # never starve the remaining channels of the caller's
+                    # budget (a dead email config used to eat the whole 4s
+                    # digest send window, cancelling Telegram behind it).
+                    results[channel_name] = await asyncio.wait_for(
+                        channel.send(message, subject, buttons), timeout=10
                     )
                 except Exception:
                     logging.getLogger(__name__).exception(
