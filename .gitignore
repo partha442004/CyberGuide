@@ -89,7 +89,9 @@ cyberguide-key.pub
 .vercel/
 .env
 .env.local
-.vercel
+
+# Local-only secrets (never commit)
+*.local.txt
 .env*
 
 # Desktop / mobile packaging build outputs

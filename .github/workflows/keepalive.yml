@@ -1,0 +1,45 @@
+name: Scheduled-workflow keepalive
+
+# GitHub disables scheduled workflows on PUBLIC repos after 60 days
+# without repo activity — and this project's entire delivery (daily
+# digests, weekly backup, catch-up sends) depends on its schedules.
+# This workflow commits an empty change weekly so the 60-day counter
+# never expires. The commit also runs CI, which doubles as a weekly
+# proof that lint/mypy/tests/smoke still pass.
+on:
+  schedule:
+    - cron: '30 2 * * 5'   # Fridays 02:30 UTC — between backup and daily slots
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    name: Keep scheduled workflows active (empty commit)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          # A token-authenticated push is required; checkout defaults to
+          # the persist-credentials token which works for this.
+          fetch-depth: 0
+
+      - name: Empty keepalive commit + push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Only commit if nothing landed in the last 6 days (manual
+          # pushes count as activity too — this avoids useless commits
+          # when the project is actively developed).
+          LAST=$(git log -1 --format=%ct)
+          NOW=$(date +%s)
+          AGE_DAYS=$(( (NOW - LAST) / 86400 ))
+          if [ "$AGE_DAYS" -lt 6 ]; then
+            echo "last commit is $AGE_DAYS day(s) old — repo active, no keepalive needed"
+            exit 0
+          fi
+          git commit --allow-empty -m "chore: keepalive — keep scheduled workflows active"
+          git push
+          echo "keepalive commit pushed"

@@ -4,8 +4,19 @@ name: Weekly member-data backup
 # their sources, but member profiles, saved domains, channels and alert
 # preferences are not — losing the database would mean asking every member
 # to sign up again. Every Monday this workflow dumps the two people-tables
-# from the API's export endpoint and stores the JSON as a workflow artifact
-# (private to this repo, kept 90 days). Refuses to upload an empty export.
+# from the API's export endpoint, ENCRYPTS the JSON with AES-256 via GPG
+# before upload, and stores the ciphertext as a workflow artifact.
+#
+# WHY ENCRYPTED: this repository is PUBLIC, and workflow artifacts on
+# public repos are downloadable by any logged-in GitHub user. The export
+# contains member PII (names, emails, alert preferences), so the plaintext
+# is never uploaded — only AES-256 ciphertext. The passphrase lives in the
+# repo secret BACKUP_PASSPHRASE (and in the owner's password manager).
+#
+# TO RESTORE a backup locally:
+#   gh run download <run-id> -n member-backup
+#   gpg --batch --yes --passphrase '<BACKUP_PASSPHRASE>' \
+#     --decrypt member-backup.json.gpg > member-backup.json
 on:
   schedule:
     - cron: '0 1 * * 1'   # Mondays 01:00 UTC = 06:30 IST
@@ -13,11 +24,12 @@ on:
 
 jobs:
   backup:
-    name: Export member profiles + preferences
+    name: Export + encrypt member profiles and preferences
     runs-on: ubuntu-latest
     env:
       API_BASE: https://cyberguide-api.vercel.app
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
     steps:
       - name: Fetch member-data export
         run: |
@@ -35,9 +47,28 @@ jobs:
             exit 1
           fi
 
-      - name: Upload backup artifact
+      - name: Encrypt export (AES-256) — plaintext never leaves the runner
+        run: |
+          if [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "::error::BACKUP_PASSPHRASE secret is not set"
+            exit 1
+          fi
+          gpg --batch --yes \
+            --passphrase "$BACKUP_PASSPHRASE" \
+            --symmetric --cipher-algo AES256 \
+            --output member-backup.json.gpg member-backup.json
+          # Plaintext is wiped immediately; only the ciphertext is uploaded.
+          rm -f member-backup.json
+          ls -la member-backup.json.gpg
+          # Sanity check: the artifact must NOT be plaintext JSON.
+          if head -c 2 member-backup.json.gpg | grep -q '{'; then
+            echo "::error::encryption produced a plaintext file"
+            exit 1
+          fi
+
+      - name: Upload encrypted backup artifact
         uses: actions/upload-artifact@v4
         with:
           name: member-backup
-          path: member-backup.json
+          path: member-backup.json.gpg
           retention-days: 90
