@@ -170,12 +170,18 @@ jobs:
             -H "X-Cron-Secret: $CRON_SECRET" \
             "$API_BASE/api/v1/archive/daily-archive" -o /tmp/daily_archive.json \
             || { echo "archive fetch failed"; exit 0; }
-          if grep -q '"members_with_jobs": 0' /tmp/daily_archive.json; then
+          # Parse with python: FastAPI JSON is minified (no space after
+          # ":"), so a textual grep for the zero-totals case is fragile.
+          MEMBERS=$(python3 -c "import json;print(json.load(open('/tmp/daily_archive.json'))['totals']['members_with_jobs'])") \
+            || { echo "archive JSON unparseable"; exit 0; }
+          if [ "$MEMBERS" -eq 0 ]; then
             echo "no jobs delivered today — nothing to archive"
             exit 0
           fi
           DATE=$(python3 -c "import json;print(json.load(open('/tmp/daily_archive.json'))['date'])")
-          DEST="archive/${DATE%%-*}/${DATE}/daily-jobs.json"
+          YEAR=${DATE%%-*}
+          MONTH=$(echo "$DATE" | cut -d- -f2)
+          DEST="archive/${YEAR}/${MONTH}/${DATE}/daily-jobs.json"
           mkdir -p "$(dirname "$DEST")"
           cp /tmp/daily_archive.json "$DEST"
           git add "$DEST"

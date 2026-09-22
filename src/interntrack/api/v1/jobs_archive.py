@@ -19,7 +19,7 @@ and only public job data (title, company, location, apply URL) is emitted.
 """
 
 import hashlib
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
@@ -32,11 +32,11 @@ from interntrack.utils.helpers import to_naive_utc
 
 router = APIRouter()
 
-# How far back to sweep NotificationHistory for archiveable sends.  The
-# daily digest fires at 08:00 IST (02:30 UTC) and catch-ups run on the
-# afternoon slots of the SAME UTC day, so 48h comfortably covers a full
-# day's sends while excluding everything older.
-_LOOKBACK_HOURS = 48
+# How far back to sweep NotificationHistory for archiveable sends: the
+# start of the current UTC day.  Each daily file must contain exactly that
+# day's deliveries — a fixed 48h window would re-include yesterday's rows
+# (already archived in yesterday's file) in today's.
+_SINCE_MIDNIGHT_UTC = True
 
 # Job fields safe (and useful) to publish.  Anything else on the stored
 # digest card — internal ids, tracking fields — is dropped here.
@@ -69,9 +69,9 @@ def _clean_job(card) -> dict | None:
 
 
 async def _collect_digest_rows(db: AsyncSession) -> list:
-    """NotificationHistory rows from the lookback window that carry jobs."""
+    """NotificationHistory rows since the start of the current UTC day."""
     now = to_naive_utc(datetime.now(UTC)) or datetime.now(UTC).replace(tzinfo=None)
-    since = now - timedelta(hours=_LOOKBACK_HOURS)
+    since = now.replace(hour=0, minute=0, second=0, microsecond=0)
     result = await db.execute(
         select(NotificationHistory)
         .where(NotificationHistory.created_at >= since)
@@ -85,7 +85,7 @@ async def daily_archive(
     db: AsyncSession = Depends(get_db),
     _: None = Depends(require_cron_secret),
 ):
-    """Build today's archive document from the last 48h of digest sends.
+    """Build today's archive document from today's (UTC) digest sends.
 
     Response shape (one file per UTC day, committed by the workflow):
     ``{date, generated_at, totals, members: [{member, domains, job_count,
