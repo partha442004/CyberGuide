@@ -2337,6 +2337,82 @@ _DIGEST_SALARY_DOMAINS = {
 }
 
 
+async def _hiring_trend_line(session, domains: list | None = None) -> str | None:
+    """One-line week-over-week hiring trend for the digest, or ``None``.
+
+    Counts postings first-seen in the last 7 days vs the 7 days before
+    that, classified into domains via the same ``classify_domain`` used
+    everywhere else, and reports the member's top domain: ``📈 Security
+    hiring up 18% this week (23 new roles)``. Data comes straight from
+    the jobs table — no external calls. Never raises; ``None`` means
+    "not enough signal this week" and the digest renders without it.
+    """
+    try:
+        from datetime import UTC, datetime, timedelta
+
+        from sqlalchemy import select
+
+        from interntrack.domain.models import Job
+        from interntrack.services.report_service import classify_domain
+
+        now = datetime.now(UTC).replace(tzinfo=None)
+        week_start = now - timedelta(days=7)
+        prev_start = now - timedelta(days=14)
+
+        rows = await session.execute(
+            select(Job.title, Job.tags)
+            .where(Job.is_active.is_(True))
+            .where(Job.first_seen_at >= prev_start)
+            .where(Job.first_seen_at < week_start)
+        )
+        prev_rows = rows.all()
+        rows2 = await session.execute(
+            select(Job.title, Job.tags)
+            .where(Job.is_active.is_(True))
+            .where(Job.first_seen_at >= week_start)
+        )
+        this_rows = rows2.all()
+
+        def _counts(rows_):
+            c: dict[str, int] = {}
+            for title, tags in rows_:
+                d = classify_domain(
+                    str(title or ""), tags if isinstance(tags, list) else None
+                )
+                if d != "other":
+                    c[d] = c.get(d, 0) + 1
+            return c
+
+        this, prev = _counts(this_rows), _counts(prev_rows)
+        watch = [d for d in (domains or []) if d] or list(this)
+        best = None
+        for d in watch:
+            t, p = this.get(d, 0), prev.get(d, 0)
+            if t < 3:  # too few postings this week for a meaningful trend
+                continue
+            delta = t - p
+            pct = round(delta / p * 100) if p else None
+            # Rank by absolute growth so a +6 on 12 beats a +1 on 2.
+            key = (delta, t)
+            if best is None or key > best[0]:
+                best = (key, d, t, p, pct, delta)
+        if best is None:
+            return None
+        _key, d, t, p, pct, delta = best
+        icon = _DOMAIN_ICONS.get(d, "📌")
+        label = d.upper()
+        if pct is None:
+            return f"{icon} {label}: {t} new roles this week — emerging trend!"
+        arrow = "📈" if delta >= 0 else "📉"
+        word = "up" if delta >= 0 else "down"
+        return (
+            f"{arrow} {icon} {label} hiring {word} {abs(pct)}% this week "
+            f"({t} new roles vs {p} last week)"
+        )
+    except Exception:  # noqa: BLE001 - the digest must never break
+        return None
+
+
 async def _weekly_salary_insight(session, domains, user_location) -> str | None:
     """One-line median-pay insight for the weekly digest, or ``None``.
 
@@ -3726,6 +3802,10 @@ async def build_alert_chunks(
                     gap_buttons.append((f"📚 Learn {_esc(g['skill'])}", url))
             chunks.append(("\n".join(gap_lines), gap_buttons))
 
+    trend = await _hiring_trend_line(session, domains)
+    if trend:
+        chunks.insert(0, (trend, []))
+
     if show_dashboard_link:
         footer_txt = _digest_footer_text()
         if footer_txt:
@@ -3779,33 +3859,29 @@ def _telegram_breakdown(
         return ""
     d_order = list(_DOMAIN_ICONS)  # canonical order; see _score_and_group_jobs
     rows = []
-    td = "padding:4px 8px;border:1px solid #e2e8f0;text-align:center;"
     for d in d_order:
         if d not in dom_loc:
             continue
         c = dom_loc[d]
-        cells = "".join(f"<td style='{td}'>{c.get(loc, 0)}</td>" for loc in top_locs)
-        rows.append(
-            f"<tr><td style='{td}font-weight:600;'>{d.title()}</td>"
-            f"{cells}<td style='{td}font-weight:600;'>{sum(c.values())}</td></tr>"
-        )
-    tc = "".join(
-        f"<td style='{td}font-weight:700;'>"
-        f"{sum(dom_loc[d].get(loc, 0) for d in dom_loc)}</td>"
-        for loc in top_locs
-    )
-    hc = "".join(
-        f"<th style='{td}background:#f1f5f9;'>{_esc(loc)}</th>" for loc in top_locs
+        cells = " | ".join(str(c.get(loc, 0)) for loc in top_locs)
+        rows.append(f"{_esc(d.title())}: {cells} — total {sum(c.values())}")
+    header = " | ".join(_esc(loc) for loc in top_locs)
+    # Telegram's HTML parse mode supports only b/i/u/s/a/code/pre/
+    # blockquote — <table>/<tr>/<td> make sendMessage reject the whole
+    # message with "can't parse entities" (HTTP 400), which silently killed
+    # EVERY digest chunk that carried this tail (0/51 delivered while tiny
+    # test messages succeeded). Monospace plain text renders the same data.
+    all_totals = " | ".join(
+        str(sum(dom_loc[d].get(loc, 0) for d in dom_loc)) for loc in top_locs
     )
     return (
-        "<b>📊 Jobs by role × location</b>"
-        "<table style='width:100%;border-collapse:collapse;font-size:12px;'>"
-        f"<tr><th style='{td}background:#f1f5f9;'>Domain</th>{hc}"
-        f"<th style='{td}background:#f1f5f9;'>Total</th></tr>"
-        + "".join(rows)
-        + f"<tr><td style='{td}font-weight:700;'>Total</td>{tc}"
-        f"<td style='{td}font-weight:700;'>{len(all_entries)}</td></tr>"
-        "</table>"
+        "<b>📊 Jobs by role × location</b>\n"
+        "<code>"
+        + _esc(header)
+        + "\n"
+        + "\n".join(rows)
+        + f"\nAll domains: {all_totals}"
+        + "</code>"
     )
 
 
@@ -3882,6 +3958,9 @@ async def build_daily_report_html(
         api_base = ""
     summary = report.get("summary") or {}
     generated = report.get("generated_at") or ""
+    # One-line week-over-week hiring trend for the member's domains —
+    # computed from the jobs table, never raises, may be None.
+    trend_line = await _hiring_trend_line(session, domains)
 
     # Split sections by location when user has a preferred location
     loc_lower = (user_location or "").strip().lower()
@@ -3938,6 +4017,12 @@ async def build_daily_report_html(
                 "border-radius:8px;padding:8px 12px;font-size:12px;'>"
                 f"{_esc(report['first_digest_note'])}</div>"
                 if report.get("first_digest_note")
+                else ""
+            )
+            + (
+                "<div style='margin-top:10px;color:#c7d2fe;font-size:12px;'>"
+                f"{_esc(trend_line)}</div>"
+                if trend_line
                 else ""
             )
             + "</div>"

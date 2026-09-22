@@ -1120,7 +1120,12 @@ class TestBuildAlertChunks:
         assert "New Jobs: 0" in chunks[0][0]
 
     def test_telegram_breakdown_table(self):
-        """The breakdown renders a role × location HTML table."""
+        """The breakdown tail uses ONLY Telegram-supported HTML.
+
+        Telegram's parse mode rejects <table>/<tr>/<td> with HTTP 400 —
+        the old table format silently failed every digest send (0/51).
+        The tail must be a <code> monospace block with the same data.
+        """
         from interntrack.scheduler.jobs import _telegram_breakdown
 
         here = [
@@ -1142,7 +1147,10 @@ class TestBuildAlertChunks:
         html = _telegram_breakdown(here, there)
 
         assert "Jobs by role × location" in html
-        assert "<table" in html
+        # Telegram-supported tags only — table tags break sendMessage.
+        assert "<table" not in html
+        assert "<td" not in html and "<tr" not in html and "<th" not in html
+        assert "<code>" in html
         assert "Security" in html
         assert "Coding" in html
         assert "Bengaluru" in html

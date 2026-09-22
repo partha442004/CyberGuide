@@ -4,6 +4,7 @@ Notification service for multi-channel notifications.
 
 import asyncio
 import logging
+from contextlib import suppress
 from email.utils import formatdate, make_msgid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -79,7 +80,21 @@ class TelegramChannel(NotificationChannel):
                 payload["reply_markup"] = {"inline_keyboard": inline}
             async with httpx.AsyncClient() as client:
                 response = await client.post(url, json=payload, timeout=10)
-                return response.status_code == 200
+                if response.status_code == 200:
+                    return True
+                # Telegram returns {"ok":false,"description":"..."} on
+                # rejection (429 rate limit, 400 can't-parse-entities, ...).
+                # Log the description — a silent False here cost us a week
+                # of undelivered digests before anyone could see why.
+                body = ""
+                with suppress(Exception):
+                    body = response.json().get("description", "")
+                logging.getLogger(__name__).error(
+                    "telegram sendMessage rejected (%s): %s",
+                    response.status_code,
+                    body or response.text[:200],
+                )
+                return False
         except Exception as e:
             raise NotificationError("telegram", str(e)) from e
 

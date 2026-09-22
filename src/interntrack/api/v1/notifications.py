@@ -1198,6 +1198,27 @@ async def brevo_bounce_webhook(request: Request, db: AsyncSession = Depends(get_
                 email,
                 prefs.bounce_count,
             )
+            # Immediate owner ping (best-effort) — the weekly recap shows
+            # bounce counts, but a dead address should be replaced now,
+            # not discovered at the next Monday summary.
+            try:
+                from interntrack.services.notification_service import (
+                    NotificationManager,
+                )
+
+                manager = NotificationManager(db)
+                await manager.notify(
+                    manager.get_configured_channels(),
+                    f"⛔ Auto-paused alerts for {email} after "
+                    f"{prefs.bounce_count} bounces. Ask them for a new "
+                    "address or move them to Telegram only — every "
+                    "further send hurts deliverability for all members.",
+                    subject="InternTrack: member auto-paused (bounces)",
+                )
+            except Exception:  # noqa: BLE001 - ping must never fail webhook
+                logging.getLogger(__name__).debug(
+                    "owner bounce-alert ping failed", exc_info=True
+                )
         await db.commit()
         logging.getLogger(__name__).warning(
             "Email bounce recorded: %s (event=%s, total=%s)",
