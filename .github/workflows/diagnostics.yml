@@ -92,7 +92,7 @@ jobs:
             curl -sS --max-time 60 -X POST \
               "$API_BASE/api/v1/notifications/preferences/$UID2/send-alert" \
               -H "Content-Type: application/json" -H "X-Cron-Secret: $CRON_SECRET" \
-              -d '{"channels":["telegram"]}' | head -c 400
+              -d '{"channels":["telegram"],"domains":["security"]}' | head -c 400
             echo
             AFTER=$(curl -sS --max-time 30 "$API_BASE/api/v1/notifications/stats?days=30" \
               -H "X-Cron-Secret: $CRON_SECRET" \
