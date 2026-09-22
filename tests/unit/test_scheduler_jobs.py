@@ -1149,7 +1149,9 @@ class TestBuildAlertChunks:
         assert "Jobs by role × location" in html
         # Telegram-supported tags only — table tags break sendMessage.
         assert "<table" not in html
-        assert "<td" not in html and "<tr" not in html and "<th" not in html
+        assert "<td" not in html
+        assert "<tr" not in html
+        assert "<th" not in html
         assert "<code>" in html
         assert "Security" in html
         assert "Coding" in html
