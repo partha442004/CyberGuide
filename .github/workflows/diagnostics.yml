@@ -85,12 +85,12 @@ jobs:
             -H "X-Cron-Secret: $CRON_SECRET" \
             | python3 -c "import json,sys;d=json.load(sys.stdin);print(d['per_channel'].get('telegram',{}).get('delivered',0))")
           OWNER=$(curl -sS --max-time 20 "$API_BASE/api/v1/notifications/owner" | python3 -c "import json,sys;print(json.load(sys.stdin).get('owner',''))")
-          UID=$(curl -sS --max-time 30 "$API_BASE/api/v1/users" -H "X-Cron-Secret: $CRON_SECRET" \
+          UID2=$(curl -sS --max-time 30 "$API_BASE/api/v1/users" -H "X-Cron-Secret: $CRON_SECRET" \
             | python3 -c "import json,sys;e='$OWNER'.lower();print(next((u['id'] for u in json.load(sys.stdin)['users'] if u['email'].lower()==e),''))")
-          echo "owner: $OWNER ($UID), telegram delivered before: $BEFORE"
-          if [ -n "$UID" ]; then
+          echo "owner: $OWNER ($UID2), telegram delivered before: $BEFORE"
+          if [ -n "$UID2" ]; then
             curl -sS --max-time 60 -X POST \
-              "$API_BASE/api/v1/notifications/preferences/$UID/send-alert" \
+              "$API_BASE/api/v1/notifications/preferences/$UID2/send-alert" \
               -H "Content-Type: application/json" -H "X-Cron-Secret: $CRON_SECRET" \
               -d '{"channels":["telegram"]}' | head -c 400
             echo
