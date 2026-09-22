@@ -165,8 +165,12 @@ jobs:
       # public CyberGuide repo never receives any member data).  Runs only
       # on the morning slot (post-digest), skips on quiet days, and pushes
       # with a dedicated deploy key stored in ARCHIVE_DEPLOY_KEY.
+      # Runs on EVERY slot: the morning pass captures the 08:00 digest, the
+      # two afternoon passes re-capture any catch-up sends that happened
+      # later the same UTC day (same-date file is refreshed in place; the
+      # unchanged-content check prevents duplicate commits).
       - name: Commit daily job archive (private repo)
-        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *'
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *' || github.event.schedule == '30 7 * * *' || github.event.schedule == '30 13 * * *'
         env:
           ARCHIVE_DEPLOY_KEY: ${{ secrets.ARCHIVE_DEPLOY_KEY }}
           ARCHIVE_REPO: git@github.com:partha442004/interntrack-jobs-archive.git
