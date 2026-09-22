@@ -19,6 +19,7 @@ from interntrack.api.v1.applications_v2 import router as applications_v2_router
 from interntrack.api.v1.bookmarks import router as bookmarks_router
 from interntrack.api.v1.domains import router as domains_router
 from interntrack.api.v1.email_actions import router as email_actions_router
+from interntrack.api.v1.jobs_archive import router as jobs_archive_router
 from interntrack.api.v1.observability import router as observability_router
 from interntrack.api.v1.resume_parser import router as resume_parser_router
 from interntrack.api.v1.salary_insights import router as salary_insights_router
@@ -30,6 +31,9 @@ api_router = APIRouter()
 
 # Include versioned routers
 api_router.include_router(jobs.router, prefix="/v1/jobs", tags=["Jobs"])
+# Own prefix: "/v1/jobs/daily-archive" would be shadowed by the
+# "/v1/jobs/{job_id}" route, so the archive lives under /v1/archive.
+api_router.include_router(jobs_archive_router, prefix="/v1/archive", tags=["Archive"])
 api_router.include_router(users.router, prefix="/v1/users", tags=["Users"])
 api_router.include_router(
     email_actions_router,

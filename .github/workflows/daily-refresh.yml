@@ -17,6 +17,11 @@ on:
     - cron: '30 13 * * *'  # 19:00 IST — discovery + cleanup + owner summary
   workflow_dispatch:      # allow manual "Run workflow" from the Actions tab
 
+# The archive step commits the day's job history into the repo
+# (archive/YYYY/MM/YYYY-MM-DD.json) — needs write access.
+permissions:
+  contents: write
+
 jobs:
   refresh:
     name: Trigger discovery + daily report
@@ -144,4 +149,39 @@ jobs:
               || echo "catch-up digest failed or timed out"
           else
             echo "all members got their digest — no catch-up needed"
+          fi
+
+      # ── Daily job archive ─────────────────────────────────────────────
+      # Commit the day's delivered-jobs document into the repo at
+      # archive/YYYY/MM/YYYY-MM-DD.json (user-wise, anonymized member
+      # keys — the repo is public so no emails/names ever land in git).
+      # Runs only on the morning slot (post-digest), skips the commit on
+      # quiet days, and [skip ci] prevents an infinite workflow loop.
+      - name: Check out repo (for the archive commit)
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *'
+        uses: actions/checkout@v4
+
+      - name: Commit daily job archive
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          curl -sS --max-time 60 \
+            -H "X-Cron-Secret: $CRON_SECRET" \
+            "$API_BASE/api/v1/archive/daily-archive" -o /tmp/daily_archive.json \
+            || { echo "archive fetch failed"; exit 0; }
+          if grep -q '"members_with_jobs": 0' /tmp/daily_archive.json; then
+            echo "no jobs delivered today — nothing to archive"
+            exit 0
+          fi
+          DATE=$(python3 -c "import json;print(json.load(open('/tmp/daily_archive.json'))['date'])")
+          DEST="archive/${DATE%%-*}/${DATE}/daily-jobs.json"
+          mkdir -p "$(dirname "$DEST")"
+          cp /tmp/daily_archive.json "$DEST"
+          git add "$DEST"
+          if git diff --cached --quiet; then
+            echo "archive unchanged — no commit needed"
+          else
+            git commit -m "archive: daily jobs for ${DATE} [skip ci]"
+            git push || echo "archive push failed (non-fatal)"
           fi
