@@ -1,21 +1,18 @@
 """
-Daily job archive endpoint — the git-based, day-by-day job history.
+Daily job archive endpoint — the private-repo, day-by-day job database.
 
 Every digest send already records the exact jobs each member received in
 ``NotificationHistory.jobs``.  This endpoint turns those rows into a single
-JSON document shaped for committing into the repo by the daily workflow:
+JSON document that the daily workflow commits into the SEPARATE PRIVATE
+repository ``partha442004/interntrack-jobs-archive``:
 
-    archive/2026/09/2026-09-22.json
+    archive/YYYY/MM/YYYY-MM-DD/daily-jobs.json
 
-Why an archive at all: the Neon free tier is the only copy of delivery
-history, and the retention purge deletes old jobs rows.  A git archive is
-free, versioned, browsable day-by-day / month-by-month, and doubles as
-disaster recovery.
-
-Privacy: the repository is PUBLIC, so member identities never leave the
-API — ``user_id`` values are irreversibly hashed (deterministic, so the
-same member maps to the same key across days, enabling user-wise tracking)
-and only public job data (title, company, location, apply URL) is emitted.
+Because the destination is private, the document carries REAL member
+identities (name/email resolved from the ``users`` table) so the owner can
+browse "jobs according to user" directly.  Nothing member-identifying is
+ever committed to the public CyberGuide repo — only this endpoint's
+response (transient, secret-guarded) and the private repo hold identities.
 """
 
 import hashlib
@@ -27,30 +24,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.api.deps import require_cron_secret
 from interntrack.database.session import get_db
-from interntrack.domain.models import NotificationHistory
+from interntrack.domain.models import NotificationHistory, User
 from interntrack.utils.helpers import to_naive_utc
 
 router = APIRouter()
 
-# How far back to sweep NotificationHistory for archiveable sends: the
-# start of the current UTC day.  Each daily file must contain exactly that
-# day's deliveries — a fixed 48h window would re-include yesterday's rows
-# (already archived in yesterday's file) in today's.
-_SINCE_MIDNIGHT_UTC = True
-
-# Job fields safe (and useful) to publish.  Anything else on the stored
-# digest card — internal ids, tracking fields — is dropped here.
-_JOB_FIELDS = ("title", "company", "location", "url", "domain", "match_score")
-
-# Salt keeps the hash from being a trivially reversible user_id rainbow
-# table (ids are uuid4, so this is belt-and-braces, but costs nothing).
+# Fallback anonymous key for rows whose user has no resolvable profile
+# (e.g. the legacy default account).  Deterministic so a given user_id
+# always maps to the same placeholder across days.
 _HASH_SALT = "interntrack-archive-v1"
 
+# Job fields that make the archive useful for browsing.  Anything else on
+# the stored digest card — internal ids, tracking fields — is dropped.
+_JOB_FIELDS = ("title", "company", "location", "url", "domain", "match_score")
 
-def _member_key(user_id: str) -> str:
-    """Deterministic anonymous member key (stable across days/commits)."""
+
+def _member_fallback_key(user_id: str) -> str:
+    """Deterministic anonymous fallback key for profile-less user ids."""
     digest = hashlib.sha256(f"{_HASH_SALT}:{user_id}".encode()).hexdigest()
-    return f"member-{digest[:8]}"
+    return f"unresolved-{digest[:8]}"
 
 
 def _clean_job(card) -> dict | None:
@@ -80,6 +72,18 @@ async def _collect_digest_rows(db: AsyncSession) -> list:
     return list(result.scalars().all())
 
 
+async def _load_user_index(db: AsyncSession) -> dict[str, dict]:
+    """``{user_id: {name, email}}`` for every profile in the users table."""
+    result = await db.execute(select(User))
+    index: dict[str, dict] = {}
+    for user in result.scalars().all():
+        index[str(user.id)] = {
+            "name": str(getattr(user, "name", "") or "").strip(),
+            "email": str(getattr(user, "email", "") or "").strip().lower(),
+        }
+    return index
+
+
 @router.get("/daily-archive")
 async def daily_archive(
     db: AsyncSession = Depends(get_db),
@@ -87,12 +91,14 @@ async def daily_archive(
 ):
     """Build today's archive document from today's (UTC) digest sends.
 
-    Response shape (one file per UTC day, committed by the workflow):
-    ``{date, generated_at, totals, members: [{member, domains, job_count,
-    jobs: [...]}]}``.  Returns ``members: []`` on quiet days so the
-    workflow skips the commit instead of creating empty history.
+    Response shape (one file per UTC day, committed by the workflow into
+    the private archive repo): ``{date, generated_at, totals, members:
+    [{name, email, domains, job_count, jobs: [...]}]}``.  Returns
+    ``members: []`` on quiet days so the workflow skips the commit
+    instead of creating empty history.
     """
     rows = await _collect_digest_rows(db)
+    users = await _load_user_index(db)
 
     members: dict[str, dict] = {}
     for row in rows:
@@ -103,19 +109,27 @@ async def daily_archive(
         if not user_id:
             continue
 
+        profile = users.get(user_id)
+        if profile and profile["email"]:
+            identity = f"{profile['name']} <{profile['email']}>"
+        else:
+            identity = _member_fallback_key(user_id)
+
         entry = members.setdefault(
-            _member_key(user_id),
+            identity,
             {
-                "member": _member_key(user_id),
-                "domains": [
-                    str(d)
-                    for d in (getattr(row, "domains", None) or [])
-                    if str(d).strip()
-                ]
-                or [],
+                "name": profile["name"] if profile else None,
+                "email": profile["email"] if profile else None,
+                "member": identity,
+                "domains": [],
                 "jobs": {},
             },
         )
+        # Latest non-empty domains win (a member may change prefs mid-day).
+        raw_domains = getattr(row, "domains", None) or []
+        row_domains = [str(d) for d in raw_domains if str(d).strip()]
+        if row_domains:
+            entry["domains"] = row_domains
         # Merge multiple sends (digest + catch-up) per member, deduped by URL.
         for card in stored_jobs:
             cleaned = _clean_job(card)

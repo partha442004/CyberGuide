@@ -17,10 +17,11 @@ on:
     - cron: '30 13 * * *'  # 19:00 IST — discovery + cleanup + owner summary
   workflow_dispatch:      # allow manual "Run workflow" from the Actions tab
 
-# The archive step commits the day's job history into the repo
-# (archive/YYYY/MM/YYYY-MM-DD.json) — needs write access.
+# The archive step pushes into the SEPARATE PRIVATE archive repo using a
+# dedicated deploy key (ARCHIVE_DEPLOY_KEY), so the GITHUB_TOKEN itself
+# needs no write permission.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   refresh:
@@ -152,20 +153,19 @@ jobs:
           fi
 
       # ── Daily job archive ─────────────────────────────────────────────
-      # Commit the day's delivered-jobs document into the repo at
-      # archive/YYYY/MM/YYYY-MM-DD.json (user-wise, anonymized member
-      # keys — the repo is public so no emails/names ever land in git).
-      # Runs only on the morning slot (post-digest), skips the commit on
-      # quiet days, and [skip ci] prevents an infinite workflow loop.
-      - name: Check out repo (for the archive commit)
+      # Commit the day's delivered-jobs document into the SEPARATE PRIVATE
+      # repository partha442004/interntrack-jobs-archive at
+      # archive/YYYY/MM/YYYY-MM-DD/daily-jobs.json (user-wise, real member
+      # names/emails — safe because the destination repo is private; the
+      # public CyberGuide repo never receives any member data).  Runs only
+      # on the morning slot (post-digest), skips on quiet days, and pushes
+      # with a dedicated deploy key stored in ARCHIVE_DEPLOY_KEY.
+      - name: Commit daily job archive (private repo)
         if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *'
-        uses: actions/checkout@v4
-
-      - name: Commit daily job archive
-        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 2 * * *'
+        env:
+          ARCHIVE_DEPLOY_KEY: ${{ secrets.ARCHIVE_DEPLOY_KEY }}
+          ARCHIVE_REPO: git@github.com:partha442004/interntrack-jobs-archive.git
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           curl -sS --max-time 60 \
             -H "X-Cron-Secret: $CRON_SECRET" \
             "$API_BASE/api/v1/archive/daily-archive" -o /tmp/daily_archive.json \
@@ -178,6 +178,17 @@ jobs:
             echo "no jobs delivered today — nothing to archive"
             exit 0
           fi
+          # Clone the private archive repo via the dedicated deploy key.
+          mkdir -p ~/.ssh
+          echo "$ARCHIVE_DEPLOY_KEY" > ~/.ssh/archive_deploy_key
+          chmod 600 ~/.ssh/archive_deploy_key
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/archive_deploy_key -o IdentitiesOnly=yes"
+          git clone --depth 1 "$ARCHIVE_REPO" /tmp/archive-repo \
+            || { echo "archive repo clone failed"; exit 0; }
+          cd /tmp/archive-repo
+          git config user.name "interntrack-archive-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           DATE=$(python3 -c "import json;print(json.load(open('/tmp/daily_archive.json'))['date'])")
           YEAR=${DATE%%-*}
           MONTH=$(echo "$DATE" | cut -d- -f2)
@@ -188,6 +199,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "archive unchanged — no commit needed"
           else
-            git commit -m "archive: daily jobs for ${DATE} [skip ci]"
-            git push || echo "archive push failed (non-fatal)"
+            git commit -m "archive: daily jobs for ${DATE}"
+            # HEAD works for the very first push into the empty repo too.
+            git push origin HEAD || echo "archive push failed (non-fatal)"
           fi
