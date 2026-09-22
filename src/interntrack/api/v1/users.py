@@ -227,8 +227,13 @@ async def login_user(
 async def rotate_user_token(
     user_id: str,
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_cron_secret),
 ):
-    """Replace the account's secret token (old one stops working)."""
+    """Replace the account's secret token (old one stops working).
+
+    Guarded: anyone who could hit this unauthenticated could lock a member
+    out of their own account.
+    """
     user = await _get_user_or_404(db, user_id)
     user.access_token = _new_access_token()  # type: ignore[assignment]
     await db.commit()
@@ -239,8 +244,13 @@ async def rotate_user_token(
 @router.get("", response_model=UserListResponse)
 async def list_users(
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_cron_secret),
 ):
-    """List registered user profiles (newest first)."""
+    """List registered user profiles (newest first).
+
+    Guarded: profiles carry member PII (names, emails, locations) — this is
+    owner/dashboard data, not public data.
+    """
     result = await db.execute(select(User).order_by(User.created_at.desc()).limit(200))
     users = result.scalars().all()
     return UserListResponse(
@@ -294,6 +304,7 @@ async def export_member_data(
 async def get_user(
     user_id: str,
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_cron_secret),
 ):
     """Get one user's profile."""
     user = await _get_user_or_404(db, user_id)
@@ -304,6 +315,7 @@ async def get_user(
 async def delete_user(
     user_id: str,
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_cron_secret),
 ):
     """Permanently delete an account and all of its data.
 
@@ -379,6 +391,7 @@ async def update_user(
     user_id: str,
     update: UserUpdate,
     db: AsyncSession = Depends(get_db),
+    _: None = Depends(require_cron_secret),
 ):
     """Update profile fields (only provided ones are changed)."""
     user = await _get_user_or_404(db, user_id)
