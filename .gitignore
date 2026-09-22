@@ -107,3 +107,10 @@ packaging/android/.gradle/
 packaging/android/cyberguide-release.keystore
 packaging/android/keystore.properties
 email_preview.html
+
+# Local-only scratch & scan artifacts (never commit)
+jscan_*.json
+OPEN HUMAN/
+.freebuff/
+resume_b64.txt
+check_*.py
