@@ -16,6 +16,11 @@ on:
     - cron: '30 7 * * *'   # 13:00 IST — discovery + cleanup only (no email)
     - cron: '30 13 * * *'  # 19:00 IST — discovery + cleanup + owner summary
   workflow_dispatch:      # allow manual "Run workflow" from the Actions tab
+    inputs:
+      archive_days:
+        description: "Archive window in days (1 = today only; up to 30 for backfill)"
+        required: false
+        default: "1"
 
 # The archive step pushes into the SEPARATE PRIVATE archive repo using a
 # dedicated deploy key (ARCHIVE_DEPLOY_KEY), so the GITHUB_TOKEN itself
@@ -165,10 +170,12 @@ jobs:
         env:
           ARCHIVE_DEPLOY_KEY: ${{ secrets.ARCHIVE_DEPLOY_KEY }}
           ARCHIVE_REPO: git@github.com:partha442004/interntrack-jobs-archive.git
+          # Backfill knob for manual runs ("Run workflow" → archive_days).
+          ARCHIVE_DAYS: ${{ github.event.inputs.archive_days || '1' }}
         run: |
           curl -sS --max-time 60 \
             -H "X-Cron-Secret: $CRON_SECRET" \
-            "$API_BASE/api/v1/archive/daily-archive" -o /tmp/daily_archive.json \
+            "$API_BASE/api/v1/archive/daily-archive?days=$ARCHIVE_DAYS" -o /tmp/daily_archive.json \
             || { echo "archive fetch failed"; exit 0; }
           # Parse with python: FastAPI JSON is minified (no space after
           # ":"), so a textual grep for the zero-totals case is fragile.

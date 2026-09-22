@@ -16,9 +16,9 @@ response (transient, secret-guarded) and the private repo hold identities.
 """
 
 import hashlib
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -60,10 +60,22 @@ def _clean_job(card) -> dict | None:
     }
 
 
-async def _collect_digest_rows(db: AsyncSession) -> list:
-    """NotificationHistory rows since the start of the current UTC day."""
-    now = to_naive_utc(datetime.now(UTC)) or datetime.now(UTC).replace(tzinfo=None)
-    since = now.replace(hour=0, minute=0, second=0, microsecond=0)
+def _window_start(days: int, now: datetime | None = None) -> datetime:
+    """Naive-UTC start of the lookback window covering ``days`` calendar days.
+
+    ``days=1`` (the default) means "since UTC midnight today" so each daily
+    file contains exactly that day's deliveries — a fixed 48h window would
+    re-include yesterday's rows (already archived in yesterday's file).
+    Larger values are for the one-time seed/backfill of the private repo.
+    """
+    now = now or to_naive_utc(datetime.now(UTC))
+    now = now or datetime.now(UTC).replace(tzinfo=None)
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    return midnight - timedelta(days=days - 1)
+
+
+async def _collect_digest_rows(db: AsyncSession, since: datetime) -> list:
+    """NotificationHistory rows from ``since`` onward that carry jobs."""
     result = await db.execute(
         select(NotificationHistory)
         .where(NotificationHistory.created_at >= since)
@@ -86,18 +98,24 @@ async def _load_user_index(db: AsyncSession) -> dict[str, dict]:
 
 @router.get("/daily-archive")
 async def daily_archive(
+    days: int = Query(default=1, ge=1, le=30),
     db: AsyncSession = Depends(get_db),
     _: None = Depends(require_cron_secret),
 ):
-    """Build today's archive document from today's (UTC) digest sends.
+    """Build an archive document from recent digest sends.
 
-    Response shape (one file per UTC day, committed by the workflow into
-    the private archive repo): ``{date, generated_at, totals, members:
-    [{name, email, domains, job_count, jobs: [...]}]}``.  Returns
-    ``members: []`` on quiet days so the workflow skips the commit
-    instead of creating empty history.
+    Default window is today (UTC) only; the daily workflow commits that
+    into the private archive repo as ``archive/YYYY/MM/YYYY-MM-DD/``.
+    ``?days=N`` widens the window to the last N calendar days — used for
+    the one-time seed of the private repo (the document lands under
+    today's date; it is a merged backfill, not per-day files).
+
+    Response shape: ``{date, generated_at, totals, members: [{name,
+    email, domains, job_count, jobs: [...]}]}``.  Returns ``members: []``
+    when the window has no delivered jobs so the workflow skips the
+    commit instead of creating empty history.
     """
-    rows = await _collect_digest_rows(db)
+    rows = await _collect_digest_rows(db, _window_start(days))
     users = await _load_user_index(db)
 
     members: dict[str, dict] = {}

@@ -221,3 +221,13 @@ def test_archive_requires_cron_secret_when_configured(client, monkeypatch):
         assert ok.status_code == 200
     finally:
         get_settings.cache_clear()
+
+
+def test_archive_window_math():
+    from interntrack.api.v1.jobs_archive import _window_start
+
+    now = __import__("datetime").datetime(2026, 9, 22, 7, 30)
+    # days=1 -> UTC midnight today (exactly today's sends).
+    assert _window_start(1, now) == __import__("datetime").datetime(2026, 9, 22)
+    # days=7 -> midnight 6 days back (7 calendar days inclusive of today).
+    assert _window_start(7, now) == __import__("datetime").datetime(2026, 9, 16)
