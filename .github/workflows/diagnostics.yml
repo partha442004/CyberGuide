@@ -88,6 +88,14 @@ jobs:
           UID2=$(curl -sS --max-time 30 "$API_BASE/api/v1/users" -H "X-Cron-Secret: $CRON_SECRET" \
             | python3 -c "import json,sys;e='$OWNER'.lower();print(next((u['id'] for u in json.load(sys.stdin)['users'] if u['email'].lower()==e),''))")
           echo "owner: $OWNER ($UID2), telegram delivered before: $BEFORE"
+          # The owner's digest only includes jobs discovered AFTER their
+          # last send this morning — without a fresh discovery run the
+          # send would be a quiet-day no-op. Run one targeted discovery
+          # for the owner's domain first (best-effort).
+          curl -sS --max-time 90 -X POST \
+            "$API_BASE/api/v1/jobs/discovery/run?query=security%20analyst%20bangalore" \
+            -H "X-Cron-Secret: $CRON_SECRET" | head -c 200
+          echo
           if [ -n "$UID2" ]; then
             curl -sS --max-time 60 -X POST \
               "$API_BASE/api/v1/notifications/preferences/$UID2/send-alert" \
