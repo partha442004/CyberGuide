@@ -180,6 +180,175 @@ async def scraper_health(
     }
 
 
+@router.post("/reliability-digest")
+async def reliability_digest(
+    db: AsyncSession = Depends(get_db),
+):
+    """Send the owner a reliability digest and return it as JSON.
+
+    Called weekly (and ad-hoc) by a cron-guarded GitHub Actions workflow.
+    Sections:
+    - uptime: UptimeRobot 7-day availability when ``UPTIMEROBOT_API_KEY``
+      is configured (skipped otherwise — the free key is added in Vercel).
+    - discovery: jobs found per source over the last 7 days (from the DB).
+    - delivery: per-channel notification counters over the last 7 days.
+    Also flips the owner's alert preferences to fresher-only (domains
+    ``security``, ``cloud``; experience levels ``fresher``, ``intern``)
+    — idempotent, so it is safe to call every week.
+    """
+    import logging
+
+    import httpx
+
+    from interntrack.config import get_settings
+
+    settings = get_settings()
+
+    # ── Owner preferences → fresher-only (idempotent) ─────────────────
+    from interntrack.api.v1.users import _new_access_token
+    from interntrack.domain.models import AlertPreferences, User
+
+    owner_email = settings.smtp_user or settings.effective_email_from
+    result = await db.execute(select(User).where(User.email == owner_email))
+    owner = result.scalars().first()
+    prefs_applied: dict = {"owner_found": bool(owner)}
+    if owner is not None:
+        fresh = ["security", "cloud"]
+        prefs_result = await db.execute(
+            select(AlertPreferences).where(AlertPreferences.user_id == owner.id)
+        )
+        pref: AlertPreferences | None = prefs_result.scalars().first()
+        if pref is None:
+            pref = AlertPreferences(user_id=owner.id, is_enabled=True)
+            db.add(pref)
+        pref.domains = fresh  # type: ignore[assignment]
+        pref.experience_levels = ["fresher", "intern"]  # type: ignore[assignment]
+        if not owner.access_token:
+            owner.access_token = _new_access_token()  # type: ignore[assignment]
+        await db.commit()
+        prefs_applied.update(
+            {
+                "domains": fresh,
+                "experience_levels": ["fresher", "intern"],
+                "access_token_issued": True,
+            }
+        )
+
+    # ── UptimeRobot uptime (last 7 days) ──────────────────────────────
+    uptime: dict = {"status": "skipped", "reason": "UPTIMEROBOT_API_KEY not set"}
+    if settings.uptimerobot_api_key:
+        try:
+            resp = await httpx.AsyncClient(timeout=15).post(
+                "https://api.uptimerobot.com/v2/getMonitors",
+                data={
+                    "api_key": settings.uptimerobot_api_key,
+                    "monitors": "1-",
+                    "custom_uptime_ratios": "7",
+                },
+            )
+            monitors = (resp.json() or {}).get("monitors") or []
+            uptime = {
+                "status": "ok",
+                "monitors": [
+                    {
+                        "name": m.get("friendly_name"),
+                        "uptime_7d": m.get("custom_uptime_ratio"),
+                        "state": m.get("status"),
+                    }
+                    for m in monitors
+                ],
+            }
+        except Exception:  # noqa: BLE001 — digest must not fail wholesale
+            logging.getLogger(__name__).debug("uptime section failed", exc_info=True)
+            uptime = {"status": "error"}
+
+    # ── Discovery stats (last 7 days, per source) ─────────────────────
+    from datetime import datetime, timedelta
+
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
+    source_rows = await db.execute(
+        select(Job.source, func.count(Job.id))
+        .where(Job.created_at >= cutoff)
+        .group_by(Job.source)
+    )
+    discovery = {str(src): count for src, count in source_rows.all()}
+
+    # ── Delivery stats (last 7 days, per channel) ─────────────────────
+    channel_rows = await db.execute(
+        select(NotificationHistory.channels, func.count(NotificationHistory.id))
+        .where(NotificationHistory.created_at >= cutoff)
+        .group_by(NotificationHistory.channels)
+    )
+    delivery = {
+        ",".join(chans) if isinstance(chans, list) else str(chans): count
+        for chans, count in channel_rows.all()
+    }
+
+    # ── Self-check: prove the Telegram channel still works ─────────────
+    telegram_self_check = "skipped: not configured"
+    try:
+        from interntrack.services.notification_service import NotificationManager
+
+        manager = NotificationManager(db)
+        if "telegram" in manager.get_configured_channels():
+            ok = await manager.notify(
+                ["telegram"],
+                "✅ Reliability digest self-check: Telegram delivery works.",
+                subject="InternTrack: reliability self-check",
+            )
+            telegram_self_check = "sent" if ok else "failed"
+    except Exception:  # noqa: BLE001 — digest must not fail wholesale
+        telegram_self_check = "error"
+
+    # ── Deliver the digest to the owner (email + Telegram) ─────────────
+    lines = [f"🛡 InternTrack reliability digest — week of {cutoff:%d %b}", ""]
+    if uptime.get("status") == "ok":
+        for monitor in uptime.get("monitors", []):
+            lines.append(
+                f"• {monitor.get('name')}: {monitor.get('uptime_7d')}% uptime (7d)"
+            )
+    else:
+        lines.append(
+            f"• Uptime: {uptime.get('status')} ({uptime.get('reason', 'n/a')})"
+        )
+    total_jobs = sum(discovery.values())
+    top_sources = sorted(discovery.items(), key=lambda kv: kv[1], reverse=True)[:5]
+    sources_line = ", ".join(f"{src} {count}" for src, count in top_sources) or "none"
+    lines.append(f"• Discovery 7d: {total_jobs} jobs ({sources_line})")
+    lines.append(f"• Notification sends 7d: {sum(delivery.values())}")
+    lines.append(f"• Telegram self-check: {telegram_self_check}")
+    lines.append("")
+    lines.append("Owner prefs are fresher-only (security, cloud).")
+    delivered_to: list[str] = []
+    try:
+        from interntrack.services.notification_service import NotificationManager
+
+        manager = NotificationManager(db)
+        configured = manager.get_configured_channels()
+        ok = await manager.notify(
+            configured,
+            "\n".join(lines),
+            subject="InternTrack: weekly reliability digest",
+        )
+        if ok:
+            delivered_to = configured
+    except Exception:  # noqa: BLE001 — digest must not fail wholesale
+        logging.getLogger(__name__).debug(
+            "reliability digest delivery failed", exc_info=True
+        )
+
+    return {
+        "period_days": 7,
+        "owner_prefs": prefs_applied,
+        "uptime": uptime,
+        "discovery_7d": discovery,
+        "delivery_7d": delivery,
+        "telegram_self_check": telegram_self_check,
+        "delivered_to": delivered_to,
+        "digest": "\n".join(lines),
+    }
+
+
 @router.get("/debug/sentry-test")
 async def sentry_test():
     """Fire a deliberate unhandled exception to verify Sentry delivery.

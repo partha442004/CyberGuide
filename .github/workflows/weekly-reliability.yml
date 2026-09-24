@@ -1,0 +1,27 @@
+name: Weekly reliability digest
+
+# Sends the owner a Sunday reliability summary: UptimeRobot 7-day uptime
+# (when UPTIMEROBOT_API_KEY is set in Vercel), 7-day discovery and delivery
+# stats, and a Telegram self-check. Also (re)applies the owner's fresher-only
+# alert preferences idempotently. Runs inside Actions where CRON_SECRET
+# exists; the secret is never printed (GitHub masks it automatically).
+
+on:
+  schedule:
+    - cron: "30 1 * * 0" # Sundays 07:00 IST
+  workflow_dispatch:
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request the reliability digest
+        env:
+          API_BASE: https://cyberguide-api.vercel.app
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          echo "POST /reliability-digest:"
+          curl -sS --max-time 60 -X POST \
+            "$API_BASE/api/v1/observability/reliability-digest" \
+            -H "X-Cron-Secret: $CRON_SECRET" | head -c 1200
+          echo

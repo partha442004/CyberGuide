@@ -74,6 +74,9 @@ class Settings(BaseSettings):
     # exception alerts (https://sentry.io → create project → copy DSN).
     sentry_dsn: str | None = None
     sentry_traces_sample_rate: float = 0.0
+    # UptimeRobot read-only API key (free tier). Powers the uptime section of
+    # the reliability digest — when unset that section reports "skipped".
+    uptimerobot_api_key: str | None = None
     # Shared secret for the scheduled-maintenance endpoints (discovery, daily
     # digest, archive, ...). When set, those endpoints reject requests without
     # a matching ``X-Cron-Secret`` header — stops strangers from triggering
