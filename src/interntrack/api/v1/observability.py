@@ -180,6 +180,36 @@ async def scraper_health(
     }
 
 
+@router.get("/debug/sentry-test")
+async def sentry_test():
+    """Fire a deliberate unhandled exception to verify Sentry delivery.
+
+    Exists so the deployment's error pipeline can be proven end-to-end: if the
+    ``SENTRY_DSN`` is configured, this 500 is captured by the Sentry FastAPI
+    integration and appears as an issue in the ``cyberguide-api`` project a
+    few seconds later. Guarded by the router-level cron-secret dependency like
+    the rest of the observability routes; also refuses to run when Sentry is
+    not initialized, so the endpoint is inert rather than a 500 noise source.
+    """
+    try:
+        import sentry_sdk
+    except ImportError:
+        # SDK not installed on this environment — treat as uninitialized.
+        sentry_sdk = None  # type: ignore[assignment]
+    # get_client() never returns None on SDK 2.x (it hands back a no-op
+    # client), so probe the DSN: it is only set when init() received a
+    # real one, i.e. exactly when events can actually be delivered.
+    if not sentry_sdk or not getattr(sentry_sdk.get_client(), "dsn", None):
+        return {
+            "status": "skipped",
+            "reason": "Sentry is not initialized on this deployment "
+            "(SENTRY_DSN not set)",
+        }
+    raise RuntimeError(
+        "Sentry delivery test from cyberguide-api /debug/sentry-test — safe to resolve"
+    )
+
+
 @router.post("/feedback")
 async def match_feedback(
     job_id: str,
