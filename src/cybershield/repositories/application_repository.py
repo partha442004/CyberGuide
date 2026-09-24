@@ -139,8 +139,14 @@ class ApplicationRepository(BaseRepository[Application]):
 
     async def get_upcoming_deadlines(self, user_id: str, days: int = 7) -> Sequence[Application]:
         """Get applications with upcoming interview deadlines."""
+        from datetime import timedelta
+
         now = utcnow()
-        future = now.replace(day=now.day + days)
+        # timedelta arithmetic — ``now.replace(day=now.day + days)`` raised
+        # ValueError "day is out of range for month" whenever now.day + days
+        # crossed a month boundary (every month from day 24 with the default
+        # 7-day window), 500ing the deadlines endpoint and CI.
+        future = now + timedelta(days=days)
 
         result = await self.session.execute(
             select(Application)
