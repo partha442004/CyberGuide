@@ -301,12 +301,12 @@ async def reliability_digest(
 
         manager = NotificationManager(db)
         if "telegram" in manager.get_configured_channels():
-            ok = await manager.notify(
+            sent = await manager.notify(
                 ["telegram"],
                 "✅ Reliability digest self-check: Telegram delivery works.",
                 subject="InternTrack: reliability self-check",
             )
-            telegram_self_check = "sent" if ok else "failed"
+            telegram_self_check = "sent" if sent.get("telegram") else "failed"
     except Exception:  # noqa: BLE001 — digest must not fail wholesale
         telegram_self_check = "error"
 
@@ -335,13 +335,14 @@ async def reliability_digest(
 
         manager = NotificationManager(db)
         configured = manager.get_configured_channels()
-        ok = await manager.notify(
+        sent = await manager.notify(
             configured,
             "\n".join(lines),
             subject="InternTrack: weekly reliability digest",
         )
-        if ok:
-            delivered_to = configured
+        # notify() returns {channel: bool} — a channel that is not
+        # configured or fails delivers False; only list real deliveries.
+        delivered_to = [c for c in configured if sent.get(c)]
     except Exception:  # noqa: BLE001 — digest must not fail wholesale
         logging.getLogger(__name__).debug(
             "reliability digest delivery failed", exc_info=True
@@ -357,6 +358,51 @@ async def reliability_digest(
         "delivered_to": delivered_to,
         "digest": "\n".join(lines),
     }
+
+
+@router.post("/watchdog-alert")
+async def watchdog_alert(
+    db: AsyncSession = Depends(get_db),
+):
+    """Ping the owner's configured channels that the site is down.
+
+    Called by the 5-minute GitHub Actions health watchdog only after the
+    health endpoint failed two consecutive checks (the workflow keeps the
+    failure state in its cache), so a single blip never pages anyone. The
+    app's own NotificationManager supplies Telegram + email — no alerting
+    credentials live in the workflow itself.
+    """
+    import logging
+    from datetime import UTC, datetime
+
+    from interntrack.services.notification_service import NotificationManager
+
+    message = (
+        "🚨 CyberGuide API DOWN — health checks failing.\n"
+        f"First page: {datetime.now(UTC).strftime('%d %b %H:%M UTC')}\n"
+        "It keeps paging every 5 minutes until the health endpoint "
+        "recovers (the workflow resolves automatically).\n"
+        "Check: https://cyberguide-api.vercel.app/health"
+    )
+    results: dict[str, bool] = {}
+    try:
+        manager = NotificationManager(db)
+        for channel in manager.get_configured_channels():
+            try:
+                sent = await manager.notify(
+                    [channel],
+                    message,
+                    subject="🚨 CyberGuide: API DOWN",
+                )
+                results[channel] = bool(sent.get(channel))
+            except Exception:  # noqa: BLE001 — every channel gets its chance
+                results[channel] = False
+    except Exception:  # noqa: BLE001 — alerting must never raise
+        logging.getLogger(__name__).debug(
+            "watchdog alert dispatch failed", exc_info=True
+        )
+        return {"ok": False, "results": results}
+    return {"ok": any(results.values()), "results": results}
 
 
 @router.get("/debug/sentry-test")

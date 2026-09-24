@@ -213,17 +213,83 @@ async def health():
 
 @app.get("/metrics")
 async def metrics():
-    """Expose in-memory request + business metrics for monitoring.
+    """Expose request + business metrics for monitoring.
 
-    Returns request counts per path, error counts/rate (HTTP >= 500), average
-    latency, a status-code histogram, plus the business metrics (DB query
-    times, scraper success rates, notification delivery rates) under the
-    ``business`` key. The metrics endpoint itself is not recorded, and it is
-    exempt from rate limiting so scrapers stay reliable.
+    The ``requests``/``business`` sections are per-serverless-instance
+    in-memory counters — they RESET whenever Vercel spins a fresh instance,
+    so on the deployment they read near-zero. They remain meaningful for
+    single-process (local/docker) runs. The ``durable`` section is computed
+    from the database on every call and is the authoritative cumulative
+    view on serverless: total jobs discovered, total notification sends,
+    total members, and 24h/7d activity windows.
     """
     snapshot = metrics_store.snapshot()
     snapshot["business"] = business_metrics_store.snapshot()
+    # Belt-and-braces around _durable_metrics' own internal guard: nothing
+    # in the durability layer may ever turn /metrics itself into a 500.
+    try:
+        snapshot["durable"] = await _durable_metrics()
+    except Exception:  # noqa: BLE001, S110 — monitoring must never be the outage
+        snapshot["durable"] = {"status": "error"}
     return snapshot
+
+
+async def _durable_metrics() -> dict:
+    """Cumulative, instance-independent metrics computed from the database.
+
+    Deliberately cheap (a handful of COUNT queries) and failure-tolerant:
+    if the database is unreachable the section reports ``error`` instead of
+    failing the whole endpoint — monitoring must never be the outage.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import func, select
+
+    from interntrack.database.session import async_session_factory
+    from interntrack.domain.models import Job, NotificationHistory, User
+
+    try:
+        async with async_session_factory() as session:
+            now = datetime.now(UTC).replace(tzinfo=None)
+            cutoff_24h = now - timedelta(hours=24)
+            cutoff_7d = now - timedelta(days=7)
+
+            jobs_total = (
+                await session.execute(select(func.count(Job.id)))
+            ).scalar() or 0
+            jobs_24h = (
+                await session.execute(
+                    select(func.count(Job.id)).where(Job.created_at >= cutoff_24h)
+                )
+            ).scalar() or 0
+            jobs_7d = (
+                await session.execute(
+                    select(func.count(Job.id)).where(Job.created_at >= cutoff_7d)
+                )
+            ).scalar() or 0
+            notifications_total = (
+                await session.execute(select(func.count(NotificationHistory.id)))
+            ).scalar() or 0
+            notifications_7d = (
+                await session.execute(
+                    select(func.count(NotificationHistory.id)).where(
+                        NotificationHistory.created_at >= cutoff_7d
+                    )
+                )
+            ).scalar() or 0
+            members_total = (
+                await session.execute(select(func.count(User.id)))
+            ).scalar() or 0
+        return {
+            "jobs_total": jobs_total,
+            "jobs_24h": jobs_24h,
+            "jobs_7d": jobs_7d,
+            "notifications_total": notifications_total,
+            "notifications_7d": notifications_7d,
+            "members_total": members_total,
+        }
+    except Exception:  # noqa: BLE001 — monitoring must never be the outage
+        return {"status": "error"}
 
 
 @app.get("/metrics/prometheus")

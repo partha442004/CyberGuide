@@ -1,0 +1,103 @@
+name: Health watchdog
+
+# Independent 5-minute liveness check of the production API. After TWO
+# consecutive failed checks it pages the owner through the app's own
+# /watchdog-alert endpoint (which fans out to Telegram + email via the
+# configured channels) — so no alerting credentials live in this workflow
+# and a single blip never pages anyone. Failure state is kept in the
+# Actions cache; when a check succeeds again the alert state is cleared
+# (the endpoint is not called for a single blip or after recovery).
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: health-watchdog
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Restore failure state
+        id: state
+        uses: actions/cache@v4
+        with:
+          path: watchdog-state
+          key: health-watchdog-state-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            health-watchdog-state-v1-
+
+      - name: Read consecutive-failure counter
+        id: counter
+        run: |
+          if [ -f watchdog-state/fail_count ]; then
+            echo "count=$(cat watchdog-state/fail_count)" >> "$GITHUB_OUTPUT"
+          else
+            echo "count=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Health check
+        id: health
+        env:
+          API_BASE: https://cyberguide-api.vercel.app
+        run: |
+          code=$(curl -sS --max-time 25 -o /tmp/health.json -w "%{http_code}" \
+            "$API_BASE/health" 2>/dev/null) || code=000
+          echo "http_status=$code" >> "$GITHUB_OUTPUT"
+          cat /tmp/health.json 2>/dev/null || echo "(no body)"
+          if [ "$code" = "200" ]; then
+            # A healthy body must also claim status=healthy (DB probe).
+            if grep -q '"healthy"' /tmp/health.json 2>/dev/null; then
+              echo "verdict=up" >> "$GITHUB_OUTPUT"
+            else
+              echo "verdict=down" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "verdict=down" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update failure counter
+        id: counter-out
+        env:
+          VERDICT: ${{ steps.health.outputs.verdict }}
+          PREV_COUNT: ${{ steps.counter.outputs.count }}
+        run: |
+          mkdir -p watchdog-state
+          if [ "$VERDICT" = "up" ]; then
+            if [ "$PREV_COUNT" -ge 2 ]; then
+              echo "site recovered while alerting was active"
+            fi
+            echo 0 | tee watchdog-state/fail_count
+            echo "page=0" >> "$GITHUB_OUTPUT"
+          else
+            echo $((PREV_COUNT + 1)) | tee watchdog-state/fail_count
+            if [ "$((PREV_COUNT + 1))" -ge 2 ]; then
+              echo "page=1" >> "$GITHUB_OUTPUT"
+            else
+              echo "page=0" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Page the owner (Telegram + email via app)
+        if: ${{ steps.counter-out.outputs.page == '1' }}
+        env:
+          API_BASE: https://cyberguide-api.vercel.app
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          resp=$(curl -sS --max-time 30 -X POST \
+            "$API_BASE/api/v1/observability/watchdog-alert" \
+            -H "X-Cron-Secret: $CRON_SECRET") || true
+          echo "watchdog-alert response: $resp"
+
+      - name: Save failure state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: watchdog-state
+          key: health-watchdog-state-v1-${{ github.run_id }}-${{ github.run_attempt }}
