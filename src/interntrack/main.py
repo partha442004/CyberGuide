@@ -117,6 +117,20 @@ async def domain_exception_handler(_request: Request, exc: AppException):
 @app.exception_handler(Exception)
 async def global_exception_handler(_request: Request, exc: Exception):
     """Global fallback exception handler."""
+    # Capture explicitly: Sentry's FastAPI integration can miss exceptions
+    # routed to a custom Exception handler (they look "handled" to it), so
+    # real 500s would never reach the DSN. Flush before returning — on
+    # Vercel the serverless function can freeze right after the response,
+    # losing the background transport's in-flight event. Both calls are
+    # no-ops when Sentry is not initialized; monitoring must never break
+    # the app.
+    try:
+        import sentry_sdk
+
+        sentry_sdk.capture_exception(exc)
+        sentry_sdk.flush(timeout=2)
+    except Exception:  # noqa: BLE001, S110 - monitoring must never break the app
+        pass
     payload: dict[str, Any] = {
         "error": {
             "code": "INTERNAL_ERROR",
