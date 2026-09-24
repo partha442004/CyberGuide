@@ -266,23 +266,32 @@ async def reliability_digest(
     from datetime import datetime, timedelta
 
     cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
-    source_rows = await db.execute(
-        select(Job.source, func.count(Job.id))
-        .where(Job.created_at >= cutoff)
-        .group_by(Job.source)
-    )
-    discovery = {str(src): count for src, count in source_rows.all()}
+    discovery: dict[str, int] = {}
+    try:
+        source_rows = await db.execute(
+            select(Job.source, func.count(Job.id))
+            .where(Job.created_at >= cutoff)
+            .group_by(Job.source)
+        )
+        discovery = {str(src): count for src, count in source_rows.all()}
+    except Exception:  # noqa: BLE001 — digest must not fail wholesale
+        logging.getLogger(__name__).debug("discovery stats failed", exc_info=True)
 
     # ── Delivery stats (last 7 days, per channel) ─────────────────────
-    channel_rows = await db.execute(
-        select(NotificationHistory.channels, func.count(NotificationHistory.id))
-        .where(NotificationHistory.created_at >= cutoff)
-        .group_by(NotificationHistory.channels)
-    )
-    delivery = {
-        ",".join(chans) if isinstance(chans, list) else str(chans): count
-        for chans, count in channel_rows.all()
-    }
+    # Aggregated in Python: ``channels`` is a JSON column and Postgres
+    # cannot GROUP BY JSON without a cast, which broke this in production.
+    delivery: dict[str, int] = {}
+    try:
+        channel_rows = await db.execute(
+            select(NotificationHistory.channels).where(
+                NotificationHistory.created_at >= cutoff
+            )
+        )
+        for (chans,) in channel_rows.all():
+            key = ",".join(chans) if isinstance(chans, list) else str(chans)
+            delivery[key] = delivery.get(key, 0) + 1
+    except Exception:  # noqa: BLE001 — digest must not fail wholesale
+        logging.getLogger(__name__).debug("delivery stats failed", exc_info=True)
 
     # ── Self-check: prove the Telegram channel still works ─────────────
     telegram_self_check = "skipped: not configured"
