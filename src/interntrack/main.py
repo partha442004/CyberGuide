@@ -31,6 +31,30 @@ logger = get_logger("interntrack.main")
 # Sentry error tracking — active only when SENTRY_DSN is configured. Installed
 # BEFORE the app is built so startup errors are captured too. A failure here
 # must never block the app (a broken monitoring SDK is not a business error).
+
+
+def _sentry_before_send(event, _hint):
+    """Strip frame variables from oversized events instead of losing them.
+
+    Local-variable capture on ASGI frames (fastapi/starlette routing) can
+    balloon an event past Sentry's 1 MB envelope limit — the ASGI ``scope``
+    alone serializes the whole routing graph — after which Sentry rejects
+    the event with HTTP 413 and the error is silently lost. Keeping the
+    stack trace and dropping the variables preserves the signal.
+    """
+    try:
+        import json
+
+        if len(json.dumps(event, default=str).encode("utf-8")) <= 500_000:
+            return event
+        for exc in event.get("exception", {}).get("values", []):
+            for frame in exc.get("stacktrace", {}).get("frames", []):
+                frame.pop("vars", None)
+    except Exception:  # noqa: BLE001, S110 - monitoring must never break the app
+        pass
+    return event
+
+
 if settings.sentry_dsn:
     try:
         import sentry_sdk
@@ -39,6 +63,7 @@ if settings.sentry_dsn:
             dsn=str(settings.sentry_dsn),
             traces_sample_rate=settings.sentry_traces_sample_rate,
             send_default_pii=False,
+            before_send=_sentry_before_send,
         )
         logger.info("Sentry error tracking enabled")
     except Exception:  # noqa: BLE001 - monitoring must never break the app
@@ -128,7 +153,11 @@ async def global_exception_handler(_request: Request, exc: Exception):
         import sentry_sdk
 
         sentry_sdk.capture_exception(exc)
-        sentry_sdk.flush(timeout=2)
+        # 8s: a 2s flush reliably lost the event — the HTTPS round trip to
+        # the ingest host can exceed 2s (TLS handshake), after which the
+        # response returns, the process freezes/scales down and the queued
+        # envelope is gone. 8s stays trivial next to the 60s function cap.
+        sentry_sdk.flush(timeout=8)
     except Exception:  # noqa: BLE001, S110 - monitoring must never break the app
         pass
     payload: dict[str, Any] = {
