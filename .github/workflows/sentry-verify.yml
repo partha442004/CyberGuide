@@ -1,0 +1,37 @@
+name: Sentry delivery verify (manual)
+
+# Bridges the CRON_SECRET (which exists only in GitHub Actions secrets and
+# Vercel) to fire the guarded /debug/sentry-test endpoint on demand. The
+# endpoint raises an unhandled RuntimeError; with SENTRY_DSN configured the
+# Sentry FastAPI integration captures it and the issue appears in the
+# cyberguide-api project's feed within seconds. Delivery is verified in the
+# Sentry UI (or via a project-scoped read token added later — the org:ci
+# scope offered for org tokens cannot read the issues API).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fire test exception
+        env:
+          API_BASE: https://cyberguide-api.vercel.app
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          echo "GET /debug/sentry-test (expect HTTP 500):"
+          code=$(curl -sS --max-time 30 -o /tmp/body -w "%{http_code}" \
+            "$API_BASE/api/v1/observability/debug/sentry-test" \
+            -H "X-Cron-Secret: $CRON_SECRET") || true
+          echo "http_status=$code"
+          echo "response_body:"; head -c 300 /tmp/body; echo
+          if [ "$code" = "500" ]; then
+            echo "endpoint raised — event en route to Sentry; check the cyberguide-api issues feed"
+          else
+            echo "::error::unexpected status from sentry-test (want 500, got $code)"
+            exit 1
+          fi
+
+      - name: Wait for ingest
+        run: sleep 20
