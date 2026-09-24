@@ -242,7 +242,8 @@ async def reliability_digest(
                 "https://api.uptimerobot.com/v2/getMonitors",
                 data={
                     "api_key": settings.uptimerobot_api_key,
-                    "monitors": "1-",
+                    # No monitors filter: ranges like "1-" silently match
+                    # nothing when IDs are large — return all monitors.
                     "custom_uptime_ratios": "7",
                 },
             )
