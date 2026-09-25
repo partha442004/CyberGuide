@@ -1,0 +1,72 @@
+# Monthly refresh of the pinned dependency lock.
+#
+# CI installs from requirements.lock so every run gets byte-identical
+# dependencies — a same-day upstream major (like SQLAlchemy 2.1.0, which
+# broke the mypy gate the day it shipped) can never surprise master again.
+# This workflow is the deliberate, monthly way the lock moves: recompile
+# from the floating floors, prove the suite still passes, then open one
+# reviewable PR instead of ten Dependabot ones.
+#
+# Note: PRs opened with the default GITHUB_TOKEN do not trigger CI
+# (GitHub blocks recursive workflow events), so each refresh PR needs one
+# maintainer action: close & reopen the PR (or push any commit) to kick CI.
+
+name: Dependency lock refresh
+
+on:
+  schedule:
+    - cron: "0 3 1 * *" # 1st of the month, 03:00 UTC = 08:30 IST
+  workflow_dispatch: # manual recompile anytime from the Actions tab
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh-lock:
+    name: Recompile requirements.lock
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Recompile lock from floating floors
+        run: |
+          uv pip compile requirements.txt requirements-dev.txt \
+            --python-version 3.11 --python-platform linux \
+            -o requirements.lock
+          git diff --stat requirements.lock || true
+
+      - name: Detect lock changes
+        id: changed
+        run: |
+          if git diff --quiet requirements.lock; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "lock already up to date — nothing to do"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff requirements.lock | grep -E "^[+-][a-zA-Z]" | head -40
+          fi
+
+      - name: Create refresh PR
+        if: steps.changed.outputs.changed == 'true'
+        run: |
+          BRANCH="dep-lock-refresh/$(date +%Y-%m)"
+          git config user.name "interntrack-lock-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add requirements.lock
+          git commit -m "Refresh requirements.lock ($(date +%Y-%m-%d))"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "Monthly dependency lock refresh ($(date +%Y-%m))" \
+            --body "Automated recompile of requirements.lock from the floating floors in requirements.txt / requirements-dev.txt (uv pip compile, py3.11/linux).
+
+          Changed pins above are the full delta. CI must be green before merge — this is the reviewed, scheduled way the lock moves.
+
+          Note: if CI did not start, close & reopen this PR once (default-token PRs don't trigger workflow runs)." \
+            --base master --head "$BRANCH"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
