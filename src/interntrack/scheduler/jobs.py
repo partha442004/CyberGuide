@@ -232,6 +232,36 @@ async def _mark_alert_sent(
             await session.rollback()
 
 
+def _digest_job_cards(
+    report: dict, resume_skills: set[str] | None = None
+) -> list[dict]:
+    """Compact cards of the jobs a digest actually sent, for history rows.
+
+    Shared by the scheduler's digest sender and the API cron path
+    (``_send_alert_digest``) so both persist the same shape — the git
+    archive endpoint reads these cards back out of
+    ``NotificationHistory.jobs``. Built defensively: history must never
+    be lost to a scoring hiccup after the mail was already delivered.
+    """
+    try:
+        skills = resume_skills if resume_skills is not None else set()
+        return [
+            {
+                "title": job.get("title"),
+                "company": job.get("company"),
+                "location": job.get("location"),
+                "url": job.get("url"),
+                "domain": job.get("domain") or "other",
+                "match_score": _job_match_score(skills, job),
+                "source": job.get("source"),
+                "posted_at": job.get("posted_at"),
+            }
+            for job in (report.get("new_jobs") or [])
+        ]
+    except Exception:  # noqa: BLE001, S110 - history must never break
+        return []
+
+
 async def _record_alert_history(
     session,
     user_id: str,
@@ -2168,19 +2198,7 @@ async def _send_alert_for(
     sent_jobs: list = []
     try:
         resume_skills = await _latest_resume_skill_names(session, user_id=user_id)
-        sent_jobs = [
-            {
-                "title": job.get("title"),
-                "company": job.get("company"),
-                "location": job.get("location"),
-                "url": job.get("url"),
-                "domain": job.get("domain") or "other",
-                "match_score": _job_match_score(resume_skills, job),
-                "source": job.get("source"),
-                "posted_at": job.get("posted_at"),
-            }
-            for job in (report.get("new_jobs") or [])
-        ]
+        sent_jobs = _digest_job_cards(report, resume_skills)
     except Exception:  # noqa: BLE001, S110 - history must never break
         sent_jobs = []
     await _record_alert_history(

@@ -231,3 +231,73 @@ def test_archive_window_math():
     assert _window_start(1, now) == __import__("datetime").datetime(2026, 9, 22)
     # days=7 -> midnight 6 days back (7 calendar days inclusive of today).
     assert _window_start(7, now) == __import__("datetime").datetime(2026, 9, 16)
+
+
+@pytest.mark.asyncio
+async def test_api_digest_send_records_job_cards():
+    """Regression: the API cron path (_send_alert_digest) must persist the
+    sent job cards into NotificationHistory. The git-archive endpoint
+    commits exactly those cards; rows recorded without them made every
+    archive document empty and silently starved the private archive repo
+    (seen 2026-09-22..24: 'no jobs delivered today' beside a 74-job send).
+    """
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from interntrack.api.v1.reports import _send_alert_digest
+
+    report = {
+        "summary": {"new_jobs": 1},
+        "new_jobs": [
+            {
+                "title": "SOC Analyst",
+                "company": "Acme",
+                "location": "Chennai",
+                "url": "https://jobs.example/soc",
+                "domain": "security",
+                "source": "test",
+            }
+        ],
+    }
+    captured: dict = {}
+
+    async def fake_history(_db, **kwargs):
+        captured.update(kwargs)
+
+    mock_manager = MagicMock()
+    mock_manager.get_configured_channels.return_value = ["email"]
+    with (
+        patch(
+            "interntrack.services.notification_service.NotificationManager",
+            return_value=mock_manager,
+        ),
+        patch(
+            "interntrack.scheduler.jobs._deliver_alert",
+            new=AsyncMock(return_value={"email": True}),
+        ),
+        patch(
+            "interntrack.scheduler.jobs._latest_resume_skill_names",
+            new=AsyncMock(return_value=[]),
+        ),
+        patch(
+            "interntrack.scheduler.jobs._record_alert_history",
+            new=fake_history,
+        ),
+    ):
+        results = await _send_alert_digest(
+            AsyncMock(),
+            {"domains": ["security"], "channels": ["email"], "is_enabled": True},
+            report,
+            user_id="u-1",
+        )
+
+    assert results == {"email": True}
+    assert captured["job_count"] == 1
+    cards = captured["jobs"]
+    assert cards, "history row must carry the sent job cards"
+    assert cards[0]["title"] == "SOC Analyst"
+    assert cards[0]["url"] == "https://jobs.example/soc"
+    # The archive endpoint keeps only cards with a non-empty title+url —
+    # exactly the fields these cards must always carry.
+    from interntrack.api.v1.jobs_archive import _clean_job
+
+    assert _clean_job(cards[0]) is not None

@@ -150,6 +150,8 @@ async def _send_alert_digest(
         DEFAULT_ALERT_USER,
         _alerts_paused,
         _deliver_alert,
+        _digest_job_cards,
+        _latest_resume_skill_names,
         _record_alert_history,
     )
     from interntrack.services.notification_service import NotificationManager
@@ -178,6 +180,18 @@ async def _send_alert_digest(
         weekly=weekly,
         user=user,
     )
+    # Compact snapshot of the jobs actually sent — same card shape as the
+    # scheduler's digest path — so NotificationHistory rows carry real
+    # content (dashboard history) and the git-archive endpoint has
+    # something to commit into the private archive repo.
+    sent_jobs: list = []
+    try:
+        resume_skills = await _latest_resume_skill_names(
+            db, user_id=user_id or DEFAULT_ALERT_USER
+        )
+        sent_jobs = _digest_job_cards(report, resume_skills)
+    except Exception:  # noqa: BLE001, S110 - history must never break a send
+        sent_jobs = []
     await _record_alert_history(
         db,
         user_id=user_id or DEFAULT_ALERT_USER,
@@ -186,6 +200,7 @@ async def _send_alert_digest(
         domains=domains or [],
         job_count=len(report.get("new_jobs") or []),
         results=results,
+        jobs=sent_jobs,
     )
     # Successfully-reminded applications stop being nudged. Only mark when at
     # least one channel actually delivered (a dict like {"telegram": False} is
