@@ -30,6 +30,39 @@ async def test_guard_accepts_matching_header(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_guard_accepts_vercel_bearer_header(monkeypatch):
+    """Vercel Cron fires endpoints with ``Authorization: Bearer <secret>``
+
+    It cannot attach custom headers, so the digest endpoints must accept
+    the Bearer form or the on-time Vercel trigger would 401.
+    """
+    monkeypatch.setattr(
+        "interntrack.api.deps.get_settings", lambda: _FakeSettings("test-secret-ok")
+    )
+    await require_cron_secret(
+        x_cron_secret=None, authorization="Bearer test-secret-ok"  # noqa: S106
+    )
+    # Scheme match is case-insensitive.
+    await require_cron_secret(
+        x_cron_secret=None, authorization="bearer test-secret-ok"  # noqa: S106
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "authorization",
+    ["Bearer wrong-value", "Basic dXNlcjpwYXNz", "bearer", "Bearer ", "Token abc"],
+)
+async def test_guard_rejects_bad_authorization(monkeypatch, authorization):
+    monkeypatch.setattr(
+        "interntrack.api.deps.get_settings", lambda: _FakeSettings("s3cret")
+    )
+    with pytest.raises(HTTPException) as exc:
+        await require_cron_secret(x_cron_secret=None, authorization=authorization)
+    assert exc.value.status_code == 401
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("header", [None, "", "wrong-value"])
 async def test_guard_rejects_missing_or_wrong_header(monkeypatch, header):
     monkeypatch.setattr(
