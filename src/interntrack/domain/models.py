@@ -522,10 +522,10 @@ class AlertPreferences(Base, TimestampMixin):
     # Auto-added to existing live tables by ``_sync_missing_columns``.
     closing_soon_sent = Column(JSON, nullable=True)
     # Whether to send the compact "📭 No new jobs today" email on days when
-    # the digest found nothing new. Off means the account only ever gets
-    # emails that actually contain job alerts. Auto-added to existing live
-    # tables by ``_sync_missing_columns``.
-    quiet_day_emails = Column(Boolean, default=True)
+    # the digest found nothing new. Off by default (job alerts only); when
+    # on, the compact check-in is sent once a day, morning-slot only. The
+    # column default also flips for new rows; pre-column rows read as off.
+    quiet_day_emails = Column(Boolean, default=False)
     # Annual minimum salary the user cares about (₹/year, INR). Jobs whose
     # listed salary is at/above this get a "💰 Meets your target" marker in
     # the digest. ``None`` = no target. Auto-added by column sync.

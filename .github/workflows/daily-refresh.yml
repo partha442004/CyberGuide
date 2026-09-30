@@ -1,14 +1,15 @@
 name: Daily refresh (Vercel auto-refresh)
 
 # Replaces the always-on APScheduler worker that used to run on Railway.
-# Vercel is serverless, so nothing runs in the background there. This free
-# GitHub Actions cron keeps the live app's data fresh. Discovery + cleanup
-# run three times a day so the dashboard's listings stay fresh, but the
-# EMAIL DIGEST is sent ONCE per day (08:00 IST): members asked for a single
-# daily mail, not three. The slot-less /reports/daily call applies each
-# user's own saved domains (a GRC user gets GRC, a data user gets data) and
-# the no-duplicates window prevents repeats. No weekly recap — one mail a
-# day is the whole deal.
+# Vercel is serverless, so nothing runs in the background there.
+# SENDING moved to Vercel Cron (vercel.json): three daily entries fire
+# /api/v1/reports/daily at 08:00/13:00/19:00 IST because GitHub's scheduler
+# kept running 45min-6h late. This workflow stays for the discovery +
+# cleanup jobs it does better (secrets, longer timeouts) and as a manual
+# dispatcher; its catch-up step below also fires the digest if the API
+# reports a member went stale. The slot-less /reports/daily call applies
+# each user's own saved domains and the no-duplicates window prevents
+# repeats, so overlapping triggers never double-mail anyone.
 # Vercel auto-deploys every push, so this always targets the latest code.
 on:
   schedule:

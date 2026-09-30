@@ -600,7 +600,7 @@ async def get_alert_preferences(
         weekly_enabled=prefs.get("weekly_enabled", True),
         instant_alerts=prefs.get("instant_alerts", True),
         include_remote=prefs.get("include_remote", True),
-        quiet_day_emails=prefs.get("quiet_day_emails", True),
+        quiet_day_emails=prefs.get("quiet_day_emails", False),
         paused_until=prefs.get("paused_until"),
         min_salary=prefs.get("min_salary"),
         keywords=list(prefs.get("keywords") or []),
@@ -695,7 +695,7 @@ async def update_alert_preferences(
             bool(pref.include_remote) if pref.include_remote is not None else True
         ),
         quiet_day_emails=(
-            bool(pref.quiet_day_emails) if pref.quiet_day_emails is not None else True
+            bool(pref.quiet_day_emails) if pref.quiet_day_emails is not None else False
         ),
         paused_until=pref.paused_until,
         min_salary=pref.min_salary,

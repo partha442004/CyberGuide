@@ -3,6 +3,14 @@
     {
       "path": "/api/v1/reports/daily",
       "schedule": "30 2 * * *"
+    },
+    {
+      "path": "/api/v1/reports/daily",
+      "schedule": "30 7 * * *"
+    },
+    {
+      "path": "/api/v1/reports/daily",
+      "schedule": "30 13 * * *"
     }
   ],
   "version": 2,

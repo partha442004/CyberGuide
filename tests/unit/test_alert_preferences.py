@@ -50,6 +50,7 @@ class TestLoadAlertPreferences:
         row.paused_until = None
         row.min_salary = None
         row.keywords = None
+        row.quiet_day_emails = None
 
         prefs = await _load_alert_preferences(_db_with_row(row))
         assert prefs == {
@@ -62,7 +63,7 @@ class TestLoadAlertPreferences:
             "weekly_enabled": True,
             "instant_alerts": True,
             "include_remote": True,
-            "quiet_day_emails": True,
+            "quiet_day_emails": False,
             "paused_until": None,
             "min_salary": None,
             "keywords": [],
@@ -86,6 +87,7 @@ class TestLoadAlertPreferences:
         row.paused_until = None
         row.min_salary = None
         row.keywords = []
+        row.quiet_day_emails = None
 
         prefs = await _load_alert_preferences(_db_with_row(row))
         assert prefs == {
@@ -97,7 +99,7 @@ class TestLoadAlertPreferences:
             "slot_domains": {"morning": ["security"]},
             "instant_alerts": True,
             "include_remote": False,
-            "quiet_day_emails": True,
+            "quiet_day_emails": False,
             "weekly_enabled": False,
             "paused_until": None,
             "min_salary": None,
@@ -1610,6 +1612,7 @@ class TestDailyReportPreview:
                                 "channels": ["email"],
                                 "min_match_score": None,
                                 "is_enabled": True,
+                                "quiet_day_emails": True,
                             },
                             "user": None,
                         }
@@ -1666,6 +1669,7 @@ class TestDailyReportPreview:
                                 "channels": ["email"],
                                 "min_match_score": None,
                                 "is_enabled": True,
+                                "quiet_day_emails": True,
                             },
                             "user": None,
                         }
@@ -1724,6 +1728,7 @@ class TestQuietDayDigest:
                                 "channels": ["email"],
                                 "min_match_score": None,
                                 "is_enabled": True,
+                                "quiet_day_emails": True,
                             },
                             "user": None,
                         }
@@ -1787,6 +1792,7 @@ class TestQuietDayDigest:
                                 "channels": ["email"],
                                 "min_match_score": None,
                                 "is_enabled": True,
+                                "quiet_day_emails": True,
                             },
                             "user": None,
                         }
@@ -1838,6 +1844,7 @@ class TestQuietDayDigest:
                                 "channels": ["email"],
                                 "min_match_score": None,
                                 "is_enabled": True,
+                                "quiet_day_emails": True,
                             },
                             "user": None,
                         }
@@ -1889,6 +1896,7 @@ class TestQuietDayDigest:
                                 "channels": ["email"],
                                 "min_match_score": None,
                                 "is_enabled": True,
+                                "quiet_day_emails": True,
                             },
                             "user": None,
                         }
@@ -2019,8 +2027,8 @@ class TestQuietDayDigest:
         mark_sent.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_quiet_day_pref_defaults_on(self):
-        """quiet_day_emails defaults to True when the row lacks the column."""
+    async def test_quiet_day_pref_defaults_off(self):
+        """quiet_day_emails defaults to False when the row lacks the column."""
         from interntrack.scheduler.jobs import _load_alert_preferences
 
         row = MagicMock()
@@ -2034,11 +2042,11 @@ class TestQuietDayDigest:
         row.instant_alerts = None
         row.include_remote = None
         row.paused_until = None
-        # No quiet_day_emails attribute (pre-column rows) -> defaults True.
+        # No quiet_day_emails attribute (pre-column rows) -> defaults False.
         del row.quiet_day_emails
 
         prefs = await _load_alert_preferences(_db_with_row(row))
-        assert prefs["quiet_day_emails"] is True
+        assert prefs["quiet_day_emails"] is False
 
     @pytest.mark.asyncio
     async def test_update_preferences_saves_quiet_day_toggle(self):

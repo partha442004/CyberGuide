@@ -88,7 +88,8 @@ class AlertPreferencesResponse(BaseModel):
     include_remote: bool = True
     # Whether the compact "📭 No new jobs today" email is sent on days when
     # the digest found nothing new (off = only real job-alert emails).
-    quiet_day_emails: bool = True
+    # "No new jobs" check-in emails are opt-in (job alerts only by default).
+    quiet_day_emails: bool = False
     # Vacation mode: when set (naive UTC), all alerts are suppressed until
     # this timestamp. ``None`` means alerts are live.
     paused_until: datetime | None = None

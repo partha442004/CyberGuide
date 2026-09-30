@@ -164,9 +164,9 @@ async def _load_alert_preferences(
                     else True
                 ),
                 "quiet_day_emails": (
-                    bool(getattr(pref, "quiet_day_emails", True))
+                    bool(getattr(pref, "quiet_day_emails", False))
                     if getattr(pref, "quiet_day_emails", None) is not None
-                    else True
+                    else False
                 ),
                 "paused_until": getattr(pref, "paused_until", None),
                 "min_salary": getattr(pref, "min_salary", None),

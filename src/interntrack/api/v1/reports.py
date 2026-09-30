@@ -275,7 +275,9 @@ async def get_daily_report(
     """Get daily report and send it to the configured notification channels.
 
     Vercel is serverless, so the APScheduler worker never runs there; the
-    free GitHub Actions cron hits this endpoint to trigger the daily digest.
+    three Vercel Cron entries in vercel.json (08:00/13:00/19:00 IST) hit
+    this endpoint to send each member their daily digest, with GitHub
+    Actions' catch-up step as a fallback for missed sends.
     Saved alert preferences (domains / channels / min match %) are applied;
     ``slot`` (morning / afternoon / evening) overrides the category filter
     with that slot's saved ``slot_domains`` when configured. ``preview``
@@ -425,23 +427,41 @@ async def get_daily_report(
             # advances — without this every later run re-evaluates the same
             # empty window forever. Real sends above stamp only on delivery
             # success instead, so a failed send never swallows a member's
-            # jobs. The compact check-in email itself is morning/manual-slot
-            # only (afternoon/evening stay silent so nobody gets 3 "no new
-            # jobs" mails a day) and respects quiet_day_emails off.
+            # jobs. The compact check-in email is opt-in (quiet_day_emails,
+            # off by default) and capped at one per UTC day: all three cron
+            # slots run this same slot-less endpoint, so without the day
+            # guard an opted-in member would get up to three "no new jobs"
+            # mails on a quiet day.
             if (slot is None or slot == "morning") and prefs.get(
-                "quiet_day_emails", True
+                "quiet_day_emails", False
             ):
-                with contextlib.suppress(Exception):
-                    await asyncio.wait_for(
-                        _send_quiet_day_digest(
-                            db,
-                            prefs,
-                            domains=domains,
-                            user_id=target["user_id"],
-                            user=target["user"],
-                        ),
-                        timeout=30,
+                last = prefs.get("last_alert_at")
+                last_dt: datetime | None = (
+                    last if isinstance(last, datetime) else None
+                )
+                if last_dt is None and last is not None:
+                    with contextlib.suppress(ValueError):
+                        last_dt = datetime.fromisoformat(str(last))
+                already_mailed_today = False
+                if last_dt is not None:
+                    if last_dt.tzinfo is None:
+                        last_dt = last_dt.replace(tzinfo=UTC)
+                    already_mailed_today = (
+                        last_dt.astimezone(UTC).date()
+                        == datetime.now(UTC).date()
                     )
+                if not already_mailed_today:
+                    with contextlib.suppress(Exception):
+                        await asyncio.wait_for(
+                            _send_quiet_day_digest(
+                                db,
+                                prefs,
+                                domains=domains,
+                                user_id=target["user_id"],
+                                user=target["user"],
+                            ),
+                            timeout=30,
+                        )
             with contextlib.suppress(Exception):
                 await _mark_alert_sent(db, target["user_id"])
         last_report = report

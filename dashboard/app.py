@@ -5148,11 +5148,10 @@ def show_settings() -> None:
     weekly_enabled = bool(prefs.get("weekly_enabled", True))
     quiet_day_emails = st.checkbox(
         "📭 Email me 'no new jobs today' on quiet days",
-        value=bool(prefs.get("quiet_day_emails", True)),
-        help="On days when nothing new matches your categories, you'd get a "
-        "compact confirmation email (once a day) so you know the system "
-        "checked in. Turn this off to only ever receive emails that "
-        "actually contain job alerts.",
+        value=bool(prefs.get("quiet_day_emails", False)),
+        help="Off by default: you only receive emails that actually contain "
+        "job alerts. Turn this on to also get a compact confirmation email "
+        "(once a day) when nothing new matched your categories.",
     )
     instant_alerts = st.checkbox(
         "⚡ Instant Telegram alert for new high-match jobs",
