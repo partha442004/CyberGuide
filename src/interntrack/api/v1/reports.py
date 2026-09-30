@@ -436,9 +436,7 @@ async def get_daily_report(
                 "quiet_day_emails", False
             ):
                 last = prefs.get("last_alert_at")
-                last_dt: datetime | None = (
-                    last if isinstance(last, datetime) else None
-                )
+                last_dt: datetime | None = last if isinstance(last, datetime) else None
                 if last_dt is None and last is not None:
                     with contextlib.suppress(ValueError):
                         last_dt = datetime.fromisoformat(str(last))
@@ -447,8 +445,7 @@ async def get_daily_report(
                     if last_dt.tzinfo is None:
                         last_dt = last_dt.replace(tzinfo=UTC)
                     already_mailed_today = (
-                        last_dt.astimezone(UTC).date()
-                        == datetime.now(UTC).date()
+                        last_dt.astimezone(UTC).date() == datetime.now(UTC).date()
                     )
                 if not already_mailed_today:
                     with contextlib.suppress(Exception):

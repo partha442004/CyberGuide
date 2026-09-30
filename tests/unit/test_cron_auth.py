@@ -40,11 +40,13 @@ async def test_guard_accepts_vercel_bearer_header(monkeypatch):
         "interntrack.api.deps.get_settings", lambda: _FakeSettings("test-secret-ok")
     )
     await require_cron_secret(
-        x_cron_secret=None, authorization="Bearer test-secret-ok"  # noqa: S106
+        x_cron_secret=None,
+        authorization="Bearer test-secret-ok",  # noqa: S106
     )
     # Scheme match is case-insensitive.
     await require_cron_secret(
-        x_cron_secret=None, authorization="bearer test-secret-ok"  # noqa: S106
+        x_cron_secret=None,
+        authorization="bearer test-secret-ok",  # noqa: S106
     )
 
 
