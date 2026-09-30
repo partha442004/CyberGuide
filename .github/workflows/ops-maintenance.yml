@@ -1,0 +1,87 @@
+name: Ops maintenance (dispatch)
+
+# One-off maintenance runner for the API's cron-secret-guarded endpoints.
+# The CRON_SECRET is write-only (GitHub Actions secret + Vercel env, never
+# readable back), so guarded calls — e.g. setting alert preferences — are
+# made from here instead of the local machine.
+#
+# Usage: Actions tab → "Ops maintenance" → Run workflow → paste JSON into
+# OPS_REQUEST. Either a single request:
+#   {"method":"PUT","path":"/api/v1/notifications/preferences/<user_id>",
+#    "body":{"experience_levels":["entry","junior"]}}
+# or a bulk list (each item checked against the same allowlist):
+#   {"bulk":[
+#     {"method":"PUT","path":"/api/v1/notifications/preferences/<uid1>",
+#      "body":{"weekly_enabled":false}},
+#     {"method":"PUT","path":"/api/v1/notifications/preferences/<uid2>",
+#      "body":{"weekly_enabled":false}}
+#   ]}
+#
+# SECURITY: every `path` is prefix-checked against the API's maintenance
+# namespaces, and only the CRON_SECRET header is attached. Only trigger
+# this workflow with trusted input — it authenticates as the deployment's
+# maintenance caller.
+
+on:
+  workflow_dispatch:
+    inputs:
+      OPS_REQUEST:
+        description: 'JSON request, or {"bulk": [requests]}'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call guarded API endpoints
+        env:
+          API_BASE: https://cyberguide-api.vercel.app
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          OPS_REQUEST: ${{ github.event.inputs.OPS_REQUEST }}
+        run: |
+          python3 - <<'PYEOF'
+          import json, os, subprocess, sys
+
+          req = json.loads(os.environ["OPS_REQUEST"])
+          items = req.get("bulk") if isinstance(req, dict) and "bulk" in req else [req]
+          base = os.environ["API_BASE"]
+          secret = os.environ["CRON_SECRET"]
+          allowed = (
+              "/api/v1/notifications/preferences/",
+              "/api/v1/users/",
+              "/api/v1/reports/",
+              "/api/v1/jobs/",
+              "/api/v1/notifications/closing-soon",
+              "/api/v1/notifications/daily-summary",
+          )
+          failures = 0
+          for item in items:
+              method = str(item.get("method", "GET")).upper()
+              path = item["path"]
+              if not path.startswith("/"):
+                  path = "/" + path
+              if not path.startswith(allowed):
+                  print(f"BLOCKED {method} {path}: not in maintenance allowlist")
+                  failures += 1
+                  continue
+              cmd = ["curl", "-sS", "--max-time", "60", "-X", method,
+                     "-H", f"X-Cron-Secret: {secret}"]
+              body = item.get("body")
+              if body is not None:
+                  cmd += ["-H", "Content-Type: application/json",
+                          "-d", json.dumps(body)]
+              cmd.append(base + path)
+              out = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+              resp = (out.stdout or out.stderr or "").strip()
+              print(f"{method} {path} -> {resp[:600]}")
+              # Response-level failure signal: FastAPI error payloads.
+              try:
+                  if "detail" in json.loads(resp or "{}"):
+                      failures += 1
+              except Exception:
+                  pass
+          sys.exit(1 if failures else 0)
+          PYEOF
