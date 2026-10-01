@@ -248,14 +248,14 @@ class TestPreferencesAPI:
         result = await update_alert_preferences(
             "user1",
             AlertPreferencesUpdate(
-                domains=["security", "bogus-domain"],
+                domains=["security"],
                 channels=["email", "pigeon"],
                 min_match_score=60,
             ),
             db=mock_db,
         )
 
-        assert result.domains == ["security"]  # unknown domains dropped
+        assert result.domains == ["security"]
         assert result.channels == ["email"]  # unknown channels dropped
         assert result.min_match_score == 60
         assert result.is_enabled is True
@@ -291,6 +291,36 @@ class TestPreferencesAPI:
             db=mock_db,
         )
         assert result.min_match_score == 100
+
+    @pytest.mark.asyncio
+    async def test_update_rejects_unknown_domains(self):
+        """Prefs PUT fails loudly on domain keys that would match nothing.
+
+        Regression guard: ``cloud`` is not a classifier bucket, so a saved
+        ``cloud`` domain generated zero searches and zero matches while the
+        profile looked perfectly configured.
+        """
+        from fastapi import HTTPException
+
+        from interntrack.api.schemas.notification import AlertPreferencesUpdate
+        from interntrack.api.v1.notifications import update_alert_preferences
+
+        mock_db = _db_with_row(None)
+        with pytest.raises(HTTPException) as excinfo:
+            await update_alert_preferences(
+                "user1",
+                AlertPreferencesUpdate(domains=["security", "cloud"]),
+                db=mock_db,
+            )
+        assert excinfo.value.status_code == 422
+        assert "cloud" in excinfo.value.detail
+        # Valid keys still pass the guard.
+        result = await update_alert_preferences(
+            "user1",
+            AlertPreferencesUpdate(domains=["security", "grc"]),
+            db=mock_db,
+        )
+        assert result.domains == ["security", "grc"]
 
     @pytest.mark.asyncio
     async def test_update_saves_slot_domains_and_weekly_enabled(self):

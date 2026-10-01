@@ -249,6 +249,23 @@ class TestDiscoveryQueries:
         assert len(queries) == 4
         assert all("Bangalore" in q for q in queries)
 
+    def test_thin_domain_members_get_deeper_discovery(self):
+        """Thin-market members (frontend/grc/govt/hardware/design) run extra
+        queries at the production default so their niche searches surface
+        before the day rotation buries them — frontend went 4+ days silent
+        at the old uniform depth."""
+        from interntrack.scheduler.jobs import _discovery_depth
+
+        thin = {"domains": ["frontend"]}
+        mixed = {"domains": ["frontend", "coding"]}
+        empty = {"domains": []}
+        # Production default 6 -> 8 for thin-domain members only.
+        assert _discovery_depth(thin, 6) == 8
+        assert _discovery_depth(mixed, 6) == 6
+        assert _discovery_depth(empty, 6) == 6
+        # Explicit larger limits pass through untouched (no clamping down).
+        assert _discovery_depth(thin, 30) == 30
+
     def test_location_extraction_from_query(self):
         """Discovery queries like 'cybersecurity bangalore' resolve the city."""
         from interntrack.api.v1.jobs import _extract_location_from_query

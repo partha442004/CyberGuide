@@ -2312,6 +2312,16 @@ def show_team() -> None:
             else:
                 badge = "⚪ never sent"
             paused = " ⏸ paused" if m.get("paused") else ""
+            # Processing status: "last sent" alone cannot distinguish a
+            # quiet day (no fresh matches for their domains) from the
+            # pipeline skipping the member entirely. The processed clock
+            # advances every slot even without a delivery.
+            quiet_h = m.get("quiet_streak_hours")
+            proc_flag = (
+                " 🚨 NOT processed 48h+"
+                if isinstance(quiet_h, (int, float)) and quiet_h >= 48
+                else ""
+            )
             st.markdown(
                 f"**{escape(m.get('name') or '—')}** "
                 f"<span style='opacity:0.6'>{escape(m.get('email') or '')}</span>",
@@ -2319,6 +2329,7 @@ def show_team() -> None:
             )
             st.caption(
                 f"{badge}{paused} · 🕒 last: {m.get('last_alert_at') or '—'} · "
+                f"⚙️ processed: {m.get('last_processed_at') or '—'}{proc_flag} · "
                 f"💼 {m.get('last_job_count') or 0} job(s) · "
                 f"📍 {escape(m.get('location') or '—')} · "
                 f"🏷 {escape(', '.join(m.get('domains') or []) or 'All')}"

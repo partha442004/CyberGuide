@@ -80,6 +80,8 @@ class TestTeamRecapStats:
                         _user("u2", "Jeeva", email="jeeva@x.com", domains=["hardware"]),
                     ]
                 ),
+                # 2nd query: AlertPreferences quiet-member check
+                _FakeResult([]),
                 _FakeResult(
                     [
                         _history(
@@ -155,6 +157,8 @@ class TestTeamRecapStats:
         session.execute = AsyncMock(
             side_effect=[
                 _FakeResult([_user("u1", "Jeeva", email="jeeva@x.com")]),
+                # 2nd query: AlertPreferences quiet-member check
+                _FakeResult([]),
                 _FakeResult(
                     [
                         _history("u1", 1, job_count=3),
@@ -182,6 +186,8 @@ class TestTeamRecapStats:
         session.execute = AsyncMock(
             side_effect=[
                 _FakeResult([_user("u1", "Boss", email="boss@x.com")]),
+                # 2nd query: AlertPreferences quiet-member check
+                _FakeResult([]),
                 _FakeResult([_history("u1", 1, job_count=1)]),
                 _FakeResult([]),
                 # (source, count) rows from the jobs-table aggregation.
@@ -198,6 +204,39 @@ class TestTeamRecapStats:
         # Never raises: a failed source query degrades to no sources line.
         session.execute = AsyncMock(side_effect=RuntimeError("db down"))
         assert (await team_recap_stats(session, days=7))["users"] == []
+
+    @pytest.mark.asyncio
+    async def test_flags_members_not_processed_for_48h(self):
+        """A frozen no-duplicates clock is surfaced as quiet_members.
+
+        The 48h prefs clock means the pipeline stopped PROCESSING the member
+        (budget exhaustion / broken prefs) — distinct from a quiet day.
+        """
+        from datetime import datetime, timedelta
+
+        from interntrack.scheduler.jobs import team_recap_stats
+
+        stale = datetime.utcnow() - timedelta(hours=73)
+        fresh = datetime.utcnow() - timedelta(hours=2)
+        session = AsyncMock()
+        session.execute = AsyncMock(
+            side_effect=[
+                _FakeResult([_user("u1", "Skar"), _user("u2", "Fresh")]),
+                # Prefs rows: u1 frozen 73h ago, u2 processed 2h ago.
+                _FakeResult([("u1", stale), ("u2", fresh)]),
+                _FakeResult([]),
+                _FakeResult([]),
+                _FakeResult([]),
+            ]
+        )
+
+        stats = await team_recap_stats(session, days=7)
+
+        quiet = {q["user_id"]: q for q in stats["quiet_members"]}
+        assert "u1" in quiet
+        assert quiet["u1"]["hours"] is not None and quiet["u1"]["hours"] >= 48
+        assert quiet["u1"]["name"] == "Skar"
+        assert "u2" not in quiet
 
     @pytest.mark.asyncio
     async def test_never_raises_on_bad_session(self):
@@ -219,6 +258,8 @@ class TestTeamRecapStats:
         session.execute = AsyncMock(
             side_effect=[
                 _FakeResult([_user("u1", "Boss")]),
+                # 2nd query: AlertPreferences quiet-member check
+                _FakeResult([]),
                 _FakeResult([_history("u1", 1, job_count=2)]),
                 _FakeResult([]),
                 _FakeResult([]),
@@ -802,6 +843,29 @@ class TestDailyOwnerSummary:
         assert "Newbie</b> — no digest sent today" in html
         assert "too narrow" in html
 
+    def test_build_html_flags_frozen_members(self):
+        """The owner summary shows a red block for members the pipeline
+        stopped processing — the "silence is invisible" fix."""
+        from interntrack.scheduler.jobs import _build_daily_summary_html
+
+        html = _build_daily_summary_html(
+            {
+                "total_jobs": 0,
+                "total_sends": 0,
+                "total_opened": 0,
+                "total_email_applied": 0,
+                "users": [],
+                "quiet_members": [
+                    {"user_id": "u1", "name": "Skar", "hours": 72.5},
+                    {"user_id": "u2", "name": "New", "hours": None},
+                ],
+            }
+        )
+        assert "Not processed for 48h+" in html
+        assert "Skar" in html
+        assert "72.5h without processing" in html
+        assert "never processed" in html
+
     @pytest.mark.asyncio
     async def test_skips_when_email_not_configured(self, monkeypatch):
         from interntrack.scheduler import jobs as jobs_mod
@@ -1041,6 +1105,10 @@ class TestDeliveryOverview:
         assert member["last_job_count"] == 5
         assert member["last_email_ok"] is True
         assert member["last_alert_at"] is not None
+        # Processing-status fields exist and degrade gracefully when the
+        # prefs query is unavailable (legacy fake DBs).
+        assert "last_processed_at" in member
+        assert "quiet_streak_hours" in member
 
     @pytest.mark.asyncio
     async def test_never_sent_when_no_history(self, monkeypatch):

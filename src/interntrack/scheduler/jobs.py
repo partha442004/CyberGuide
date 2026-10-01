@@ -362,6 +362,52 @@ async def team_recap_stats(session, days: int = 7) -> dict:
 
         users_result = await session.execute(select(User))
         users = list(users_result.scalars().all())
+
+        # Members whose no-duplicates clock has not advanced in 48h+ — the
+        # digest pipeline stopped PROCESSING them (budget exhaustion, a
+        # paused flag nobody noticed, a broken prefs row). This is a real
+        # fault signal, unlike "no delivered email" which legitimately
+        # happens whenever a member's domains have no fresh matches.
+        quiet_members: list[dict] = []
+        try:
+            from interntrack.domain.models import (
+                AlertPreferences as AlertPrefsModel,
+            )
+
+            pref_rows = await session.execute(
+                select(AlertPrefsModel.user_id, AlertPrefsModel.last_alert_at).where(
+                    AlertPrefsModel.is_enabled.is_(True)
+                )
+            )
+            user_names: dict[str, str] = {
+                str(getattr(u, "id", "") or ""): str(getattr(u, "name", "") or "")
+                for u in users
+            }
+            now_naive = datetime.now(UTC).replace(tzinfo=None)
+            for uid, stamp in pref_rows.all():
+                uid = str(uid or "")
+                if not uid or stamp is None:
+                    quiet_members.append(
+                        {
+                            "user_id": uid,
+                            "name": user_names.get(uid, uid),
+                            "hours": None,
+                        }
+                    )
+                    continue
+                if getattr(stamp, "tzinfo", None) is not None:
+                    stamp = stamp.replace(tzinfo=None)
+                hours = (now_naive - stamp).total_seconds() / 3600
+                if hours >= 48:
+                    quiet_members.append(
+                        {
+                            "user_id": uid,
+                            "name": user_names.get(uid, uid),
+                            "hours": round(hours, 1),
+                        }
+                    )
+        except Exception:  # noqa: BLE001 - never break the recap over a check
+            quiet_members = []
         hist_result = await session.execute(select(NotificationHistory))
         rows = list(hist_result.scalars().all())
 
@@ -469,6 +515,7 @@ async def team_recap_stats(session, days: int = 7) -> dict:
             "total_email_applied": sum(email_applied.values()),
             "sources": sources,
             "users": out,
+            "quiet_members": quiet_members,
         }
     except Exception:  # noqa: BLE001 - a recap must never break the worker
         return {
@@ -850,6 +897,29 @@ def _build_daily_summary_html(stats: dict) -> str:
             )
         elif not sends:
             attention.append(f"<li><b>{name}</b> — no digest sent today</li>")
+    # Silence alarm: members the pipeline stopped PROCESSING (not the same
+    # as a quiet day). Their no-duplicates clock is frozen 48h+ — budget
+    # exhaustion or a broken prefs row — and no self-heal path fixes it,
+    # so it must be visible to the owner directly.
+    silence_html = ""
+    for q in stats.get("quiet_members") or []:
+        name = escape(str(q.get("name") or q.get("user_id") or "?"))
+        hours = q.get("hours")
+        detail = "never processed" if hours is None else f"{hours}h without processing"
+        silence_html += f"<li><b>{name}</b> — {escape(detail)}</li>"
+    if silence_html:
+        silence_html = (
+            "<div style='background:#fef2f2;border:1px solid #fecaca;"
+            "border-radius:10px;padding:10px 14px;margin-top:14px;'>"
+            "<p style='margin:0 0 4px;color:#b91c1c;font-weight:700;'>"
+            "🚨 Not processed for 48h+</p>"
+            "<ul style='margin:0;padding-left:18px;color:#7f1d1d;"
+            "font-size:13px;'>" + silence_html + "</ul>"
+            "<p style='margin:6px 0 0;color:#b91c1c;font-size:12px;'>"
+            "These members' digest windows are frozen — the pipeline is "
+            "skipping them entirely (not a quiet day). Check the delivery "
+            "overview and the digest budget.</p></div>"
+        )
     attention_html = ""
     if attention:
         attention_html = (
@@ -884,6 +954,7 @@ def _build_daily_summary_html(stats: dict) -> str:
         + "".join(rows)
         + "</table>"
         + sources_line
+        + silence_html
         + attention_html
         + failed_line
         + "<p style='color:#94a3b8;font-size:12px;'>Automatic daily summary — "
@@ -935,11 +1006,14 @@ async def send_daily_owner_summary() -> dict:
             if not stats.get("users") or not stats.get("total_sends"):
                 return {"sent": False, "reason": "nothing sent in window"}
 
+            frozen = len(stats.get("quiet_members") or [])
             subject = (
                 f"📊 Today's delivery — {stats['total_jobs']} jobs, "
                 f"{stats['total_opened']} opened, "
                 f"{stats['total_email_applied']} applied"
             )
+            if frozen:
+                subject = f"🚨 {frozen} member(s) not processed — {subject}"
             channel = _owner_email_channel(settings, owner_email)
             await channel.send(
                 _build_daily_summary_html(stats),
@@ -1844,6 +1918,47 @@ async def send_interview_reminders() -> dict:
     """Scheduled wrapper: run the interview-reminder sweep on its own session."""
     async with get_db_session() as session:
         return await _send_interview_reminders(session)
+
+
+async def compute_last_processed(
+    session,
+    user_id: str,
+    user_pref_processed=None,
+) -> float | None:
+    """Hours since the member was last processed (delivered or not).
+
+    Companion to the delivery clock: members are processed at every digest
+    slot even when nothing matches, and the prefs ``last_alert_at`` stamp
+    advances on those quiet passes too. Delivered mail is tracked separately
+    (NotificationHistory), so a member with no email for days is QUIET, not
+    broken, whenever this gap is small. Returns None when the member has
+    never been processed (new account before its first slot). Never raises.
+    """
+    try:
+        from interntrack.utils.helpers import utcnow
+
+        if user_pref_processed is not None:
+            stamp = user_pref_processed
+        else:
+            from sqlalchemy import select
+
+            from interntrack.domain.models import AlertPreferences
+
+            result = await session.execute(
+                select(AlertPreferences.last_alert_at).where(
+                    AlertPreferences.user_id == user_id
+                )
+            )
+            stamp = result.scalar_one_or_none()
+        if stamp is None:
+            return None
+        if getattr(stamp, "tzinfo", None) is None:
+            from interntrack.utils.helpers import to_naive_utc
+
+            stamp = to_naive_utc(stamp)
+        return round((utcnow() - stamp).total_seconds() / 3600, 1)
+    except Exception:  # noqa: BLE001 - status fields must never break the API
+        return None
 
 
 async def _enabled_alert_targets(session) -> list[dict]:
@@ -5434,13 +5549,38 @@ def _fresher_only(prefs: dict) -> bool:
     return levels.issubset({"entry", "junior", "intern", "fresher"})
 
 
+# Domains whose job market is thin on the boards we scrape: their members
+# historically got zero matches for days (frontend went 4+ days silent) not
+# because jobs do not exist but because every member runs only ``limit``
+# queries a day and these domains' niche searches rotate too slowly. The
+# per-user discovery depth is raised for members whose domains are ALL thin,
+# so the pipeline spends its query budget where the scarcity is.
+_THIN_DOMAINS = frozenset({"frontend", "grc", "govt", "hardware", "design"})
+
+
+def _discovery_depth(prefs: dict, default: int) -> int:
+    """Per-member query count: thin-domain-only members get deeper discovery.
+
+    Only ever RAISES the depth (and only for the production default of 6 —
+    explicit larger limits pass through untouched), so callers that ask for
+    a specific count keep getting exactly that.
+    """
+    domains = {str(d).strip().lower() for d in (prefs.get("domains") or []) if d}
+    if not domains or default >= 8:
+        return default
+    if domains.issubset(_THIN_DOMAINS):
+        return min(default + 2, 8)
+    return default
+
+
 def discovery_queries_for(prefs: dict, user=None, limit: int = 4) -> list[str]:
     """Search queries matching a user's alert domains + resume skills.
 
     Domain keywords produce the bulk of the queries; up to three skills from
     the user's profile are appended as ``<skill> intern`` searches so niche
     roles (e.g. VAPT, Burp Suite) get discovered too. Deduplicated and
-    capped at ``limit``.
+    capped at ``limit``. Production callers pass
+    ``_discovery_depth(prefs, limit)`` so thin-market members run deeper.
     """
     domains = prefs.get("domains") or []
     queries: list[str] = []

@@ -24,7 +24,7 @@ from interntrack.api.schemas.user import (
     UserResponse,
     UserUpdate,
 )
-from interntrack.api.v1.notifications import _normalize_domains
+from interntrack.api.v1.notifications import _normalize_domains, reject_unknown_domains
 from interntrack.config import get_settings
 from interntrack.database.session import get_db
 from interntrack.domain.models import AlertPreferences, User
@@ -157,6 +157,10 @@ async def register_user(
             detail=f"experience_level must be one of {', '.join(_EXPERIENCE_LEVELS)}",
         )
 
+    # Fail loudly on domains that would silently match nothing, instead of
+    # saving a profile that looks configured but never feeds the digest.
+    reject_unknown_domains(payload.domains)
+
     user = User(
         name=payload.name,
         email=payload.email,
@@ -182,12 +186,30 @@ async def register_user(
         ) from None
 
     # Auto-enable personalized alerts with the chosen domains + channels.
+    # experience_levels is seeded straight from the registration form (the
+    # User model only has the single legacy experience_level string): entry-
+    # level vocabulary maps to the fresher-friendly filter set, so a new
+    # member's digest gate works from their very first send without needing
+    # a second API call after signup.
+    seeded_levels: list[str] = []
+    if experience:
+        seeded_levels = (
+            ["entry", "junior"]
+            if experience
+            in (
+                "fresher",
+                "intern",
+                "junior",
+            )
+            else [experience]
+        )
     db.add(
         AlertPreferences(
             user_id=user.id,
             domains=_normalize_domains(payload.domains),
             channels=_member_default_channels(),
             is_enabled=True,
+            experience_levels=seeded_levels,
         )
     )
     await db.commit()
@@ -413,6 +435,9 @@ async def update_user(
             )
         user.experience_level = update.experience_level  # type: ignore[assignment]
     if update.domains is not None:
+        # Same no-silent-drop rule as registration: an unknown key here
+        # would save a profile that looks configured but matches nothing.
+        reject_unknown_domains(update.domains)
         user.domains = _normalize_domains(update.domains)  # type: ignore[assignment]
     if update.skills is not None:
         user.skills = [  # type: ignore[assignment]

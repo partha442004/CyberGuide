@@ -94,8 +94,13 @@ class TestRegisterUser:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_register_unknown_domains_dropped(self, client):
-        """Unknown domain keys are filtered out of the saved profile."""
+    async def test_register_unknown_domains_rejected(self, client):
+        """Unknown domain keys fail loudly instead of being silently dropped.
+
+        Regression guard: a member who registered with ``cloud`` (not a real
+        classifier bucket) ran for months with a domain that generated zero
+        searches and matched zero jobs — nobody ever saw the typo.
+        """
         response = await client.post(
             "/api/v1/users/register",
             json={
@@ -104,8 +109,31 @@ class TestRegisterUser:
                 "domains": ["security", "quantum-computing"],
             },
         )
+        assert response.status_code == 422
+        assert "quantum-computing" in response.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_register_seeds_experience_levels_into_prefs(self, client):
+        """Fresher-style signup seeds prefs experience_levels in one call.
+
+        The digest experience gate reads AlertPreferences.experience_levels;
+        it used to stay empty until a second guarded API call after signup,
+        so new members' first digests were not fresher-filtered.
+        """
+        response = await client.post(
+            "/api/v1/users/register",
+            json={
+                "name": "Fresher Fred",
+                "email": "fred@example.com",
+                "experience_level": "fresher",
+                "domains": ["security"],
+            },
+        )
         assert response.status_code == 201
-        assert response.json()["domains"] == ["security"]
+        uid = response.json()["id"]
+        prefs = await client.get(f"/api/v1/notifications/preferences/{uid}")
+        assert prefs.status_code == 200
+        assert prefs.json()["experience_levels"] == ["entry", "junior"]
 
     @pytest.mark.asyncio
     async def test_register_invalid_experience_level(self, client):
@@ -405,6 +433,24 @@ class TestUserProfile:
         assert data["domains"] == ["coding", "security"]
         assert data["skills"] == ["react", "go"]
         assert data["telegram_chat_id"] == "987"
+
+    @pytest.mark.asyncio
+    async def test_update_user_unknown_domains_rejected(self, client):
+        """PUT /users/{id} rejects domain keys that would match nothing."""
+        user = await self._register(client)
+        response = await client.put(
+            f"/api/v1/users/{user['id']}",
+            json={"domains": ["coding", "cloud"]},
+        )
+        assert response.status_code == 422
+        assert "cloud" in response.json()["detail"]
+        # Valid domains still save fine.
+        ok = await client.put(
+            f"/api/v1/users/{user['id']}",
+            json={"domains": ["coding", "security"]},
+        )
+        assert ok.status_code == 200
+        assert ok.json()["domains"] == ["coding", "security"]
 
     @pytest.mark.asyncio
     async def test_list_users(self, client):

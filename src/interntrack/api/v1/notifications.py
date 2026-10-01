@@ -2,7 +2,7 @@
 Notifications API endpoints.
 """
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from interntrack.api.deps import require_cron_secret
@@ -56,6 +56,29 @@ def _normalize_domains(domains: list[str] | None) -> list[str]:
     if not domains:
         return []
     return [d for d in domains if d in _ALERT_DOMAINS]
+
+
+def reject_unknown_domains(domains: list[str] | None, context: str = "domains") -> None:
+    """Raise 422 when ``domains`` contains keys the system will never match.
+
+    Registration and prefs updates previously SILENTLY dropped unknown keys,
+    so a member who typed ``cloud`` (not a real domain — only the compound
+    "cloud security" role classifies there) ran for months with a saved
+    domain that generated zero searches and matched zero jobs. Fail loudly
+    instead: name the dropped keys and list the valid ones so the caller can
+    fix the request immediately.
+    """
+    if not domains:
+        return
+    dropped = [str(d) for d in domains if str(d) not in _ALERT_DOMAINS]
+    if dropped:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Unknown {context}: {', '.join(dropped)}. Valid domains: "
+                f"{', '.join(_ALERT_DOMAINS)}"
+            ),
+        )
 
 
 @router.get("/channels", response_model=NotificationChannelsResponse)
@@ -628,6 +651,11 @@ async def update_alert_preferences(
         pref = AlertPrefModel(user_id=user_id, is_enabled=True)
         db.add(pref)
 
+    # Fail loudly on domains that would silently match nothing (e.g. a
+    # ``cloud`` key that is not a real classifier bucket — it once sat on a
+    # member's profile for months generating zero searches).
+    reject_unknown_domains(update.domains)
+
     if update.domains is not None:
         pref.domains = _normalize_domains(update.domains)  # type: ignore[assignment]
     if update.channels is not None:
@@ -835,10 +863,31 @@ async def delivery_overview(db: AsyncSession = Depends(get_db)):
     """
     from sqlalchemy import select
 
-    from interntrack.domain.models import NotificationHistory
-    from interntrack.scheduler.jobs import _alerts_paused, _enabled_alert_targets
+    from interntrack.domain.models import AlertPreferences, NotificationHistory
+    from interntrack.scheduler.jobs import (
+        _alerts_paused,
+        _enabled_alert_targets,
+        compute_last_processed,
+    )
 
     targets = await _enabled_alert_targets(db)
+    # The no-duplicates clock per member: this advances EVERY slot the
+    # member is processed, even on a quiet day with zero matching jobs (the
+    # digest path stamps it so the same window is not re-evaluated forever).
+    # Overview consumers compare it against ``last_alert_at`` — a member
+    # processed recently but never delivered is quiet, not broken.
+    last_processed: dict[str, object] = {}
+    try:
+        processed_result = await db.execute(
+            select(AlertPreferences.user_id, AlertPreferences.last_alert_at).where(
+                AlertPreferences.is_enabled.is_(True)
+            )
+        )
+        last_processed = {
+            str(uid): stamp for uid, stamp in processed_result.all() if uid
+        }
+    except Exception:  # noqa: BLE001 - overview must never 500 over status
+        last_processed = {}
     hist_rows = list(
         (
             await db.execute(
@@ -881,6 +930,19 @@ async def delivery_overview(db: AsyncSession = Depends(get_db)):
                     last_row.created_at.isoformat()
                     if last_row and last_row.created_at
                     else None
+                ),
+                # When the digest pipeline last processed this member (any
+                # slot, delivered or not) plus the quiet-streak length in
+                # hours. ``processed_hours_ago`` > 6 means the pipeline is
+                # MISSING this member; a large ``quiet_streak_hours`` with a
+                # recent ``processed_at`` just means no fresh matches.
+                "last_processed_at": (
+                    last_processed[uid].isoformat()
+                    if last_processed.get(uid) is not None
+                    else None
+                ),
+                "quiet_streak_hours": await compute_last_processed(
+                    db, uid, user_pref_processed=last_processed.get(uid)
                 ),
                 "last_job_count": (last_row.job_count or 0) if last_row else 0,
                 "last_email_ok": bool(results.get("email")) if last_row else None,

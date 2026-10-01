@@ -1046,6 +1046,7 @@ async def run_discovery_for_users(
     """
     from interntrack.scheduler.jobs import (
         DEFAULT_LOCATION,
+        _discovery_depth,
         _enabled_alert_targets,
         discovery_queries_for,
     )
@@ -1067,7 +1068,10 @@ async def run_discovery_for_users(
         for q in discovery_queries_for(
             target["prefs"],
             target["user"],
-            limit=limit,
+            # Thin-market members (frontend / grc / govt / hardware) get two
+            # extra queries so their niche searches surface before the day
+            # rotation buries them — see _discovery_depth.
+            limit=_discovery_depth(target["prefs"], limit),
         ):
             # Each located query carries its own city; pass that single city
             # (not the full comma-list) to the India scrapers so they
