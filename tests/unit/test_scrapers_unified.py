@@ -99,6 +99,11 @@ class TestMatchesQuery:
         assert matches_query("Penetration Tester", "cybersecurity")
         assert matches_query("Application Security Engineer", "vapt")
         assert matches_query("Incident Response Consultant", "infosec")
+        assert matches_query("Purple Team Analyst", "cybersecurity")
+        assert matches_query("DRDO Cyber Security Apprentice", "cybersecurity")
+        # Bare org names are found by the dedicated "drdo" query (title
+        # match), not by family expansion:
+        assert matches_query("DRDO Apprentice", "drdo")
 
     def test_word_boundary_no_social_false_positive(self):
         """'soc' must not match 'social media'."""

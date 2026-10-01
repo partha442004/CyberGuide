@@ -51,6 +51,12 @@ _DOMAIN_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "incident responder",
             "red team",
             "blue team",
+            "purple team",
+            # Government cyber employers: DRDO / CERT-In postings name the
+            # org, not always the role, so the org token claims them for the
+            # security bucket ("goat cybersecurity" would be lost to "other").
+            "drdo",
+            "cert-in",
             "ethical hack",
             "information security",
             # grc / compliance / nist / risk now classify as "grc" (the grc

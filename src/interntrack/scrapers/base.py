@@ -81,6 +81,7 @@ SECURITY_KEYWORDS = (
     "intrusion",
     "red team",
     "blue team",
+    "purple team",
     "appsec",
     "devsecops",
     "siem",

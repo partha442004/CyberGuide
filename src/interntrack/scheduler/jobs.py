@@ -5174,6 +5174,13 @@ DOMAIN_QUERIES = {
         "incident response",
         "devsecops",
         "blue team",
+        "red team",
+        "purple team",
+        # Government cyber employers: DRDO/CERT-In recruitment + apprentice
+        # postings name the org, so single-token queries are the only way
+        # sarkari-feed titles match (AND queries need every word present).
+        "drdo",
+        "cert-in",
         "cybersecurity bangalore",
         "soc analyst bangalore",
         "security analyst bangalore",

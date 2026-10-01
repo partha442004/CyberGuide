@@ -357,6 +357,19 @@ class TestClassifyDomain:
         assert classify_domain("DevSecOps Engineer", []) == "security"
         assert classify_domain("Information Security Manager") == "security"
 
+    def test_team_and_govt_cyber_tokens(self):
+        """Purple-team roles and DRDO / CERT-In govt cyber postings classify
+        as security (org-named recruitment would otherwise fall to other)."""
+        from interntrack.services.report_service import classify_domain
+
+        for title in (
+            "Purple Team Analyst",
+            "Purple Team Exercise Specialist",
+            "DRDO Apprentice - Cyber Security",
+            "CERT-In Internship 2026",
+        ):
+            assert classify_domain(title, []) == "security"
+
     def test_govt_domain(self):
         """Sarkari / govt / PSU / railway titles classify as govt."""
         from interntrack.services.report_service import classify_domain
