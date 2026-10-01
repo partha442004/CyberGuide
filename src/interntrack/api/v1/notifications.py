@@ -2,8 +2,13 @@
 Notifications API endpoints.
 """
 
+from typing import TYPE_CHECKING, cast
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 from interntrack.api.deps import require_cron_secret
 from interntrack.api.schemas.notification import (
@@ -937,7 +942,7 @@ async def delivery_overview(db: AsyncSession = Depends(get_db)):
                 # MISSING this member; a large ``quiet_streak_hours`` with a
                 # recent ``processed_at`` just means no fresh matches.
                 "last_processed_at": (
-                    last_processed[uid].isoformat()
+                    cast("datetime", last_processed[uid]).isoformat()
                     if last_processed.get(uid) is not None
                     else None
                 ),

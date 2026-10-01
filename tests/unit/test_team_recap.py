@@ -212,12 +212,12 @@ class TestTeamRecapStats:
         The 48h prefs clock means the pipeline stopped PROCESSING the member
         (budget exhaustion / broken prefs) — distinct from a quiet day.
         """
-        from datetime import datetime, timedelta
+        from datetime import UTC, datetime, timedelta
 
         from interntrack.scheduler.jobs import team_recap_stats
 
-        stale = datetime.utcnow() - timedelta(hours=73)
-        fresh = datetime.utcnow() - timedelta(hours=2)
+        stale = datetime.now(UTC) - timedelta(hours=73)
+        fresh = datetime.now(UTC) - timedelta(hours=2)
         session = AsyncMock()
         session.execute = AsyncMock(
             side_effect=[
@@ -234,7 +234,8 @@ class TestTeamRecapStats:
 
         quiet = {q["user_id"]: q for q in stats["quiet_members"]}
         assert "u1" in quiet
-        assert quiet["u1"]["hours"] is not None and quiet["u1"]["hours"] >= 48
+        assert quiet["u1"]["hours"] is not None
+        assert quiet["u1"]["hours"] >= 48
         assert quiet["u1"]["name"] == "Skar"
         assert "u2" not in quiet
 

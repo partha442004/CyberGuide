@@ -1956,7 +1956,7 @@ async def compute_last_processed(
             from interntrack.utils.helpers import to_naive_utc
 
             stamp = to_naive_utc(stamp)
-        return round((utcnow() - stamp).total_seconds() / 3600, 1)
+        return float(round((utcnow() - stamp).total_seconds() / 3600, 1))
     except Exception:  # noqa: BLE001 - status fields must never break the API
         return None
 
