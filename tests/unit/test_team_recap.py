@@ -407,6 +407,7 @@ class TestSendTeamRecap:
             email_from = "InternTrack <noreply@test>"
             team_owner_email = owner_email
             team_recap_enabled = True
+            quiet_threshold_hours = 48
 
             @property
             def is_email_configured(self):
@@ -749,6 +750,7 @@ class TestDailyOwnerSummary:
             smtp_password = "pw"
             email_from = "InternTrack <noreply@test>"
             team_owner_email = ""
+            quiet_threshold_hours = 48
 
             @property
             def is_email_configured(self):

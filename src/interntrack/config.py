@@ -127,6 +127,13 @@ class Settings(BaseSettings):
     # users, not a team, and must not receive summaries of other users'
     # activity. Turn on only for an explicit owner-dashboard use case.
     team_recap_enabled: bool = False
+    #
+    # Hours since a member's no-duplicates clock was last advanced before the
+    # pipeline is considered stuck on them (budget exhaustion, broken prefs).
+    # Surfacing this in the daily recap lets the owner notice silent stalls
+    # without digging into logs. Tunnable per-environment; 48h covers a full
+    # weekend so a Friday-Sunday gap doesn't false-positive.
+    quiet_threshold_hours: int = 48
 
     # Scraper Settings
     scrape_interval_minutes: int = 30

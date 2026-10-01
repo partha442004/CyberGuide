@@ -344,6 +344,9 @@ async def team_recap_stats(session, days: int = 7) -> dict:
     page recap panel.
     """
     try:
+        from interntrack.config import get_settings
+
+        quiet_threshold = get_settings().quiet_threshold_hours
         from collections import Counter
 
         from sqlalchemy import func, select
@@ -362,12 +365,12 @@ async def team_recap_stats(session, days: int = 7) -> dict:
 
         users_result = await session.execute(select(User))
         users = list(users_result.scalars().all())
-
-        # Members whose no-duplicates clock has not advanced in 48h+ — the
-        # digest pipeline stopped PROCESSING them (budget exhaustion, a
-        # paused flag nobody noticed, a broken prefs row). This is a real
-        # fault signal, unlike "no delivered email" which legitimately
-        # happens whenever a member's domains have no fresh matches.
+        # Members whose no-duplicates clock has not advanced in
+        # quiet_threshold hours+ — the digest pipeline stopped PROCESSING
+        # them (budget exhaustion, a paused flag nobody noticed, a broken
+        # prefs row). This is a real fault signal, unlike "no delivered
+        # email" which legitimately happens whenever a member's domains
+        # have no fresh matches.
         quiet_members: list[dict] = []
         try:
             from interntrack.domain.models import (
@@ -398,7 +401,7 @@ async def team_recap_stats(session, days: int = 7) -> dict:
                 if getattr(stamp, "tzinfo", None) is not None:
                     stamp = stamp.replace(tzinfo=None)
                 hours = (now_naive - stamp).total_seconds() / 3600
-                if hours >= 48:
+                if hours >= quiet_threshold:
                     quiet_members.append(
                         {
                             "user_id": uid,
@@ -898,9 +901,12 @@ def _build_daily_summary_html(stats: dict) -> str:
         elif not sends:
             attention.append(f"<li><b>{name}</b> — no digest sent today</li>")
     # Silence alarm: members the pipeline stopped PROCESSING (not the same
-    # as a quiet day). Their no-duplicates clock is frozen 48h+ — budget
-    # exhaustion or a broken prefs row — and no self-heal path fixes it,
-    # so it must be visible to the owner directly.
+    # as a quiet day). Their no-duplicates clock is frozen quiet_threshold
+    # hours+ — budget exhaustion or a broken prefs row — and no self-heal
+    # path fixes it, so it must be visible to the owner directly.
+    from interntrack.config import get_settings
+
+    silence_threshold = get_settings().quiet_threshold_hours
     silence_html = ""
     for q in stats.get("quiet_members") or []:
         name = escape(str(q.get("name") or q.get("user_id") or "?"))
@@ -912,7 +918,7 @@ def _build_daily_summary_html(stats: dict) -> str:
             "<div style='background:#fef2f2;border:1px solid #fecaca;"
             "border-radius:10px;padding:10px 14px;margin-top:14px;'>"
             "<p style='margin:0 0 4px;color:#b91c1c;font-weight:700;'>"
-            "🚨 Not processed for 48h+</p>"
+            f"🚨 Not processed for {silence_threshold}h+</p>"
             "<ul style='margin:0;padding-left:18px;color:#7f1d1d;"
             "font-size:13px;'>" + silence_html + "</ul>"
             "<p style='margin:6px 0 0;color:#b91c1c;font-size:12px;'>"

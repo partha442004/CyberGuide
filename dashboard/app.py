@@ -414,6 +414,9 @@ HEALTH_URL = _get_setting("HEALTH_URL", "https://cyberguide-api.vercel.app/healt
 # Owner-only cron secret: lets the dashboard read the cron-guarded
 # catch-up-status endpoint for the member delivery-health page.
 CRON_SECRET = _get_setting("CRON_SECRET", "")
+# Hours since a member's no-duplicates clock was last advanced before the
+# pipeline is considered stuck on them. Matches the backend setting.
+QUIET_THRESHOLD = int(_get_setting("QUIET_THRESHOLD_HOURS", "48"))
 DEFAULT_VERSION = "1.20.0"
 
 
@@ -2318,8 +2321,8 @@ def show_team() -> None:
             # advances every slot even without a delivery.
             quiet_h = m.get("quiet_streak_hours")
             proc_flag = (
-                " 🚨 NOT processed 48h+"
-                if isinstance(quiet_h, (int, float)) and quiet_h >= 48
+                f" 🚨 NOT processed {QUIET_THRESHOLD}h+"
+                if isinstance(quiet_h, (int, float)) and quiet_h >= QUIET_THRESHOLD
                 else ""
             )
             st.markdown(
