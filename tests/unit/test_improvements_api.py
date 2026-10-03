@@ -266,6 +266,25 @@ class TestDiscoveryQueries:
         # Explicit larger limits pass through untouched (no clamping down).
         assert _discovery_depth(thin, 30) == 30
 
+    def test_discovery_depth_honours_explicit_limits_below_default(self):
+        """An explicit ``?limit=N`` below the production default is verbatim.
+
+        ``run_discovery_for_users`` exposes ``limit`` as ``Query(6, ge=1, le=8)``,
+        so an operator asking for 2 queries is asking for 2 — for EVERY
+        member, thin-domain ones included. The boost is pinned to the
+        production default precisely so it cannot silently inflate a
+        deliberately small run (it used to turn limit=1 into 3 queries).
+        """
+        from interntrack.scheduler.jobs import _discovery_depth
+
+        thin = {"domains": ["grc", "frontend"]}
+        for explicit in (1, 2, 3, 4, 5, 7, 8, 12):
+            assert _discovery_depth(thin, explicit) == explicit, (
+                f"limit={explicit} must pass through verbatim"
+            )
+        # ...and the ceiling is still never exceeded at the default.
+        assert _discovery_depth(thin, 6) == 8
+
     def test_location_extraction_from_query(self):
         """Discovery queries like 'cybersecurity bangalore' resolve the city."""
         from interntrack.api.v1.jobs import _extract_location_from_query

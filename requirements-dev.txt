@@ -6,7 +6,11 @@ ruff>=0.1.0
 mypy>=1.20,<3
 pre-commit>=3.6.0
 httpx>=0.25.0
-safety>=3.8.1
+# CI runs `safety check`, which safety v3 renamed to `safety scan`. The
+# ci.yml security job installs "safety>=2.3.0,<3" — keep this floor on the
+# same major so a local `pip install -r requirements-dev.txt` reproduces the
+# gate instead of failing with "no such command: check".
+safety>=2.3.0,<3
 bandit>=1.7.0
 fakeredis[lua]>=2.38.0
 pyyaml>=6.0

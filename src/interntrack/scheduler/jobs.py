@@ -5563,19 +5563,29 @@ def _fresher_only(prefs: dict) -> bool:
 # so the pipeline spends its query budget where the scarcity is.
 _THIN_DOMAINS = frozenset({"frontend", "grc", "govt", "hardware", "design"})
 
+# The boost applies ONLY at the production default depth, so an explicit
+# ``?limit=N`` from the discovery endpoint is always honoured verbatim.
+# Mirrors run_discovery_for_users's ``limit: int = Query(6, ge=1, le=8)``.
+_THIN_DISCOVERY_BASE = 6
+_THIN_DISCOVERY_BONUS = 2
+
 
 def _discovery_depth(prefs: dict, default: int) -> int:
     """Per-member query count: thin-domain-only members get deeper discovery.
 
-    Only ever RAISES the depth (and only for the production default of 6 —
-    explicit larger limits pass through untouched), so callers that ask for
-    a specific count keep getting exactly that.
+    Raises the depth from the production default of 6 to 8 for members whose
+    domains are ALL thin-market. Every other limit — including ones BELOW 6 —
+    passes through untouched, so an operator who asks for an exact count (the
+    API exposes ``limit`` as ``ge=1, le=8``) always gets exactly that. The
+    boost is deliberately pinned to the default rather than applied to any
+    limit under the ceiling: an explicit ``limit=2`` is a request to run
+    fewer queries, not a request to run four.
     """
     domains = {str(d).strip().lower() for d in (prefs.get("domains") or []) if d}
-    if not domains or default >= 8:
+    if not domains or default != _THIN_DISCOVERY_BASE:
         return default
     if domains.issubset(_THIN_DOMAINS):
-        return min(default + 2, 8)
+        return _THIN_DISCOVERY_BASE + _THIN_DISCOVERY_BONUS
     return default
 
 
